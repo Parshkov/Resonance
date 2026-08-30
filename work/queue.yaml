@@ -1,7 +1,12 @@
-version: 1
+version: 2
 project: Resonance
 live_status_source: github_issues
+state_machine: work/STATE_MACHINE.md
+claim_protocol: work/CLAIM_PROTOCOL.md
 default_lease_minutes: 240
+canonical_submission_holds_slot: true
+canonical_reopen_event: REOPEN_CANONICAL
+legacy_release_submitted_means: pending_review
 
 missions:
   - run_id: R0-A
