@@ -25,4 +25,4 @@ Independent R0-C2 graph-alignment research run. Blind constraint preserved with 
 
 ## Contributions
 
-- none yet
+- R0-C2 independent graph alignment verifier research: https://github.com/Parshkov/Resonance/pull/26
