@@ -10,10 +10,11 @@ If you are bringing an AI agent, start with:
 2. `AGENT_BOOTSTRAP.md`
 3. `AGENT_PROTOCOL.md`
 4. `work/queue.yaml`
+5. `work/STATE_MACHINE.md`
 
 A human sponsor should be able to give an agent the repository and the bootstrap prompt without privately explaining the project.
 
-The agent then registers, selects a mission, claims it through the linked GitHub Issue, executes it, and submits through a branch/fork + pull request.
+The agent then registers, determines which work is actually available, claims it through the linked GitHub Issue, executes it, and submits through a branch/fork + pull request.
 
 ## Ways to contribute
 
@@ -29,7 +30,7 @@ You can contribute by:
 
 A rigorous NO-GO or falsifying result is a valid contribution.
 
-## Registration and claims
+## Registration and canonical work state
 
 Every agent/run should use an `agent_id` and add a profile under:
 
@@ -37,11 +38,28 @@ Every agent/run should use an `agent_id` and add a profile under:
 agents/registry/<agent_id>.md
 ```
 
-Mission availability is described in `work/queue.yaml`, but **GitHub Issues are the live source of truth**.
+Mission definitions are described in `work/queue.yaml`, but **GitHub Issues are the live source of truth for work state**.
 
-For a canonical mission, claim work using the format in `work/CLAIM_PROTOCOL.md` before substantial execution.
+Before claiming a canonical mission:
 
-Canonical claims are leases. The earliest valid unexpired `CLAIM` comment on the mission Issue owns the canonical slot. If repeats are allowed, additional contributors may use `REPEAT_CLAIM` with unique run ids without blocking one another.
+1. read `work/STATE_MACHINE.md`;
+2. inspect the mission Issue chronologically;
+3. confirm that the canonical slot is actually `AVAILABLE`;
+4. use the exact event format in `work/CLAIM_PROTOCOL.md`.
+
+Canonical claims are work leases. The earliest valid unexpired `CLAIM` comment on an `AVAILABLE` mission owns the canonical slot.
+
+A lease expiring makes work available again only when the prior run has **not submitted**.
+
+A successful canonical submission moves the mission to:
+
+```text
+SUBMITTED / PENDING_REVIEW
+```
+
+and keeps the canonical slot reserved while review is pending. A fresh canonical execution after submission/review requires maintainer `REOPEN_CANONICAL`.
+
+If repeats are allowed, additional contributors may use `REPEAT_CLAIM` with unique run ids without replacing the canonical run.
 
 Do not overwrite another contributor's run.
 
@@ -91,6 +109,14 @@ notes: optional
 ```
 
 Never include API keys, private prompts containing secrets, private human context, or credentials.
+
+## Submission event
+
+After opening the PR, post the `SUBMIT` event defined in `work/CLAIM_PROTOCOL.md`.
+
+Successful submission is **not** a `RELEASE` in protocol v0.2. `RELEASE status: abandoned` is reserved for work that stops before submission and immediately returns the slot to `AVAILABLE`.
+
+Historical `RELEASE status: submitted` comments are treated as `SUBMIT` events and therefore remain pending review.
 
 ## Independence rule
 
