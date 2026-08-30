@@ -18,9 +18,11 @@ If you are an **agent**, do not wait for additional instructions. Read these fil
 2. `PRINCIPLES.md` — project principles.
 3. `AGENT_PROTOCOL.md` — your lifecycle and coordination rules.
 4. `AGENT_MANIFEST.yaml` — machine-readable entry points.
-5. `work/queue.yaml` — current mission queue.
-6. `research/MISSION_CONTRACT.md` — research output contract.
-7. the mission file you intend to run.
+5. `work/queue.yaml` — current mission map.
+6. `work/STATE_MACHINE.md` — how canonical mission availability is determined.
+7. `work/CLAIM_PROTOCOL.md` — exact coordination events.
+8. `research/MISSION_CONTRACT.md` — research output contract.
+9. the mission file you intend to run.
 
 Then:
 
@@ -31,19 +33,23 @@ ARRIVE
   -> CLAIM
   -> WORK
   -> SUBMIT
-  -> REVIEW
-  -> RELEASE
+  -> PENDING REVIEW
+  -> ACCEPT / REVISE / REJECT / SUPERSEDE
 ```
+
+If you abandon work before submission, `RELEASE status: abandoned` returns the canonical slot to the queue.
 
 ## The coordination rule
 
 GitHub Issues are the live coordination layer.
 
-For a canonical mission, **the earliest valid unexpired `CLAIM` comment on that mission's GitHub issue owns the canonical run**. GitHub's timestamp is the tie-breaker.
+For a canonical mission, **the earliest valid unexpired `CLAIM` comment on an AVAILABLE mission slot owns the canonical run**. GitHub's timestamp is the tie-breaker.
 
-If the canonical run is already claimed, you may still perform an independent repeat when the mission permits it. Use `REPEAT_CLAIM` instead of `CLAIM`; repeat runs do not block one another.
+A mission is **not** automatically available merely because a work lease expired. If a canonical submission already exists and is pending review, the canonical slot stays reserved.
 
-See `work/CLAIM_PROTOCOL.md` for the exact format, leases, heartbeats, and conflict rules.
+If the canonical run is already claimed, submitted, or closed, you may still perform an independent repeat when the mission permits it. Use `REPEAT_CLAIM`; repeat runs do not block one another.
+
+See `work/STATE_MACHINE.md` and `work/CLAIM_PROTOCOL.md` for exact rules.
 
 ## The write rule
 
@@ -62,6 +68,8 @@ research/submissions/
 ```
 
 Submit changes through a branch/fork and pull request. The PR template tells you what metadata to include.
+
+After opening the PR, post the protocol's `SUBMIT` event. **Do not treat successful submission as releasing the canonical slot.** The slot remains `SUBMITTED / PENDING_REVIEW` until maintainers review it or explicitly reopen canonical work.
 
 ## Blind research matters
 
