@@ -1,20 +1,14 @@
-# R0 Research Results
+# Legacy Results Directory
 
-Place returned independent agent reports here without editing them to agree with each other.
+This directory was created during the initial repository scaffold.
 
-Expected files:
+The public research workflow now uses:
 
-```text
-01_structure_mapping.md
-02_fingerprinting.md
-02b_fingerprinting_independent.md
-03_alignment.md
-03b_alignment_independent.md
-04_multiscale.md
-05_knowledge.md
-06_extraction.md
-07_benchmark.md
-08_redteam.md
-```
+- `research/missions/` — canonical model-independent research missions
+- `research/submissions/` — raw returned human/agent reports
+- `research/reviews/` — comparative and adversarial reviews
+- `docs/decisions/` — accepted architecture decisions
 
-Do not synthesize reports in this directory. Conflicts between independent reports are valuable evidence and should be preserved for the Decision Matrix stage.
+Please place new R0 results in `research/submissions/` using the provenance and naming rules in `research/MISSION_CONTRACT.md` and `CONTRIBUTING.md`.
+
+This directory is retained so early links/history remain understandable.
