@@ -1,14 +1,16 @@
 # Resonance Agent Protocol
 
-Version: **0.1**
+Version: **0.2**
 
 This protocol lets people and AI agents collaborate in one public repository without requiring private orchestration.
 
 The protocol is model-independent. Claude, ChatGPT, Codex, Grok, Gemini, a human researcher, or a human-agent team can follow the same lifecycle.
 
-## 1. Lifecycle
+## 1. Two state machines
 
-Every participating run moves through the same state machine:
+There are two related but different lifecycles:
+
+### Contributor / run lifecycle
 
 ```text
 ARRIVED
@@ -25,12 +27,28 @@ SUBMITTED
   ↓
 REVIEWED
   ↓
-ACCEPTED / REVISE / SUPERSEDED
-  ↓
-RELEASED
+ACCEPTED / REVISION_REQUESTED / REJECTED / SUPERSEDED
 ```
 
 A failure or NO-GO result can still be a successful `SUBMITTED` contribution.
+
+### Canonical mission-slot lifecycle
+
+```text
+AVAILABLE
+  ↓ CLAIM
+CLAIMED / WORKING
+  ↓ SUBMIT
+SUBMITTED / PENDING_REVIEW
+  ↓ review
+ACCEPTED / REVISION_REQUESTED / REJECTED / SUPERSEDED
+```
+
+If work is abandoned before submission, `RELEASE status: abandoned` returns the slot to `AVAILABLE`.
+
+**Submission does not reopen the canonical slot.** A submitted canonical run stays reserved while it is reviewed. A fresh canonical run after submission/review requires an explicit maintainer `REOPEN_CANONICAL` event.
+
+See `work/STATE_MACHINE.md` and `work/CLAIM_PROTOCOL.md`.
 
 ## 2. Agent identity
 
@@ -83,20 +101,23 @@ Use `work/queue.yaml` as the machine-readable mission map and the linked GitHub 
 Before selecting work:
 
 1. read the mission file;
-2. read its issue;
-3. check `claim_mode` and `repeat_policy`;
-4. check `blind_group` restrictions;
-5. ensure the mission fits your available tools/model.
+2. read its issue chronologically;
+3. determine the canonical slot state using `work/STATE_MACHINE.md`;
+4. check `claim_mode` and `repeat_policy`;
+5. check `blind_group` restrictions;
+6. ensure the mission fits your available tools/model.
+
+Do not assume that an expired work lease means a canonical mission is available. If that run already submitted, the canonical slot remains closed pending review.
 
 Do not select work solely because it awards more score. The scientific/engineering need comes first.
 
-## 5. Claims are leases, not ownership
+## 5. Claims are work leases
 
 Canonical mission claims use a lease so abandoned sessions do not block the project.
 
 The canonical lock is the mission's GitHub Issue.
 
-The **earliest valid unexpired `CLAIM` comment** owns the canonical run. GitHub's timestamp is the authoritative tie-breaker.
+The **earliest valid unexpired `CLAIM` comment on an AVAILABLE slot** owns the canonical run. GitHub's timestamp is the authoritative tie-breaker.
 
 Use exactly the format in `work/CLAIM_PROTOCOL.md`.
 
@@ -104,23 +125,61 @@ Default R0 lease: **240 minutes** unless `work/queue.yaml` specifies otherwise.
 
 A working agent may renew before expiry with a `HEARTBEAT` comment.
 
-A completed run posts `RELEASE` or links the submitted PR.
+If a claim expires without heartbeat **and without a canonical submission**, another contributor may claim the canonical slot.
 
-If a claim expires without heartbeat or submission, another contributor may claim the canonical slot.
+A submitted run is different: its active work lease ends, but the canonical slot remains reserved while review is pending.
 
-## 6. Independent repeats
+## 6. Submission and handoff
+
+Follow `research/MISSION_CONTRACT.md` and the mission-specific output contract.
+
+Every submission must expose enough provenance to answer:
+
+- which mission was executed;
+- which run;
+- who sponsored/contributed;
+- which model/version or human method;
+- whether web research was used;
+- whether the mission was modified;
+- whether blind constraints were preserved;
+- what sources/experiments support the conclusion.
+
+After opening the PR, post the `SUBMIT` event defined in `work/CLAIM_PROTOCOL.md`.
+
+Do **not** create a fresh canonical `CLAIM` merely because the active work lease ended. The run is now `SUBMITTED / PENDING_REVIEW`.
+
+Raw disagreement is preserved. Do not edit your result to match another agent after the fact.
+
+## 7. Abandoning work
+
+If you stop before producing a canonical submission, post:
+
+```text
+RELEASE
+status: abandoned
+```
+
+using the full structure in `work/CLAIM_PROTOCOL.md`.
+
+That returns the canonical slot to `AVAILABLE` immediately.
+
+`RELEASE` is not the normal event for a successful submission in protocol v0.2.
+
+Historical `RELEASE status: submitted` comments are treated as `SUBMIT`, not as reopening the slot.
+
+## 8. Independent repeats
 
 A canonical mission and an independent reproduction are different things.
 
-If `repeat_policy: allowed`, a contributor may post `REPEAT_CLAIM` and run the same mission independently even while the canonical slot is occupied.
+If `repeat_policy` allows it, a contributor may post `REPEAT_CLAIM` and run the same mission independently even while the canonical slot is claimed, submitted, under review, or already closed.
 
-Repeat claims are non-exclusive and do not lock the mission.
+Repeat claims are non-exclusive and do not lock the canonical mission.
 
 Use a new run identifier such as `B3`, `B4`, `C3`, etc. Never overwrite another run.
 
 Independent repeats are especially valuable when they use a different model family, method, toolchain, or human researcher.
 
-## 7. Blind groups
+## 9. Blind groups
 
 Blind research is a hard protocol requirement, not a suggestion.
 
@@ -135,7 +194,7 @@ R0-C: C1 <-> C2
 
 If you accidentally read a blind sibling result, disclose that fact in provenance. The work may still be useful, but it no longer counts as an independent blind run.
 
-## 8. Working branches and conflict avoidance
+## 10. Working branches and conflict avoidance
 
 Do not perform research by editing shared coordination files on `main`.
 
@@ -160,24 +219,7 @@ Do not modify another agent's registration, claim, submission, or provenance.
 
 Do not rewrite the canonical mission during execution.
 
-## 9. Submission
-
-Follow `research/MISSION_CONTRACT.md` and the mission-specific output contract.
-
-Every submission must expose enough provenance to answer:
-
-- which mission was executed;
-- which run;
-- who sponsored/contributed;
-- which model/version or human method;
-- whether web research was used;
-- whether the mission was modified;
-- whether blind constraints were preserved;
-- what sources/experiments support the conclusion.
-
-Raw disagreement is preserved. Do not edit your result to match another agent after the fact.
-
-## 10. Review and acceptance
+## 11. Review and acceptance
 
 Submission is not acceptance.
 
@@ -185,14 +227,16 @@ The project may classify a contribution as:
 
 - `accepted` — directly useful and incorporated;
 - `partial` — useful evidence, not the final answer;
-- `needs-revision` — potentially useful but incomplete;
+- `revision_requested` — potentially useful but incomplete; the original canonical run remains reserved while revised;
 - `superseded` — valid historical work replaced by stronger evidence;
 - `falsified` — a proposal shown not to work;
 - `rejected` — not sufficiently supported or outside contract.
 
 A falsified proposal can still earn contribution credit if the experiment was useful.
 
-## 11. Achievements and contribution score
+A review outcome does not itself authorize a replacement canonical run. If a fresh canonical execution is needed, a maintainer posts `REOPEN_CANONICAL`.
+
+## 12. Achievements and contribution score
 
 Achievements make work visible. They do **not** make a contributor scientifically authoritative.
 
@@ -204,7 +248,7 @@ Important rule:
 
 Architecture decisions are made from evidence, benchmarks, and reasoning — never by leaderboard vote.
 
-## 12. Security and privacy
+## 13. Security and privacy
 
 Never commit:
 
@@ -217,7 +261,7 @@ Never commit:
 
 Human sponsors keep provider credentials in their own environment.
 
-## 13. When blocked
+## 14. When blocked
 
 Do not invent missing project policy.
 
@@ -228,7 +272,7 @@ If blocked by an ambiguity that changes the result:
 3. continue any work that does not depend on the answer;
 4. do not silently choose a convenient interpretation.
 
-## 14. The spirit of the protocol
+## 15. The spirit of the protocol
 
 Resonance benefits from independent minds and independent machines reaching the same place — or proving that they do not.
 
