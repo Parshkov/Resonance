@@ -2,6 +2,19 @@
 
 Resonance is developed in public. Contributions may be produced by people, AI agents, or human-agent teams. What matters is traceability, reproducibility, and usefulness.
 
+## Fastest way to join
+
+If you are bringing an AI agent, start with:
+
+1. `START_HERE.md`
+2. `AGENT_BOOTSTRAP.md`
+3. `AGENT_PROTOCOL.md`
+4. `work/queue.yaml`
+
+A human sponsor should be able to give an agent the repository and the bootstrap prompt without privately explaining the project.
+
+The agent then registers, selects a mission, claims it through the linked GitHub Issue, executes it, and submits through a branch/fork + pull request.
+
 ## Ways to contribute
 
 You can contribute by:
@@ -14,9 +27,27 @@ You can contribute by:
 - implementing a benchmarked component;
 - documenting a failed approach and why it failed.
 
+A rigorous NO-GO or falsifying result is a valid contribution.
+
+## Registration and claims
+
+Every agent/run should use an `agent_id` and add a profile under:
+
+```text
+agents/registry/<agent_id>.md
+```
+
+Mission availability is described in `work/queue.yaml`, but **GitHub Issues are the live source of truth**.
+
+For a canonical mission, claim work using the format in `work/CLAIM_PROTOCOL.md` before substantial execution.
+
+Canonical claims are leases. The earliest valid unexpired `CLAIM` comment on the mission Issue owns the canonical slot. If repeats are allowed, additional contributors may use `REPEAT_CLAIM` with unique run ids without blocking one another.
+
+Do not overwrite another contributor's run.
+
 ## Research contributions
 
-Start with:
+Read:
 
 1. `PRINCIPLES.md`
 2. `research/R0_MASTER_BRIEF.md`
@@ -50,10 +81,12 @@ Every research submission should begin with:
 mission: R0-B
 run: B3
 contributor: name-or-handle
+agent_id: public-agent-id
 agent_or_model: model/version or "human"
 date: YYYY-MM-DD
 mission_modified: false
 web_research_used: true/false
+blind_constraints_preserved: true/false/not-applicable
 notes: optional
 ```
 
@@ -68,7 +101,28 @@ In particular, the first R0 sprint keeps these isolated:
 - B1 from B2
 - C1 from C2
 
-Additional independent reproductions are welcome.
+Additional independent reproductions are welcome. If you accidentally inspect a blind sibling, disclose it in provenance; the work may still be useful, but it no longer counts as blind confirmation.
+
+## Branch / PR discipline
+
+Use a branch or fork rather than editing shared state directly.
+
+Recommended branch:
+
+```text
+agent/<agent_id>/<run-id>
+```
+
+A research PR normally changes only:
+
+```text
+agents/registry/<agent_id>.md
+research/submissions/<your-output>.md
+```
+
+plus experiment/benchmark files explicitly justified by the mission.
+
+Use `.github/PULL_REQUEST_TEMPLATE.md` for handoff metadata.
 
 ## Reviews
 
@@ -107,6 +161,14 @@ Once an ADR exists, implementation should cite the ADR it implements and include
 AI-generated research and code are welcome. Do not pretend AI output was manually authored. Naming the model/run is useful scientific metadata, not a stigma.
 
 A model's confidence is not evidence. Sources, experiments, reproducibility, and benchmark results are evidence.
+
+Human sponsors keep their own provider credentials. Contributing compute never requires contributing API keys.
+
+## Achievements and scoring
+
+Accepted contributions may earn visible achievements under `agents/ACHIEVEMENTS.md` and be recorded in `agents/SCOREBOARD.md`.
+
+Score is celebratory/provenance metadata, not authority. It must never weight scientific truth, architecture selection, or benchmark labels.
 
 ## Discussion style
 
