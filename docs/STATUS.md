@@ -11,27 +11,50 @@ Target window:
 
 ## Current phase
 
-**R0 — Research / algorithm selection**
+**R0 — scientific / algorithmic architecture selection**
 
-## Immediate objective
+Resonance is the project. Research is the current state used to select the implementation.
 
-Use independent research agents to resolve the architecture before freezing Thought DNA.
+## Public research program
 
-Critical parallel missions:
+The R0 process is public and reproducible:
 
-- B — Relational Constellation Fingerprinting
-- C — Approximate Graph Alignment
+```text
+Mission
+  -> independent submission(s)
+  -> comparative/adversarial review
+  -> benchmark / falsification
+  -> ADR
+  -> implementation
+```
 
-Both should be duplicated across independent model families.
+Canonical files:
 
-Other missions:
+- `PRINCIPLES.md`
+- `OPEN_RESEARCH.md`
+- `ROADMAP.md`
+- `CONTRIBUTING.md`
+- `research/R0_EXECUTION_PLAN.md`
+- `research/missions/`
+- `research/submissions/`
+- `research/reviews/`
+- `research/logbook/`
+- `docs/decisions/`
+
+## R0 active runs
 
 - A — Structure Mapping / cognitive analogy
+- B1 — Relational Constellation Fingerprinting — GPT-5.6 Sol MAX
+- B2 — Relational Constellation Fingerprinting — Claude Opus 5, blind from B1
+- C1 — Approximate Graph Alignment — Claude Opus 5
+- C2 — Approximate Graph Alignment — GPT-5.6 Sol MAX, blind from C1
 - D — multiscale / granularity invariance
 - E — Knowledge DNA
 - F — Thought extraction
 - G — benchmark / falsification
 - H — architecture red team
+
+B and C are intentionally duplicated across independent model families because they form the core retrieval/verification engine.
 
 ## Working hypothesis
 
@@ -44,19 +67,24 @@ Thought
 → resonance score + explanation
 ```
 
-A candidate match is valuable only when multiple independent local matches support one coherent correspondence between graph regions.
+A candidate match is valuable only when multiple local correspondences support a coherent relational alignment rather than merely sharing vocabulary.
 
-## Research success condition
+## R0 gate
 
-Before implementation, we want enough evidence to write:
+Before core implementation, produce:
 
-1. Invariance Spec
-2. Retrieval ADR
-3. Verification ADR
-4. Thought DNA v0.1
-5. Benchmark v0.1
-6. Resonance scoring model
+1. Decision Matrix
+2. Invariance Specification
+3. Retrieval ADR
+4. Verification ADR
+5. Thought DNA v0.1
+6. Benchmark v0.1
+7. Resonance scoring / explanation contract
 
 ## Current core phrase
 
 > Find isomorphic, approximately isomorphic, causally analogous, or complementary subgraphs inside independently evolving human Thought Graphs.
+
+## Orchestration
+
+GitHub issues track the primary R0 runs and the synthesis gate. Raw research artifacts must still be committed under `research/submissions/` so the durable scientific record remains versioned in the repository.
