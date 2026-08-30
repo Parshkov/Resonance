@@ -1,25 +1,30 @@
 # Resonance Architecture Loop
 
-The project is deliberately staged so that implementation follows falsifiable architecture decisions rather than intuition.
+The project is deliberately staged so implementation follows falsifiable architecture decisions rather than intuition or one persuasive model response.
 
-## Loop
+## Public loop
 
 ```text
-Independent research
+Question
+→ canonical Mission
+→ independent submission(s)
+→ comparative / adversarial Review
 → Decision Matrix
-→ Invariance Spec
-→ Algorithm ADR
+→ Invariance Specification
+→ Algorithm ADR(s)
 → Thought DNA v0.1
 → Benchmark
 → Prototype
 → Red Team
-→ Revise or freeze
+→ revise or freeze
 → MCP integration
 ```
 
+Research artifacts remain public under `research/`; accepted architecture lives under `docs/decisions/`.
+
 ## Gate 1 — Research → Architecture
 
-Do not start production implementation until we can answer all of these:
+Do not start core implementation until we can answer all of these:
 
 1. What transformations should Resonance be invariant to?
 2. What is the fast retrieval representation?
@@ -30,16 +35,21 @@ Do not start production implementation until we can answer all of these:
 7. What benchmark would falsify the architecture?
 8. What result constitutes PASS / FAIL?
 
+The first mandatory independent comparisons are B1 vs B2 (fingerprinting) and C1 vs C2 (alignment).
+
 ## Gate 2 — Architecture → Prototype
 
 Required artifacts:
 
+- Decision Matrix
 - `INVARIANCE_SPEC.md`
 - retrieval ADR
 - verification ADR
 - Thought DNA v0.1 schema
 - benchmark definition
-- resonance scoring equation
+- resonance scoring/explanation contract
+
+An ADR should be specific enough that a coding agent can implement it without reinterpreting the entire research archive.
 
 ## Gate 3 — Prototype → MCP
 
@@ -59,6 +69,12 @@ get_thought(id)
 ```
 
 These names are provisional until the core data model is frozen.
+
+## Revision rule
+
+No accepted decision is sacred. If new evidence contradicts an ADR, supersede it explicitly and preserve the old decision and reason for change.
+
+Research reports are never retroactively edited to pretend they predicted the final architecture.
 
 ## Non-goals for the first 40–60 hours
 
