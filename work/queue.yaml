@@ -1,0 +1,128 @@
+version: 1
+project: Resonance
+live_status_source: github_issues
+default_lease_minutes: 240
+
+missions:
+  - run_id: R0-A
+    issue: 3
+    mission_file: research/missions/R0_A_STRUCTURE_MAPPING.md
+    output_pattern: research/submissions/R0_A_structure_mapping_<agent_id>.md
+    recommended_model: Claude Opus 5
+    claim_mode: exclusive
+    repeat_policy: allowed
+    blind_group: null
+    phase: R0
+
+  - run_id: R0-B1
+    issue: 4
+    mission_file: research/missions/R0_B_RELATIONAL_FINGERPRINTING.md
+    output_pattern: research/submissions/R0_B1_fingerprinting_<agent_id>.md
+    recommended_model: GPT-5.6 Sol MAX
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: R0-B
+    must_not_read_before_submission:
+      - R0-B2
+    phase: R0
+
+  - run_id: R0-B2
+    issue: 5
+    mission_file: research/missions/R0_B_RELATIONAL_FINGERPRINTING.md
+    output_pattern: research/submissions/R0_B2_fingerprinting_<agent_id>.md
+    recommended_model: Claude Opus 5
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: R0-B
+    must_not_read_before_submission:
+      - R0-B1
+    phase: R0
+
+  - run_id: R0-C1
+    issue: 6
+    mission_file: research/missions/R0_C_GRAPH_ALIGNMENT.md
+    output_pattern: research/submissions/R0_C1_alignment_<agent_id>.md
+    recommended_model: Claude Opus 5
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: R0-C
+    must_not_read_before_submission:
+      - R0-C2
+    phase: R0
+
+  - run_id: R0-C2
+    issue: 7
+    mission_file: research/missions/R0_C_GRAPH_ALIGNMENT.md
+    output_pattern: research/submissions/R0_C2_alignment_<agent_id>.md
+    recommended_model: GPT-5.6 Sol MAX
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: R0-C
+    must_not_read_before_submission:
+      - R0-C1
+    phase: R0
+
+  - run_id: R0-D
+    issue: 8
+    mission_file: research/missions/R0_D_MULTISCALE.md
+    output_pattern: research/submissions/R0_D_multiscale_<agent_id>.md
+    recommended_model: GPT-5.6 Sol MAX
+    claim_mode: exclusive
+    repeat_policy: allowed
+    blind_group: null
+    phase: R0
+
+  - run_id: R0-E
+    issue: 9
+    mission_file: research/missions/R0_E_KNOWLEDGE_DNA.md
+    output_pattern: research/submissions/R0_E_knowledge_<agent_id>.md
+    recommended_model: Grok 4.6 xhigh
+    claim_mode: exclusive
+    repeat_policy: allowed
+    blind_group: null
+    phase: R0
+
+  - run_id: R0-F
+    issue: 10
+    mission_file: research/missions/R0_F_THOUGHT_EXTRACTION.md
+    output_pattern: research/submissions/R0_F_extraction_<agent_id>.md
+    recommended_model: Claude Opus 5
+    claim_mode: exclusive
+    repeat_policy: allowed
+    blind_group: null
+    phase: R0
+
+  - run_id: R0-G
+    issue: 11
+    mission_file: research/missions/R0_G_BENCHMARK.md
+    output_pattern: research/submissions/R0_G_benchmark_<agent_id>.md
+    recommended_model: GPT-5.6 Sol MAX
+    claim_mode: exclusive
+    repeat_policy: allowed
+    blind_group: null
+    phase: R0
+
+  - run_id: R0-H
+    issue: 12
+    mission_file: research/missions/R0_H_RED_TEAM.md
+    output_pattern: research/submissions/R0_H_redteam_<agent_id>.md
+    recommended_model: Grok 4.6 xhigh
+    claim_mode: exclusive
+    repeat_policy: allowed
+    blind_group: null
+    phase: R0
+
+  - run_id: R0-SYNTHESIS
+    issue: 13
+    mission_file: null
+    output_pattern: docs/decisions/
+    recommended_model: human_agent_orchestration
+    claim_mode: coordinator
+    repeat_policy: review_only
+    blind_group: null
+    prerequisites:
+      - R0-B1
+      - R0-B2
+      - R0-C1
+      - R0-C2
+    phase: R0
