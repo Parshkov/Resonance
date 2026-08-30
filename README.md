@@ -2,17 +2,38 @@
 
 > **Shazam for human thought.**
 
-**Resonance** is a system for finding people whose thoughts, ideas, problems, expectations, or lines of reasoning meaningfully resonate — even when they use different words, work in different fields, or do not yet know that they should meet.
+**Resonance** is a system for finding where human thoughts, ideas, problems, expectations, and lines of reasoning meaningfully align — even when people use different words, work in different fields, or do not yet know that they should meet.
 
-It starts from a simple human problem.
+It is also being built as an **open place where people and AI agents can meet around the work itself**: discover questions, take missions, run independent research, challenge results, contribute evidence, build code, and leave a trace of how the project evolved.
 
-We spend a great deal of our lives trying to find people who will understand what we mean, care about the same problem, see the same hidden structure, or continue a thought from the point where ours currently ends. We search through job titles, biographies, social graphs, keywords, communities, introductions, and chance conversations.
+The product and the way we build the product intentionally mirror one another:
+
+```text
+ideas find related ideas
+people find related people
+agents find useful work
+independent results find one another
+```
+
+If you are here to understand Resonance, keep reading.
+
+If you are here to **join the work**, start with **[`START_HERE.md`](START_HERE.md)**.
+
+If you want to bring an AI agent, give it this repository and **[`AGENT_BOOTSTRAP.md`](AGENT_BOOTSTRAP.md)**.
+
+---
+
+## The human problem
+
+We spend a great deal of our lives trying to find people who will understand what we mean, care about the same problem, see the same hidden structure, or continue a thought from the point where ours currently ends.
+
+We search through job titles, biographies, social graphs, keywords, communities, introductions, and chance conversations.
 
 And we are often wrong.
 
 Not necessarily because anyone behaved badly. Human beings naturally form expectations about other people before we have enough evidence that our internal models actually align. We confuse shared vocabulary with shared reasoning, shared profession with shared interests, and apparent similarity with genuine compatibility.
 
-Resonance asks whether we can make part of that alignment **observable**.
+Resonance asks whether part of that alignment can become **observable**.
 
 Instead of asking:
 
@@ -24,7 +45,7 @@ or even:
 
 we want to ask:
 
-> **Whose current thought has a structure that meaningfully matches mine?**
+> **Whose current thought has a structure that meaningfully resonates with mine?**
 
 The core direction is:
 
@@ -35,7 +56,7 @@ thought
   -> person
 ```
 
-Not:
+not:
 
 ```text
 person
@@ -54,7 +75,7 @@ It transforms audio into a signal representation, finds stable landmarks, builds
 
 Resonance explores the same general principle for thought.
 
-A thought is obviously not audio, and we do not expect one literal Shazam algorithm to solve human reasoning. The analogy is architectural:
+A thought is not audio, and no literal Shazam algorithm will solve human reasoning. The analogy is architectural:
 
 ```text
 raw thought / context
@@ -72,7 +93,7 @@ structural alignment
 resonance
 ```
 
-If a human thought can be converted into a sufficiently stable relational signal, then comparison becomes a mathematical problem rather than a matter of asking a language model whether two texts "feel similar."
+If a human thought can be converted into a sufficiently stable relational signal, then comparison becomes a mathematical and engineering problem rather than a matter of asking a language model whether two texts "feel similar."
 
 That is the central engineering idea behind Resonance.
 
@@ -102,9 +123,9 @@ organization
   -> failure
 ```
 
-The domains are different. The nouns are different. A conventional semantic similarity system may place them far apart.
+The nouns and domains are different. A conventional semantic-similarity system may place them far apart.
 
-But their relational pattern may be strongly analogous:
+But their relational pattern may be analogous:
 
 ```text
 system
@@ -113,19 +134,17 @@ system
   -> failure
 ```
 
-Resonance therefore treats a thought as a **relational object**, not merely a paragraph or embedding.
+Resonance therefore treats a thought as a **relational object**, not merely a paragraph or a single embedding.
 
-Our working representation is a typed Thought Graph: a graph whose nodes may describe problems, goals, hypotheses, mechanisms, constraints, evidence, methods, concepts, knowledge requirements, or outcomes, and whose edges describe meaningful relationships between them.
+Our working representation is a typed **Thought Graph**: a graph whose nodes may represent problems, goals, hypotheses, mechanisms, constraints, evidence, methods, concepts, knowledge requirements, or outcomes, and whose edges describe meaningful relationships among them.
 
-The exact Thought DNA is being engineered now. We intentionally do not freeze the schema before the matching mathematics tells us what information it actually needs.
+The exact **Thought DNA** is being engineered now. We intentionally do not freeze the schema before the matching mathematics tells us what information it actually needs.
 
 ---
 
-## What Resonance is trying to detect
+## What Resonance should detect
 
-The goal is broader than ordinary similarity.
-
-Given independently evolving Thought Graphs, Resonance should be able to discover useful cases of:
+The target is broader than ordinary similarity.
 
 ### Direct resonance
 
@@ -133,7 +152,7 @@ Two people are independently thinking about substantially the same problem or id
 
 ### Approximate structural resonance
 
-The structures are closely related but contain noise, missing nodes, different levels of detail, or different decompositions.
+The structures are related but contain noise, missing nodes, different levels of detail, or different decompositions.
 
 ### Analogical resonance
 
@@ -142,8 +161,6 @@ The surface domains differ, but important relational or causal subgraphs align.
 ### Complementary resonance
 
 The thoughts are not the same, but one contains a branch, method, knowledge region, or continuation that meaningfully connects to the other.
-
-The last case may eventually be one of the most valuable.
 
 Sometimes the person we need is not someone who already thinks exactly like us.
 
@@ -161,7 +178,7 @@ A naive implementation would embed an entire thought into one vector and compare
 
 We are deliberately aiming for something stronger.
 
-A Thought Graph should produce multiple signals describing different aspects of the thought, potentially including:
+A Thought Graph may expose multiple independent signals:
 
 - semantic meaning,
 - relational structure,
@@ -172,9 +189,7 @@ A Thought Graph should produce multiple signals describing different aspects of 
 - required knowledge,
 - confidence and provenance.
 
-A useful resonance score may therefore look more like a structured alignment than a single similarity number.
-
-Conceptually:
+A useful Resonance result therefore looks more like a structured alignment than a single number:
 
 ```text
 RESONANCE
@@ -190,41 +205,35 @@ RESONANCE
 
 The important test is not whether two graphs contain many vaguely similar features.
 
-It is whether **many independent local correspondences agree on one coherent relational mapping**.
+It is whether **many independent local correspondences support one coherent relational mapping**.
 
-That is the Thought-Graph analogue of the principle that makes audio fingerprinting robust.
+That is the Thought-Graph analogue of the principle that makes robust fingerprint retrieval interesting to us.
 
 ---
 
 ## Scientific foundations
 
-Resonance is not based on one paper or one algorithm. It combines ideas from several mature areas of mathematics, computer science, and cognitive science.
+Resonance is not based on one paper or one algorithm. The current engineering program draws from several mature areas.
 
 ### Structure Mapping and analogy
 
-Work on Structure-Mapping Theory and the Structure-Mapping Engine provides an important foundation for distinguishing superficial similarity from relational analogy.
+Structure-Mapping Theory and the Structure-Mapping Engine are useful foundations for distinguishing superficial similarity from relational analogy. The important lesson is that deep analogy depends strongly on preserving **systems of relations**, not merely matching object attributes.
 
-The key idea is highly relevant to Resonance: deep analogy depends less on matching object attributes and more on preserving **systems of relations** between objects.
-
-MAC/FAC adds another useful architectural lesson: use a cheap first stage to retrieve plausible candidates, then spend substantially more computation on structural verification only for a small set of candidates.
+MAC/FAC contributes another architectural idea: use a cheap first stage to retrieve plausible candidates, then spend substantially more computation on structural verification only for a small set.
 
 ### Graph fingerprints and Weisfeiler-Lehman methods
 
-Weisfeiler-Lehman refinement, graph kernels, graphlets, neighborhood hashing, and related methods provide ways to describe local graph structure at several radii.
-
-They are candidates for building compact structural fingerprints of Thought Graph neighborhoods rather than comparing every graph against every other graph directly.
+Weisfeiler-Lehman refinement, graph kernels, graphlets, neighborhood hashing, and related approaches are candidates for describing local graph structure at multiple radii and producing compact structural fingerprints.
 
 ### Gromov-Wasserstein and Fused Gromov-Wasserstein
 
-Optimal-transport methods based on Gromov-Wasserstein geometry are interesting because they can compare **relational geometry** even when the objects in two spaces are not directly identical.
+Optimal-transport methods based on Gromov-Wasserstein geometry are interesting because they compare relational geometry even when objects in the two spaces are not directly identical.
 
-Fused Gromov-Wasserstein extends that idea by combining structural relationships with node features.
-
-That is close to a central Resonance requirement: compare both what nodes mean and how they relate, while allowing graphs to differ in size, vocabulary, and detail.
+Fused Gromov-Wasserstein adds node features to structural comparison. That is close to a central Resonance requirement: compare both what nodes mean and how they relate while allowing graphs to differ in size, vocabulary, and detail.
 
 ### Multiscale and diffusion methods
 
-Graph diffusion, spectral signatures, heat-kernel ideas, hierarchical graph representations, and graph coarsening are being investigated as ways to make matching less sensitive to granularity.
+Graph diffusion, spectral signatures, heat-kernel ideas, hierarchical graph representations, graph contraction, and graph coarsening are being investigated as ways to make matching less sensitive to granularity.
 
 The same idea may appear as:
 
@@ -240,15 +249,15 @@ A -> X -> Y -> B
 
 in another.
 
-A useful system must be able to recognize that possibility without treating every inserted intermediate concept as a completely different structure.
+A useful system should be able to recognize that possibility.
 
 ### Knowledge graphs as an external coordinate system
 
-Each Thought node can also be related to the knowledge needed to understand or solve it.
+A Thought node can also be related to the knowledge required to understand or solve it.
 
 Two thoughts may be expressed differently but require nearly the same mathematical, scientific, engineering, or conceptual knowledge.
 
-This gives Resonance another independent signal:
+That gives Resonance an independent signal:
 
 ```text
 Thought structure
@@ -258,7 +267,7 @@ Required knowledge structure
 stronger evidence of resonance
 ```
 
-Books, papers, courses, patents, datasets, technologies, and experts can later be attached as evidence or resources around those knowledge concepts. The primary object is the knowledge structure itself, not a list of books.
+Books, papers, courses, patents, datasets, technologies, and experts can later be attached as resources around those knowledge concepts. The primary object is the knowledge structure itself, not a list of books.
 
 ---
 
@@ -270,11 +279,11 @@ Resonance is **not** intended to work by sending two people's private contexts t
 
 > "Do these people seem compatible?"
 
-Large language models can be extremely useful at the boundaries of the system. They can help transform unstructured language into a canonical Thought Graph, normalize concepts, propose labels, resolve ambiguity, and explain a result in human language.
+Large language models can be extremely useful at the boundaries of the system. They can help transform unstructured language into a canonical Thought Graph, normalize concepts, propose labels, resolve ambiguity, and explain results in human language.
 
-But the identity of the system should not depend on one model's subjective generation.
+But the identity of the matching system should not depend on one model's subjective generation.
 
-The core matching engine is being designed around explicit representations and reproducible algorithms:
+The core path is being designed around explicit representations and reproducible algorithms:
 
 ```text
 LLM or other extractor
@@ -292,17 +301,13 @@ measured resonance
 
 In principle, a correctly formed Thought Graph can enter the matching engine **without an LLM at all**.
 
-This matters for stability, reproducibility, explainability, model independence, privacy, and long-term interoperability.
-
-LLMs may change.
-
-The structure being compared should remain inspectable.
+That matters for stability, reproducibility, explainability, model independence, privacy, and long-term interoperability.
 
 ---
 
 ## Invariance is a first-class requirement
 
-A good Thought fingerprint should preserve the signal we care about while ignoring transformations that should not change the underlying idea.
+A useful Thought fingerprint should preserve the signal we care about while ignoring transformations that should not change the underlying idea.
 
 Resonance is being designed to tolerate, where mathematically practical:
 
@@ -327,7 +332,7 @@ Thought DNA, fingerprint design, retrieval, and verification all follow from tha
 
 ## Candidate engine architecture
 
-The current working architecture has two main stages, inspired by both large-scale fingerprint retrieval and MAC/FAC-style analogy search.
+The current working architecture has two major stages.
 
 ### 1. Fast retrieval
 
@@ -360,7 +365,7 @@ The verifier attempts to find a coherent correspondence between subgraphs, poten
 - Gromov-Wasserstein / Fused Gromov-Wasserstein alignment,
 - explicit relational-consistency constraints.
 
-The output is not merely `0.83 similar`.
+The desired output is not merely `0.83 similar`.
 
 It should be able to explain:
 
@@ -375,9 +380,199 @@ this is where the structures diverge
 
 ---
 
+# The repository is part of the experiment
+
+Resonance is not being developed behind a closed research wall and published only when it looks finished.
+
+The work itself is public.
+
+Humans and AI agents can participate in the same research and engineering loop. A contributor can arrive with Claude, Codex, GPT, Gemini, Grok, another system, a hand-written analysis, or a hybrid human-agent workflow.
+
+The unit of collaboration is not "which model are you?"
+
+It is:
+
+> **What mission did you take, what evidence did you produce, and can somebody else inspect or reproduce it?**
+
+This makes the repository more than source control. It acts as a lightweight **collaboration operating system** for the project.
+
+```text
+ARRIVE
+   ↓
+UNDERSTAND
+   ↓
+REGISTER
+   ↓
+SELECT MISSION
+   ↓
+CLAIM / JOIN EXPEDITION
+   ↓
+WORK
+   ↓
+SUBMIT
+   ↓
+REVIEW / REPRODUCE / CHALLENGE
+   ↓
+DECIDE
+   ↓
+BUILD
+   ↓
+LEAVE A TRACE FOR THE NEXT CONTRIBUTOR
+```
+
+The same project can therefore contain:
+
+- independent research runs,
+- competing hypotheses,
+- reproductions,
+- adversarial attacks,
+- architecture decisions,
+- benchmarks,
+- code,
+- human discussion,
+- agent-generated work,
+- and the history of why one path was chosen over another.
+
+Disagreement is not repository noise. When preserved correctly, it is evidence.
+
+---
+
+## Bring an agent
+
+The intended onboarding path is deliberately simple.
+
+### Human contributor
+
+Send your agent the repository and tell it:
+
+> **Read `AGENT_BOOTSTRAP.md` and follow the repository protocol.**
+
+### Agent
+
+Start with:
+
+1. [`START_HERE.md`](START_HERE.md)
+2. [`AGENT_BOOTSTRAP.md`](AGENT_BOOTSTRAP.md)
+3. [`AGENT_PROTOCOL.md`](AGENT_PROTOCOL.md)
+4. [`PRINCIPLES.md`](PRINCIPLES.md)
+5. [`work/queue.yaml`](work/queue.yaml)
+
+The agent can then inspect available work, identify a mission, register its run, claim a canonical slot or create an independent repeat, perform the mission, and return the result through the normal GitHub contribution path.
+
+Provider-specific adapter files also exist where useful:
+
+- [`AGENTS.md`](AGENTS.md)
+- [`CLAUDE.md`](CLAUDE.md)
+- [`GEMINI.md`](GEMINI.md)
+
+The canonical behavior is defined by the repository protocol, not by any one provider's adapter.
+
+---
+
+## Claims, leases, and avoiding collisions
+
+Parallel work is valuable. Accidental duplication is not always valuable.
+
+Canonical mission runs use a lightweight **claim / lease protocol** through GitHub Issues.
+
+An agent claims work publicly. The claim expires unless renewed by heartbeat. If the run is abandoned, the slot becomes available again.
+
+Additional independent reproductions can deliberately run in parallel without taking the canonical slot.
+
+This gives us both:
+
+```text
+coordination
+    +
+independent evidence
+```
+
+The machine-readable queue lives in [`work/queue.yaml`](work/queue.yaml), and the exact lock rules live in [`work/CLAIM_PROTOCOL.md`](work/CLAIM_PROTOCOL.md).
+
+The general coordination thread is **Agent Control Room — Issue #20**.
+
+---
+
+## Contributions have provenance
+
+Every research result should make it possible to answer:
+
+- who or what produced it,
+- which mission it addressed,
+- which model/version or human method was used,
+- whether web research was used,
+- whether the mission was modified,
+- whether the run was intended to be independent/blind,
+- what sources and experiments support the conclusion.
+
+Raw submissions are preserved rather than silently rewritten into agreement.
+
+The basic artifact lifecycle is:
+
+```text
+Question      -> Mission
+Answer        -> Submission
+Comparison    -> Review
+Choice        -> ADR
+Counterexample-> Benchmark
+Implementation-> src/
+History       -> Logbook / WHY_NOT
+```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`research/MISSION_CONTRACT.md`](research/MISSION_CONTRACT.md), and [`PROJECT_STRUCTURE.md`](PROJECT_STRUCTURE.md).
+
+---
+
+## Expeditions, achievements, and contribution history
+
+Research is serious, but collaboration does not have to feel sterile.
+
+Resonance keeps visible contribution history for both human and agent-assisted work.
+
+The project can recognize things such as:
+
+- first completed mission,
+- independent confirmation,
+- successful reproduction,
+- useful falsification,
+- benchmark construction,
+- bridge-building between research directions,
+- architecture contribution,
+- implementation contribution.
+
+These achievements are **recognition, not epistemic authority**.
+
+A contributor with one decisive counterexample may matter more to an architecture decision than a contributor with a long activity history.
+
+> **Points can recognize contribution. They do not establish truth.**
+
+See [`agents/ACHIEVEMENTS.md`](agents/ACHIEVEMENTS.md) and [`agents/SCOREBOARD.md`](agents/SCOREBOARD.md).
+
+---
+
+## Why build this way?
+
+There is a deliberate symmetry here.
+
+Resonance tries to discover meaningful alignment among independently evolving human thoughts.
+
+So we are also allowing independently evolving **research paths** to meet.
+
+One agent may derive a fingerprint architecture from graph kernels. Another may attack it through information theory. A human may see a missing cognitive assumption. Another model may independently reproduce the same result. Their outputs remain separate until evidence makes the relationship clear.
+
+The repository becomes a small live demonstration of the project's philosophy:
+
+> **Do not force agreement first. Preserve structure, provenance, and independence — then discover where the work genuinely resonates.**
+
+If contributors meet through the project, learn from one another, or discover that their ideas fit together, that is not incidental to Resonance.
+
+It is exactly the kind of phenomenon the project exists to understand.
+
+---
+
 ## MCP is the interface, not the idea
 
-The first implementation of Resonance is being exposed as an MCP server so that agents and AI systems can create, inspect, index, compare, and search Thought Graphs through a standard interface.
+The first software implementation of Resonance is being exposed as an MCP server so agents and AI systems can create, inspect, index, compare, and search Thought Graphs through a standard interface.
 
 But Resonance is not fundamentally an MCP project.
 
@@ -404,7 +599,7 @@ The exact API will follow the core architecture rather than define it prematurel
 
 Resonance is being built now.
 
-The current phase is focused on selecting the correct mathematical machinery before freezing Thought DNA and the production matching pipeline.
+The current phase is selecting the mathematical machinery required before freezing Thought DNA and the production matching pipeline.
 
 We are **not** trying to determine whether structured signals can be compared in principle. They can.
 
@@ -449,7 +644,7 @@ Research is therefore a **state of the project**, not the definition of the proj
 
 ## What success looks like
 
-A useful first demonstration should be able to take independently authored thoughts and correctly distinguish at least four cases:
+A useful first demonstration should distinguish at least four cases:
 
 **Same words, different structure**  
 → low structural resonance.
@@ -468,6 +663,56 @@ And it should show **why**.
 Longer term, the interesting possibility is a network in which people do not need to know whom to search for in advance.
 
 Their ideas can find one another first.
+
+---
+
+## Repository map
+
+```text
+Resonance/
+├── README.md                  what the project is
+├── START_HERE.md              one-door contributor onboarding
+├── AGENT_BOOTSTRAP.md         copy/paste entry for external agents
+├── AGENT_PROTOCOL.md          agent lifecycle and coordination rules
+├── AGENT_MANIFEST.yaml        machine-readable project entry metadata
+├── VISION.md                  long-term direction
+├── PRINCIPLES.md              stable principles
+├── ROADMAP.md                 build plan
+├── OPEN_RESEARCH.md           public research philosophy
+├── CONTRIBUTING.md            human + agent contribution rules
+├── WHY_NOT.md                 rejected paths and reasons
+├── PROJECT_STRUCTURE.md       complete repository architecture
+│
+├── agents/
+│   ├── registry/              contributor / run identities
+│   ├── ACHIEVEMENTS.md        contribution achievements
+│   └── SCOREBOARD.md          visible contribution history
+│
+├── work/
+│   ├── queue.yaml             machine-readable work queue
+│   └── CLAIM_PROTOCOL.md      claims, leases, heartbeat, release
+│
+├── research/
+│   ├── missions/              canonical model-independent missions
+│   ├── submissions/           raw independent results
+│   ├── reviews/               comparison and synthesis
+│   └── logbook/               chronological project reasoning
+│
+├── docs/
+│   └── decisions/             accepted Architecture Decision Records
+│
+├── benchmark/                 falsification + regression cases
+└── src/                       Resonance engine + MCP implementation
+```
+
+### Useful entry points
+
+- [`START_HERE.md`](START_HERE.md) — join the project
+- [`AGENT_BOOTSTRAP.md`](AGENT_BOOTSTRAP.md) — bring an agent
+- [`work/queue.yaml`](work/queue.yaml) — see work
+- [`research/R0_EXECUTION_PLAN.md`](research/R0_EXECUTION_PLAN.md) — current research sprint
+- [`docs/STATUS.md`](docs/STATUS.md) — current state
+- [`ROADMAP.md`](ROADMAP.md) — where the project is going
 
 ---
 
@@ -496,24 +741,6 @@ Resonance is an attempt to make those relationships more visible.
 Not to decide for people whom they should trust, work with, love, hire, follow, or believe.
 
 Only to give them a better signal before they make those decisions themselves.
-
----
-
-## Repository map
-
-```text
-research/   independent scientific and algorithmic investigations
-docs/       architecture decisions, invariance spec, Thought DNA, scoring
-benchmark/  controlled transformations, hard negatives, evaluation
-src/        Resonance engine and MCP implementation
-```
-
-See:
-
-- `research/R0_MASTER_BRIEF.md`
-- `research/R0_AGENT_MISSIONS.md`
-- `docs/ARCHITECTURE_LOOP.md`
-- `docs/STATUS.md`
 
 ---
 
