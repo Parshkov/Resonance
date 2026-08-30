@@ -28,4 +28,4 @@ inferred from the mission's recommendation.
 
 ## Contributions
 
-- none yet
+- [R0-G falsification benchmark design — PR #21](https://github.com/Parshkov/Resonance/pull/21)
