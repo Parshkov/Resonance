@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/schemas/thought-dna-0.1.schema.json",
+  "title": "Resonance Thought DNA v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "thought_id", "source", "provenance", "nodes", "relations"],
+  "properties": {
+    "schema_version": {"const": "thought-dna/0.1"},
+    "thought_id": {"type": "string", "minLength": 1},
+    "source": {"$ref": "#/$defs/source"},
+    "provenance": {"$ref": "#/$defs/provenance"},
+    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"provenance": {"properties": {"kind": {"const": "extracted"}}}}},
+      "then": {"properties": {
+        "nodes": {"items": {"properties": {"spans": {"minItems": 1}}}},
+        "relations": {"items": {"properties": {"spans": {"minItems": 1}}}}
+      }}
+    }
+  ],
+  "$defs": {
+    "span": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start", "end", "text"],
+      "properties": {
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 0},
+        "text": {"type": "string"}
+      }
+    },
+    "knowledgeRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "conf"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^(wd|openalex|acmccs|local):[^\\s:][^\\s]*$"},
+        "conf": {"type": "number", "minimum": 0.5, "maximum": 1},
+        "via": {"type": "string"}
+      }
+    },
+    "knowledge": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "about": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/knowledgeRef"}},
+        "requires": {"type": "array", "maxItems": 8, "items": {"$ref": "#/$defs/knowledgeRef"}}
+      }
+    },
+    "node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label", "role", "spans", "extract_conf", "atomic"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string"},
+        "role": {"enum": ["problem", "mechanism", "state", "outcome", "constraint", "method", "evidence", "resource", "agent"]},
+        "spans": {"type": "array", "items": {"$ref": "#/$defs/span"}},
+        "extract_conf": {"type": "number", "minimum": 0, "maximum": 1},
+        "atomic": {"type": "boolean"},
+        "assertion": {"enum": ["asserted", "negated"], "default": "asserted"},
+        "modality": {"enum": ["actual", "possible", "conditional"], "default": "actual"},
+        "knowledge": {"$ref": "#/$defs/knowledge"}
+      }
+    },
+    "relation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "source", "target", "type", "extract_conf", "spans"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "type": {"enum": ["causes", "prevents", "requires", "part_of", "constrains", "supports", "contradicts"]},
+        "extract_conf": {"type": "number", "minimum": 0, "maximum": 1},
+        "spans": {"type": "array", "items": {"$ref": "#/$defs/span"}},
+        "cue": {"$ref": "#/$defs/span"},
+        "assertion": {"enum": ["asserted", "negated"], "default": "asserted"},
+        "modality": {"enum": ["actual", "possible", "conditional"], "default": "actual"},
+        "provenance_refs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["text", "sha256"],
+      "properties": {
+        "text": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "extractor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "extractor"],
+      "properties": {
+        "kind": {"enum": ["extracted", "manual"]},
+        "extractor": {"oneOf": [{"$ref": "#/$defs/extractor"}, {"type": "null"}]},
+        "human_id": {"type": ["string", "null"]}
+      },
+      "allOf": [
+        {"if": {"properties": {"kind": {"const": "extracted"}}}, "then": {"properties": {"extractor": {"$ref": "#/$defs/extractor"}}}},
+        {"if": {"properties": {"kind": {"const": "manual"}}}, "then": {"properties": {"extractor": {"type": "null"}}}}
+      ]
+    }
+  }
+}
