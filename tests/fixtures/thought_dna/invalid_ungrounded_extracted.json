@@ -3,7 +3,7 @@
   "thought_id": "t_bad",
   "source": {
     "text": "Heat causes failure.",
-    "sha256": "71dc527a5cc6908724c32d53d4f3ef0d9790da800866d04108d272b0e2b9dd50"
+    "sha256": "fb3a311518d5f0550b40a62ba3e607ad9cb2c275aa425f76c3d0dac44e8aa53a"
   },
   "provenance": {"kind": "extracted", "extractor": {"id": "fixture-extractor", "version": "0.1"}},
   "nodes": [
