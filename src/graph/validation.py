@@ -10,12 +10,8 @@ from typing import Any, Mapping
 
 from .versioning import MigrationRequired, ensure_supported_version
 
-NODE_ROLES = frozenset(
-    {"problem", "mechanism", "state", "outcome", "constraint", "method", "evidence", "resource", "agent"}
-)
-RELATION_TYPES = frozenset(
-    {"causes", "prevents", "requires", "part_of", "constrains", "supports", "contradicts"}
-)
+NODE_ROLES = frozenset({"problem", "mechanism", "state", "outcome", "constraint", "method", "evidence", "resource", "agent"})
+RELATION_TYPES = frozenset({"causes", "prevents", "requires", "part_of", "constrains", "supports", "contradicts"})
 ASSERTIONS = frozenset({"asserted", "negated"})
 MODALITIES = frozenset({"actual", "possible", "conditional"})
 PROVENANCE_KINDS = frozenset({"extracted", "manual"})
@@ -42,6 +38,11 @@ def _issue(issues: list[ValidationIssue], path: str, message: str) -> None:
     issues.append(ValidationIssue(path, message))
 
 
+def _reject_unknown_fields(value: Mapping[str, Any], allowed: set[str] | frozenset[str], path: str, issues: list[ValidationIssue]) -> None:
+    for key in sorted(set(value) - set(allowed)):
+        _issue(issues, f"{path}.{key}", "unknown field; Thought DNA is a closed schema")
+
+
 def _is_number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
@@ -50,6 +51,7 @@ def _validate_span(span: Any, path: str, source_text: str, issues: list[Validati
     if not isinstance(span, Mapping):
         _issue(issues, path, "must be an object")
         return
+    _reject_unknown_fields(span, {"start", "end", "text"}, path, issues)
     for field in ("start", "end", "text"):
         if field not in span:
             _issue(issues, f"{path}.{field}", "is required")
@@ -98,6 +100,7 @@ def _validate_knowledge(value: Any, path: str, issues: list[ValidationIssue]) ->
             if not isinstance(ref, Mapping):
                 _issue(issues, rpath, "must be an object")
                 continue
+            _reject_unknown_fields(ref, {"id", "conf", "via"}, rpath, issues)
             rid = ref.get("id")
             if not isinstance(rid, str) or not CONCEPT_RE.match(rid):
                 _issue(issues, f"{rpath}.id", "must be a namespaced wd:/openalex:/acmccs:/local: identifier")
@@ -111,12 +114,7 @@ def _validate_knowledge(value: Any, path: str, issues: list[ValidationIssue]) ->
 
 
 def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) -> tuple[ValidationIssue, ...]:
-    """Validate structural, grounding and provenance invariants.
-
-    The JSON Schema captures the portable shape. This validator enforces the
-    cross-field rules JSON Schema cannot express compactly: source hashes,
-    exact spans, endpoint existence, uniqueness and manual/extracted grounding.
-    """
+    """Validate portable shape plus cross-field grounding/provenance invariants."""
     issues: list[ValidationIssue] = []
     if not isinstance(data, Mapping):
         issues.append(ValidationIssue("$", "must be an object"))
@@ -124,6 +122,7 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
             raise ThoughtDNAValidationError(issues)
         return tuple(issues)
 
+    _reject_unknown_fields(data, {"schema_version", "thought_id", "source", "provenance", "nodes", "relations"}, "$", issues)
     try:
         ensure_supported_version(data.get("schema_version"))
     except MigrationRequired as exc:
@@ -138,6 +137,9 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
     if not isinstance(source, Mapping):
         _issue(issues, "$.source", "must be an object")
     else:
+        _reject_unknown_fields(source, {"text", "sha256"}, "$.source", issues)
+        if "text" not in source:
+            _issue(issues, "$.source.text", "is required")
         source_text = source.get("text", "")
         if not isinstance(source_text, str):
             _issue(issues, "$.source.text", "must be a string")
@@ -153,6 +155,7 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
     if not isinstance(provenance, Mapping):
         _issue(issues, "$.provenance", "must be an object")
     else:
+        _reject_unknown_fields(provenance, {"kind", "extractor", "human_id"}, "$.provenance", issues)
         kind = provenance.get("kind")
         if kind not in PROVENANCE_KINDS:
             _issue(issues, "$.provenance.kind", f"must be one of {sorted(PROVENANCE_KINDS)}")
@@ -161,13 +164,13 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
             if not isinstance(extractor, Mapping):
                 _issue(issues, "$.provenance.extractor", "must be an object for extracted thoughts")
             else:
+                _reject_unknown_fields(extractor, {"id", "version"}, "$.provenance.extractor", issues)
                 if not isinstance(extractor.get("id"), str) or not extractor.get("id"):
                     _issue(issues, "$.provenance.extractor.id", "must be a non-empty string")
                 if not isinstance(extractor.get("version"), str) or not extractor.get("version"):
                     _issue(issues, "$.provenance.extractor.version", "must be a non-empty string")
-        elif kind == "manual":
-            if extractor is not None:
-                _issue(issues, "$.provenance.extractor", "must be null for manual thoughts")
+        elif kind == "manual" and extractor is not None:
+            _issue(issues, "$.provenance.extractor", "must be null for manual thoughts")
         if "human_id" in provenance and provenance["human_id"] is not None and not isinstance(provenance["human_id"], str):
             _issue(issues, "$.provenance.human_id", "must be a string or null")
 
@@ -181,6 +184,7 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
         if not isinstance(node, Mapping):
             _issue(issues, path, "must be an object")
             continue
+        _reject_unknown_fields(node, {"id", "label", "role", "spans", "extract_conf", "atomic", "assertion", "modality", "knowledge"}, path, issues)
         nid = node.get("id")
         if not isinstance(nid, str) or not nid:
             _issue(issues, f"{path}.id", "must be a non-empty string")
@@ -219,6 +223,7 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
         if not isinstance(rel, Mapping):
             _issue(issues, path, "must be an object")
             continue
+        _reject_unknown_fields(rel, {"id", "source", "target", "type", "extract_conf", "spans", "cue", "assertion", "modality", "provenance_refs"}, path, issues)
         rid = rel.get("id")
         if not isinstance(rid, str) or not rid:
             _issue(issues, f"{path}.id", "must be a non-empty string")
@@ -246,6 +251,14 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
             _issue(issues, f"{path}.spans", "must not be empty for extracted relations")
         for j, span in enumerate(spans):
             _validate_span(span, f"{path}.spans[{j}]", source_text, issues)
+        if "provenance_refs" in rel:
+            refs = rel["provenance_refs"]
+            if not isinstance(refs, list):
+                _issue(issues, f"{path}.provenance_refs", "must be an array")
+            else:
+                for j, ref in enumerate(refs):
+                    if not isinstance(ref, str) or not ref:
+                        _issue(issues, f"{path}.provenance_refs[{j}]", "must be a non-empty string")
         if "cue" in rel and rel["cue"] is not None:
             _validate_span(rel["cue"], f"{path}.cue", source_text, issues)
 
