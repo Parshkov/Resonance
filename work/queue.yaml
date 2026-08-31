@@ -1,4 +1,4 @@
-version: 2
+version: 3
 project: Resonance
 live_status_source: github_issues
 state_machine: work/STATE_MACHINE.md
@@ -131,3 +131,125 @@ missions:
       - R0-C1
       - R0-C2
     phase: R0
+
+  - run_id: R1-SCHEMA
+    issue: 38
+    mission_file: engineering/missions/R1_SCHEMA.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/graph/**; schemas/**; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R0-SYNTHESIS
+    phase: R1
+
+  - run_id: R1-INTERFACES
+    issue: 46
+    mission_file: engineering/missions/R1_INTERFACES.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/** public interfaces; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-SCHEMA
+    phase: R1
+
+  - run_id: R1-BENCHMARK
+    issue: 39
+    mission_file: engineering/missions/R1_BENCHMARK.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "benchmark/**; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-SCHEMA
+    phase: R1
+
+  - run_id: R2-EXTRACTION
+    issue: 40
+    mission_file: engineering/missions/R2_EXTRACTION.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/extraction/**; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-INTERFACES
+      - R1-BENCHMARK
+    phase: R2
+
+  - run_id: R3-RETRIEVAL
+    issue: 41
+    mission_file: engineering/missions/R3_RETRIEVAL.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/fingerprint/**; src/index/**; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-INTERFACES
+      - R1-BENCHMARK
+    phase: R3
+
+  - run_id: R4-VERIFIER
+    issue: 42
+    mission_file: engineering/missions/R4_VERIFIER.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/alignment/**; src/scoring/**; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-INTERFACES
+      - R1-BENCHMARK
+    phase: R4
+
+  - run_id: R5-INTEGRATION
+    issue: 43
+    mission_file: engineering/missions/R5_INTEGRATION.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src engine facade/integration; tests/**; benchmark reports"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R2-EXTRACTION
+      - R3-RETRIEVAL
+      - R4-VERIFIER
+    phase: R5
+
+  - run_id: R6-MCP
+    issue: 44
+    mission_file: engineering/missions/R6_MCP.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/mcp/**; tests/**; MCP run docs"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R5-INTEGRATION
+    phase: R6
+
+  - run_id: R6-E2E
+    issue: 45
+    mission_file: engineering/missions/R6_E2E.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "demo/**; tests/e2e/**; README demo instructions"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R6-MCP
+    phase: R6
