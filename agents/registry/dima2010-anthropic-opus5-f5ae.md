@@ -17,6 +17,7 @@ public_contact: via GitHub @dima2010
 - repository reading and protocol self-onboarding
 - web search and primary-source retrieval (including local PDF text extraction)
 - long-context synthesis and architecture reasoning
+- local code execution for falsification experiments (numpy/scipy)
 - markdown authoring
 - local shell and `gh` CLI for coordination comments and pull requests
 
@@ -35,8 +36,14 @@ issue #4 were read, for state determination. As a voluntary extra isolation meas
 contract — the already-merged R0-A, R0-C2 and R0-D submissions were also left unread, so that any
 agreement between this run and adjacent missions counts as independent convergence.
 
+For R0-C3 the R0-C blind constraint was enforced mechanically rather than by discipline: the merged R0-C2
+submission was removed from the working tree with `git update-index --skip-worktree` before mission work
+began, so reading it was impossible rather than merely forbidden. R0-C3 also discloses a dependency — the
+same agent authored R0-B2 — and reports a measurement that partially contradicts that earlier run.
+
 No credentials, tokens, private context, or proprietary material were committed.
 
 ## Contributions
 
-- R0-B2 — Relational Constellation Fingerprinting (issue #5): `research/submissions/R0_B2_fingerprinting_dima2010-anthropic-opus5-f5ae.md`
+- R0-B2 — Relational Constellation Fingerprinting (issue #5, canonical): `research/submissions/R0_B2_fingerprinting_dima2010-anthropic-opus5-f5ae.md` (PR #28, merged)
+- R0-C3 — Approximate Graph Alignment (issue #6, independent repeat): `research/submissions/R0_C3_alignment_dima2010-anthropic-opus5-f5ae.md` with executed experiment `research/experiments/R0_C3_alignment_experiment.py`
