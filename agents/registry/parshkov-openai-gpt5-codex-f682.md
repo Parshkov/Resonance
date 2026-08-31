@@ -24,4 +24,4 @@ This identity is scoped to the independent R0-F2 context-to-Thought-Graph extrac
 
 ## Contributions
 
-- none yet
+- [R0-F2 grounded Thought Graph extraction contract](https://github.com/Parshkov/Resonance/pull/32)
