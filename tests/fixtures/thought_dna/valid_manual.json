@@ -1,0 +1,20 @@
+{
+  "schema_version": "thought-dna/0.1",
+  "thought_id": "t_manual",
+  "source": {
+    "text": "",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "provenance": {
+    "kind": "manual",
+    "extractor": null,
+    "human_id": "fixture-author"
+  },
+  "nodes": [
+    {"id": "n1", "label": "problem", "role": "problem", "spans": [], "extract_conf": 1.0, "atomic": true},
+    {"id": "n2", "label": "method", "role": "method", "spans": [], "extract_conf": 1.0, "atomic": false, "assertion": "asserted", "modality": "possible"}
+  ],
+  "relations": [
+    {"id": "r1", "source": "n2", "target": "n1", "type": "supports", "extract_conf": 1.0, "spans": [], "assertion": "asserted", "modality": "possible"}
+  ]
+}
