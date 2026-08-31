@@ -64,6 +64,10 @@ class ValidationTests(unittest.TestCase):
         x["nodes"][0]["knowledge"]["about"][0]["conf"] = 0.49
         cases.append((x, "[0.5,1]"))
 
+        x = copy.deepcopy(base)
+        x["relations"][0]["mystery_score"] = 0.7
+        cases.append((x, "unknown field"))
+
         for raw, needle in cases:
             with self.subTest(needle=needle):
                 with self.assertRaises(ThoughtDNAValidationError) as ctx:
@@ -105,16 +109,15 @@ class CanonicalizationTests(unittest.TestCase):
         graph = ThoughtGraph.from_dict(raw)
         out = graph.to_dict()
         rel = next(r for r in out["relations"] if r["id"] == "r_prevents")
+        model_rel = next(r for r in graph.relations if r.id == "r_prevents")
+        self.assertEqual(model_rel.polarity, "negative")
         self.assertEqual((rel["source"], rel["target"]), ("n_deg", "n_failure"))
         self.assertEqual(rel["type"], "prevents")
         self.assertEqual(rel["assertion"], "asserted")
         self.assertEqual(rel["modality"], "conditional")
         self.assertEqual(out["provenance"]["extractor"]["id"], "fixture-extractor")
         self.assertEqual(out["schema_version"], "thought-dna/0.1")
-        self.assertEqual(
-            canonical_json(out),
-            canonical_json(ThoughtGraph.from_dict(out).to_dict()),
-        )
+        self.assertEqual(canonical_json(out), canonical_json(ThoughtGraph.from_dict(out).to_dict()))
 
     def test_defaults_materialize_in_canonical_output(self):
         raw = load("valid_extracted.json")
@@ -131,10 +134,7 @@ class StableIdTests(unittest.TestCase):
         text = "abc"
         self.assertEqual(make_thought_id(text), make_thought_id(text))
         span = [{"start": 0, "end": 1, "text": "a"}]
-        self.assertEqual(
-            make_node_id("problem", spans=span),
-            make_node_id("problem", spans=list(reversed(span))),
-        )
+        self.assertEqual(make_node_id("problem", spans=span), make_node_id("problem", spans=list(reversed(span))))
 
     def test_relation_id_changes_with_direction_and_polarity(self):
         span = [{"start": 1, "end": 2, "text": "x"}]
@@ -147,10 +147,7 @@ class StableIdTests(unittest.TestCase):
     def test_manual_id_requires_stable_key(self):
         with self.assertRaises(ValueError):
             make_node_id("problem")
-        self.assertEqual(
-            make_node_id("problem", manual_key="p1"),
-            make_node_id("problem", manual_key="p1"),
-        )
+        self.assertEqual(make_node_id("problem", manual_key="p1"), make_node_id("problem", manual_key="p1"))
 
 
 if __name__ == "__main__":
