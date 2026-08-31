@@ -79,8 +79,6 @@ def _validate_conf(value: Any, path: str, issues: list[ValidationIssue], *, mini
 
 
 def _validate_knowledge(value: Any, path: str, issues: list[ValidationIssue]) -> None:
-    if value is None:
-        return
     if not isinstance(value, Mapping):
         _issue(issues, path, "must be an object")
         return
@@ -211,7 +209,8 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
             _issue(issues, f"{path}.spans", "must not be empty for extracted nodes")
         for j, span in enumerate(spans):
             _validate_span(span, f"{path}.spans[{j}]", source_text, issues)
-        _validate_knowledge(node.get("knowledge"), f"{path}.knowledge", issues)
+        if "knowledge" in node:
+            _validate_knowledge(node["knowledge"], f"{path}.knowledge", issues)
 
     relations = data.get("relations")
     relation_ids: set[str] = set()
@@ -259,7 +258,7 @@ def validate_thought(data: Mapping[str, Any], *, raise_on_error: bool = True) ->
                 for j, ref in enumerate(refs):
                     if not isinstance(ref, str) or not ref:
                         _issue(issues, f"{path}.provenance_refs[{j}]", "must be a non-empty string")
-        if "cue" in rel and rel["cue"] is not None:
+        if "cue" in rel:
             _validate_span(rel["cue"], f"{path}.cue", source_text, issues)
 
     if issues and raise_on_error:
