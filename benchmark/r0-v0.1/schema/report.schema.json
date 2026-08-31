@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/report.schema.json",
+  "title": "Benchmark v0.1 non-compensating report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_version", "benchmark_version", "manifest_sha256", "config_sha256", "prediction_sha256", "fixture_readiness", "metrics", "per_family", "pipeline_attribution", "gates", "overall_status", "report_sha256"],
+  "properties": {
+    "report_version": {"const": "resonance-benchmark-report/0.1"},
+    "benchmark_version": {"const": "r0-v0.1"},
+    "manifest_sha256": {"type": "string"},
+    "config_sha256": {"type": "string"},
+    "prediction_sha256": {"type": "string"},
+    "fixture_readiness": {"type": "object"},
+    "metrics": {"type": "object"},
+    "per_family": {"type": "object"},
+    "pipeline_attribution": {"type": "object"},
+    "gates": {"type": "object"},
+    "overall_status": {"enum": ["pass", "fail"]},
+    "report_sha256": {"type": "string"}
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "config_version": "resonance-benchmark-evaluation/0.1",
+  "benchmark_version": "r0-v0.1",
+  "retrieval_k": 5,
+  "thresholds": {
+    "sow_min_passes": 10,
+    "sow_total": 12,
+    "overall_recall_at_5_min": 0.85,
+    "positive_family_gate_hits_min": 4,
+    "positive_family_gate_total": 6,
+    "resonance_precision_min": 0.8,
+    "overall_negative_fpr_max": 0.1,
+    "negative_family_false_positives_max": 1,
+    "node_pair_f1_min": 0.7,
+    "directed_typed_edge_accuracy_min": 0.75,
+    "false_meaningful_contractions_max": 0,
+    "serialization_score_vector_delta_max": 0.0,
+    "verifier_p95_seconds_max": 2.0,
+    "polarity_rejection_rate_min": 1.0,
+    "extraction_span_hash_schema_rate_min": 1.0,
+    "duplicate_extract_node_f1_min": 0.7,
+    "duplicate_extract_edge_f1_min": 0.6,
+    "ungrounded_extracted_objects_max": 0
+  },
+  "positive_families": [
+    "paraphrase",
+    "vocabulary_substitution",
+    "irrelevant_branch",
+    "partial_graph",
+    "transparent_granularity",
+    "same_domain_structural_match",
+    "serialization_permutation",
+    "modest_extraction_error",
+    "cross_domain_analogy",
+    "branch_continuation",
+    "method_knowledge_bridge"
+  ],
+  "negative_families": [
+    "same_vocabulary_wrong_structure",
+    "same_topic_different_intent",
+    "local_match_global_conflict",
+    "generic_motif_distractor",
+    "accidental_semantic_similarity"
+  ],
+  "manual_review_families": [
+    "same_domain_structural_match",
+    "cross_domain_analogy",
+    "same_topic_different_intent",
+    "local_match_global_conflict",
+    "generic_motif_distractor",
+    "accidental_semantic_similarity",
+    "branch_continuation",
+    "method_knowledge_bridge"
+  ],
+  "non_compensating": true
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/extraction-prediction.schema.json",
+  "title": "Benchmark v0.1 extraction prediction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["extraction_case_id", "thought_dna"],
+  "properties": {
+    "extraction_case_id": {"type": "string"},
+    "thought_dna": {"type": "object"}
+  }
+}
