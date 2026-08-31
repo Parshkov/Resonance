@@ -47,6 +47,13 @@ channel; a single scalar or symmetrized structure matrix is prohibited.
 Reversed direction, incompatible relation type, assertion, or modality receives
 no compatibility credit.
 
+The exact adjudicator is the polarity boundary for the entire pipeline. A
+high-confidence mapped `causes`/`prevents`, asserted/negated, or directed-sign
+conflict invalidates that correspondence and prevents a direct/analogical
+acceptance unless a different conflict-free mapping passes. This is a hard
+decision rule, not merely a small negative weight: E1 shows structural retrieval
+can rank a one-edge polarity flip above a true noisy analogue.
+
 The final adjudicator evaluates the discrete mapping with the
 [Scoring Contract](../RESONANCE_SCORING_v0.1.md), including signed
 contradictions. RRWM's non-negative relaxation is a proposal mechanism, never
@@ -98,6 +105,8 @@ polarity, assertion, direction, or modality differences reject the path match.
 - R0-D supplies the only semantically guarded granularity mechanism.
 - R0-G supplies correspondence, hard-negative, runtime, and stage-isolation
   metrics.
+- R0-B E1 shows why retrieval-side redundancy cannot be trusted for polarity;
+  the verifier must reject the surfaced sign-inverted near-duplicate.
 
 Exact artifacts and head SHAs are recorded in
 [R0 Synthesis](../../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
@@ -162,8 +171,11 @@ Mandatory verifier gates:
 - directed typed edge preservation at least `0.75`;
 - zero false contractions of marked meaningful nodes;
 - p95 verification time at most `2 s` per 50×50 pair after candidate pruning on
-  the declared reference CPU; and
-- deterministic exact rescoring and mapping-set equivalence for fixed inputs.
+  the declared reference CPU;
+- deterministic exact rescoring and mapping-set equivalence for fixed inputs;
+  and
+- every retrieved polarity-flip regression is rejected end-to-end even when it
+  ranks above the true analogue during candidate retrieval.
 
 The bake-off includes semantic Hungarian, SME-lite greedy, QAP hybrid,
 partial/multi-relational FGW-CG with identical rescore, and exact/timed GED only

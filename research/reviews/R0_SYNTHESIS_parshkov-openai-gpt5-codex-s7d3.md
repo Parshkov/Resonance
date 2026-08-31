@@ -31,11 +31,11 @@ including the formerly blind B1/B2 and C1/C2 pairs, into seven proposed outputs:
 6. [Benchmark v0.1](../../benchmark/R0_BENCHMARK_v0.1.md); and
 7. [Resonance Scoring and Explanation Contract v0.1](../../docs/RESONANCE_SCORING_v0.1.md).
 
-The overall result is a **PROVISIONAL GO** for an extraction and benchmark
-prototype, and a **NO-GO** for claiming million-corpus cross-domain analogical
-retrieval before the structural channel passes its explicit gates. Both ADRs are
-`proposed`, not accepted; this submission does not silently open the core
-implementation gate.
+The revised result is a **PROVISIONAL GO** for an extraction, benchmark, and
+multi-scale structural-retrieval prototype behind the R0-G gate. It remains a
+**NO-GO** for claiming million-corpus, real-distribution cross-domain recall
+before that gate and a corpus-scale replay pass. Both ADRs are `proposed`, not
+accepted; this submission does not silently open the core implementation gate.
 
 # Inputs Reviewed
 
@@ -63,6 +63,7 @@ inspected:
 | R0-F2 independent repeat | [#32](https://github.com/Parshkov/Resonance/pull/32) | `cfc0e8ea5391930da5487626c927be6c937abc31` | corroborates exact spans, abstention, manual bypass |
 | R0-C3 independent repeat + executed experiment | [#33](https://github.com/Parshkov/Resonance/pull/33) | `5f4b5aca36cb10a098a162128ae826c798a9a683` | multi-relational FGW, restart/seed and generic-motif evidence |
 | B/C comparative `REVIEW_INPUT` | [#34](https://github.com/Parshkov/Resonance/pull/34) | `1ffe6518d1d4f5babdfbc0b5743ada2f6c12493b` | conflict-disclosed review of B1/B2/H and C1/C2/C3 |
+| R0-B E1 post-submit evidence | [#36](https://github.com/Parshkov/Resonance/pull/36) | `0c48babb20c5829bfce5f4a7e6c796cbf1e9d661` (merged as `33bce16e75d5d5f8583ebf15caa6f2e50f7b4cac`) | executes the B review's structural-retrieval kill test |
 
 These repeats and reviews do not replace the canonical primary runs. The PR #34
 reviewer discloses that the same human sponsor authored B2 and C3; its
@@ -76,6 +77,17 @@ including clean cross-domain `1.000`, noisy cross-domain `0.740`, generic long
 chain `0.512`, and seed accuracy `0.896 -> 0.750`. Runtime is machine-dependent:
 this run measured 13.7 ms for 50×50 versus C3's 8.7 ms. No other submission's
 analytic estimate or toy result was relabeled as a synthesis-run measurement.
+
+After the first synthesis `SUBMIT`, PR #36 supplied the previously open E1
+experiment and triggered a formal `REVISION_REQUESTED`. Its exact stdlib script
+was rerun locally. MULTI passed 12 reproduced world/size/seed configurations;
+at `N=30000` in the rich world, `org_noisy` ranked 4, the best generic chain
+ranked 5, and 1,834 postings were touched. The polarity-flipped near-duplicate
+ranked 3 above the true noisy analogue throughout. Local build/query timings
+differed from the contributor's machine and are treated as machine-specific,
+not as an SLA. E1's toy role/relation inventories are not identical to Thought
+DNA v0.1 (`increases`, `enables`, and `precedes` appear in E1), so the run
+validates the retrieval machinery rather than freezing the extraction schema.
 
 # Independent Convergence
 
@@ -113,14 +125,28 @@ correctly limits that attack: H's minimal chains omit B1/B2 landmark descriptors
 distance buckets, and correspondence-consensus voting, so it falsifies a naive
 path bag rather than the complete constellation design.
 
-**Resolution:** content/knowledge retrieval is the default v0.1 candidate
-generator. The complete structural relational-fingerprint design may be built
-only as an unblended shadow experiment and promoted only after passing
-self-match, full-constellation generic-motif precision, cross-domain recall, and
-posting-skew gates. Seed correspondences are retained as optional hints if it is
-promoted. This preserves B1's falsifiable proposal, B2's entropy accounting, and
-H's valid entropy/motif warning without overstating H's toy as a test of the
-complete design.
+**Initial submitted resolution (`7864446`):** content/knowledge retrieval was
+the default v0.1 generator and the complete structural design remained an
+unblended shadow experiment. That was the correct state before E1 existed, but
+it is preserved here as superseded evidence history rather than silently erased.
+
+**Post-submit E1 evidence:** PR #36 runs the full descriptor + typed path +
+distance + DF/IDF + injective-consensus design against full constellations in a
+rich-random world and an 80%-bare-chain world. MULTI passes the kill rule across
+the tested sizes and four seeds. Role-only D0 fails systematically at `N=10000`
+in the rich world; D1 survives but is brittle under graph edits, so combining D0
+and D1 is mandatory. Touched postings grow 216 -> 819 -> 1,834 as the rich
+corpus grows `10^3 -> 10^4 -> 3*10^4`. The rich-world positive margin is thin,
+and one `causes -> prevents` near-duplicate still outranks the true analogue.
+
+**Revised resolution:** include the unblended **multi-scale structural channel
+in v0.1 behind the R0-G architecture gate**, alongside content and knowledge
+channels. It returns candidates and optional seeds, never a final resonance
+decision. Its output is explicitly polarity-unreliable and MUST pass through a
+verifier-side sign/direction rejection before user-visible acceptance. E1
+refutes H's NO-GO as stated while preserving H's entropy, extraction, generic
+motif, and polarity warnings. Real-corpus distribution and million-scale recall
+remain open.
 
 ## C1 versus C2 versus C3
 
@@ -174,7 +200,7 @@ edge-to-path verification. Only transparent nodes explicitly marked
 | Extraction | F and F2 converge; H identifies relation instability | staged span → role → closed relation → validate; abstain; manual bypass | duplicate-extract node F1 ≥0.70 and edge F1 ≥0.60 on calibration set | medium |
 | Relation vocabulary | A/B need direction and polarity; F limits reliable types | `causes`, `prevents`, `requires`, `part_of`, `constrains`, `supports`, `contradicts`; versioned compatibility table | explicit-cue and polarity tests | medium |
 | Higher-order structure | A needs systematicity; F rejects nested extraction | compile a derived statement/chain view; never treat it as new source truth | improves hard-negative ranking without provenance loss | medium |
-| Retrieval | B1 GO; B2 qualified GO; H qualified NO-GO | content + specific concept postings by default; structural fingerprints shadow-only | promotion gates in retrieval ADR | medium-low for global analogy |
+| Retrieval | B1/B2 design convergence; H warning; E1 full-design pass with corrections | content, knowledge, and mandatory MULTI structural candidates; unblended scores; structural output polarity-unreliable | R0-G gate plus real-distribution scale replay | medium for v0.1, low for million-scale claim |
 | Candidate hand-off | B1/B2/C1 agree | ranked IDs plus per-channel scores and optional seed correspondences | deterministic replay | high |
 | Verification | C1 typed QAP; C2 pFGW; C3 multi-relational FGW | typed-directed soft proposal → consistency → partial Hungarian → exact scorer; solver selected by bake-off | benchmark thresholds and ≤2 s/pair target | medium |
 | Granularity | D versus generic coarsening | reversible guarded suppression plus bounded edge-to-path matching | zero false contraction in gate cases | medium-high |
@@ -188,7 +214,8 @@ edge-to-path verification. Only transparent nodes explicitly marked
 | Assumption | Current evidence | If false | Required experiment |
 |---|---|---|---|
 | Closed roles/relations repeat across extraction | literature-backed, not measured on Resonance text | all structural features drift | duplicate greedy extraction with span-aligned node/edge F1 |
-| Generic motifs can be suppressed without losing analogical recall | disputed by B1/B2/H | structural channel cannot be global retrieval | generic-motif pack plus corpus-skew scaling |
+| Generic motifs can be suppressed without losing analogical recall | E1 passes two synthetic worlds and four seeds; rich margin is thin | structural channel fails the R0-G gate or remains corpus-specific | margin distribution on reviewed fixtures and real-like corpus skew |
+| E1 discrimination transfers to Thought DNA v0.1's vocabulary | machinery passes, but E1 uses different role/relation enums | rare branch entropy may disappear under the canonical extraction schema | DNA-native companion of the exact E1 matrix |
 | Candidate pruning retains cross-domain correspondences | unmeasured | QAP cannot recover a pair it never sees | seeded/unseeded oracle-candidate verification |
 | One proposal solver dominates after identical exact rescore | C1 and C3 executed different toys/machines; C2 unexecuted | retain the simpler winner or SME-lite | frozen one-machine QAP/FGW/SME-lite bake-off |
 | `atomic=false` can be assigned conservatively | D hypothesis | false contractions erase mechanisms | meaningful-versus-transparent subdivision cases |
@@ -208,9 +235,10 @@ fails.
 3. **Oracle-pair verifier bake-off:** semantic Hungarian, SME-lite greedy, typed
    QAP hybrid, pFGW+rescore, and C3's per-relation-plus-transpose FGW-CG on the
    same pairs and machine, with seeded and unseeded restarts.
-4. **Structural retrieval shadow test:** B1-style pair fingerprints and B2-style
-   monotone path shingles, measured against H's generic-motif pack and the
-   benchmark's cross-domain positives.
+4. **Structural retrieval gate extension:** retain E1 as a regression, then
+   measure MULTI recall, positive-minus-generic margin distribution, polarity
+   inversions, and postings skew across all R0-G packs and real-like fillers;
+   run a companion using the exact Thought DNA v0.1 enums.
 5. **Scale replay:** fixed queries against increasing synthetic distractor IDs;
    report posting-list distribution, touched postings, build size, p50/p95, and
    recall rather than extrapolating from 136 graphs.
@@ -231,8 +259,8 @@ Adopt the contracts in the linked documents for review:
 ```text
 source text / manual graph
   -> staged grounded Thought DNA
-  -> content + Knowledge DNA candidate retrieval
-       + optional shadow structural retrieval
+  -> unblended content + Knowledge DNA + MULTI structural retrieval
+       (structural candidates require polarity-aware verification)
   -> top-K candidates (+ optional seed correspondences)
   -> canonical + guarded coarse graph views
   -> typed-directed soft proposal (QAP and multi-relational FGW candidates)
@@ -240,9 +268,9 @@ source text / manual graph
   -> score vector, class, correspondence, contradictions, provenance
 ```
 
-Do not advertise cross-domain analogical recall at corpus scale in v0.1. The
-verifier may validate a supplied/retrieved cross-domain pair; discovering that
-pair globally remains an experiment.
+Do not advertise cross-domain analogical recall at corpus scale from E1 alone.
+The channel is an explicit v0.1 architecture component, but its claims remain
+bounded by R0-G and a future real-distribution scale replay.
 
 # Confidence
 
@@ -256,8 +284,8 @@ retrieval. This is exactly why the outputs remain proposed and benchmark-gated.
    accept grounded relation-as-argument statements?
 2. What corpus-derived relation compatibility and composition table preserves
    recall without collapsing `causes`, `prevents`, and `requires`?
-3. Does any structural fingerprint family promote out of shadow mode after the
-   generic-motif and extraction-self-match gates?
+3. Does MULTI retain its E1 margin across all R0-G packs and real-distribution
+   motif skew, rather than one synthetic constellation family?
 4. Which typed proposal solver wins the one-machine bake-off, and can its
    candidate mask/transport preserve cross-domain pairs without unstable cost?
 5. Can two human reviewers agree on the six gate analogies and mappings?

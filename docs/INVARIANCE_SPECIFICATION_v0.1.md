@@ -31,13 +31,13 @@ versioned derived views. It never licenses mutation of the canonical graph.
 | ID | Transformation | Extract | Retrieve | Verify | v0.1 level | Required mechanism |
 |---|---|---|---|---|---|---|
 | A | paraphrase | tolerant | content: invariant; structural: tolerant | tolerant | tolerant end-to-end | span grounding, normalized roles, optional concepts, typed structure |
-| B | vocabulary substitution | tolerant | semantic: tolerant; structural shadow: target invariant | tolerant | tolerant | role/relation channel independent of label text |
+| B | vocabulary substitution | tolerant | MULTI structural: gated invariant target | tolerant | tolerant | D0+D1 role/relation channel independent of label text |
 | C | serialized node/edge order | invariant | invariant | invariant | invariant | canonical serialization and set/graph operations |
 | D | irrelevant branch insertion | extra grounded branch allowed | tolerant | tolerant | tolerant | local features, partial mapping, unmatched branch, containment normalization |
 | E | partial observation / missing nodes | must abstain, never fill | tolerant | tolerant | tolerant | partial candidate evidence and explicit unmatched nodes |
 | F | different granularity | may differ | unsupported by default | conditional | conditional only | guarded suppression and bounded edge-to-path mapping |
 | G | different graph sizes | expected | tolerant | invariant to padding/order, tolerant to content | tolerant | rectangular partial assignment and coverage reporting |
-| H | domain substitution with preserved relations | no special action | unsupported by default content path; structural shadow target | tolerant | verification-only promise | functional roles and typed relation consistency |
+| H | domain substitution with preserved relations | no special action | MULTI structural: supported only after R0-G gate | tolerant | gated end-to-end | functional roles, multiscale descriptors, typed relation consistency |
 | I | modest extraction mistakes | exposed by confidence/provenance | tolerant only after self-match gate | tolerant | tolerant, gated | confidence, abstention, partial mapping, duplicate-extract tests |
 
 ## Stage Responsibilities
@@ -52,11 +52,19 @@ the self-match gate in Benchmark v0.1.
 
 ### Retrieval
 
-The default content/knowledge path supports paraphrase, same-domain, and
-complementary recall. It does not promise domain-substitution invariance.
-Structural fingerprints are a shadow channel until promoted by the Retrieval
-ADR gates. Scores from semantic, knowledge, and structural channels remain
-separate.
+Content/knowledge paths support paraphrase, same-domain, and complementary
+recall. The mandatory MULTI structural path targets vocabulary/domain
+substitution and combines D0 roles with D1 directed typed neighborhoods,
+DF/IDF suppression, and correspondence consensus. It is included in v0.1 only
+behind the Retrieval ADR and R0-G gates. Scores from semantic, knowledge, and
+structural channels remain separate.
+
+Retrieval is not required to rank a polarity-flipped near-duplicate below every
+true analogue: E1 shows that expectation is unrealistic for redundant local
+fingerprints. It MUST label structural output polarity-unreliable, and
+verification MUST reject mapped sign/direction conflicts before end-to-end
+acceptance. Polarity remains an anti-invariance of the system, not a guaranteed
+ordering property of its recall stage.
 
 ### Verification
 
@@ -115,7 +123,7 @@ The following transformations must not be normalized away:
 | E | partial graph | Recall@5 ≥ 4/6; surviving-pair F1 reported |
 | F | transparent and meaningful subdivision | transparent recall target; zero meaningful-node contractions |
 | G | size variation | no forced dummy match in explanation |
-| H | cross-domain analogy | oracle-pair verifier ranks positive over lexical negative; retrieval reported separately |
+| H | cross-domain analogy | MULTI Recall@K and margin reported separately; end-to-end positive outranks lexical negative |
 | I | extraction error and duplicate extraction | self-match and error-family results reported; no silent fill |
 | anti-invariance | reversal, polarity, intent, global conflict | each negative family has at most 1/6 false positives |
 

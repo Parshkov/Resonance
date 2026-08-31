@@ -28,3 +28,4 @@ This identity is scoped to the canonical R0 synthesis gate. The runtime does not
 - R0-SYNTHESIS decision matrix and reconciliation
 - Invariance Specification, Retrieval ADR, and Verification ADR
 - Thought DNA, Benchmark, and Resonance Scoring contracts v0.1
+- post-submit synthesis revision incorporating reproduced R0-B E1 evidence

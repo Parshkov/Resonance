@@ -19,12 +19,17 @@ weights are initial benchmark parameters, not learned truths.
   "query_id": "q",
   "candidate_id": "c",
   "candidate_config": "immutable-config-hash",
+  "retrieval_flags": {
+    "requires_structural_verification": true,
+    "polarity_reliable": false
+  },
   "mapping": [{"query_node": "q1", "candidate_node": "c4"}],
   "matched_relations": [],
   "edge_path_matches": [],
   "unmatched_query_nodes": [],
   "unmatched_candidate_nodes": [],
   "contradictions": [],
+  "hard_rejection": null,
   "components": {},
   "classification": "analogical",
   "confidence": "provisional"
@@ -54,6 +59,8 @@ All components are in `[0,1]` before the contradiction subtraction.
 - `X_contradiction`: confidence-weighted mass of mapped endpoint pairs whose
   direction, relation type, assertion, modality, or role constraints conflict,
   normalized by comparable induced relation mass.
+- `H_sign_conflict`: boolean hard boundary for a high-confidence mapped
+  `causes`/`prevents`, asserted/negated, or direction/sign inversion.
 - `E_nodes`: number of mapped nodes.
 - `E_relations`: effective confidence-weighted count of preserved direct or
   guarded path relations.
@@ -94,6 +101,13 @@ structural_raw =
 structural_score = evidence_gate * clamp(structural_raw, 0, 1)
 ```
 
+The formula is evaluated only on a conflict-free final mapping. If
+`H_sign_conflict=true`, the adjudicator first searches for a valid alternative
+mapping; if none passes, `structural_score=0`, `hard_rejection` records the
+conflict, and direct/analogical classification is prohibited. This rule is
+required because E1 shows a polarity-flipped near-duplicate can rank above the
+true analogue during recall-oriented retrieval.
+
 These values are intentionally structure-heavy and reject accidental one-edge
 motifs. They are frozen before the first gate run and may be changed only on
 calibration packs. Gate failures are reported before any new version is tuned.
@@ -131,7 +145,9 @@ frozen. Scores across modes are not assumed comparable.
 if explicit requires/about bridge and K_comp_q_to_c >= T_comp:
     complementary candidate (direction q -> c)
 
-if structural_score >= T_structure and X_contradiction <= T_contradiction:
+if not H_sign_conflict and
+   structural_score >= T_structure and
+   X_contradiction <= T_contradiction:
     if knowledge evidence is present and K_about < T_about:
         analogical
     else:
@@ -160,9 +176,11 @@ Each contradiction contains:
 - source spans or manual provenance; and
 - the rule/version that classified it.
 
-Causal reversal, `causes`/`prevents`, `requires`/`causes`, and asserted/negated
-conflicts are high-severity by default. Low-confidence missing relations are
-unmatched evidence, not automatically contradictions.
+Causal reversal, `causes`/`prevents`, and asserted/negated sign conflicts are
+hard rejections at calibrated high confidence. `requires`/`causes` and other
+type conflicts contribute to contradiction policy unless separately promoted
+to a hard rule. Low-confidence missing relations are unmatched evidence, not
+automatically contradictions.
 
 ## Explanation Requirements
 

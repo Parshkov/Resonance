@@ -60,6 +60,11 @@ Each seed also has two independently generated extraction observations for the
 self-match prerequisite. They may reuse family 8's source text but are scored
 as extraction artifacts, not as an additional candidate family.
 
+Across the six gate packs, family 10 MUST include at least two one-edge
+`causes`/`prevents` polarity flips, two direction reversals, and two broader
+rewirings. Retrieval is allowed to surface all six; end-to-end verification must
+reject them.
+
 ## Files and Schemas
 
 Recommended layout for implemented fixtures:
@@ -120,6 +125,7 @@ For each query and mode:
 ranked candidate IDs
 per-channel raw/calibrated scores
 optional seed correspondences
+requires_structural_verification / polarity_reliable flags
 index / corpus / feature versions
 latency and postings touched
 ```
@@ -161,6 +167,10 @@ pair score/mapping is a verifier failure.
   deterministic replay hash.
 - Fragment/whole score stability across size ratios `1:2`, `1:4`, and `1:8`,
   with containment and symmetric coverage reported separately.
+- Structural margin `score(noisy_true_analogue) - max(score(generic_motif))`
+  by pack, filler world, corpus size, and seed; report minimum and distribution,
+  not only pass count.
+- Polarity-flip retrieval rank/score and end-to-end rejection rate.
 
 Scores are reported per component under the Scoring Contract. There is no
 single aggregate allowed to hide a family failure.
@@ -182,6 +192,7 @@ directed typed edge accuracy >= 0.75
 false meaningful-node contractions == 0
 serialization score-vector delta == 0
 p95 verifier latency <= 2 s per 50x50 pair on the declared reference CPU
+end-to-end polarity-flip rejection == 100%
 ```
 
 Extraction is a prerequisite:
@@ -203,22 +214,59 @@ require Precision@3 at least `0.67`, correct bridge direction, and no conversion
 of a complementary result into structural analogy. If not claimed, report the
 mode as unsupported.
 
-## Structural Retrieval Promotion Gate
+## Structural Retrieval Gate
 
-In addition to the architecture gate, a shadow structural channel needs:
+The v0.1 MULTI structural channel must satisfy:
 
 - structural-only cross-domain Recall@20 at least `0.50`;
 - intended analogue strictly above every generic-motif distractor in each gate
   pack;
-- the full B design enabled: landmark descriptors, typed directed paths,
-  distance buckets, DF/IDF policy, and injective correspondence-consensus voting;
+- positive structural margin in every frozen seed/world/size E1 regression, with
+  the thin-margin distribution reported;
+- the full B design enabled: D0+D1 landmark descriptors, typed directed paths,
+  distance buckets, DF/IDF policy, and injective correspondence-consensus
+  voting; role-only D0 is a required non-shipping control;
+- the exact legacy E1 regression and its Thought-DNA-native companion both
+  pass, so toy-only relation entropy cannot grant the gate;
 - sublinear postings touched from `10^3` through `10^5` synthetic distractors
-  under a fixed 64-feature query budget; and
+  under a fixed 64-feature query budget;
 - deterministic seed correspondences and unchanged recall after rerun on the
-  same corpus snapshot.
+  same corpus snapshot; and
+- `polarity_reliable=false` on structural retrieval output plus 100% verifier
+  rejection of the polarity-flip regression before user-visible acceptance.
 
-Failure keeps structural retrieval in shadow mode. It does not invalidate the
-structural verifier.
+Failure is a NO-GO for the v0.1 structural retrieval capability and requires an
+ADR revision; it does not invalidate the structural verifier.
+
+### E1 executable regression
+
+Retain merged
+`research/experiments/R0_E1_fingerprint_discrimination.py` as an executable
+regression and extend, rather than rewrite, its evidence matrix:
+
+- worlds `R` (rich random typed graphs) and `Z` (80% bare causal chains);
+- the default seed at corpus sizes `10^3`, `10^4`, and `3*10^4` in both worlds;
+- three additional fixed, recorded seeds at `10^4` in both worlds, producing
+  the 12-case regression matrix, then the scale replay below;
+- D0, D1, and MULTI descriptors;
+- noisy cross-domain organisation analogue, three bare-chain distractors,
+  topology/direction negatives, and the one-edge polarity flip; and
+- postings touched, build/query time, live/dead keys, ranks, scores, margin, and
+  fortress/tumor motif-family isolation.
+
+PR #36's reference evidence is provenance, not a universal threshold: MULTI
+passes the stated kill rule; D0 fails at rich-world `N=10^4`; rich-world margin
+is only about `0.009`; and touched postings grow `216 -> 819 -> 1834` for the
+default rich-world seed. The synthesis rerun reproduced the ranks/pass results
+across 12 world/size/seed configurations. Machine-specific timing differences
+must be reported rather than normalized away.
+
+The exact E1 script deliberately remains unchanged, including its toy role and
+relation enums. It contains `increases`, `enables`, and `precedes`, which are not
+in Thought DNA v0.1's extraction relation set. Add a companion matrix authored
+with the exact DNA v0.1 roles/relations (or a reviewed versioned projection) and
+apply the same kill rule. Passing the legacy toy alone cannot satisfy the
+DNA-native structural gate.
 
 ## Solver Bake-Off
 
@@ -258,6 +306,10 @@ Report:
 - p50/p95 query latency;
 - Recall@5/20; and
 - peak memory.
+
+Run both E1 filler worlds at every feasible scale and add a third distribution
+derived from actual extracted fixtures once available. The two synthetic worlds
+bracket hypotheses; they do not establish the real motif distribution.
 
 Do not claim scale if synthetic distractors are uniformly distributed while the
 real system expects a Zipfian motif tail.

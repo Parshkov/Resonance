@@ -22,7 +22,7 @@ The numbering/order may change as evidence arrives.
 
 ## Current proposed records
 
-- [ADR-0002 — candidate retrieval with a gated structural shadow channel](ADR-0002-retrieval-candidate-generation.md)
+- [ADR-0002 — candidate retrieval with gated multi-scale structural fingerprints](ADR-0002-retrieval-candidate-generation.md)
 - [ADR-0003 — typed partial graph alignment for structural verification](ADR-0003-structural-verification.md)
 
 These remain proposed until maintainer review and the declared benchmark gates;
