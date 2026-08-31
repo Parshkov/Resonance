@@ -4,8 +4,10 @@ from .protocols import CandidateIndex, ConfigSource, EngineFacade, Extractor, Gr
 from .types import (
     INTERFACE_VERSION,
     SCORE_CONTRACT_VERSION,
+    SCORE_WIRE_NAMES,
     CandidateResult,
     ConfigRef,
+    RetrievalFlags,
     Contradiction,
     EdgePathMatch,
     Explanation,
@@ -22,7 +24,9 @@ from .types import (
 __all__ = [
     "INTERFACE_VERSION",
     "SCORE_CONTRACT_VERSION",
+    "SCORE_WIRE_NAMES",
     "ConfigRef",
+    "RetrievalFlags",
     "ExtractionResult",
     "SeedCorrespondence",
     "CandidateResult",
