@@ -44,7 +44,14 @@ they do not import one another's internals.
 - Retrieval never supplies a semantic node-pair mask that constrains structural
   correspondence.
 - `VerifierResult` exposes a score vector, mapping, contradictions, unmatched
-  regions and structured provenance. There is no blended-only result type.
+  nodes **and relations**, retrieval flags, and structured provenance. There is
+  no blended-only result type. Mapping/unmatched/contradiction payloads in
+  `Explanation` must equal the parent `VerifierResult`.
+- `ScoreVector` types Scoring v0.1 components (`N_role`, `R_direct`, `R_path`,
+  `Y_systematicity`, `H_sign_conflict`, `E_nodes`, `E_relations`, …) and
+  round-trips through `to_wire()` / `from_wire()`.
+- `CandidateResult` snapshots channel maps; callers cannot alias-mutate them.
+- `EdgePathMatch` carries query provenance and per-relation candidate provenance.
 - `ConfigRef` carries schema/component/config identity through boundaries.
 - `EngineFacade` is a core Python protocol, not a transport protocol. R6 may
   adapt it, but must not move matching logic into handlers.

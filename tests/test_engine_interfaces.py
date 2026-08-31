@@ -7,6 +7,7 @@ from pathlib import Path
 from src.graph import ThoughtGraph
 from src.interfaces import (
     SCORE_CONTRACT_VERSION,
+    SCORE_WIRE_NAMES,
     CandidateIndex,
     CandidateResult,
     ConfigRef,
@@ -20,6 +21,7 @@ from src.interfaces import (
     NodeMatch,
     RelationMatch,
     ResonanceHit,
+    RetrievalFlags,
     ScoreVector,
     SeedCorrespondence,
     StructuralVerifier,
@@ -89,11 +91,34 @@ class FakeIndex:
         return out[:k]
 
 
+def _empty_explanation_kwargs(query: ThoughtGraph, mapping=(), matched_relations=(), edge_path_matches=(), contradictions=()):
+    return {
+        "mapping": mapping,
+        "matched_relations": matched_relations,
+        "edge_path_matches": edge_path_matches,
+        "unmatched_query_nodes": ("n2",),
+        "unmatched_candidate_nodes": ("n2",),
+        "unmatched_query_relations": ("r9",),
+        "unmatched_candidate_relations": ("r9",),
+        "contradictions": contradictions,
+        "retrieval_channels": ("structural", "content"),
+        "systematicity_systems": (),
+        "score_model_version": SCORE_CONTRACT_VERSION,
+        "schema_version": query.schema_version,
+        "config_hash": CFG.config_hash,
+    }
+
+
 class FakeVerifier:
     def verify(self, query: ThoughtGraph, candidate: ThoughtGraph, *, seeds=()):
         qp = ItemProvenance(query.thought_id, "n1", query.provenance.kind, query.nodes[0].spans)
         cp = ItemProvenance(candidate.thought_id, "n1", candidate.provenance.kind, candidate.nodes[0].spans)
         mapping = (NodeMatch("n1", "n1", 1.0, qp, cp),)
+        qrp = ItemProvenance(query.thought_id, "r0", query.provenance.kind, ())
+        crp = ItemProvenance(candidate.thought_id, "r0a", candidate.provenance.kind, ())
+        paths = (
+            EdgePathMatch("r0", ("r0a",), ("x0",), 1.0, qrp, (crp,)),
+        )
         components = ScoreVector(
             structural=0.8,
             semantic=0.1,
@@ -105,22 +130,19 @@ class FakeVerifier:
             coverage_symmetric=0.5,
             contradiction=0.0,
             evidence_gate=0.5,
+            n_role=0.1,
+            r_direct=0.7,
+            r_path=0.1,
+            y_systematicity=0.8,
+            h_sign_conflict=False,
+            e_nodes=2.0,
+            e_relations=1.0,
             retrieval_content=0.1,
             retrieval_structural=0.8,
         )
-        explanation = Explanation(
-            mapping=mapping,
-            matched_relations=(),
-            edge_path_matches=(),
-            unmatched_query_nodes=("n2",),
-            unmatched_candidate_nodes=("n2",),
-            contradictions=(),
-            retrieval_channels=("structural", "content"),
-            systematicity_systems=(),
-            score_model_version=SCORE_CONTRACT_VERSION,
-            schema_version=query.schema_version,
-            config_hash=CFG.config_hash,
-        )
+        shared = _empty_explanation_kwargs(query, mapping=mapping, edge_path_matches=paths)
+        explanation = Explanation(**shared)
+        flags = RetrievalFlags(requires_structural_verification=True, polarity_reliable=False)
         return VerifierResult(
             contract_version=SCORE_CONTRACT_VERSION,
             query_id=query.thought_id,
@@ -128,9 +150,11 @@ class FakeVerifier:
             candidate_config=CFG.config_hash,
             mapping=mapping,
             matched_relations=(),
-            edge_path_matches=(),
-            unmatched_query_nodes=("n2",),
-            unmatched_candidate_nodes=("n2",),
+            edge_path_matches=paths,
+            unmatched_query_nodes=shared["unmatched_query_nodes"],
+            unmatched_candidate_nodes=shared["unmatched_candidate_nodes"],
+            unmatched_query_relations=shared["unmatched_query_relations"],
+            unmatched_candidate_relations=shared["unmatched_candidate_relations"],
             contradictions=(),
             hard_rejection=None,
             components=components,
@@ -138,6 +162,7 @@ class FakeVerifier:
             confidence="provisional",
             explanation=explanation,
             solver_config=CFG,
+            retrieval_flags=flags,
         )
 
 
@@ -201,6 +226,14 @@ class InterfaceTests(unittest.TestCase):
         self.assertEqual(hit.verification.explanation.mapping[0].query_provenance.thought_id, "q")
         self.assertEqual(hit.verification.explanation.mapping[0].candidate_provenance.thought_id, "c")
         self.assertEqual(hit.verification.solver_config.config_hash, CFG.config_hash)
+        self.assertEqual(hit.verification.unmatched_query_relations, ("r9",))
+        self.assertEqual(hit.verification.unmatched_candidate_relations, ("r9",))
+        self.assertEqual(hit.verification.retrieval_flags.to_wire(), {
+            "requires_structural_verification": True,
+            "polarity_reliable": False,
+        })
+        self.assertEqual(hit.verification.explanation.unmatched_query_relations, ("r9",))
+        self.assertEqual(hit.verification.edge_path_matches[0].candidate_provenances[0].item_id, "r0a")
         self.assertIs(engine.explain("q", "c"), hit.verification)
         self.assertIs(engine.get("c"), candidate)
 
@@ -221,10 +254,92 @@ class InterfaceTests(unittest.TestCase):
 
     def test_score_contract_is_vector_not_blended_scalar(self):
         fields = ScoreVector.__dataclass_fields__
-        for required in ("structural", "semantic", "knowledge_about", "knowledge_requires", "contradiction", "evidence_gate"):
+        for required in (
+            "structural", "semantic", "knowledge_about", "knowledge_requires", "contradiction",
+            "evidence_gate", "n_role", "r_direct", "r_path", "y_systematicity",
+            "h_sign_conflict", "e_nodes", "e_relations",
+        ):
             self.assertIn(required, fields)
         self.assertNotIn("score", fields)
         self.assertNotIn("similarity", fields)
+
+    def test_score_vector_round_trips_scoring_v0_1_wire_names(self):
+        vector = ScoreVector(
+            structural=0.8,
+            semantic=0.1,
+            knowledge_about=0.2,
+            knowledge_requires=0.0,
+            complement_query_to_candidate=0.3,
+            complement_candidate_to_query=0.0,
+            coverage_containment=0.5,
+            coverage_symmetric=0.4,
+            contradiction=0.01,
+            evidence_gate=0.9,
+            n_role=0.1,
+            r_direct=0.7,
+            r_path=0.05,
+            y_systematicity=0.8,
+            h_sign_conflict=True,
+            e_nodes=5.0,
+            e_relations=4.0,
+            retrieval_content=0.2,
+            retrieval_knowledge=0.0,
+            retrieval_structural=0.7,
+        )
+        wire = vector.to_wire()
+        for python_name, wire_name in SCORE_WIRE_NAMES.items():
+            self.assertIn(wire_name, wire)
+            self.assertEqual(wire[wire_name], getattr(vector, python_name))
+        restored = ScoreVector.from_wire(wire)
+        self.assertEqual(restored.to_wire(), wire)
+        self.assertTrue(restored.h_sign_conflict)
+        self.assertEqual(restored.q_containment, 0.5)
+        self.assertEqual(restored.x_contradiction, 0.01)
+
+    def test_candidate_maps_are_snapshotted_against_alias_mutation(self):
+        scores = {"content": 0.1, "structural": 0.8}
+        ranks = {"content": 1, "structural": 1}
+        candidate = CandidateResult(
+            candidate_id="c",
+            channel_scores=scores,
+            channel_ranks=ranks,
+            seed_correspondences=(),
+            usable_query_evidence=1.0,
+            requires_structural_verification=True,
+            polarity_reliable=False,
+            index_version="i",
+            feature_version="f",
+            corpus_snapshot="s",
+            config=CFG,
+        )
+        scores["content"] = 99.0
+        ranks["structural"] = 99
+        self.assertEqual(candidate.channel_scores["content"], 0.1)
+        self.assertEqual(candidate.channel_ranks["structural"], 1)
+        with self.assertRaises(TypeError):
+            candidate.channel_scores["content"] = 0.0
+
+    def test_verifier_rejects_contradictory_explanation_payload(self):
+        query = graph_with_id("q")
+        candidate = graph_with_id("c")
+        result = FakeVerifier().verify(query, candidate)
+        with self.assertRaisesRegex(ValueError, "unmatched_query_nodes"):
+            VerifierResult(
+                **{
+                    **{field: getattr(result, field) for field in result.__dataclass_fields__ if field != "explanation"},
+                    "explanation": Explanation(
+                        **{**_empty_explanation_kwargs(query, mapping=result.mapping, edge_path_matches=result.edge_path_matches), "unmatched_query_nodes": ("n-other",)},
+                    ),
+                }
+            )
+
+    def test_compare_without_retrieval_still_carries_fail_closed_flags(self):
+        engine = FakeEngine()
+        query = graph_with_id("q")
+        candidate = graph_with_id("c")
+        result = engine.compare(query, candidate, mode="analogical")
+        self.assertFalse(result.retrieval_flags.polarity_reliable)
+        self.assertTrue(result.retrieval_flags.requires_structural_verification)
 
 
 if __name__ == "__main__":
