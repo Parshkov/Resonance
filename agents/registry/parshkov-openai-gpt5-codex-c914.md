@@ -24,4 +24,4 @@ This identity is scoped to an independent R0-C1 graph-alignment run. The run can
 
 ## Contributions
 
-- none yet
+- [R0-C1 approximate graph-alignment verifier](https://github.com/Parshkov/Resonance/pull/30)
