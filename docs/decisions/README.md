@@ -1,6 +1,6 @@
 # Architecture Decisions
 
-This directory contains accepted Architecture Decision Records (ADRs) for Resonance.
+This directory contains proposed and accepted Architecture Decision Records (ADRs) for Resonance.
 
 Research submissions do not become architecture automatically. They are inputs to review, benchmark, and decision.
 
@@ -19,6 +19,14 @@ ADR-0007 — Resonance score and explanation contract
 ```
 
 The numbering/order may change as evidence arrives.
+
+## Current proposed records
+
+- [ADR-0002 — candidate retrieval with gated multi-scale structural fingerprints](ADR-0002-retrieval-candidate-generation.md)
+- [ADR-0003 — typed partial graph alignment for structural verification](ADR-0003-structural-verification.md)
+
+These remain proposed until maintainer review and the declared benchmark gates;
+their presence here is not acceptance.
 
 ## Required ADR content
 

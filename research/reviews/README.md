@@ -40,8 +40,9 @@ C1 vs C2 -> structural verifier review
 
 After those, synthesize A/D/E/F/G/H around the candidate architecture.
 
-Independent review of the reserved R0-SYNTHESIS revision (PR #35) is in
-`R0_SYNTHESIS_review_parshkov-xai-grok46-k3e8.md`. That file is review input;
-it does not replace the canonical synthesis run.
+## Current synthesis
+
+- [R0 architecture synthesis](R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+- Independent review of the reserved R0-SYNTHESIS revision: `R0_SYNTHESIS_review_parshkov-xai-grok46-k3e8.md` (review input, not a replacement canonical run).
 
 A review does not erase minority conclusions. When uncertainty remains, preserve it in the ADR and state what evidence would trigger reconsideration.
