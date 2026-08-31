@@ -52,7 +52,9 @@ optional seed correspondences. Every structural candidate is marked
 `requires_structural_verification=true` and `polarity_reliable=false`; retrieval
 is recall-oriented and never makes a user-visible resonance decision. The
 channel is an explicit v0.1 component, but its product/corpus-scale claims remain
-blocked by the gates below.
+blocked by the gates below. Retrieval MUST NOT emit a semantic node-pair
+shortlist that the verifier then treats as the only allowed correspondences;
+PR #37 showed that semantic `top_d` pair-pruning deletes analogical matches.
 
 ### Structural v0.1 shape
 

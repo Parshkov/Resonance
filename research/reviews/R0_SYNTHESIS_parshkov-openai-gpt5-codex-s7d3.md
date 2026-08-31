@@ -15,6 +15,14 @@ tools_used:
   - local Python validation
   - temporary Python 3.12 environment with numpy 2.0.2 and scipy 1.13.1 for C3 reproduction
 blind_constraints_preserved: true
+revision_assists:
+  - agent_id: parshkov-xai-grok46-k3e8
+    run_id: R0-SYNTHESIS-REV37
+    consumes: "PR #37 / C-REVIEW2 bake-off (c2f48e2 / 3f30b58) plus PR #48 review map"
+    note: >
+      Assist patch into the reserved canonical run. Does not replace
+      parshkov-openai-gpt5-codex-s7d3 as the canonical synthesis author
+      and is not a second CLAIM on issue #13.
 ---
 
 # Scope
@@ -31,11 +39,14 @@ including the formerly blind B1/B2 and C1/C2 pairs, into seven proposed outputs:
 6. [Benchmark v0.1](../../benchmark/R0_BENCHMARK_v0.1.md); and
 7. [Resonance Scoring and Explanation Contract v0.1](../../docs/RESONANCE_SCORING_v0.1.md).
 
-The revised result is a **PROVISIONAL GO** for an extraction, benchmark, and
-multi-scale structural-retrieval prototype behind the R0-G gate. It remains a
-**NO-GO** for claiming million-corpus, real-distribution cross-domain recall
-before that gate and a corpus-scale replay pass. Both ADRs are `proposed`, not
-accepted; this submission does not silently open the core implementation gate.
+The revised result is a **PROVISIONAL GO** for an extraction, benchmark, a
+multi-scale structural-retrieval prototype behind the R0-G gate, and a
+three-stage verifier whose v0.1 **prototype default** is multi-relational FGW
+(per-type + transpose). It remains a **NO-GO** for claiming million-corpus,
+real-distribution cross-domain recall before that gate and a corpus-scale
+replay pass, and a **NO-GO** for freezing the production proposal solver from
+the 8-node stipulated-oracle bake-off. Both ADRs are `proposed`, not accepted;
+this submission does not silently open the core implementation gate.
 
 # Inputs Reviewed
 
@@ -64,6 +75,8 @@ inspected:
 | R0-C3 independent repeat + executed experiment | [#33](https://github.com/Parshkov/Resonance/pull/33) | `5f4b5aca36cb10a098a162128ae826c798a9a683` | multi-relational FGW, restart/seed and generic-motif evidence |
 | B/C comparative `REVIEW_INPUT` | [#34](https://github.com/Parshkov/Resonance/pull/34) | `1ffe6518d1d4f5babdfbc0b5743ada2f6c12493b` | conflict-disclosed review of B1/B2/H and C1/C2/C3 |
 | R0-B E1 post-submit evidence | [#36](https://github.com/Parshkov/Resonance/pull/36) | `0c48babb20c5829bfce5f4a7e6c796cbf1e9d661` (merged as `33bce16e75d5d5f8583ebf15caa6f2e50f7b4cac`) | executes the B review's structural-retrieval kill test |
+| C-REVIEW2 shared-testbed bake-off | [#37](https://github.com/Parshkov/Resonance/pull/37) | `3f30b58` (merged as `c2f48e2d5ef8217347feadf09f01485554377c63`) | executes E-C1 on one scorer; default prototype vs co-equal fallback |
+| Synthesis review of this PR | [#48](https://github.com/Parshkov/Resonance/pull/48) | review input | maps the #37 gap and the semantic pair-pruning hole |
 
 These repeats and reviews do not replace the canonical primary runs. The PR #34
 reviewer discloses that the same human sponsor authored B2 and C3; its
@@ -88,6 +101,18 @@ differed from the contributor's machine and are treated as machine-specific,
 not as an SLA. E1's toy role/relation inventories are not identical to Thought
 DNA v0.1 (`increases`, `enables`, and `precedes` appear in E1), so the run
 validates the retrieval machinery rather than freezing the extraction schema.
+
+After the E1 revision (`beda225`), maintainer `REVISION_INPUT` required this
+run to consume merged PR #37. That review plus
+`research/experiments/R0_C_REVIEW2_bakeoff.py` executed a shared-testbed
+comparison of semantic Hungarian, C1-style RRWM with and without semantic
+`top_d=3`, C2-style single shortest-path FGW, and C3 multi-relational FGW.
+C3's published table reproduced. This second revision records that bake-off
+as **partially executed**, names a v0.1 prototype default, and keeps the
+production freeze behind the DNA-native / pygmtools / real-encoder follow-ups.
+The pre-#37 wording that the solver choice was unrun is preserved only as
+superseded history. PR #48 (same assist identity as PR #37) is review input,
+not a second independent vote on the ranking.
 
 # Independent Convergence
 
@@ -160,14 +185,32 @@ but also measures non-convex relabeling variance, seed-induced accuracy loss,
 cross-size score incomparability, and only a 0.23 noisy-positive/generic-chain
 margin. All three disagree on proposal optimization, not the decision object.
 
-**Resolution:** adopt the shared typed-directed `soft proposal -> structural
-consistency -> discrete partial mapping -> exact rescore` pattern. Do not select
-a production proposal solver before one-machine head-to-head evidence. Typed
-QAP-RRWM and multi-relational FGW-CG are co-equal gate candidates; partial FGW
-variants cover unmatched-mass alternatives. All terminate in the same mapping
-and scorer. If retrieval seeds are used, at least one unseeded restart is
-mandatory because C3 shows seeds can improve stability while reducing mapping
-accuracy.
+**Initial submitted resolution (`7864446` / `beda225`):** adopt the shared
+typed-directed `soft proposal -> structural consistency -> discrete partial
+mapping -> exact rescore` pattern, and leave QAP-RRWM versus multi-relational
+FGW-CG as co-equal gate candidates until a one-machine bake-off. That was
+correct while C1 and C3 used different toys and C2 was unexecuted. It is
+preserved here as superseded evidence history.
+
+**Post-submit C-REVIEW2 evidence (PR #37, merged `c2f48e2`):** on one shared
+scorer, C1-style RRWM-all and C3 multi-rel FGW `α=0.7` both pass 8/8 combined
+kill rules; C3's published table reproduces; C2-style single shortest-path FGW
+fails the analogical struct/accuracy floors (6/8); C1-style semantic `top_d=3`
+kills the analogical case (`S_struct` 1.000 → 0.024); equal-weight
+`(S_struct+S_sem)/2` inverts analog vs rewired on C3's winning numbers.
+Qualifications remain: numpy RRWM ≠ pygmtools; stipulated 1.00/0.85/0.05
+oracle; 4–11 node graphs; no real encoder.
+
+**Revised resolution:** keep the three-stage hybrid. v0.1 **prototype default**
+is C3 multi-relational FGW (one matrix per relation type plus transpose,
+`α≈0.7` on this testbed). Typed QAP/RRWM remains a **co-equal gate candidate /
+fallback**, with **no semantic top-d pair pruning**. Single-matrix /
+path-distance FGW is not a primary encoding. Partial/ε-padded FGW variants
+remain unmatched-mass alternatives of the FGW family, not a third judge.
+Blended-only public APIs are rejected. Production primary is still selected
+only by the frozen DNA-native gate, not by this toy. If retrieval seeds are
+used, at least one unseeded restart is mandatory because C3 shows seeds can
+improve stability while reducing mapping accuracy.
 
 ## Reified propositions versus extractable binary relations
 
@@ -202,7 +245,7 @@ edge-to-path verification. Only transparent nodes explicitly marked
 | Higher-order structure | A needs systematicity; F rejects nested extraction | compile a derived statement/chain view; never treat it as new source truth | improves hard-negative ranking without provenance loss | medium |
 | Retrieval | B1/B2 design convergence; H warning; E1 full-design pass with corrections | content, knowledge, and mandatory MULTI structural candidates; unblended scores; structural output polarity-unreliable | R0-G gate plus real-distribution scale replay | medium for v0.1, low for million-scale claim |
 | Candidate hand-off | B1/B2/C1 agree | ranked IDs plus per-channel scores and optional seed correspondences | deterministic replay | high |
-| Verification | C1 typed QAP; C2 pFGW; C3 multi-relational FGW | typed-directed soft proposal → consistency → partial Hungarian → exact scorer; solver selected by bake-off | benchmark thresholds and ≤2 s/pair target | medium |
+| Verification | C1 typed QAP; C2 pFGW; C3 multi-rel FGW; PR #37 bake-off | three-stage hybrid; prototype default = multi-rel FGW α≈0.7; QAP/RRWM co-equal fallback; no semantic pair-pruning; no blended-only API | DNA-native gate + pygmtools/real-encoder follow-up; ≤2 s/pair | medium for prototype, low for production freeze |
 | Granularity | D versus generic coarsening | reversible guarded suppression plus bounded edge-to-path matching | zero false contraction in gate cases | medium-high |
 | Knowledge | E and H agree it is not analogical identity | optional `about`/`requires` IDs; same-domain and complementary side-channel only | generic-ID, polysemy, and direction tests | medium |
 | Scoring | A/C/E/G converge on inspectability | structural score plus semantic, knowledge, coverage, contradiction, and evidence fields; no cross-mode scalar | calibration-only thresholds; family reports | medium |
@@ -216,8 +259,8 @@ edge-to-path verification. Only transparent nodes explicitly marked
 | Closed roles/relations repeat across extraction | literature-backed, not measured on Resonance text | all structural features drift | duplicate greedy extraction with span-aligned node/edge F1 |
 | Generic motifs can be suppressed without losing analogical recall | E1 passes two synthetic worlds and four seeds; rich margin is thin | structural channel fails the R0-G gate or remains corpus-specific | margin distribution on reviewed fixtures and real-like corpus skew |
 | E1 discrimination transfers to Thought DNA v0.1's vocabulary | machinery passes, but E1 uses different role/relation enums | rare branch entropy may disappear under the canonical extraction schema | DNA-native companion of the exact E1 matrix |
-| Candidate pruning retains cross-domain correspondences | unmeasured | QAP cannot recover a pair it never sees | seeded/unseeded oracle-candidate verification |
-| One proposal solver dominates after identical exact rescore | C1 and C3 executed different toys/machines; C2 unexecuted | retain the simpler winner or SME-lite | frozen one-machine QAP/FGW/SME-lite bake-off |
+| Candidate pruning retains cross-domain correspondences | **falsified for semantic top-d** (C1 failure mode 2; C3 analogical sim ~0.05; PR #37 `top_d=3` drops analog `S_struct` 1.000→0.024) | analogical pairs never enter the proposal | DNA-native bake-off must keep semantic pair-pruning as a required failing control |
+| One proposal solver dominates after identical exact rescore | PR #37: both typed QAP-RRWM and multi-rel FGW pass 8/8; FGW has higher noisy recall on this numpy RRWM; pygmtools/real-encoder unrun | keep FGW as prototype default and QAP as fallback, or invert after library-faithful replay | DNA-native one-machine bake-off with pygmtools RRWM and a real encoder |
 | `atomic=false` can be assigned conservatively | D hypothesis | false contractions erase mechanisms | meaningful-versus-transparent subdivision cases |
 | Knowledge IDs are sufficiently precise | E hand-linked only; H cites linker risk | optional channel creates false matches | polysemy and abstention audit with second annotator |
 | Hand-authored analogies have useful gold mappings | G design only | gate measures author theory | independent human review of manual gate cases |
@@ -232,9 +275,13 @@ fails.
 2. **Benchmark fixture audit:** second-human review of the six manually authored
    gate analogies and complementary bridges; schema validation and permutation
    invariance.
-3. **Oracle-pair verifier bake-off:** semantic Hungarian, SME-lite greedy, typed
-   QAP hybrid, pFGW+rescore, and C3's per-relation-plus-transpose FGW-CG on the
-   same pairs and machine, with seeded and unseeded restarts.
+3. **Oracle-pair verifier bake-off:** **partially executed** by PR #37 on a
+   stipulated-oracle toy. Remaining work is not “run any bake-off”; it is
+   pygmtools / exact-library RRWM on the same harness, a real encoder instead
+   of 1.00/0.85/0.05, DNA-native relation enums (no `increases`), C3's
+   relation-pattern IDF ablation, and cross-size normalisation of `S_struct`.
+   Path-distance FGW and semantic Hungarian stay as diagnostic controls.
+   Semantic `top_d` pair-pruning stays as a required failing control.
 4. **Structural retrieval gate extension:** retain E1 as a regression, then
    measure MULTI recall, positive-minus-generic margin distribution, polarity
    inversions, and postings skew across all R0-G packs and real-like fillers;
@@ -261,9 +308,11 @@ source text / manual graph
   -> staged grounded Thought DNA
   -> unblended content + Knowledge DNA + MULTI structural retrieval
        (structural candidates require polarity-aware verification)
-  -> top-K candidates (+ optional seed correspondences)
+  -> top-K graphs (+ optional seed correspondences; never semantic pair-pruning)
   -> canonical + guarded coarse graph views
-  -> typed-directed soft proposal (QAP and multi-relational FGW candidates)
+  -> typed-directed soft proposal
+       default prototype: multi-relational FGW (per-type + transpose, α≈0.7)
+       co-equal gate candidate: typed QAP / RRWM, no semantic top-d
   -> partial injective rounding + exact structural rescore
   -> score vector, class, correspondence, contradictions, provenance
 ```
@@ -274,9 +323,12 @@ bounded by R0-G and a future real-distribution scale replay.
 
 # Confidence
 
-**MEDIUM.** Confidence is high in the contracts and falsification order, medium
-in the schema and verifier choice, and low-to-medium in global structural
-retrieval. This is exactly why the outputs remain proposed and benchmark-gated.
+**MEDIUM.** Confidence is high in the contracts, the three-stage verifier
+shape, typed/directed encoding, the no-semantic-pair-prune rule, and the
+falsification order; medium in naming multi-rel FGW as the v0.1 prototype
+default (PR #37 numpy RRWM is not pygmtools); and low-to-medium in global
+structural retrieval and any production solver freeze. This is exactly why
+the outputs remain proposed and benchmark-gated.
 
 # Open Questions
 
@@ -286,8 +338,10 @@ retrieval. This is exactly why the outputs remain proposed and benchmark-gated.
    recall without collapsing `causes`, `prevents`, and `requires`?
 3. Does MULTI retain its E1 margin across all R0-G packs and real-distribution
    motif skew, rather than one synthetic constellation family?
-4. Which typed proposal solver wins the one-machine bake-off, and can its
-   candidate mask/transport preserve cross-domain pairs without unstable cost?
+4. Does pygmtools RRWM close C3's noisy-recall gap on the shared harness, and
+   does a real encoder shrink the safe FGW `α` interval? (The shared-testbed
+   bake-off has been run; this is the remaining library/oracle question, not
+   an unrun comparison.)
 5. Can two human reviewers agree on the six gate analogies and mappings?
 6. What is the minimum evidence floor that rejects tiny generic motifs without
    suppressing genuinely small thoughts?

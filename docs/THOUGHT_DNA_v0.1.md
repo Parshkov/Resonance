@@ -28,6 +28,9 @@ Normative words `MUST`, `SHOULD`, and `MAY` describe the v0.1 contract.
 5. Human-authored graphs use the same shape and may omit source spans.
 6. Knowledge identifiers are optional node annotations. Structural roles do
    not leak into Knowledge DNA.
+7. Closed node roles remain canonical because MULTI retrieval D0 needs them.
+   Verify-time matching consumes a node-pair similarity function; role
+   identity is not a hard exclusive correspondence gate.
 
 ## Canonical Object
 

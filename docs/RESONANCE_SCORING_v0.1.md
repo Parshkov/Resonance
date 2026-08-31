@@ -8,8 +8,11 @@ Date: 2026-08-31
 
 Resonance v0.1 returns a score vector and an explanation, not a universal
 similarity scalar. Structural, semantic/content, knowledge, complementary,
-coverage, evidence, and contradiction signals remain visible. Thresholds and
-weights are initial benchmark parameters, not learned truths.
+coverage, evidence, and contradiction signals remain visible. A blended-only
+public API is non-conforming: equal-weight `(S_struct + S_sem) / 2` inverts
+the project's hard negative on C3/PR #37 numbers, and even a structure-heavy
+scalar must not replace the vector. Thresholds and weights are initial
+benchmark parameters, not learned truths.
 
 ## Required Verifier Output
 
