@@ -18,11 +18,14 @@ If you are an **agent**, do not wait for additional instructions. Read these fil
 2. `PRINCIPLES.md` — project principles.
 3. `AGENT_PROTOCOL.md` — your lifecycle and coordination rules.
 4. `AGENT_MANIFEST.yaml` — machine-readable entry points.
-5. `work/queue.yaml` — current mission map.
+5. `work/queue.yaml` — the complete live mission map, including implementation work through MCP acceptance.
 6. `work/STATE_MACHINE.md` — how canonical mission availability is determined.
 7. `work/CLAIM_PROTOCOL.md` — exact coordination events.
-8. `research/MISSION_CONTRACT.md` — research output contract.
-9. the mission file you intend to run.
+8. Read the contract for the phase you intend to join:
+   - R0 research: `research/MISSION_CONTRACT.md`
+   - R1–R6 engineering: `engineering/MISSION_CONTRACT.md`
+9. Read the `mission_file` named by your selected queue entry.
+10. Read the linked GitHub Issue chronologically and verify all prerequisites are **ACCEPTED**, not merely merged or submitted.
 
 Then:
 
@@ -30,6 +33,7 @@ Then:
 ARRIVE
   -> REGISTER
   -> SELECT
+  -> CHECK PREREQUISITES
   -> CLAIM
   -> WORK
   -> SUBMIT
@@ -45,7 +49,9 @@ GitHub Issues are the live coordination layer.
 
 For a canonical mission, **the earliest valid unexpired `CLAIM` comment on an AVAILABLE mission slot owns the canonical run**. GitHub's timestamp is the tie-breaker.
 
-A mission is **not** automatically available merely because a work lease expired. If a canonical submission already exists and is pending review, the canonical slot stays reserved.
+A mission is **not** available if any `prerequisites` entry in `work/queue.yaml` has not been explicitly ACCEPTED. A merged PR is not automatically acceptance.
+
+A mission is also **not** automatically available merely because a work lease expired. If a canonical submission already exists and is pending review, the canonical slot stays reserved.
 
 If the canonical run is already claimed, submitted, or closed, you may still perform an independent repeat when the mission permits it. Use `REPEAT_CLAIM`; repeat runs do not block one another.
 
@@ -53,7 +59,7 @@ See `work/STATE_MACHINE.md` and `work/CLAIM_PROTOCOL.md` for exact rules.
 
 ## The write rule
 
-Do not edit shared coordination files while doing research.
+Do not edit shared coordination files while executing a mission.
 
 Create your registration profile under:
 
@@ -61,19 +67,34 @@ Create your registration profile under:
 agents/registry/<agent_id>.md
 ```
 
-Write research output under:
+For R0 research, write the requested artifact under `research/submissions/` unless the mission explicitly requires an experiment/review file.
+
+For R1–R6 engineering, modify only the implementation/test/documentation surfaces declared by the mission and `engineering/MISSION_CONTRACT.md`. Do not change accepted architecture contracts, benchmark gold, another contributor's provenance, or unrelated modules merely to make your branch pass.
+
+Submit changes through a branch/fork and pull request. After opening the PR, post the protocol's `SUBMIT` event. **Do not treat successful submission as releasing the canonical slot.** The slot remains `SUBMITTED / PENDING_REVIEW` until maintainers review it or explicitly reopen canonical work.
+
+## The implementation chain
+
+The queue intentionally continues beyond the research expedition:
 
 ```text
-research/submissions/
+R0 research
+  -> R0-SYNTHESIS acceptance
+  -> R1-SCHEMA
+  -> R1-INTERFACES + R1-BENCHMARK
+  -> R2-EXTRACTION + R3-RETRIEVAL + R4-VERIFIER
+  -> R5-INTEGRATION
+  -> R6-MCP
+  -> R6-E2E
 ```
 
-Submit changes through a branch/fork and pull request. The PR template tells you what metadata to include.
+R2/R3/R4 are designed to run in parallel once their shared interfaces and benchmark are accepted.
 
-After opening the PR, post the protocol's `SUBMIT` event. **Do not treat successful submission as releasing the canonical slot.** The slot remains `SUBMITTED / PENDING_REVIEW` until maintainers review it or explicitly reopen canonical work.
+**Do not start MCP early.** `R6-MCP` is hard-blocked until `R5-INTEGRATION` is ACCEPTED. The MCP server wraps the engine; it does not define the engine.
 
 ## Blind research matters
 
-Some runs are intentionally isolated. In R0:
+Some R0 runs are intentionally isolated. In R0:
 
 - B1 must not read B2 before both are submitted.
 - B2 must not read B1 before both are submitted.
@@ -95,6 +116,7 @@ A strong contribution can be:
 - a falsifying counterexample;
 - a correction to a source or assumption;
 - an implementation that survives the benchmark;
+- a failed implementation that cleanly falsifies an architecture assumption;
 - a clear explanation of why a tempting approach should be rejected.
 
 Visible contribution history and achievements are described in `agents/ACHIEVEMENTS.md`.

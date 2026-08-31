@@ -13,7 +13,7 @@ Resonance/
 ├── AGENT_MANIFEST.yaml       machine-readable entry metadata
 ├── VISION.md                 long-term human/product direction
 ├── PRINCIPLES.md             stable project/engineering principles
-├── ROADMAP.md                60-hour sprint and later phases
+├── ROADMAP.md                execution roadmap through MCP acceptance
 ├── OPEN_RESEARCH.md          why and how the research process is public
 ├── CONTRIBUTING.md           contribution rules for humans and agents
 ├── WHY_NOT.md                rejected approaches and reasons
@@ -25,68 +25,66 @@ Resonance/
 │   └── SCOREBOARD.md
 │
 ├── work/
-│   ├── queue.yaml            machine-readable mission map
-│   ├── STATE_MACHINE.md      canonical mission-slot states
-│   └── CLAIM_PROTOCOL.md     claims, leases, submit, abandon, reopen
+│   ├── queue.yaml            complete machine-readable mission/dependency map
+│   ├── STATE_MACHINE.md      prerequisite + canonical mission-slot states
+│   └── CLAIM_PROTOCOL.md     claims, leases, submit, review, reopen
 │
 ├── research/
 │   ├── README.md
 │   ├── R0_MASTER_BRIEF.md
 │   ├── R0_EXECUTION_PLAN.md
 │   ├── MISSION_CONTRACT.md
-│   ├── missions/             canonical model-independent tasks
-│   ├── submissions/          raw human/agent results
+│   ├── missions/             R0 model-independent research tasks
+│   ├── submissions/          raw human/agent research results
 │   ├── reviews/              comparative/adversarial synthesis
 │   ├── logbook/              chronological research/engineering record
 │   └── results/              legacy initial scaffold; do not use for new runs
+│
+├── engineering/
+│   ├── README.md             R1–R6 implementation chain
+│   ├── MISSION_CONTRACT.md   engineering evidence/acceptance contract
+│   └── missions/             schema → engine → MCP mission contracts
 │
 ├── docs/
 │   ├── ARCHITECTURE_LOOP.md
 │   ├── STATUS.md
 │   └── decisions/            accepted ADRs
 │
-├── benchmark/                falsification and regression fixtures
-└── src/                      implementation after architecture gate
+├── benchmark/                frozen falsification/regression fixtures
+└── src/                      engine + thin MCP adapter after their gates
 ```
 
 ## Artifact lifecycle
 
 ```text
-Mission
-  │
-  ├─ run by model/person/team
-  ↓
-Submission
-  │
-  ├─ preserved as returned, with provenance
-  ↓
-Review
-  │
-  ├─ compare independent evidence
-  ↓
-Decision / ADR
-  │
-  ├─ defines implementable architecture
-  ↓
-Benchmark + Code
-  │
-  └─ produces new evidence that may supersede the ADR
+Research Mission
+  -> Submission
+  -> Review
+  -> Decision / ADR
+  -> Executable schema/interfaces/benchmark
+  -> Component implementation
+  -> Integrated engine gate
+  -> MCP adapter
+  -> clean-client E2E acceptance
 ```
+
+Every step can produce new evidence that causes an earlier decision to be revised. Nothing is accepted merely because it is generated or merged.
 
 ## Work-state lifecycle
 
-Research artifacts and canonical work ownership are intentionally separate concepts.
+Canonical work ownership and artifact existence are separate concepts.
 
-A canonical mission slot follows:
+A mission with unaccepted prerequisites begins as:
 
 ```text
-AVAILABLE
+BLOCKED
+  -> AVAILABLE                  all prerequisites ACCEPTED
   -> CLAIMED / WORKING
   -> SUBMITTED / PENDING_REVIEW
   -> ACCEPTED / REVISION_REQUESTED / REJECTED / SUPERSEDED
 ```
 
-Abandoning before submission returns the slot to `AVAILABLE`. Submission does not.
+Abandoning before submission returns the slot to `AVAILABLE` only when prerequisites remain accepted; otherwise it returns to `BLOCKED`. Submission does not release the canonical slot and does not satisfy downstream prerequisites.
 
 A fresh canonical run after submission/review requires `REOPEN_CANONICAL`. Independent repeats remain available according to mission policy.
 
@@ -96,7 +94,7 @@ See `work/STATE_MACHINE.md` and `work/CLAIM_PROTOCOL.md`.
 
 ### `research/missions/`
 
-The question and acceptance contract. Missions should be vendor-independent. Do not store a model answer here.
+R0 research question and acceptance contract. Missions should be vendor-independent. Do not store a model answer here.
 
 ### `research/submissions/`
 
@@ -104,11 +102,19 @@ Raw returned research. Preserve disagreements and failed proposals. Add provenan
 
 ### `research/reviews/`
 
-Comparison across submissions. A review should resolve, or make experimentally resolvable, the differences between reports.
+Comparison across research submissions. A review should resolve, or make experimentally resolvable, the differences between reports.
 
 ### `docs/decisions/`
 
-Only actual architecture decisions. A model recommendation is not an ADR until the project accepts it.
+Actual architecture decisions. A model recommendation is not an ADR until the project accepts it.
+
+### `engineering/missions/`
+
+Durable scope, ownership surface, prerequisites and acceptance gates for R1–R6 implementation. GitHub Issues remain the live coordination stream.
+
+### `engineering/MISSION_CONTRACT.md`
+
+The evidence and submission rules for implementation missions. It requires executable code/tests where implementation is requested, frozen benchmark discipline, accepted prerequisites, and a strict core/MCP boundary.
 
 ### `research/logbook/`
 
@@ -116,19 +122,19 @@ Chronological context: why a question appeared, what changed, which hypothesis w
 
 ### `benchmark/`
 
-Executable or inspectable cases designed to falsify claims. Every core algorithmic ADR should eventually cite benchmark evidence.
+Executable or inspectable cases designed to falsify claims. Gate fixtures are versioned/frozen and may not be rewritten to make a current engine pass.
 
 ### `src/`
 
-Production/prototype implementation after the relevant architecture gate. Short experiment code may precede an ADR only when it exists specifically to test a research claim.
+Implementation after the relevant gates. R2 extraction, R3 retrieval and R4 verification communicate through accepted R1 interfaces. R5 integrates them as an MCP-independent engine. `src/mcp/` is only a thin adapter after R5 acceptance.
 
 ### `work/queue.yaml`
 
-The machine-readable mission map. It is not an exclusive lock and does not by itself prove that a mission is available.
+The complete machine-readable mission/dependency map through R6-E2E. It is not an exclusive lock and does not by itself prove that a mission is available; prerequisites and issue state must be resolved first.
 
 ### `work/STATE_MACHINE.md`
 
-The canonical definition of mission-slot states and transitions.
+The canonical definition of prerequisite blocking, mission-slot states and transitions.
 
 ### `work/CLAIM_PROTOCOL.md`
 
@@ -136,21 +142,24 @@ The exact GitHub Issue event formats used to claim, renew, submit, abandon, revi
 
 ## GitHub Issues
 
-Issues are the public orchestration layer: ownership, model run, status, blockers, and discussion.
+Issues are the public orchestration layer: ownership, model run, status, blockers, review outcomes and discussion.
 
-The durable result of a research issue should still be committed as a submission/review/ADR. An issue comment alone is not the scientific record.
+The durable result should still be committed to the appropriate research, engineering, benchmark, docs or source path. An issue comment alone is not the durable scientific/engineering record.
 
-When determining canonical work availability, read the issue event history under `work/STATE_MACHINE.md`; do not infer availability from the absence of recent compute activity.
+When determining canonical work availability, first resolve queue prerequisites, then read the issue event history under `work/STATE_MACHINE.md`; do not infer availability from the absence of recent compute activity or from a merged PR.
 
 ## Contributor rule of thumb
 
 If you are unsure where something belongs:
 
-- a **question** becomes a Mission;
-- an **answer** becomes a Submission;
+- a **research question** becomes a research Mission;
+- a **research answer** becomes a Submission;
 - a **comparison** becomes a Review;
-- a **choice** becomes an ADR;
+- an **architecture choice** becomes an ADR;
 - a **counterexample** becomes Benchmark data;
+- an **engineering task** becomes an engineering Mission + linked Issue;
+- an **implementation** goes in its mission-owned `src/`/test/fixture surface;
+- an **integration result** belongs to R5 evidence and tests;
+- an **MCP transport change** belongs under the R6 mission and must wrap the engine;
 - a **historical explanation** goes in the Logbook or `WHY_NOT.md`;
-- an **implementation** goes in `src/` only when its architecture is sufficiently defined;
 - a **work-state event** goes on the mission Issue according to `work/CLAIM_PROTOCOL.md`.
