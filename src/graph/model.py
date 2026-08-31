@@ -132,10 +132,17 @@ class Relation:
 
     @property
     def polarity(self) -> str:
-        """A convenience view; polarity stays encoded in canonical type/assertion."""
-        if self.assertion == "negated" or self.type in {"prevents", "contradicts"}:
-            return "negative"
-        return "positive"
+        """Return causal sign when the relation has one, otherwise ``not_applicable``.
+
+        Canonical polarity remains encoded by ``type`` plus ``assertion``; this
+        derived view never replaces those fields.
+        """
+        if self.type not in {"causes", "prevents"}:
+            return "not_applicable"
+        positive = self.type == "causes"
+        if self.assertion == "negated":
+            positive = not positive
+        return "positive" if positive else "negative"
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
