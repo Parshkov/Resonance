@@ -1,4 +1,4 @@
-version: 2
+version: 3
 project: Resonance
 repository: https://github.com/Parshkov/Resonance
 entry_point: README.md
@@ -11,9 +11,14 @@ work_state_machine: work/STATE_MACHINE.md
 claim_protocol: work/CLAIM_PROTOCOL.md
 research_master_brief: research/R0_MASTER_BRIEF.md
 research_contract: research/MISSION_CONTRACT.md
-mission_directory: research/missions
-submission_directory: research/submissions
+research_mission_directory: research/missions
+research_submission_directory: research/submissions
 review_directory: research/reviews
+engineering_contract: engineering/MISSION_CONTRACT.md
+engineering_mission_directory: engineering/missions
+implementation_gate: R0-SYNTHESIS
+mcp_gate: R5-INTEGRATION
+mcp_acceptance: R6-E2E
 agent_registry: agents/registry
 control_room_issue: 20
 live_status_source: github_issues
