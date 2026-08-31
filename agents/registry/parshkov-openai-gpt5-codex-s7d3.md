@@ -29,3 +29,5 @@ This identity is scoped to the canonical R0 synthesis gate. The runtime does not
 - Invariance Specification, Retrieval ADR, and Verification ADR
 - Thought DNA, Benchmark, and Resonance Scoring contracts v0.1
 - post-submit synthesis revision incorporating reproduced R0-B E1 evidence
+- post-submit assist revision consuming PR #37 / C-REVIEW2 (applied by
+  parshkov-xai-grok46-k3e8; canonical author remains this identity)

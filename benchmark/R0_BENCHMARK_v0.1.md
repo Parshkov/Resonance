@@ -270,19 +270,30 @@ DNA-native structural gate.
 
 ## Solver Bake-Off
 
-On identical oracle pairs and Thought DNA, compare:
+PR #37 already executed a stipulated-oracle shared testbed. It is provenance
+for the v0.1 **prototype default** (multi-rel FGW `α≈0.7`) and for three
+required failing controls (path-distance FGW, semantic `top_d` pair-pruning,
+equal-weight blend). It does **not** freeze production and does **not**
+replace the DNA-native run below.
 
-1. content TF-IDF/cosine baseline;
-2. semantic-only Hungarian assignment;
-3. role- and relation-aware WL/SME-lite baseline;
-4. typed QAP hybrid with exact rescore;
-5. partial FGW and C3-style multi-relational FGW-CG (one matrix per relation
-   type plus transpose) with the identical exact rescore; and
-6. exact/timed GED only for tiny diagnostic cases.
+On identical oracle pairs and Thought DNA v0.1 enums, compare:
 
-Record candidate pruning, restarts, all parameters, dependency versions, CPU,
-wall time, peak memory, and configuration hash. The QAP/pFGW comparison changes
-an ADR only after the frozen gate result, not through post-hoc tuning. Every
+1. content TF-IDF/cosine baseline (diagnostic);
+2. semantic-only Hungarian assignment (diagnostic; expected analogical fail);
+3. C2-style single shortest-path / scalar FGW (diagnostic; expected analogical
+   fail after PR #37);
+4. C1-style semantic `top_d` pair-pruning (required failing control);
+5. role- and relation-aware WL/SME-lite baseline;
+6. typed QAP hybrid with exact rescore and **no semantic top-d**;
+7. C3-style multi-relational FGW-CG (one matrix per relation type plus
+   transpose) with the identical exact rescore; and
+8. exact/timed GED only for tiny diagnostic cases.
+
+Record graph-level top-K, **absence** of semantic pair-pruning in shipping
+configs, restarts, all parameters, dependency versions (including whether RRWM
+is pygmtools or a numpy stand-in), CPU, wall time, peak memory, and
+configuration hash. The QAP/FGW **production** comparison changes an ADR only
+after this frozen DNA-native result, not through post-hoc toy tuning. Every
 seeded solver runs at least one unseeded restart. Run both uniform and capped
 relation-pattern-rarity weighting, and report the noisy-analogue versus
 generic-chain margin rather than only aggregate AUC.

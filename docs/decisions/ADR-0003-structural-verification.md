@@ -20,32 +20,49 @@ one-to-one correspondence, parallel connectivity, and systematicity. R0-D shows
 that granularity must be handled by guarded reversible views and bounded
 edge-to-path matching, not arbitrary edit costs.
 
+Post-submit PR #37 ran those proposal families on one shared discrete scorer.
+C1-style RRWM (no semantic `top_d`) and C3 multi-rel FGW both passed the
+combined analogical/hard-negative gate; C2-style single shortest-path FGW did
+not; C1-style semantic `top_d=3` deleted the analogical case. That bake-off is
+a prototype-default result, not a production freeze: the RRWM was not
+pygmtools, the node similarity was a stipulated oracle, and the graphs were
+tiny.
+
 ## Decision
 
-Adopt a common proposal/consistency/round/adjudicate pipeline, and leave the
-production proposal solver to the frozen head-to-head defined below:
+Adopt a common proposal/consistency/round/adjudicate pipeline. The v0.1
+**prototype default** is multi-relational FGW-CG. Typed QAP/RRWM remains a
+**co-equal gate candidate / fallback**. Production primary is selected only by
+the frozen DNA-native lexicographic rule below, not by the PR #37 toy.
 
 ```text
 canonical graphs + optional retrieval seeds
-  -> compatible candidate node pairs
+  -> all node pairs, or a structural/role-soft mask that is NOT a semantic top-d
   -> canonical and guarded coarse views
   -> typed-directed soft proposal
-       A: sparse Lawler-QAP / RRWM
-       B: multi-relational FGW-CG (one matrix per relation type + transpose)
+       default prototype: multi-relational FGW-CG
+         (one matrix per relation type + transpose, α≈0.7 on the PR #37 testbed)
+       co-equal fallback: sparse Lawler-QAP / RRWM, no semantic top-d
   -> parallel-connectivity / structural-consistency filter
   -> partial Hungarian assignment with explicit unmatched options
   -> exact add/drop/swap local improvement and structural rescore
   -> mapping, matched relations/paths, unmatched items, contradictions, scores
 ```
 
-Both proposals consume the same functional-role compatibility, optional
-semantic support, extraction confidence, and versioned relation-compatibility
-policy. QAP association variables are candidate node pairs and its pairwise
-affinity rewards preserved typed propositions. Multi-relational FGW uses one
-directed adjacency/cost matrix per relation type and a separate transpose
-channel; a single scalar or symmetrized structure matrix is prohibited.
-Reversed direction, incompatible relation type, assertion, or modality receives
-no compatibility credit.
+Semantic support MAY weight a proposal. It MUST NOT gate candidate node pairs
+by semantic top-d / top-k shortlisting. C1's own failure mode 2, C3's
+analogical semantic floor, and PR #37 (`S_struct` 1.000 → 0.024 at `top_d=3`)
+make that shortcut a v0.1 NO-GO. Retrieval may still return a top-K list of
+*graphs*. Functional-role compatibility MAY enter as a score component
+(`N_role`); it MUST NOT be an exclusive pair mask until a DNA-native
+experiment shows it does not recreate the semantic-pruning kill.
+
+QAP association variables are candidate node pairs and its pairwise affinity
+rewards preserved typed propositions. Multi-relational FGW uses one directed
+adjacency/cost matrix per relation type and a separate transpose channel; a
+single scalar, symmetrized, or shortest-path structure matrix is prohibited as
+the primary encoding. Reversed direction, incompatible relation type,
+assertion, or modality receives no compatibility credit.
 
 The exact adjudicator is the polarity boundary for the entire pipeline. A
 high-confidence mapped `causes`/`prevents`, asserted/negated, or directed-sign
@@ -61,18 +78,24 @@ the final truth value.
 
 ### Solver-selection rule
 
-Implement the smallest reproducible QAP-RRWM and multi-relational FGW-CG
+Implement the smallest reproducible multi-relational FGW-CG **and** QAP-RRWM
 proposals behind one interface. Partial/semi-relaxed FGW or epsilon padding are
-declared unmatched-node variants, not separate final scorers. Every coupling or
-soft assignment is filtered, rounded to a partial injective mapping, and passed
-through the identical exact adjudicator. A relaxation objective is never the
-final resonance decision.
+declared unmatched-node variants of the FGW family, not separate final scorers.
+Every coupling or soft assignment is filtered, rounded to a partial injective
+mapping, and passed through the identical exact adjudicator. A relaxation
+objective is never the final resonance decision.
 
-Among candidates that pass every mandatory gate, select production primary
-lexicographically by: hard-negative top-1/SOW, automorphism-tolerant mapping F1,
-worst-family recall, then p95 latency and implementation complexity. If neither
-passes, keep SME-lite as the diagnostic baseline and revise representation or
-extraction; do not choose the less-bad relaxation.
+v0.1 ships FGW-CG as the prototype default because PR #37 measured higher
+noisy-positive recall (0.740 vs 0.375) and reproduced C3's table on the shared
+scorer, and because C2+C3 already sat in the FGW family once encoding is typed
+and directed. This inverts C1's paper ranking only for the prototype. It is
+not a production crown: the measured RRWM is not pygmtools.
+
+Among candidates that pass every mandatory DNA-native gate, select production
+primary lexicographically by: hard-negative top-1/SOW, automorphism-tolerant
+mapping F1, worst-family recall, then p95 latency and implementation
+complexity. If neither passes, keep SME-lite as the diagnostic baseline and
+revise representation or extraction; do not choose the less-bad relaxation.
 
 When retrieval seeds initialize a solver, run at least one unseeded restart.
 C3 measured that seeds reduced mapping variance to zero while lowering its
@@ -94,8 +117,9 @@ polarity, assertion, direction, or modality differences reject the path match.
 
 - R0-C1 executed a 50×50 typed RRWM/Hungarian smoke test and obtained practical
   runtime, while identifying dense 100×100 affinity as a NO-GO.
-- R0-C2 provides the strongest alternative for partial/noisy overlap but notes
-  that directed typed graph costs are unresolved and no code was executed.
+- R0-C2 provides the strongest alternative for partial/noisy overlap but left
+  directed typed graph costs as its main uncertainty and executed no code.
+  PR #37 resolved that uncertainty against a single shortest-path matrix.
 - R0-C3 resolves the encoding hypothesis in a small executed experiment using
   per-relation matrices plus transposes, while exposing generic-motif margin,
   seed, non-convexity, and cross-size normalization risks.
@@ -107,18 +131,50 @@ polarity, assertion, direction, or modality differences reject the path match.
   metrics.
 - R0-B E1 shows why retrieval-side redundancy cannot be trusted for polarity;
   the verifier must reject the surfaced sign-inverted near-duplicate.
+- R0-C-REVIEW2 / PR #37 executed the missing shared-testbed bake-off: typed
+  QAP-RRWM and multi-rel FGW both pass 8/8; path-distance FGW fails analogical
+  floors; semantic `top_d=3` is a kill switch for analogy; equal-weight blend
+  inverts the project's hard negative. Remaining limits: stipulated oracle,
+  tiny graphs, numpy RRWM ≠ pygmtools.
 
 Exact artifacts and head SHAs are recorded in
 [R0 Synthesis](../../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
 
 ## Alternatives Considered
 
-### Preselect QAP or FGW from design arguments alone
+### Leave the prototype solver unnamed after PR #37
 
-Rejected. C1 and C3 executed different datasets on different machines; C2 did
-not execute. QAP represents candidate affinities directly, while FGW handles
-soft partial structure naturally. Neither evidence base supports a production
-crown before identical exact rescoring on one frozen benchmark.
+Rejected as of this revision. A shared-testbed result now exists. Naming no
+default would force every implementer to re-litigate C1 vs C3. The remaining
+uncertainty is library/oracle/size, which is why QAP stays a co-equal gate
+candidate rather than being deleted.
+
+### Freeze production QAP or FGW from the PR #37 toy
+
+Rejected. The bake-off used a stipulated similarity oracle and a numpy RRWM
+that is not C1's pygmtools path. Production primary still requires the frozen
+DNA-native lexicographic rule.
+
+### Semantic top-d / top-k node-pair pruning
+
+Rejected as a v0.1 candidate mask. C1 named this as failure mode 2; C3
+measured analogical semantic support near 0.05; PR #37 measured `top_d=3`
+dropping analogical `S_struct` from 1.000 to 0.024. Semantic weights may
+exist; they may not delete analogical pairs before structure can rescue them.
+
+### Single-matrix or shortest-path FGW as primary encoding
+
+Rejected. C2 left this as its main uncertainty; PR #37 failed the analogical
+struct/accuracy floors on that encoding (0.655 / 0.698). Per-type directed
+matrices plus transpose, or native typed pairwise QAP terms, are the surviving
+encodings.
+
+### Blended-only public scoring API
+
+Rejected. The scoring contract is a vector plus mapping. Equal-weight
+`(S_struct + S_sem) / 2` inverts analog vs rewired on C3's winning numbers.
+C1's structure-heavy weights would still separate that pair; that does not
+license a blended-only API.
 
 ### Pure SME-lite greedy kernels
 
@@ -146,8 +202,10 @@ violate the project's comparison constraints.
   relations, relation identity, confidence, assertion/modality, and provenance.
 - Candidate masks/feature costs must be recorded; retrieval seeds are hints,
   never hard truth, and cannot replace an unseeded restart.
-- Dense unpruned 100×100 QAP is prohibited. Verification processes top-K with a
-  memory-aware concurrency cap.
+- Semantic top-d node-pair masks are prohibited. Dense unpruned 100×100 QAP is
+  still a scaling NO-GO and must be solved by sparsity, typed structure, or
+  FGW — not by semantic shortlisting. Verification processes a top-K list of
+  graphs with a memory-aware concurrency cap.
 - “Unmatched” is explicit in optimization and output.
 - Structural and semantic signals remain separate. The final mapping and exact
   scorer, not a relaxation objective, define the result.
@@ -170,23 +228,28 @@ Mandatory verifier gates:
 - node-pair F1 at least `0.70`, with automorphism-tolerant alternatives;
 - directed typed edge preservation at least `0.75`;
 - zero false contractions of marked meaningful nodes;
-- p95 verification time at most `2 s` per 50×50 pair after candidate pruning on
-  the declared reference CPU;
+- p95 verification time at most `2 s` per 50×50 pair after graph-level top-K
+  (not semantic node-pair pruning) on the declared reference CPU;
 - deterministic exact rescoring and mapping-set equivalence for fixed inputs;
   and
 - every retrieved polarity-flip regression is rejected end-to-end even when it
   ranks above the true analogue during candidate retrieval.
 
-The bake-off includes semantic Hungarian, SME-lite greedy, QAP hybrid,
-partial/multi-relational FGW-CG with identical rescore, and exact/timed GED only
-on tiny cases. It runs on one machine, includes seeded and unseeded restarts,
-generic-motif rarity ablations, and sweeps fragment/whole size ratios. Report
-score by family and do not average away a polarity, reversal, or global-conflict
-failure.
+The DNA-native bake-off includes semantic Hungarian and path-distance FGW as
+**diagnostic controls expected to fail the analogical gate**; SME-lite greedy;
+typed QAP hybrid with **no semantic top-d**; C3-style multi-relational FGW-CG
+with identical rescore; and exact/timed GED only on tiny cases. Semantic
+`top_d` pair-pruning is a required failing control, not a shipping
+configuration. PR #37 is provenance for the prototype default; it does not
+replace this frozen DNA-native run. It runs on one machine, includes seeded
+and unseeded restarts, generic-motif rarity ablations, pygmtools RRWM if used,
+and sweeps fragment/whole size ratios. Report score by family and do not
+average away a polarity, reversal, or global-conflict failure.
 
 ## Known Failure Modes
 
-1. Candidate pruning removes the true cross-domain node pair.
+1. Semantic candidate-pair pruning removes the true cross-domain node pair
+   (v0.1 prohibition, not a tolerated risk).
 2. Symmetric/automorphic motifs admit several valid mappings.
 3. Generic hubs dominate unary and pairwise rewards.
 4. Relation compatibility that is too broad creates false causal analogies.
@@ -199,8 +262,9 @@ failure.
 
 ## Conditions for Reconsideration
 
-- Select QAP or FGW only through the declared frozen lexicographic rule; changing
-  the selected production solver afterward requires recorded benchmark evidence.
+- Changing the prototype default or the selected production solver requires
+  recorded DNA-native benchmark evidence. A pygmtools replay of the PR #37
+  harness that closes the noisy-recall gap may invert the prototype ranking.
 - Prefer SME-lite if it reaches the same family-level gates with materially less
   latency/complexity.
 - Revisit Thought DNA if repeated failures require grounded relation-as-argument
