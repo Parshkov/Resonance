@@ -27,4 +27,4 @@ not exposed to the run, so it is not inferred here.
 
 ## Contributions
 
-- none yet
+- [R0-A structure mapping and relational Thought DNA decision](https://github.com/Parshkov/Resonance/pull/27)
