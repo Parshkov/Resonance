@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/pair.schema.json",
+  "title": "Benchmark v0.1 pair gold",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "pack_id", "split", "family", "query_graph", "candidate_graph", "gold_class", "evaluation_mode", "relevant", "gold_node_pairs", "gold_edge_pairs", "equivalent_mapping_sets", "bridge_pairs", "transform_manifest", "rationale", "review"],
+  "properties": {
+    "case_id": {"type": "string", "pattern": "^(C0[12]|G0[1-6])-(0[1-9]|1[0-6])$"},
+    "pack_id": {"type": "string", "pattern": "^(C0[12]|G0[1-6])$"},
+    "split": {"enum": ["calibration", "gate"]},
+    "family": {"type": "string"},
+    "query_graph": {"type": "string"},
+    "candidate_graph": {"type": "string"},
+    "gold_class": {"enum": ["direct", "approximate", "analogical", "complementary", "negative"]},
+    "evaluation_mode": {"enum": ["structural", "analogical", "complementary"]},
+    "relevant": {"type": "boolean"},
+    "gold_node_pairs": {"$ref": "#/$defs/nodePairs"},
+    "gold_edge_pairs": {"type": "array", "items": {"$ref": "#/$defs/edgePair"}},
+    "equivalent_mapping_sets": {"type": "array", "items": {"$ref": "#/$defs/nodePairs"}},
+    "bridge_pairs": {"$ref": "#/$defs/nodePairs"},
+    "transform_manifest": {"type": "object"},
+    "rationale": {"type": "string", "minLength": 1},
+    "review": {"$ref": "#/$defs/review"}
+  },
+  "$defs": {
+    "nodePair": {"type": "array", "prefixItems": [{"type": "string"}, {"type": "string"}], "items": false, "minItems": 2, "maxItems": 2},
+    "nodePairs": {"type": "array", "items": {"$ref": "#/$defs/nodePair"}},
+    "edgePair": {"type": "array", "prefixItems": [{"type": "string"}, {"oneOf": [{"type": "string"}, {"type": "array", "minItems": 1, "items": {"type": "string"}}]}], "items": false, "minItems": 2, "maxItems": 2},
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required", "status", "reviewer"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "status": {"enum": ["generated", "pending", "approved", "rejected"]},
+        "reviewer": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

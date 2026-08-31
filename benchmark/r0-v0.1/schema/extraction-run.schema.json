@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/extraction-run.schema.json",
+  "title": "Benchmark v0.1 extraction observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["extraction_case_id", "pack_id", "split", "run_index", "input", "reference_thought_dna", "review"],
+  "properties": {
+    "extraction_case_id": {"type": "string"},
+    "pack_id": {"type": "string"},
+    "split": {"enum": ["calibration", "gate"]},
+    "run_index": {"type": "integer", "minimum": 1, "maximum": 2},
+    "input": {"$ref": "../../../schemas/thought-dna-0.1.schema.json#/$defs/source"},
+    "reference_thought_dna": {"$ref": "../../../schemas/thought-dna-0.1.schema.json"},
+    "review": {"$ref": "pair.schema.json#/$defs/review"}
+  }
+}

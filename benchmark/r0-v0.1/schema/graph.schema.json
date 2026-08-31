@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/graph.schema.json",
+  "title": "Benchmark v0.1 graph wrapper",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["benchmark_graph_id", "thought_dna"],
+  "properties": {
+    "benchmark_graph_id": {"type": "string", "pattern": "^(C0[12]|G0[1-6])-(Q|C(0[1-9]|1[0-6]))$"},
+    "thought_dna": {"$ref": "../../../schemas/thought-dna-0.1.schema.json"}
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "review_ledger_version": "resonance-benchmark-review/0.1",
+  "policy": "Only an independent public reviewer may add case_id -> reviewer_id entries. The fixture author must not self-approve.",
+  "pair_approvals": {},
+  "extraction_approvals": {}
+}
