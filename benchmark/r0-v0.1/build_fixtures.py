@@ -103,6 +103,109 @@ REVIEW_REQUIRED = frozenset(
     }
 )
 
+# Same-domain lexical substitutes for family 2. Must NOT reuse the
+# cross-domain analogy label set; a previous generator revision made
+# vocabulary_substitution and cross_domain_analogy identical graphs,
+# which duplicated the two SOW comparisons.
+VOCAB_SUB = {
+    "battery": (
+        "cell temperature rise",
+        "solvent decomposition",
+        "impedance growth",
+        "charge-rate cap",
+        "heat management",
+        "stored-energy fade",
+        "resistance measurements",
+        "heat-sink assembly",
+        "cell management unit",
+        "parasitic reaction cycle",
+    ),
+    "software": (
+        "traffic spike",
+        "retry storm",
+        "buffer overflow wait",
+        "SLA cutoff",
+        "backoff scheduler",
+        "availability collapse",
+        "tail-latency samples",
+        "delay budget",
+        "on-call engineer",
+        "timeout feedback loop",
+    ),
+    "organization": (
+        "unclear accountability",
+        "alignment churn",
+        "decision queue",
+        "headcount cap",
+        "explicit mandate",
+        "slipped ship date",
+        "handover log",
+        "review bandwidth",
+        "initiative owner",
+        "sign-off cycle",
+    ),
+    "eutrophication": (
+        "fertilizer discharge",
+        "phytoplankton surge",
+        "hypoxia",
+        "catchment cap",
+        "riparian repair",
+        "fish kill",
+        "dissolved-oxygen samples",
+        "marsh acreage",
+        "basin board",
+        "decay feedback",
+    ),
+    "medicine": (
+        "tumour load",
+        "drug-escape pathway",
+        "lingering disease",
+        "toxicity bound",
+        "multi-agent regimen",
+        "clinical worsening",
+        "assay evidence",
+        "clinic capacity",
+        "treating team",
+        "bypass mechanism",
+    ),
+    "liquidity": (
+        "forced selling",
+        "collateral-call cascade",
+        "thin order book",
+        "capital bound",
+        "emergency funding window",
+        "firm collapse",
+        "bid-ask evidence",
+        "cash buffer",
+        "risk desk",
+        "fire-sale spiral",
+    ),
+    "learning": (
+        "absent prior skill",
+        "error rehearsal",
+        "stalled mastery",
+        "schedule bound",
+        "guided drill",
+        "exam failure",
+        "mistake log",
+        "worked-item bank",
+        "teacher",
+        "feedback cycle",
+    ),
+    "supply": (
+        "vendor outage",
+        "order bullwhip",
+        "stock gap",
+        "storage cap",
+        "demand leveling",
+        "missed shipment",
+        "stockout log",
+        "buffer stock",
+        "planning lead",
+        "expedite cycle",
+    ),
+}
+
 DOMAINS = {
     "battery": (
         "high cell heat",
@@ -332,7 +435,9 @@ def build_pack(pack_id: str, split: str, query_domain: str, analogy_domain: str)
 
         if family == "paraphrase":
             labels = tuple(f"rephrased {label}" for label in query_labels)
-        elif family in {"vocabulary_substitution", "cross_domain_analogy"}:
+        elif family == "vocabulary_substitution":
+            labels = VOCAB_SUB[query_domain]
+        elif family == "cross_domain_analogy":
             labels = analogy_labels
         elif family == "irrelevant_branch":
             extra_nodes = [
@@ -629,7 +734,14 @@ def build_manifest() -> dict[str, Any]:
         "manifest_version": "resonance-benchmark-manifest/0.1",
         "benchmark_version": "r0-v0.1",
         "thought_dna_schema": SCHEMA_VERSION,
-        "freeze_state": "candidate_frozen_pending_independent_review",
+        "freeze_state": (
+            "independent_review_complete"
+            if (
+                len(APPROVALS.get("pair_approvals", {})) == 64
+                and len(APPROVALS.get("extraction_approvals", {})) == 16
+            )
+            else "candidate_frozen_pending_independent_review"
+        ),
         "counts": {
             "packs": 8,
             "calibration_packs": 2,

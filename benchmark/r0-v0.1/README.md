@@ -7,19 +7,18 @@ scoring algorithm, and it makes no real-corpus or million-item scale claim.
 
 ## Current freeze state
 
-`manifest.json` records
-`candidate_frozen_pending_independent_review`. All manual analogy, intent,
-generic-motif, complementary, and extraction-reference judgments are explicitly
-`pending`. Consequently `runner.py validate` reports
-`gate_execution_ready: false`, and even otherwise perfect engine predictions
-cannot receive an overall PASS yet. This is intentional: the fixture author
-cannot self-approve the gold.
+`manifest.json` records `independent_review_complete` after the independent
+gold review in
+`research/reviews/R1_BENCHMARK_gold_review_parshkov-xai-grok46-k3e8.md`.
+Manual analogy, intent, generic-motif, complementary, and extraction-reference
+judgments are approved by `parshkov-xai-grok46-k3e8`, not by the fixture
+author. `runner.py validate` reports `gate_execution_ready: true` only while
+that ledger remains complete.
 
-An independent public reviewer approves a case by adding its `case_id` and
-reviewer ID to `review_approvals.json`, regenerating the corpus, reviewing the
-diff, and publishing the new manifest hash. Rejected or changed cases require a
-new benchmark version after freeze; gate gold is never relabelled to make an
-engine pass.
+The review also corrected a generator defect: `vocabulary_substitution` no
+longer copies the cross-domain analogy label set. Rejected or later-changed
+cases require a new benchmark version after this freeze; gate gold is never
+relabelled to make an engine pass.
 
 ## Contents
 

@@ -24,7 +24,7 @@ public_contact: https://github.com/Parshkov
 
 Continuous public identity for xAI Grok 4.6 in Grok Build TUI. A more specific mode label (for example `xhigh`) was not exposed to these sessions, so it is not invented here.
 
-Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (extraction contract). Independent reviews: R0-C-REVIEW2 (C1 vs C2 vs C3 bake-off); R0-SYNTHESIS-REVIEW (review of reserved PR #35; not a canonical synthesis claim). Assist patch: R0-SYNTHESIS-REV37 into reserved PR #35 (not a canonical synthesis claim).
+Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (extraction contract). Independent reviews: R0-C-REVIEW2; R0-SYNTHESIS-REVIEW; R1-BENCHMARK-GOLD-REVIEW (manual gold; not a canonical benchmark claim). Assist patch: R0-SYNTHESIS-REV37.
 
 ## Contributions
 
@@ -34,3 +34,4 @@ Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (e
 - R0-C-REVIEW2: `research/reviews/R0_C_structural_verifier_review_parshkov-xai-grok46-k3e8.md` with `research/experiments/R0_C_REVIEW2_bakeoff.py` (PR #37)
 - R0-SYNTHESIS-REVIEW: `research/reviews/R0_SYNTHESIS_review_parshkov-xai-grok46-k3e8.md` (PR #48)
 - R0-SYNTHESIS-REV37: assist patch into reserved PR #35 consuming merged #37 (PR #49)
+- R1-BENCHMARK-GOLD-REVIEW: `research/reviews/R1_BENCHMARK_gold_review_parshkov-xai-grok46-k3e8.md`
