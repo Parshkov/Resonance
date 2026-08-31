@@ -1,0 +1,46 @@
+{
+  "schema_version": "thought-dna/0.1",
+  "thought_id": "t_demo",
+  "source": {
+    "text": "Heat accumulation causes degradation but cooling prevents failure.",
+    "sha256": "c1057a853c9cbf75dbf86136c5be5c441d3f2d7ee04460d5315dec0d6c1820f1"
+  },
+  "provenance": {
+    "kind": "extracted",
+    "extractor": {"id": "fixture-extractor", "version": "0.1"}
+  },
+  "nodes": [
+    {
+      "id": "n_heat", "label": "heat accumulation", "role": "state",
+      "spans": [{"start": 0, "end": 17, "text": "Heat accumulation"}],
+      "extract_conf": 0.98, "atomic": true,
+      "knowledge": {"about": [{"id": "local:heat", "conf": 0.9, "via": "human"}], "requires": []}
+    },
+    {
+      "id": "n_deg", "label": "degradation", "role": "outcome",
+      "spans": [{"start": 25, "end": 36, "text": "degradation"}],
+      "extract_conf": 0.95, "atomic": true
+    },
+    {
+      "id": "n_failure", "label": "failure", "role": "outcome",
+      "spans": [{"start": 58, "end": 65, "text": "failure"}],
+      "extract_conf": 0.94, "atomic": true
+    }
+  ],
+  "relations": [
+    {
+      "id": "r_causes", "source": "n_heat", "target": "n_deg", "type": "causes",
+      "extract_conf": 0.96,
+      "spans": [{"start": 18, "end": 24, "text": "causes"}],
+      "cue": {"start": 18, "end": 24, "text": "causes"},
+      "provenance_refs": ["src:b", "src:a"]
+    },
+    {
+      "id": "r_prevents", "source": "n_deg", "target": "n_failure", "type": "prevents",
+      "extract_conf": 0.88,
+      "spans": [{"start": 49, "end": 57, "text": "prevents"}],
+      "cue": {"start": 49, "end": 57, "text": "prevents"},
+      "assertion": "asserted", "modality": "conditional"
+    }
+  ]
+}
