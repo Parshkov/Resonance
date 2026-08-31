@@ -68,6 +68,14 @@ class ValidationTests(unittest.TestCase):
         x["relations"][0]["mystery_score"] = 0.7
         cases.append((x, "unknown field"))
 
+        x = copy.deepcopy(base)
+        x["nodes"][0]["knowledge"] = None
+        cases.append((x, "knowledge"))
+
+        x = copy.deepcopy(base)
+        x["relations"][0]["cue"] = None
+        cases.append((x, "must be an object"))
+
         for raw, needle in cases:
             with self.subTest(needle=needle):
                 with self.assertRaises(ThoughtDNAValidationError) as ctx:
