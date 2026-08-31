@@ -20,23 +20,23 @@
       "sha256": "8467bcdda7c73a685afaca3c9179672b8a0c7ab4d6224a032cac6608c7efbd5b"
     },
     "extraction_runs.jsonl": {
-      "bytes": 97144,
+      "bytes": 97512,
       "records": 16,
-      "sha256": "d9932f17ee3e0893dc40ea3551b47719d354473904d2d1356b96dce6848e3d79"
+      "sha256": "f2601b4424af7457993a0e28219764f9e92de63f162bba26ce13c138a05476c9"
     },
     "graphs.jsonl": {
-      "bytes": 454678,
+      "bytes": 454633,
       "records": 136,
-      "sha256": "8f8b78b3104456d19012aaa0b3c6b44b0b81cf80dc03c34cf590e23dab987bf5"
+      "sha256": "b749f10e4178a5b21a9bab03f01defbbb35f2688faa8103b952135c63ee1c9cd"
     },
     "pairs.jsonl": {
-      "bytes": 82518,
+      "bytes": 83990,
       "records": 128,
-      "sha256": "dff99c48bdc8b6c0420928fc56db87e61aa3d63eb6fd748c7dc8829371b9b8b4"
+      "sha256": "f5f345dcf142203105b221014659cdaa6f7d7abb5ac372ccdea3cae2f33739a1"
     },
     "review_approvals.json": {
-      "bytes": 251,
-      "sha256": "e27e296ac1d08e11fc97d8406ba208f162aea1685f66bba2d2f617b42049f039"
+      "bytes": 4074,
+      "sha256": "26a28999aac23467c9edf1a7b0c34e5903be317a0ffcda22d6a91df20f6123c5"
     },
     "schema/e1-case.schema.json": {
       "bytes": 1161,
@@ -75,7 +75,7 @@
       "sha256": "53b89b482a136b320e30d8974946dfc41a55e76c86dd121814592463994e67a3"
     }
   },
-  "freeze_state": "candidate_frozen_pending_independent_review",
+  "freeze_state": "independent_review_complete",
   "manifest_version": "resonance-benchmark-manifest/0.1",
   "provenance": {
     "agent_id": "parshkov-openai-gpt5-codex-s7d3",
