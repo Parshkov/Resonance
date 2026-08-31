@@ -31,4 +31,7 @@ Required categories:
 
 Primary metrics should include retrieval recall@K, resonance precision, node-correspondence accuracy, robustness under controlled transformations and false-positive rate.
 
-The benchmark definition is intentionally not frozen until Research Mission G returns.
+Research Mission G has returned and the R0 synthesis records the proposed
+[Benchmark v0.1 contract](R0_BENCHMARK_v0.1.md). Its fixture manifest is frozen
+only after the authoring, validation, and independent-review steps in that
+contract; the synthesis document alone does not invent benchmark results.

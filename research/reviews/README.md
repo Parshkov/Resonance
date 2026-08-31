@@ -41,3 +41,10 @@ C1 vs C2 -> structural verifier review
 After those, synthesize A/D/E/F/G/H around the candidate architecture.
 
 A review does not erase minority conclusions. When uncertainty remains, preserve it in the ADR and state what evidence would trigger reconsideration.
+
+## Current synthesis
+
+- [R0 architecture synthesis](R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+
+The synthesis preserves the B and C minority conclusions as benchmark-gated
+alternatives and leaves both resulting ADRs proposed pending review.
