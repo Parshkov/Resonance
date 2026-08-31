@@ -1,0 +1,122 @@
+R0-C-REVIEW2 bake-off
+numpy 2.5.2
+scipy 1.18.1
+repeats=12  (random node relabelings per case)
+
+=== SEM-Hungarian  (0.01s) ===
+case                                 S_struct   S_sem  cover  kappa  corr.acc
+PARAPHRASE           (pos)     1.000 [1.00,1.00]   0.850   1.00   1.00     1.000
+CROSS-DOMAIN         (pos)     0.083 [0.00,0.29]   0.050   1.00   0.20     0.156
+NOISY cross-dom      (pos)     0.052 [0.00,0.25]   0.050   1.00   0.17       nan
+PARTIAL frag         (pos)     0.179 [0.00,0.43]   0.050   1.00   0.54       nan
+SAME WORDS/REWIRED   (neg)     0.143 [0.14,0.14]   1.000   1.00   0.25     1.000
+GENERIC short        (neg)     0.024 [0.00,0.29]   0.050   1.00   0.15     0.083
+GENERIC long         (neg)     0.107 [0.00,0.29]   0.050   1.00   0.22     0.104
+CAUSAL REVERSAL      (neg)     0.000 [0.00,0.00]   1.000   1.00   0.12     1.000
+TYPE SWAP            (neg)     0.286 [0.29,0.29]   1.000   1.00   0.25     1.000
+GRANULARITY split    (ctrl)    0.400 [0.40,0.40]   1.000   1.00   0.38       nan
+
+=== C1-RRWM-all  (0.09s) ===
+case                                 S_struct   S_sem  cover  kappa  corr.acc
+PARAPHRASE           (pos)     1.000 [1.00,1.00]   0.850   1.00   1.00     1.000
+CROSS-DOMAIN         (pos)     1.000 [1.00,1.00]   0.050   1.00   1.00     1.000
+NOISY cross-dom      (pos)     0.375 [0.38,0.38]   0.050   1.00   0.50       nan
+PARTIAL frag         (pos)     0.286 [0.29,0.29]   0.050   1.00   0.50       nan
+SAME WORDS/REWIRED   (neg)     0.143 [0.14,0.14]   0.762   1.00   0.25     0.750
+GENERIC short        (neg)     0.143 [0.14,0.14]   0.050   1.00   0.25     0.188
+GENERIC long         (neg)     0.143 [0.14,0.14]   0.050   1.00   0.25     0.229
+CAUSAL REVERSAL      (neg)     0.143 [0.14,0.14]   0.288   1.00   0.25     0.250
+TYPE SWAP            (neg)     0.143 [0.14,0.14]   0.525   1.00   0.25     0.500
+GRANULARITY split    (ctrl)    0.400 [0.40,0.40]   1.000   1.00   0.38       nan
+
+=== C1-RRWM-sem3  (0.07s) ===
+case                                 S_struct   S_sem  cover  kappa  corr.acc
+PARAPHRASE           (pos)     1.000 [1.00,1.00]   0.850   1.00   1.00     1.000
+CROSS-DOMAIN         (pos)     0.024 [0.00,0.14]   0.050   0.38   0.39     0.094
+NOISY cross-dom      (pos)     0.021 [0.00,0.12]   0.050   0.38   0.39       nan
+PARTIAL frag         (pos)     0.095 [0.00,0.14]   0.050   0.75   0.56       nan
+SAME WORDS/REWIRED   (neg)     0.143 [0.14,0.14]   0.941   1.00   0.25     0.938
+GENERIC short        (neg)     0.000 [0.00,0.00]   0.050   0.38   0.33     0.062
+GENERIC long         (neg)     0.036 [0.00,0.14]   0.050   0.38   0.42     0.031
+CAUSAL REVERSAL      (neg)     0.143 [0.00,0.29]   0.842   1.00   0.25     0.833
+TYPE SWAP            (neg)     0.310 [0.29,0.57]   0.980   1.00   0.27     0.979
+GRANULARITY split    (ctrl)    0.392 [0.30,0.40]   0.990   1.00   0.38       nan
+
+=== C2-FGW-path-a07  (0.13s) ===
+case                                 S_struct   S_sem  cover  kappa  corr.acc
+PARAPHRASE           (pos)     1.000 [1.00,1.00]   0.850   1.00   1.00     1.000
+CROSS-DOMAIN         (pos)     0.655 [0.57,1.00]   0.050   1.00   0.70     0.698
+NOISY cross-dom      (pos)     0.240 [0.00,0.75]   0.050   1.00   0.30       nan
+PARTIAL frag         (pos)     0.119 [0.00,0.29]   0.050   1.00   0.46       nan
+SAME WORDS/REWIRED   (neg)     0.143 [0.14,0.14]   0.762   1.00   0.25     0.750
+GENERIC short        (neg)     0.060 [0.00,0.14]   0.050   1.00   0.18     0.271
+GENERIC long         (neg)     0.155 [0.00,0.29]   0.050   1.00   0.26     0.062
+CAUSAL REVERSAL      (neg)     0.000 [0.00,0.00]   1.000   1.00   0.12     1.000
+TYPE SWAP            (neg)     0.286 [0.29,0.29]   1.000   1.00   0.25     1.000
+GRANULARITY split    (ctrl)    0.300 [0.30,0.30]   0.644   1.00   0.38       nan
+
+=== C3-FGW-multi-a00  (0.43s) ===
+case                                 S_struct   S_sem  cover  kappa  corr.acc
+PARAPHRASE           (pos)     1.000 [1.00,1.00]   0.850   1.00   1.00     1.000
+CROSS-DOMAIN         (pos)     0.083 [0.00,0.29]   0.050   1.00   0.20     0.156
+NOISY cross-dom      (pos)     0.052 [0.00,0.25]   0.050   1.00   0.17       nan
+PARTIAL frag         (pos)     0.179 [0.00,0.43]   0.050   1.00   0.54       nan
+SAME WORDS/REWIRED   (neg)     0.143 [0.14,0.14]   1.000   1.00   0.25     1.000
+GENERIC short        (neg)     0.024 [0.00,0.29]   0.050   1.00   0.15     0.083
+GENERIC long         (neg)     0.107 [0.00,0.29]   0.050   1.00   0.22     0.104
+CAUSAL REVERSAL      (neg)     0.000 [0.00,0.00]   1.000   1.00   0.12     1.000
+TYPE SWAP            (neg)     0.286 [0.29,0.29]   1.000   1.00   0.25     1.000
+GRANULARITY split    (ctrl)    0.400 [0.40,0.40]   1.000   1.00   0.38       nan
+
+=== C3-FGW-multi-a07  (1.39s) ===
+case                                 S_struct   S_sem  cover  kappa  corr.acc
+PARAPHRASE           (pos)     1.000 [1.00,1.00]   0.850   1.00   1.00     1.000
+CROSS-DOMAIN         (pos)     1.000 [1.00,1.00]   0.050   1.00   1.00     1.000
+NOISY cross-dom      (pos)     0.740 [0.62,0.75]   0.050   1.00   0.50       nan
+PARTIAL frag         (pos)     0.393 [0.29,0.43]   0.050   1.00   0.88       nan
+SAME WORDS/REWIRED   (neg)     0.143 [0.14,0.14]   1.000   1.00   0.25     1.000
+GENERIC short        (neg)     0.286 [0.29,0.29]   0.050   1.00   0.38     0.042
+GENERIC long         (neg)     0.512 [0.00,0.57]   0.050   1.00   0.56     0.271
+CAUSAL REVERSAL      (neg)     0.000 [0.00,0.00]   1.000   1.00   0.12     1.000
+TYPE SWAP            (neg)     0.571 [0.57,0.57]   0.762   1.00   0.50     0.750
+GRANULARITY split    (ctrl)    0.400 [0.40,0.40]   1.000   1.00   0.38       nan
+
+==============================================================================
+KILL RULES  (method x check). PASS = the proposal generator,
+after shared typed-edge rescoring, satisfies that C1/C2/C3 gate.
+==============================================================================
+SEM-Hungarian          2/8  P F F F F F F P
+C1-RRWM-all            8/8  P P P P P P P P
+C1-RRWM-sem3           2/8  P F F F F F F P
+C2-FGW-path-a07        6/8  P F F P P P P P
+C3-FGW-multi-a00       2/8  P F F F F F F P
+C3-FGW-multi-a07       8/8  P P P P P P P P
+
+check order:
+  1. F1 paraphrase struct>=0.8
+  2. F2 cross-domain struct>=0.8
+  3. F3 cross-domain acc>=0.8
+  4. F4 cd-rewired gap>=0.5
+  5. F5 noisy > generic-long
+  6. F6 reversal struct < cd-0.3
+  7. F7 typeswap struct < cd-0.3
+  8. F8 cd sem < 0.3 (not topical)
+
+==============================================================================
+HEADLINE MARGINS  (mean S_struct)
+==============================================================================
+method                      cd   noisy  rewire    genL     rev    swap    gran
+SEM-Hungarian            0.083   0.052   0.143   0.107   0.000   0.286   0.400
+C1-RRWM-all              1.000   0.375   0.143   0.143   0.143   0.143   0.400
+C1-RRWM-sem3             0.024   0.021   0.143   0.036   0.143   0.310   0.392
+C2-FGW-path-a07          0.655   0.240   0.143   0.155   0.000   0.286   0.300
+C3-FGW-multi-a00         0.083   0.052   0.143   0.107   0.000   0.286   0.400
+C3-FGW-multi-a07         1.000   0.740   0.143   0.512   0.000   0.571   0.400
+
+==============================================================================
+RUNTIME  (one 50x50 pair, single core, this implementation)
+==============================================================================
+  SEM-Hungarian               0.7 ms/pair   top-20:   0.01s
+  C1-RRWM-all                56.0 ms/pair   top-20:   1.12s
+  C2-FGW-path-a07             6.5 ms/pair   top-20:   0.13s
+  C3-FGW-multi-a07           13.3 ms/pair   top-20:   0.27s

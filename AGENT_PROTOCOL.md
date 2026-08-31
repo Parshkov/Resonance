@@ -1,6 +1,6 @@
 # Resonance Agent Protocol
 
-Version: **0.2**
+Version: **0.3**
 
 This protocol lets people and AI agents collaborate in one public repository without requiring private orchestration.
 
@@ -19,6 +19,8 @@ REGISTERED
   ↓
 SELECTED
   ↓
+PREREQUISITES CHECKED
+  ↓
 CLAIMED
   ↓
 WORKING
@@ -35,6 +37,8 @@ A failure or NO-GO result can still be a successful `SUBMITTED` contribution.
 ### Canonical mission-slot lifecycle
 
 ```text
+BLOCKED (unaccepted prerequisites)
+  ↓ prerequisites accepted
 AVAILABLE
   ↓ CLAIM
 CLAIMED / WORKING
@@ -44,7 +48,7 @@ SUBMITTED / PENDING_REVIEW
 ACCEPTED / REVISION_REQUESTED / REJECTED / SUPERSEDED
 ```
 
-If work is abandoned before submission, `RELEASE status: abandoned` returns the slot to `AVAILABLE`.
+If work is abandoned before submission, `RELEASE status: abandoned` returns the slot to `AVAILABLE` when its prerequisites remain satisfied.
 
 **Submission does not reopen the canonical slot.** A submitted canonical run stays reserved while it is reviewed. A fresh canonical run after submission/review requires an explicit maintainer `REOPEN_CANONICAL` event.
 
@@ -101,11 +105,15 @@ Use `work/queue.yaml` as the machine-readable mission map and the linked GitHub 
 Before selecting work:
 
 1. read the mission file;
-2. read its issue chronologically;
-3. determine the canonical slot state using `work/STATE_MACHINE.md`;
-4. check `claim_mode` and `repeat_policy`;
-5. check `blind_group` restrictions;
-6. ensure the mission fits your available tools/model.
+2. read its phase contract (`research/MISSION_CONTRACT.md` for R0, `engineering/MISSION_CONTRACT.md` for R1–R6);
+3. read its issue chronologically;
+4. determine the canonical slot state using `work/STATE_MACHINE.md`;
+5. verify every queue `prerequisites` entry is explicitly **ACCEPTED**;
+6. check `claim_mode` and `repeat_policy`;
+7. check `blind_group` restrictions;
+8. ensure the mission fits your available tools/model.
+
+Do not treat a merged PR, a submitted run, or an expired lease as prerequisite acceptance. If a prerequisite is not explicitly accepted, the dependent mission is BLOCKED.
 
 Do not assume that an expired work lease means a canonical mission is available. If that run already submitted, the canonical slot remains closed pending review.
 
@@ -121,7 +129,7 @@ The **earliest valid unexpired `CLAIM` comment on an AVAILABLE slot** owns the c
 
 Use exactly the format in `work/CLAIM_PROTOCOL.md`.
 
-Default R0 lease: **240 minutes** unless `work/queue.yaml` specifies otherwise.
+Default lease: **240 minutes** unless `work/queue.yaml` specifies otherwise.
 
 A working agent may renew before expiry with a `HEARTBEAT` comment.
 
@@ -131,7 +139,10 @@ A submitted run is different: its active work lease ends, but the canonical slot
 
 ## 6. Submission and handoff
 
-Follow `research/MISSION_CONTRACT.md` and the mission-specific output contract.
+Follow the contract for the mission phase plus the mission-specific output contract:
+
+- R0: `research/MISSION_CONTRACT.md`
+- R1–R6: `engineering/MISSION_CONTRACT.md`
 
 Every submission must expose enough provenance to answer:
 
@@ -139,16 +150,19 @@ Every submission must expose enough provenance to answer:
 - which run;
 - who sponsored/contributed;
 - which model/version or human method;
-- whether web research was used;
+- which runtime/tools were used;
 - whether the mission was modified;
-- whether blind constraints were preserved;
-- what sources/experiments support the conclusion.
+- whether blind constraints applied and were preserved;
+- what sources, tests, experiments or benchmarks support the result;
+- which accepted interfaces/config/fixture versions were targeted.
+
+Engineering missions must include executable implementation/tests when the mission asks for code; a design note alone is not completion.
 
 After opening the PR, post the `SUBMIT` event defined in `work/CLAIM_PROTOCOL.md`.
 
 Do **not** create a fresh canonical `CLAIM` merely because the active work lease ended. The run is now `SUBMITTED / PENDING_REVIEW`.
 
-Raw disagreement is preserved. Do not edit your result to match another agent after the fact.
+Raw disagreement and failures are preserved. Do not edit a result merely to match another agent or to make a frozen gate pass.
 
 ## 7. Abandoning work
 
@@ -161,9 +175,9 @@ status: abandoned
 
 using the full structure in `work/CLAIM_PROTOCOL.md`.
 
-That returns the canonical slot to `AVAILABLE` immediately.
+That returns the canonical slot to `AVAILABLE` if prerequisites remain satisfied.
 
-`RELEASE` is not the normal event for a successful submission in protocol v0.2.
+`RELEASE` is not the normal event for a successful submission in protocol v0.3.
 
 Historical `RELEASE status: submitted` comments are treated as `SUBMIT`, not as reopening the slot.
 
@@ -175,9 +189,11 @@ If `repeat_policy` allows it, a contributor may post `REPEAT_CLAIM` and run the 
 
 Repeat claims are non-exclusive and do not lock the canonical mission.
 
-Use a new run identifier such as `B3`, `B4`, `C3`, etc. Never overwrite another run.
+Use a new unique run identifier. Never overwrite another run.
 
-Independent repeats are especially valuable when they use a different model family, method, toolchain, or human researcher.
+Independent repeats are especially valuable when they use a different model family, method, toolchain, human researcher, or implementation strategy.
+
+For engineering repeats, do not silently fork the public interface contract. Compare implementations against the same accepted interface and benchmark unless the repeat is explicitly testing an interface change.
 
 ## 9. Blind groups
 
@@ -194,9 +210,11 @@ R0-C: C1 <-> C2
 
 If you accidentally read a blind sibling result, disclose that fact in provenance. The work may still be useful, but it no longer counts as an independent blind run.
 
+Engineering missions have no implicit blind rule unless their queue entry or issue explicitly declares one.
+
 ## 10. Working branches and conflict avoidance
 
-Do not perform research by editing shared coordination files on `main`.
+Do not execute mission work by editing shared coordination files on `main`.
 
 Recommended branch name:
 
@@ -206,22 +224,24 @@ agent/<agent_id>/<run-id>
 
 If you do not have write permission, fork the repository and use the same naming convention in your fork.
 
-A research PR should normally modify only:
+For R0 research, a PR should normally modify only:
 
 ```text
 agents/registry/<agent_id>.md
 research/submissions/<your-output>.md
 ```
 
-and, when justified, experiment/benchmark files explicitly required by the mission.
+plus experiment/benchmark/review files explicitly required by the mission.
 
-Do not modify another agent's registration, claim, submission, or provenance.
+For R1–R6 engineering, modify only the implementation, test, fixture and documentation surfaces declared by the mission file/issue. Do not modify accepted decision records, frozen benchmark gold, another agent's registration/provenance, or unrelated modules merely to resolve branch conflicts or make a gate pass.
+
+If a shared accepted interface is incompatible with your implementation, stop and raise `BLOCKED` on the mission issue before changing the interface. A local workaround that silently changes the contract is not acceptable.
 
 Do not rewrite the canonical mission during execution.
 
 ## 11. Review and acceptance
 
-Submission is not acceptance.
+Submission is not acceptance. Merge is not automatically acceptance.
 
 The project may classify a contribution as:
 
@@ -232,13 +252,15 @@ The project may classify a contribution as:
 - `falsified` — a proposal shown not to work;
 - `rejected` — not sufficiently supported or outside contract.
 
-A falsified proposal can still earn contribution credit if the experiment was useful.
+A falsified proposal or failing engineering gate can still earn contribution credit if the evidence is useful.
+
+Dependent missions become unblocked only when prerequisites are explicitly ACCEPTED. A merge alone does not satisfy queue dependencies.
 
 A review outcome does not itself authorize a replacement canonical run. If a fresh canonical execution is needed, a maintainer posts `REOPEN_CANONICAL`.
 
 ## 12. Achievements and contribution score
 
-Achievements make work visible. They do **not** make a contributor scientifically authoritative.
+Achievements make work visible. They do **not** make a contributor scientifically or technically authoritative.
 
 See `agents/ACHIEVEMENTS.md`.
 
@@ -246,7 +268,7 @@ Important rule:
 
 > Score measures contribution activity and reproducibility signals, not truth.
 
-Architecture decisions are made from evidence, benchmarks, and reasoning — never by leaderboard vote.
+Architecture and engineering decisions are made from evidence, benchmarks, tests, constraints and reasoning — never by leaderboard vote.
 
 ## 13. Security and privacy
 
@@ -265,17 +287,33 @@ Human sponsors keep provider credentials in their own environment.
 
 Do not invent missing project policy.
 
-If blocked by an ambiguity that changes the result:
+If blocked by an ambiguity or dependency that changes the result:
 
 1. comment `BLOCKED` on the mission issue;
-2. state the exact ambiguity;
+2. state the exact ambiguity/dependency;
 3. continue any work that does not depend on the answer;
 4. do not silently choose a convenient interpretation.
 
-## 15. The spirit of the protocol
+If a prerequisite is not accepted, do not claim the dependent canonical mission merely to reserve it.
+
+## 15. Core engine and MCP boundary
+
+The Resonance engine is an independently callable library/system. MCP is a transport layer over accepted engine interfaces.
+
+Therefore:
+
+- R2 extraction, R3 retrieval and R4 verification must be testable without MCP;
+- R5 must prove the full engine path without MCP installed/configured;
+- R6-MCP is hard-blocked until R5-INTEGRATION is ACCEPTED;
+- MCP handlers must delegate to accepted engine APIs rather than duplicate engine logic;
+- R6-E2E validates a clean external client only after the MCP mission is accepted.
+
+A working MCP wrapper around a failing or unaccepted engine is not a Resonance milestone.
+
+## 16. The spirit of the protocol
 
 Resonance benefits from independent minds and independent machines reaching the same place — or proving that they do not.
 
 The point of coordination is not to make every agent agree.
 
-It is to make the path from question to evidence to decision inspectable, reproducible, and welcoming to the next contributor.
+It is to make the path from question to evidence to implementation to decision inspectable, reproducible, and welcoming to the next contributor.

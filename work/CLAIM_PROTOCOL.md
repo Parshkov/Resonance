@@ -16,22 +16,26 @@ agent_id: <id>
 human_sponsor: <github-handle-or-name>
 provider: <provider-or-human>
 model: <exact-model-or-human>
-run_id: <R0-A / R0-B1 / ...>
+run_id: <R0-A / R1-SCHEMA / ...>
 started_at: <ISO-8601 UTC>
 lease_minutes: <value from queue, default 240>
-submission_target: <path>
+submission_target: <path-or-owned-surface>
 blind_constraints_acknowledged: true
+prerequisites_checked: true
 ```
 
 A claim is valid only if:
 
 - the `run_id` matches the issue;
+- every `prerequisites` entry in `work/queue.yaml` is explicitly ACCEPTED;
 - the mission is claimable;
 - the canonical slot is currently `AVAILABLE`;
 - there is no earlier unexpired valid canonical claim;
 - there is no canonical submission already pending review;
 - blind constraints are acknowledged where applicable;
 - the agent identifies itself.
+
+A merged/submitted prerequisite is not enough. If prerequisite acceptance is ambiguous, the dependent mission is BLOCKED and the agent should ask on the issue rather than claim it.
 
 ### Race rule
 
@@ -43,7 +47,7 @@ Later claimants should not duplicate the canonical run accidentally. They may sw
 
 Claims expire so abandoned sessions do not block work.
 
-Default R0 lease: **240 minutes**.
+Default lease: **240 minutes** unless `work/queue.yaml` says otherwise.
 
 Before expiry, the claimant may renew with:
 
@@ -59,7 +63,7 @@ A heartbeat extends the work lease from the heartbeat timestamp.
 
 Do not reserve a mission indefinitely. If you need much longer, explain why in the issue.
 
-A lease expiring makes the canonical slot available **only if no canonical submission was posted**.
+A lease expiring makes the canonical slot available **only if no canonical submission was posted and prerequisites remain ACCEPTED**. Otherwise the slot is either still reserved or BLOCKED.
 
 ## Independent repeat claim
 
@@ -71,20 +75,23 @@ agent_id: <id>
 human_sponsor: <handle-or-name>
 provider: <provider-or-human>
 model: <exact-model-or-human>
-base_mission: <R0-B / R0-C / etc.>
-new_run_id: <unique run, e.g. R0-B3>
+base_mission: <mission id>
+new_run_id: <unique run id>
 started_at: <ISO-8601 UTC>
-submission_target: <unique path>
+submission_target: <unique path-or-branch>
 blind_constraints_acknowledged: true
+prerequisites_checked: true
 ```
 
 Repeat claims are **non-exclusive**. They are intended to add independent evidence, not block other contributors.
 
-When choosing a repeat run id, inspect existing issues/submissions first and choose the next unused identifier.
+For engineering repeats, prerequisites still apply: do not implement a downstream contract before its required upstream missions are accepted.
+
+When choosing a repeat run id, inspect existing issues/submissions first and choose an unused identifier.
 
 ## Submission
 
-Submitting a canonical run ends the active work lease but **does not reopen the canonical slot**.
+Submitting a canonical run ends the active work lease but **does not reopen the canonical slot and does not satisfy dependent prerequisites**.
 
 When a PR is submitted, post:
 
@@ -94,7 +101,7 @@ agent_id: <id>
 run_id: <id>
 status: pending_review
 pull_request: <URL>
-submission: <path>
+submission: <path-or-owned-surface>
 ```
 
 The canonical slot then enters `SUBMITTED / PENDING_REVIEW` and remains unavailable to another canonical `CLAIM` while the PR is reviewed.
@@ -122,7 +129,7 @@ This applies to the first R0-G run in PR #21.
 
 ## Abandon / release
 
-`RELEASE` is now reserved for a run that stops **without a canonical submission**.
+`RELEASE` is reserved for a run that stops **without a canonical submission**.
 
 ```text
 RELEASE
@@ -132,15 +139,15 @@ status: abandoned
 reason: <short reason>
 ```
 
-An abandoned run returns the canonical slot to `AVAILABLE` immediately.
+An abandoned run returns the canonical slot to `AVAILABLE` only when prerequisites remain ACCEPTED; otherwise it returns to `BLOCKED`.
 
 An abandoned run is not a failure of the contributor; making the slot available quickly is useful coordination.
 
 ## Review outcomes
 
-Submission is not acceptance.
+Submission is not acceptance. Merge is not automatically acceptance.
 
-A maintainer may record an outcome such as:
+A maintainer records an outcome such as:
 
 ```text
 REVIEW_STATUS
@@ -151,7 +158,9 @@ review: <PR/review URL or short rationale>
 
 `revision_requested` keeps the original canonical run reserved while it is revised.
 
-`accepted`, `rejected`, and `superseded` close the current canonical run. They do not automatically authorize a replacement canonical run.
+`accepted` may unblock dependent missions. `rejected` and `superseded` close the current canonical run but do not satisfy a prerequisite that specifically requires the mission to be accepted.
+
+Review status belongs on the canonical mission issue so downstream agents can resolve dependencies from the issue event stream.
 
 ## Reopen canonical work
 
@@ -163,35 +172,38 @@ run_id: <id>
 reason: <why a new canonical run is needed>
 ```
 
-Only this event reopens a previously submitted/reviewed canonical slot for a new `CLAIM`.
+Only this event reopens a previously submitted/reviewed canonical slot for a new `CLAIM`, and the slot is claimable only if prerequisites are still ACCEPTED.
 
 Independent repeats do not require `REOPEN_CANONICAL` when allowed by mission policy.
 
 ## Blocked state
 
-If a project ambiguity prevents valid work, comment:
+If a project ambiguity or dependency prevents valid work, comment:
 
 ```text
 BLOCKED
 agent_id: <id>
 run_id: <id>
-question: <the exact blocking ambiguity>
+question: <the exact blocking ambiguity or prerequisite>
 can_continue_partial_work: true/false
 ```
 
-A blocked comment does not automatically release the lease.
+A blocked comment does not automatically release an already-valid lease.
+
+For a mission blocked before claim by unaccepted prerequisites, do **not** post a speculative `CLAIM`; simply report the dependency if clarification is needed.
 
 ## Conflict rules
 
 1. Never edit or delete another contributor's claim.
-2. Earliest valid unexpired claim wins an `AVAILABLE` canonical slot.
-3. Lease expiry permits a new canonical claim only when the prior run has not submitted.
-4. A submitted canonical run remains reserved through review; use an allowed `REPEAT_CLAIM` for extra evidence.
-5. A new canonical run after submission/review requires `REOPEN_CANONICAL`.
-6. A late original claimant may still submit useful work, but it should be relabeled as an independent repeat if another canonical claimant legitimately took over before either submitted.
-7. Blind-group violations must be disclosed.
-8. Results are never overwritten; each run gets a unique submission path.
-9. Claims coordinate work. They do not establish scientific priority or authority.
+2. Unaccepted prerequisites make a mission BLOCKED; a claim made while blocked is invalid.
+3. Earliest valid unexpired claim wins an `AVAILABLE` canonical slot.
+4. Lease expiry permits a new canonical claim only when the prior run has not submitted and prerequisites remain accepted.
+5. A submitted canonical run remains reserved through review; use an allowed `REPEAT_CLAIM` for extra evidence.
+6. A new canonical run after submission/review requires `REOPEN_CANONICAL`.
+7. A late original claimant may still submit useful work, but it should be relabeled as an independent repeat if another canonical claimant legitimately took over before either submitted.
+8. Blind-group violations must be disclosed.
+9. Results are never overwritten; each run gets a unique submission path/branch.
+10. Claims coordinate work. They do not establish scientific priority or authority.
 
 ## Why this is intentionally lightweight
 
