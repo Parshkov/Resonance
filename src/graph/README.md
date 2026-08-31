@@ -22,6 +22,7 @@ Validation is intentionally split in two layers:
    exact source spans, unique IDs, endpoint existence, and manual-vs-extracted
    grounding rules.
 
-Polarity is not an extra canonical field: it is preserved through relation
-`type` (`causes` vs `prevents`/`contradicts`) plus `assertion`; the Python
-`Relation.polarity` property is only a convenience view.
+Causal polarity is not an extra canonical field: it is preserved through
+`causes` vs `prevents` plus `assertion`. `contradicts` remains a distinct
+non-causal relation type. The Python `Relation.polarity` property is only a
+convenience view and returns `not_applicable` for non-causal relation types.
