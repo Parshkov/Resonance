@@ -1,0 +1,45 @@
+"""Stable public interfaces between Resonance engine components."""
+
+from .protocols import CandidateIndex, ConfigSource, EngineFacade, Extractor, GraphValidator, StructuralVerifier, ThoughtStore
+from .types import (
+    INTERFACE_VERSION,
+    SCORE_CONTRACT_VERSION,
+    CandidateResult,
+    ConfigRef,
+    Contradiction,
+    EdgePathMatch,
+    Explanation,
+    ExtractionResult,
+    ItemProvenance,
+    NodeMatch,
+    RelationMatch,
+    ResonanceHit,
+    ScoreVector,
+    SeedCorrespondence,
+    VerifierResult,
+)
+
+__all__ = [
+    "INTERFACE_VERSION",
+    "SCORE_CONTRACT_VERSION",
+    "ConfigRef",
+    "ExtractionResult",
+    "SeedCorrespondence",
+    "CandidateResult",
+    "ItemProvenance",
+    "NodeMatch",
+    "RelationMatch",
+    "EdgePathMatch",
+    "Contradiction",
+    "ScoreVector",
+    "Explanation",
+    "VerifierResult",
+    "ResonanceHit",
+    "GraphValidator",
+    "Extractor",
+    "ThoughtStore",
+    "CandidateIndex",
+    "StructuralVerifier",
+    "EngineFacade",
+    "ConfigSource",
+]
