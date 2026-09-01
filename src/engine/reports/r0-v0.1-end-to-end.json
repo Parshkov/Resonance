@@ -1,0 +1,395 @@
+{
+ "frozen_runner_report": {
+  "benchmark_version": "r0-v0.1",
+  "config_sha256": "96c28068b1798ef17e236e91de484f747ec9f33977edf6a49959a0f922e101f8",
+  "fixture_readiness": {
+   "benchmark_version": "r0-v0.1",
+   "config_sha256": "96c28068b1798ef17e236e91de484f747ec9f33977edf6a49959a0f922e101f8",
+   "counts": {
+    "calibration_packs": 2,
+    "e1_matrix_cases": 12,
+    "extraction_runs": 16,
+    "gate_packs": 6,
+    "graphs": 136,
+    "packs": 8,
+    "pairs": 128
+   },
+   "engine_input_projection": {
+    "extraction_fields": [
+     "extraction_case_id",
+     "input"
+    ],
+    "gold_in_engine_input": false,
+    "graph_fields": [
+     "benchmark_graph_id",
+     "thought_dna"
+    ]
+   },
+   "extraction_reviews_unapproved": 0,
+   "gate_execution_ready": true,
+   "manifest_sha256": "1700935134235ab1a376779c54b0fbc70db19cc72d9c93bc5f06f9485cd7e49e",
+   "manual_pair_reviews_unapproved": 0
+  },
+  "gates": {
+   "deterministic_replay": {
+    "observed": {
+     "failures": 0,
+     "max_score_vector_delta": 0.0
+    },
+    "required": "zero mapping/class/rank differences and score-vector delta == 0",
+    "status": "pass"
+   },
+   "directed_typed_edge_accuracy": {
+    "observed": 1.0,
+    "required": ">= 0.75",
+    "status": "pass"
+   },
+   "extraction_prerequisite": {
+    "observed": null,
+    "required": "all extraction gates must pass",
+    "status": "not_evaluated"
+   },
+   "false_meaningful_contractions": {
+    "observed": 0,
+    "required": "== 0",
+    "status": "pass"
+   },
+   "independent_gold_review": {
+    "observed": {
+     "extraction_reviews_unapproved": 0,
+     "pair_reviews_unapproved": 0
+    },
+    "required": "all required manual judgments approved by an independent reviewer",
+    "status": "pass"
+   },
+   "negative_family_fpr": {
+    "observed": {
+     "accidental_semantic_similarity": true,
+     "generic_motif_distractor": true,
+     "local_match_global_conflict": true,
+     "same_topic_different_intent": true,
+     "same_vocabulary_wrong_structure": true
+    },
+    "required": "each family <= 1/6 false positives",
+    "status": "pass"
+   },
+   "node_pair_f1": {
+    "observed": 1.0,
+    "required": ">= 0.70",
+    "status": "pass"
+   },
+   "overall_negative_fpr": {
+    "observed": 0.0,
+    "required": "<= 0.10",
+    "status": "pass"
+   },
+   "overall_recall_at_5": {
+    "observed": 0.7272727272727273,
+    "required": ">= 0.85",
+    "status": "fail"
+   },
+   "polarity_rejection": {
+    "observed": 1.0,
+    "required": "== 1.0 end-to-end",
+    "status": "pass"
+   },
+   "positive_family_recall": {
+    "observed": {
+     "branch_continuation": true,
+     "cross_domain_analogy": true,
+     "irrelevant_branch": true,
+     "method_knowledge_bridge": true,
+     "modest_extraction_error": false,
+     "paraphrase": true,
+     "partial_graph": false,
+     "same_domain_structural_match": true,
+     "serialization_permutation": true,
+     "transparent_granularity": false,
+     "vocabulary_substitution": true
+    },
+    "required": "every family >= 4/6",
+    "status": "fail"
+   },
+   "resonance_precision": {
+    "observed": 1.0,
+    "required": ">= 0.80",
+    "status": "pass"
+   },
+   "sow": {
+    "observed": 12,
+    "required": ">= 10/12; ties fail",
+    "status": "pass"
+   },
+   "structural_e1_matrix": {
+    "observed": null,
+    "required": "all 12 DNA-native E1 cases must pass MULTI and polarity rejection",
+    "status": "not_evaluated"
+   },
+   "structural_scale_replay": {
+    "observed": null,
+    "required": "both synthetic worlds at 10^3, 10^4 and 10^5 with sublinear touched postings and Recall@20 >= 0.50",
+    "status": "not_evaluated"
+   }
+  },
+  "manifest_sha256": "1700935134235ab1a376779c54b0fbc70db19cc72d9c93bc5f06f9485cd7e49e",
+  "metrics": {
+   "bridge_mapping_f1": 1.0,
+   "directed_typed_edge_accuracy": 1.0,
+   "extraction": null,
+   "node_pair_f1": 1.0,
+   "overall_gate_recall_at_5": 0.7272727272727273,
+   "overall_negative_fpr": 0.0,
+   "polarity_rejection_rate": 1.0,
+   "resonance_precision": 1.0,
+   "sow_passes": 12,
+   "sow_total": 12,
+   "structural_retrieval": {
+    "e1": null,
+    "scale": null
+   }
+  },
+  "overall_status": "fail",
+  "per_family": {
+   "accidental_semantic_similarity": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "branch_continuation": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": 1.0,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "cross_domain_analogy": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "generic_motif_distractor": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "irrelevant_branch": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "local_match_global_conflict": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "method_knowledge_bridge": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": 1.0,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "modest_extraction_error": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "paraphrase": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "partial_graph": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "same_domain_structural_match": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "same_topic_different_intent": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "same_vocabulary_wrong_structure": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": null,
+    "mean_node_f1": null,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "serialization_permutation": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   },
+   "transparent_granularity": {
+    "classification_accuracy": 1.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 0.0,
+    "retrieval_hits_at_5": 0
+   },
+   "vocabulary_substitution": {
+    "classification_accuracy": 0.0,
+    "false_positives": 0,
+    "gate_count": 6,
+    "mean_bridge_f1": null,
+    "mean_edge_f1": 1.0,
+    "mean_node_f1": 1.0,
+    "recall_at_5": 1.0,
+    "retrieval_hits_at_5": 6
+   }
+  },
+  "pipeline_attribution": {
+   "pass": 72,
+   "retrieval_miss": 18,
+   "verifier_classification_failure": 6
+  },
+  "prediction_sha256": "1507693e1f93c96a33fa9b40c5e68e7fb1e9c1e97f136248a2b2ed89f132da51",
+  "report_sha256": "222457fc5d201c21678bade166638c61476c5f403ca569747da380609c82468f",
+  "report_version": "resonance-benchmark-report/0.1"
+ },
+ "summary": {
+  "engine_version": "resonance-engine/0.1",
+  "graphs_indexed": 136,
+  "mode": "end_to_end_no_oracle",
+  "pairs": 128,
+  "retrieval_misses_top20": [
+   "C01-04",
+   "C01-05",
+   "C01-08",
+   "C01-10",
+   "C01-11",
+   "C01-12",
+   "C01-13",
+   "C01-14",
+   "C02-04",
+   "C02-05",
+   "C02-08",
+   "C02-10",
+   "C02-11",
+   "C02-12",
+   "C02-13",
+   "C02-14",
+   "G01-04",
+   "G01-05",
+   "G01-08",
+   "G01-10",
+   "G01-11",
+   "G01-12",
+   "G01-13",
+   "G01-14",
+   "G02-04",
+   "G02-05",
+   "G02-08",
+   "G02-10",
+   "G02-11",
+   "G02-12",
+   "G02-13",
+   "G02-14",
+   "G03-04",
+   "G03-05",
+   "G03-08",
+   "G03-10",
+   "G03-11",
+   "G03-12",
+   "G03-13",
+   "G03-14",
+   "G04-04",
+   "G04-05",
+   "G04-08",
+   "G04-10",
+   "G04-11",
+   "G04-12",
+   "G04-13",
+   "G04-14",
+   "G05-04",
+   "G05-05",
+   "G05-08",
+   "G05-10",
+   "G05-11",
+   "G05-12",
+   "G05-13",
+   "G05-14",
+   "G06-04",
+   "G06-05",
+   "G06-08",
+   "G06-10",
+   "G06-11",
+   "G06-12",
+   "G06-13",
+   "G06-14"
+  ]
+ }
+}
