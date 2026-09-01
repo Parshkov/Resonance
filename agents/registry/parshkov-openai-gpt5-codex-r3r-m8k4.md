@@ -24,4 +24,4 @@ version is not exposed to the session, so no more specific version is claimed.
 
 ## Contributions
 
-- none yet
+- [R3-RETRIEVAL-REPEAT-M8K4 — PR #66](https://github.com/Parshkov/Resonance/pull/66)
