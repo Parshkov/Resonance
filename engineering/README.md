@@ -14,13 +14,18 @@ R0-SYNTHESIS
   -> R5-INTEGRATION
   -> R6-MCP
   -> R6-E2E
+  -> R7-CORPUS -> R8-DISCOVERY -> R9-VISUAL -> R10-SHOWCASE
 ```
+
+R7–R10 are the competition-demo chain opened after MCP. `R7-CORPUS` may
+proceed in parallel with a submitted R6-E2E run because it must not change
+engine/retrieval/scoring semantics; its hard start gate is accepted R6-MCP.
 
 R2/R3/R4 are intentionally parallel after their shared R1 gates.
 
 ## Contract
 
-All R1–R6 missions follow [`MISSION_CONTRACT.md`](MISSION_CONTRACT.md) in addition to the repository-wide agent protocol.
+All R1–R10 missions follow [`MISSION_CONTRACT.md`](MISSION_CONTRACT.md) in addition to the repository-wide agent protocol.
 
 Mission files live under `engineering/missions/`. GitHub Issues are the live coordination source; the mission files are durable scope/acceptance contracts.
 

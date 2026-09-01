@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/schemas/demo-corpus-0.1.schema.json",
+  "title": "Resonance demo corpus session v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "person",
+    "consent",
+    "location",
+    "presentation",
+    "record_provenance",
+    "thought_dna"
+  ],
+  "properties": {
+    "schema_version": {"const": "resonance-demo-corpus/0.1"},
+    "session_id": {"type": "string", "minLength": 1, "pattern": "^ses-[a-z0-9-]+$"},
+    "person": {"$ref": "#/$defs/person"},
+    "consent": {"$ref": "#/$defs/consent"},
+    "location": {"$ref": "#/$defs/location"},
+    "presentation": {"$ref": "#/$defs/presentation"},
+    "record_provenance": {"$ref": "#/$defs/recordProvenance"},
+    "thought_dna": {"$ref": "thought-dna-0.1.schema.json"}
+  },
+  "$defs": {
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["person_id", "display_label", "avatar_placeholder"],
+      "properties": {
+        "person_id": {"type": "string", "minLength": 1, "pattern": "^person-[a-z0-9-]+$"},
+        "display_label": {"type": "string", "minLength": 1},
+        "avatar_placeholder": {"type": "string", "minLength": 1}
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["share_enabled", "share_thought_dna", "share_coarse_location", "share_display_profile"],
+      "properties": {
+        "share_enabled": {"type": "boolean"},
+        "share_thought_dna": {"type": "boolean"},
+        "share_coarse_location": {"type": "boolean"},
+        "share_display_profile": {"type": "boolean"}
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "region", "city", "lat", "lon", "precision"],
+      "properties": {
+        "kind": {"const": "synthetic_coarse"},
+        "region": {"type": "string", "minLength": 1},
+        "city": {"type": "string", "minLength": 1},
+        "lat": {"type": "number"},
+        "lon": {"type": "number"},
+        "precision": {"const": "city"}
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["domain", "topic", "cluster_id"],
+      "properties": {
+        "domain": {"type": "string", "minLength": 1},
+        "topic": {"type": "string", "minLength": 1},
+        "cluster_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "recordProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_kind", "builder_id", "notes"],
+      "properties": {
+        "record_kind": {"enum": ["synthetic", "volunteer", "manually_curated"]},
+        "builder_id": {"type": "string", "minLength": 1},
+        "notes": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "builder_id": "parshkov-xai-grok46-t2n9",
+  "clusters": {
+    "accumulating-intermediary-failure": [
+      "ses-aria-plasma-lens",
+      "ses-gabe-warehouse",
+      "ses-kwame-traffic",
+      "ses-mei-battery-heat",
+      "ses-noah-org-overload",
+      "ses-ravi-irrigation",
+      "ses-sora-plasma-partial",
+      "ses-theo-plasma-granular"
+    ],
+    "complementary-bridge": [
+      "ses-diego-chiller",
+      "ses-yuki-stabilization"
+    ],
+    "evidence-corroboration": [
+      "ses-elena-litigation",
+      "ses-omar-chronology",
+      "ses-wei-climate"
+    ],
+    "method-resource-hub": [
+      "ses-jonas-diagnostics",
+      "ses-lina-scaffold",
+      "ses-nico-tracing-private",
+      "ses-priya-tracing"
+    ],
+    "polarity-inversion": [
+      "ses-lea-plasma-polarity"
+    ],
+    "same-words-wrong-structure": [
+      "ses-sam-plasma-rewire"
+    ],
+    "unrelated-distractor": [
+      "ses-camille-portrait",
+      "ses-dev-tax",
+      "ses-franz-counterpoint",
+      "ses-luz-tomato",
+      "ses-marc-sourdough",
+      "ses-nina-alpine"
+    ]
+  },
+  "corpus_id": "resonance-demo-corpus/0.1",
+  "discoverable_count": 23,
+  "flagship_query_session_id": "ses-aria-plasma-lens",
+  "frozen_v0_1_manifest_sha256": "1700935134235ab1a376779c54b0fbc70db19cc72d9c93bc5f06f9485cd7e49e",
+  "hidden_session_ids": [
+    "ses-nico-tracing-private",
+    "ses-ravi-irrigation"
+  ],
+  "matching_rule": "Thought DNA only; presentation/location/topic never enter the engine",
+  "schema_version": "resonance-demo-corpus/0.1",
+  "session_count": 25,
+  "sessions_sha256": "eba6f76e23a702f891d356754cd9bf96df727bf6c61581cd8c8431c3d4dff925",
+  "thought_hashes": {
+    "ses-aria-plasma-lens": "fa00796c974a414c4fefb0214b1c36df5ae25d17ce9ef0333eb1dee934673732",
+    "ses-camille-portrait": "ebc0fed358c82f753f02d6f573b6a459297112d4b8c576d9baafb5b882b3b5af",
+    "ses-dev-tax": "cf3dfe6a1ed376133061a3e16ce40a346c5daa6621196dd1d06591c10bccde78",
+    "ses-diego-chiller": "3b95ba4bf554494cffe3baa0f55ec27a872abfd14b6683e9aef4fad5b5a2e50e",
+    "ses-elena-litigation": "c8f96e0f44aea14972396625d3950b0a0901040b0458208422979add8d8cf5a8",
+    "ses-franz-counterpoint": "d4f2d660b7d58317b051ada9b80c6827715d5f96e9ac0d424af8da67b90a27d8",
+    "ses-gabe-warehouse": "890c98c8be6b2e0e6838524edeb3f33f2826372522a39613d96ada7024b36bc3",
+    "ses-jonas-diagnostics": "694163cab66b3c3a64e96c8a4d9f700b00ab3668621d2960e39755e36bf9ba08",
+    "ses-kwame-traffic": "3250dce33b38dc50b3de0b001ab9bbc67d9f77b6efd070ff4da28a58395a6457",
+    "ses-lea-plasma-polarity": "a914798155a3699ef937d3e9a9e73e11838ab79bdddf27ba744909fcb0797af7",
+    "ses-lina-scaffold": "b35ba09db7c8106f69b9f7e872e1c5341499f1a8fd2babb744e38b2bfc43dcf8",
+    "ses-luz-tomato": "c94c469e43d5bf068b5417b0bc804e083edac34bb9c8f55e58ea9576e62e2b00",
+    "ses-marc-sourdough": "561aed461d04a84cd613e175ea1d5f25a08380cacb3b96ac61b140e12bf89b8d",
+    "ses-mei-battery-heat": "4ad8d22472ce3cf558b8c0d7f5995f42459dd678e20395a2fa40095e6e78d66c",
+    "ses-nico-tracing-private": "31fa71ad215214d4c2325699a6d4555952ab77d782765d15c3e3ae7b58a5e7b0",
+    "ses-nina-alpine": "e111f9bd96875df9062c72987f01d902a792eb3a3007353e5cb8141c25c3cff0",
+    "ses-noah-org-overload": "183d13dfcb8ab1ba4c3011990b1648754f30dcb594f525e6152a4911ea05cfc3",
+    "ses-omar-chronology": "edc75b47e50839a280124f1fa4dfdecd3286f527cc64ca775e881694d11a3c2c",
+    "ses-priya-tracing": "10a5129c834eee6d9f4924ec06f08eff0adc2ddf547c13247dec323a7e461b1d",
+    "ses-ravi-irrigation": "d5f2c5809848b2f79152104fb55c63200a3cde5f7f3be84488e2732d2df852af",
+    "ses-sam-plasma-rewire": "740da86cb2370e5d506f8803ef78e9536f5ea27e89be2e7b09967f16104d2ca6",
+    "ses-sora-plasma-partial": "acbb4200211577775c6b100ee442e9fe4696c9794af3e198bb1f3d4dde666678",
+    "ses-theo-plasma-granular": "622d42911c725aea5c05ea10b5c6bc058453c2ef6f7a35cd1cd1704cd4a80276",
+    "ses-wei-climate": "c73c0a9f2e21e2e771cf6625a902244d1b91856bf3ca78d55021e66d3dfbe829",
+    "ses-yuki-stabilization": "863202c2f747ba72cc34012e790f6988b2c9dc0f7208c00cfe54c3d0f5bfbde7"
+  }
+}

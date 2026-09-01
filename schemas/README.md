@@ -3,6 +3,9 @@
 `thought-dna-0.1.schema.json` is the portable JSON Schema for the accepted
 Thought DNA v0.1 shape.
 
+`demo-corpus-0.1.schema.json` is the portable envelope for R7 consented demo
+sessions. It wraps Thought DNA; it does not extend or replace it.
+
 The Python validator in `src/graph/validation.py` is additionally normative for
 cross-field invariants that JSON Schema alone does not conveniently enforce:
 source SHA-256, exact span slices, unique local IDs, relation endpoint existence,
