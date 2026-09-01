@@ -34,4 +34,6 @@ R1-SCHEMA
 
 R2/R3/R4 should communicate only through the accepted public interfaces, not each other's internals. `src/mcp/` must delegate to the accepted engine facade rather than duplicating extraction, retrieval, verification or scoring logic.
 
+`src/extraction/` implements R2: cue-grounded extraction plus a manual non-LLM ingest path through the same Thought DNA validator.
+
 Mission-specific ownership and acceptance gates live under `engineering/missions/` and the linked GitHub Issues.

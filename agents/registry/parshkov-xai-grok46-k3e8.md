@@ -39,3 +39,4 @@ Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (e
 - R1-INTERFACES-ASSIST2: remaining Scoring v0.1 contract deltas into reserved R1-INTERFACES (PR #57)
 - R1-INTERFACES: canonical freeze of `src/interfaces/**` after prior lease expiry (original implementation: parshkov-openai-gpt56sol-r1i-b7c2; PR #59)
 - R3-RETRIEVAL: MULTI candidate generation (`src/fingerprint/**`, `src/index/**`; PR #61); revisions for independent review (budget/DF/build/persistence/path-ID, then competition min-rank tie policy). Frozen min-rank Recall@20 is 6/6 with a disclosed 71-graph rank-1 tie group.
+- R2-EXTRACTION: cue-grounded context→ThoughtGraph plus manual bypass (`src/extraction/**`)
