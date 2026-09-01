@@ -11,6 +11,7 @@ from typing import Any
 
 from src.graph import ThoughtGraph
 from src.interfaces import (
+    ConfigRef,
     Contradiction,
     EdgePathMatch,
     Explanation,
@@ -20,6 +21,13 @@ from src.interfaces import (
     ResonanceHit,
     VerifierResult,
 )
+
+
+def _config_ref(c: ConfigRef) -> dict[str, str]:
+    return {"component": c.component,
+            "component_version": c.component_version,
+            "config_hash": c.config_hash,
+            "schema_version": c.schema_version}
 
 
 def _prov(p: ItemProvenance) -> dict[str, Any]:
@@ -87,10 +95,7 @@ def verifier_result(r: VerifierResult) -> dict[str, Any]:
             "unmatched_candidate_relations": list(r.unmatched_candidate_relations),
             "contradictions": [_contradiction(c) for c in r.contradictions],
             "explanation": _explanation(r.explanation),
-            "solver_config": {"component": r.solver_config.component,
-                              "component_version": r.solver_config.component_version,
-                              "config_hash": r.solver_config.config_hash,
-                              "schema_version": r.solver_config.schema_version}}
+            "solver_config": _config_ref(r.solver_config)}
 
 
 def resonance_hit(h: ResonanceHit) -> dict[str, Any]:
@@ -107,7 +112,8 @@ def resonance_hit(h: ResonanceHit) -> dict[str, Any]:
                           "polarity_reliable": c.polarity_reliable,
                           "index_version": c.index_version,
                           "feature_version": c.feature_version,
-                          "corpus_snapshot": c.corpus_snapshot},
+                          "corpus_snapshot": c.corpus_snapshot,
+                          "config": _config_ref(c.config)},
             "verification": verifier_result(h.verification)}
 
 
