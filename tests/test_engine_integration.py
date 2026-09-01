@@ -17,7 +17,7 @@ sys.path.insert(0, str(REPO))
 
 from src.graph import ThoughtGraph
 from src.interfaces import EngineFacade, ThoughtStore
-from src.engine import InMemoryThoughtStore, ResonanceEngine
+from src.engine import EngineIntegrityError, InMemoryThoughtStore, ResonanceEngine
 
 V01 = REPO / "benchmark" / "r0-v0.1"
 
@@ -123,26 +123,60 @@ class RequiredDemoTests(unittest.TestCase):
 
 
 class PersistenceCompositionTests(unittest.TestCase):
-    def test_store_and_index_round_trip_preserve_find(self):
+    def _engine(self, count=20):
         engine = ResonanceEngine()
-        subset = list(GRAPHS.values())[:20]
+        subset = list(GRAPHS.values())[:count]
         for g in subset:
             engine.index(g)
+        return engine, subset
+
+    def test_bound_snapshot_round_trip_preserves_find(self):
+        engine, subset = self._engine()
         query = subset[0]
         before = [(h.candidate.candidate_id, h.verification.classification)
                   for h in engine.find(query, mode="structural", k=5)]
         with tempfile.TemporaryDirectory() as tmp:
-            store_path = Path(tmp) / "store.json"
-            index_path = Path(tmp) / "index.json"
-            engine.store.dump(store_path)
-            engine.candidate_index.dump(index_path)
-            from src.index.store import InvertedCandidateIndex
-            restored = ResonanceEngine(
-                store=InMemoryThoughtStore.load(store_path),
-                index=InvertedCandidateIndex.load(index_path))
+            engine.dump(Path(tmp))
+            restored = ResonanceEngine.load(Path(tmp))
         after = [(h.candidate.candidate_id, h.verification.classification)
                  for h in restored.find(query, mode="structural", k=5)]
         self.assertEqual(before, after)
+
+    def test_mixed_store_index_pair_is_rejected_on_load(self):
+        """A 1-graph store bound to a 20-graph index must fail closed."""
+        big, subset = self._engine(20)
+        small, _ = self._engine(1)
+        with tempfile.TemporaryDirectory() as tmp:
+            big.dump(Path(tmp))
+            small.store.dump(Path(tmp) / "store.json")   # swap in mismatched store
+            import hashlib, json
+            mpath = Path(tmp) / "manifest.json"
+            manifest = json.loads(mpath.read_text())
+            manifest["files"]["store.json"] = hashlib.sha256(
+                (Path(tmp) / "store.json").read_bytes()).hexdigest()
+            mpath.write_text(json.dumps(manifest, sort_keys=True,
+                                        separators=(",", ":")) + "\n")
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
+
+    def test_tampered_snapshot_file_is_rejected(self):
+        engine, _ = self._engine(5)
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            index_path = Path(tmp) / "index.json"
+            index_path.write_bytes(index_path.read_bytes().replace(b"causes", b"caused", 1))
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
+
+    def test_find_fails_closed_when_store_misses_a_candidate(self):
+        """A retrieved candidate absent from the store raises; it is never
+        silently skipped (reviewer finding 1 regression)."""
+        engine, subset = self._engine(5)
+        engine.store._graphs.pop(subset[1].thought_id)   # simulate divergence
+        with self.assertRaises(EngineIntegrityError):
+            # query with a SIBLING so the popped graph is retrieved as a
+            # candidate (the index excludes the query's own id)
+            engine.find(subset[0], mode="structural", k=5)
 
 
 if __name__ == "__main__":

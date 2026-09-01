@@ -316,14 +316,14 @@
    "retrieval_miss": 18,
    "verifier_classification_failure": 6
   },
-  "prediction_sha256": "1507693e1f93c96a33fa9b40c5e68e7fb1e9c1e97f136248a2b2ed89f132da51",
-  "report_sha256": "222457fc5d201c21678bade166638c61476c5f403ca569747da380609c82468f",
+  "prediction_sha256": "cb918d9349c3528b6eb6717da85373d508360aa400b410bdc22e918b2550c4dd",
+  "report_sha256": "9aebc1acb738ab16a0c2dbeb7949fcdb97ed55fb3290cc5b3b79aacc66f7667d",
   "report_version": "resonance-benchmark-report/0.1"
  },
  "summary": {
   "engine_version": "resonance-engine/0.1",
   "graphs_indexed": 136,
-  "mode": "end_to_end_no_oracle",
+  "mode": "retrieval_ranks=real; verification_pairs=evaluator_selected",
   "pairs": 128,
   "retrieval_misses_top20": [
    "C01-04",

@@ -6,6 +6,7 @@ retrieve -> verify -> score -> explain. Pure Python; no MCP anywhere.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Sequence
@@ -23,6 +24,10 @@ from src.index.store import InvertedCandidateIndex
 from src.alignment import MultiRelFGWVerifier
 
 ENGINE_VERSION = "resonance-engine/0.1"
+
+
+class EngineIntegrityError(RuntimeError):
+    """Store/index composition is inconsistent; fail closed, never skip."""
 
 
 class InMemoryThoughtStore:
@@ -43,6 +48,16 @@ class InMemoryThoughtStore:
 
     def thought_ids(self) -> tuple[str, ...]:
         return tuple(sorted(self._graphs))
+
+    def snapshot(self) -> str:
+        """Same recipe as the index corpus snapshot: sha256 over sorted
+        (thought_id, canonical graph hash) pairs, so store/index binding is a
+        string-equality check."""
+        from src.graph import canonical_sha256
+        items = sorted((tid, canonical_sha256(g.to_dict()))
+                       for tid, g in self._graphs.items())
+        blob = json.dumps(items, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(blob).hexdigest()
 
     def dump(self, path: Path) -> None:
         payload = {tid: g.to_dict() for tid, g in sorted(self._graphs.items())}
@@ -93,7 +108,9 @@ class ResonanceEngine:
         for candidate in self.candidate_index.query(graph, mode=mode, k=k):
             target = self.store.get(candidate.candidate_id)
             if target is None:
-                continue
+                raise EngineIntegrityError(
+                    f"index returned {candidate.candidate_id!r} which is absent "
+                    "from the thought store; store/index snapshots have diverged")
             verification = self.verifier.verify(
                 graph, target, seeds=candidate.seed_correspondences)
             self._explanations[(graph.thought_id, candidate.candidate_id)] = verification
@@ -121,3 +138,53 @@ class ResonanceEngine:
                 and candidate.polarity_reliable == flags.polarity_reliable):
             return candidate
         raise ValueError("retrieval flags drifted between index and verifier")
+
+
+    # -- bound persistence --------------------------------------------------
+    def dump(self, directory: Path) -> None:
+        """Persist store+index as ONE verified snapshot: a manifest binds the
+        two payloads by hash and by the shared corpus snapshot."""
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        store_path = directory / "store.json"
+        index_path = directory / "index.json"
+        self.store.dump(store_path)
+        self.candidate_index.dump(index_path)
+        store_snapshot = self.store.snapshot()
+        index_snapshot = self.candidate_index.corpus_snapshot
+        if store_snapshot != index_snapshot:
+            raise EngineIntegrityError(
+                "refusing to dump: store and index disagree on corpus snapshot")
+        manifest = {
+            "engine_version": ENGINE_VERSION,
+            "corpus_snapshot": index_snapshot,
+            "files": {
+                "store.json": hashlib.sha256(store_path.read_bytes()).hexdigest(),
+                "index.json": hashlib.sha256(index_path.read_bytes()).hexdigest(),
+            },
+        }
+        (directory / "manifest.json").write_text(
+            json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8")
+
+    @classmethod
+    def load(cls, directory: Path, **kwargs) -> "ResonanceEngine":
+        """Load a snapshot; any hash or snapshot mismatch fails closed."""
+        directory = Path(directory)
+        manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+        if manifest.get("engine_version") != ENGINE_VERSION:
+            raise EngineIntegrityError(
+                f"unsupported engine snapshot version: {manifest.get('engine_version')!r}")
+        for name, expected in manifest["files"].items():
+            actual = hashlib.sha256((directory / name).read_bytes()).hexdigest()
+            if actual != expected:
+                raise EngineIntegrityError(f"snapshot file hash mismatch: {name}")
+        from src.index.store import InvertedCandidateIndex
+        store = InMemoryThoughtStore.load(directory / "store.json")
+        index = InvertedCandidateIndex.load(directory / "index.json")
+        if store.snapshot() != index.corpus_snapshot:
+            raise EngineIntegrityError(
+                "store and index snapshots diverge inside the manifest-verified payloads")
+        if manifest["corpus_snapshot"] != index.corpus_snapshot:
+            raise EngineIntegrityError("manifest corpus_snapshot mismatch")
+        return cls(store=store, index=index, **kwargs)

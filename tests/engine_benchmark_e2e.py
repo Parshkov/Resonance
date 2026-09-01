@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""R5 end-to-end benchmark harness: REAL retrieval ranks, no oracle.
+"""R5 mixed-mode benchmark harness: REAL retrieval ranks, ORACLE-SELECTED
+verification pairs.
+
+Retrieval column: no oracle -- candidate_rank is the index's actual tie-aware
+rank for the evaluator's candidate (rank 10^6 on a top-k miss). Verification
+column: stage isolation -- the evaluator-selected pair is always verified,
+including on retrieval misses, so verifier gates measure the verifier rather
+than compounding retrieval failures. A pure find()-driven pipeline is what
+`ResonanceEngine.find` does in the integration tests; this harness exists to
+feed the frozen per-pair runner.
 
 Builds the composed engine over all frozen v0.1 graphs, then for every frozen
 pair asks the index for the candidate's actual tie-aware rank and verifies the
@@ -146,7 +155,7 @@ def main() -> int:
 
     summary = {
         "engine_version": ENGINE_VERSION,
-        "mode": "end_to_end_no_oracle",
+        "mode": "retrieval_ranks=real; verification_pairs=evaluator_selected",
         "graphs_indexed": len(graphs),
         "index_build_seconds": round(build_seconds, 3),
         "pairs": len(records),

@@ -16,11 +16,17 @@ Persistence composes from the parts: `store.dump/load` (canonical JSON) +
 `candidate_index.dump/load` (R3's tamper-checked payload); a restored engine
 reproduces `find` exactly (integration-tested).
 
-## End-to-end benchmark result (frozen v0.1, no oracle)
+## Mixed-mode benchmark result (frozen v0.1)
 
-`tests/engine_benchmark_e2e.py` builds the engine over all 136 graphs and asks
-the index for every pair's REAL tie-aware candidate rank. Committed report:
-`reports/r0-v0.1-end-to-end.json` (volatile timings stripped).
+`tests/engine_benchmark_e2e.py` builds the engine over all 136 graphs. Its two
+columns run in different modes, named precisely: the **retrieval column is
+no-oracle** (candidate_rank is the index's real tie-aware rank; a top-20 miss
+is rank 10^6), while the **verification column is oracle-candidate** (the
+evaluator-selected pair is always verified, retrieval misses included) so
+verifier gates measure the verifier in isolation rather than compounding
+retrieval failures. Committed report: `reports/r0-v0.1-end-to-end.json`
+(volatile timings stripped). Its `overall_status` is **fail** -- carried
+verbatim, per the contract's non-compensation rule.
 
 Stage-attributed outcome, preserved rather than compensated:
 
@@ -44,5 +50,10 @@ Stage-attributed outcome, preserved rather than compensated:
 - `extraction_prerequisite`, `structural_e1_matrix`, `structural_scale_replay`
   stay `not_evaluated` (R2 discloses the frozen-16 gap; full E1/scale files are
   R3-scope, with the independent repeat PR #66 carrying a full matrix).
+- Known classification divergence, disclosed since R4 acceptance: all 6 gate
+  `vocabulary_substitution` pairs classify `analogical` vs gold `approximate`
+  (`classification_accuracy = 0` for that family; no gate reads the metric;
+  the R4 record documents why the two classes are indistinguishable on these
+  fixtures without knowledge annotations).
 
 Requires Python ≥ 3.10 (interfaces contract).
