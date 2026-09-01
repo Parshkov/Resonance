@@ -1,0 +1,89 @@
+{
+  "build_seconds": 0.4067342500202358,
+  "config_hash": "a934d165a25a6c1e12322d655932601c3ceae0a2d234195989910dae3c109eb5",
+  "corpus_n": 136,
+  "cutoff": 122.4,
+  "dead_keys": 4,
+  "feature_version": "resonance-fingerprint/0.1.1-multi",
+  "gate_cross_domain_analogy": [
+    {
+      "analogue_rank": 24,
+      "analogue_score": 0.9999999999999999,
+      "best_score": 0.9999999999999999,
+      "budget_used": 64,
+      "case_id": "G01-09",
+      "content_scanned": false,
+      "latency_seconds": 0.007522792089730501,
+      "postings_touched": 5888,
+      "skipped_dead_keys": 4,
+      "tied_best": true
+    },
+    {
+      "analogue_rank": 33,
+      "analogue_score": 0.9999999999999999,
+      "best_score": 0.9999999999999999,
+      "budget_used": 64,
+      "case_id": "G02-09",
+      "content_scanned": false,
+      "latency_seconds": 0.007329541957005858,
+      "postings_touched": 5888,
+      "skipped_dead_keys": 4,
+      "tied_best": true
+    },
+    {
+      "analogue_rank": 42,
+      "analogue_score": 0.9999999999999999,
+      "best_score": 0.9999999999999999,
+      "budget_used": 64,
+      "case_id": "G03-09",
+      "content_scanned": false,
+      "latency_seconds": 0.009936749935150146,
+      "postings_touched": 5888,
+      "skipped_dead_keys": 4,
+      "tied_best": true
+    },
+    {
+      "analogue_rank": 51,
+      "analogue_score": 0.9999999999999999,
+      "best_score": 0.9999999999999999,
+      "budget_used": 64,
+      "case_id": "G04-09",
+      "content_scanned": false,
+      "latency_seconds": 0.007371500134468079,
+      "postings_touched": 5888,
+      "skipped_dead_keys": 4,
+      "tied_best": true
+    },
+    {
+      "analogue_rank": 60,
+      "analogue_score": 0.9999999999999999,
+      "best_score": 0.9999999999999999,
+      "budget_used": 64,
+      "case_id": "G05-09",
+      "content_scanned": false,
+      "latency_seconds": 0.00729249999858439,
+      "postings_touched": 5888,
+      "skipped_dead_keys": 4,
+      "tied_best": true
+    },
+    {
+      "analogue_rank": 69,
+      "analogue_score": 0.9999999999999999,
+      "best_score": 0.9999999999999999,
+      "budget_used": 64,
+      "case_id": "G06-09",
+      "content_scanned": false,
+      "latency_seconds": 0.007329083047807217,
+      "postings_touched": 5888,
+      "skipped_dead_keys": 4,
+      "tied_best": true
+    }
+  ],
+  "index_version": "resonance-index/0.1.1",
+  "live_keys": 672,
+  "notes": "72 frozen graphs share the query MULTI keyset. Specific-ID Recall@20 after thought_id tie-break is not a structural discrimination task. The analogue is in the tied-best set when scores match the maximum. Shipping DF policy for n<1000 uses small_corpus_max_df_frac=0.90 so analogical keys are not all dead.",
+  "query_budget": 64,
+  "recall_at_20": 0.0,
+  "structural_recall_at_20_claimed": false,
+  "tied_best_rate": 1.0
+}

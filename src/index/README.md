@@ -15,4 +15,19 @@ Every `CandidateResult` is fail-closed: `polarity_reliable=false` and
 `requires_structural_verification=true`. Retrieval never emits a semantic
 node-pair mask.
 
-Persistence is a rebuildable JSON snapshot (postings + DF + graph ids).
+Persistence is a rebuildable JSON snapshot of graphs, DF, versions, and
+the DF/budget policy. `load()` restores that policy and rejects tampered
+`index_version` / `feature_version` / `corpus_snapshot`.
+
+Bulk indexing uses `build(graphs)` (one rebuild). Sequential `upsert`
+remains correct but is quadratic; do not use it to load a large corpus.
+
+Query instrumentation is on `index.last_query` (`postings_touched`,
+`latency_seconds`, live/skipped keys, budget). Structural mode does not
+scan the content corpus. The shipping query uses a 64-key rarest-live-key
+budget.
+
+Small corpora (n < 1000) use a 0.90 DF fraction so analogical keys are
+not all killed by `min_df_cutoff=5`. Large corpora keep the 0.005 / 5
+policy. Frozen Benchmark v0.1 packs are MULTI-identical across domains;
+specific-ID Recall@20 among 72 ties is not claimed as a pass.

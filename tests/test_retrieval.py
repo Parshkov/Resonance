@@ -5,9 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.fingerprint.keys import FEATURE_VERSION, fingerprints
+from src.fingerprint.keys import FEATURE_VERSION, fingerprints, path_signature
 from src.graph import ThoughtGraph
-from src.index import INDEX_VERSION, InvertedCandidateIndex
+from src.index import INDEX_VERSION, QUERY_BUDGET, InvertedCandidateIndex
 from src.interfaces import CandidateIndex, require_mode
 
 
@@ -157,8 +157,7 @@ class RetrievalTests(unittest.TestCase):
             knowledge={"n1": {"requires": ["local:thermo:heat"]}},
         )
         self.index = InvertedCandidateIndex(max_df_frac=1.0, min_df_cutoff=100)
-        for item in (self.query, self.analogue, self.flip, self.chain, self.knowledge_hit):
-            self.index.upsert(item)
+        self.index.build((self.query, self.analogue, self.flip, self.chain, self.knowledge_hit))
 
     def test_index_satisfies_protocol(self):
         self.assertIsInstance(self.index, CandidateIndex)
@@ -184,7 +183,9 @@ class RetrievalTests(unittest.TestCase):
     def test_structural_channel_ranks_cross_domain_analogue_above_generic_chain(self):
         hits = {hit.candidate_id: hit for hit in self.index.query(self.query, mode="structural", k=10)}
         self.assertIn("c-org", hits)
-        self.assertGreater(hits["c-org"].channel_scores["structural"], hits["c-chain"].channel_scores["structural"])
+        analogue = hits["c-org"].channel_scores["structural"]
+        chain = hits["c-chain"].channel_scores["structural"] if "c-chain" in hits else 0.0
+        self.assertGreater(analogue, chain)
         self.assertTrue(hits["c-org"].seed_correspondences)
         self.assertTrue(all(seed.channel == "structural" for seed in hits["c-org"].seed_correspondences))
 
@@ -223,6 +224,67 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first, third)
         self.assertEqual(restored.corpus_snapshot, self.index.corpus_snapshot)
+
+    def test_path_signature_is_invariant_to_relation_id_renaming(self):
+        diamond_a = graph(
+            "diamond-a",
+            {"n0": "start", "n1": "mid-a", "n2": "mid-b", "n3": "end"},
+            [
+                ("r-causes", "n0", "n1", "causes"),
+                ("r-supports", "n1", "n3", "supports"),
+                ("r-prevents", "n0", "n2", "prevents"),
+                ("r-requires", "n2", "n3", "requires"),
+            ],
+        )
+        diamond_b = graph(
+            "diamond-b",
+            {"n0": "start", "n1": "mid-a", "n2": "mid-b", "n3": "end"},
+            [
+                ("z-prevents", "n0", "n2", "prevents"),
+                ("z-requires", "n2", "n3", "requires"),
+                ("a-causes", "n0", "n1", "causes"),
+                ("a-supports", "n1", "n3", "supports"),
+            ],
+        )
+        self.assertEqual(path_signature(diamond_a, "n0", "n3"), path_signature(diamond_b, "n0", "n3"))
+        self.assertEqual(
+            {key for key, _, _ in fingerprints(diamond_a, "MULTI")},
+            {key for key, _, _ in fingerprints(diamond_b, "MULTI")},
+        )
+
+    def test_persistence_restores_policy_and_rejects_tampered_versions(self):
+        custom = InvertedCandidateIndex(max_df_frac=1.0, min_df_cutoff=100)
+        custom.build((self.query, self.analogue))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "index.json"
+            custom.dump(path)
+            restored = InvertedCandidateIndex.load(path)
+            self.assertEqual(restored.max_df_frac, 1.0)
+            self.assertEqual(restored.min_df_cutoff, 100)
+            self.assertEqual(restored.corpus_snapshot, custom.corpus_snapshot)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["index_version"] = "tampered-version"
+            tampered = Path(tmp) / "tampered.json"
+            tampered.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "index_version"):
+                InvertedCandidateIndex.load(tampered)
+
+    def test_query_rejects_non_positive_k_and_records_diagnostics(self):
+        with self.assertRaises(ValueError):
+            self.index.query(self.query, mode="structural", k=0)
+        with self.assertRaises(ValueError):
+            self.index.query(self.query, mode="structural", k=-1)
+        hits = self.index.query(self.query, mode="structural", k=5)
+        self.assertTrue(hits)
+        diag = self.index.last_query
+        self.assertIsNotNone(diag)
+        self.assertGreaterEqual(diag.postings_touched, 1)
+        self.assertGreaterEqual(diag.latency_seconds, 0.0)
+        self.assertLessEqual(diag.budget_used, QUERY_BUDGET)
+        self.assertFalse(diag.content_scanned)
+        analogical = self.index.query(self.query, mode="analogical", k=5)
+        self.assertTrue(analogical)
+        self.assertTrue(self.index.last_query.content_scanned)
 
     def test_fingerprint_and_index_do_not_import_verifier_or_mcp(self):
         forbidden = ("src.alignment", "src.scoring", "src.extraction", "src.mcp", "mcp")

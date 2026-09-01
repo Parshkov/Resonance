@@ -1,0 +1,106 @@
+"""Measure shipping retrieval against frozen Benchmark v0.1 graphs.
+
+Does not mutate frozen gold. Uses public ``build()``.
+"""
+
+from __future__ import annotations
+
+import json
+import time
+from pathlib import Path
+
+from src.graph import ThoughtGraph
+from src.index import QUERY_BUDGET, InvertedCandidateIndex
+
+REPO = Path(__file__).resolve().parents[2]
+BENCHMARK = REPO / "benchmark" / "r0-v0.1"
+REPORT = Path(__file__).resolve().parent / "reports" / "r0-v0.1-retrieval.json"
+GATE_ANALOGY = [
+    ("G01-09", "G01-Q", "G01-C09"),
+    ("G02-09", "G02-Q", "G02-C09"),
+    ("G03-09", "G03-Q", "G03-C09"),
+    ("G04-09", "G04-Q", "G04-C09"),
+    ("G05-09", "G05-Q", "G05-C09"),
+    ("G06-09", "G06-Q", "G06-C09"),
+]
+
+
+def _load_graphs() -> dict[str, ThoughtGraph]:
+    graphs: dict[str, ThoughtGraph] = {}
+    for line in (BENCHMARK / "graphs.jsonl").read_text(encoding="utf-8").splitlines():
+        record = json.loads(line)
+        graph = ThoughtGraph.from_dict(record["thought_dna"])
+        graphs[record["benchmark_graph_id"]] = graph
+    return graphs
+
+
+def measure() -> dict[str, object]:
+    graphs = _load_graphs()
+    index = InvertedCandidateIndex()
+    started = time.perf_counter()
+    index.build(graphs.values())
+    build_seconds = time.perf_counter() - started
+    rows = []
+    in_top20 = 0
+    in_tied_best = 0
+    for case_id, query_id, analogue_id in GATE_ANALOGY:
+        hits = index.query(graphs[query_id], mode="structural", k=80)
+        diag = index.last_query
+        scores = {hit.candidate_id: hit.channel_scores["structural"] for hit in hits}
+        ranks = {hit.candidate_id: rank for rank, hit in enumerate(hits, start=1)}
+        analogue_score = scores.get(analogue_id, 0.0)
+        best = max(scores.values()) if scores else 0.0
+        rank = ranks.get(analogue_id)
+        tied = analogue_score == best and analogue_id in scores
+        if rank is not None and rank <= 20:
+            in_top20 += 1
+        if tied:
+            in_tied_best += 1
+        rows.append(
+            {
+                "case_id": case_id,
+                "analogue_rank": rank,
+                "analogue_score": analogue_score,
+                "best_score": best,
+                "tied_best": tied,
+                "postings_touched": diag.postings_touched if diag else None,
+                "latency_seconds": diag.latency_seconds if diag else None,
+                "budget_used": diag.budget_used if diag else None,
+                "skipped_dead_keys": diag.skipped_dead_keys if diag else None,
+                "content_scanned": diag.content_scanned if diag else None,
+            }
+        )
+    report = {
+        "index_version": index.config.component_version,
+        "feature_version": index.query(graphs["G01-Q"], mode="structural", k=1)[0].feature_version,
+        "config_hash": index.config.config_hash,
+        "corpus_n": len(graphs),
+        "query_budget": QUERY_BUDGET,
+        "cutoff": index._cutoff_value,
+        "dead_keys": len(index._structural_dead),
+        "live_keys": len(index._structural_df) - len(index._structural_dead),
+        "build_seconds": build_seconds,
+        "gate_cross_domain_analogy": rows,
+        "recall_at_20": in_top20 / len(GATE_ANALOGY),
+        "tied_best_rate": in_tied_best / len(GATE_ANALOGY),
+        "structural_recall_at_20_claimed": False,
+        "notes": (
+            "72 frozen graphs share the query MULTI keyset. Specific-ID "
+            "Recall@20 after thought_id tie-break is not a structural "
+            "discrimination task. The analogue is in the tied-best set when "
+            "scores match the maximum. Shipping DF policy for n<1000 uses "
+            "small_corpus_max_df_frac=0.90 so analogical keys are not all dead."
+        ),
+    }
+    return report
+
+
+def main() -> None:
+    report = measure()
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
+    REPORT.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

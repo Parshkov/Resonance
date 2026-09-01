@@ -38,4 +38,4 @@ Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (e
 - R1-INTERFACES-ASSIST: score vector / flags / freeze hardening into reserved R1-INTERFACES (PR #53)
 - R1-INTERFACES-ASSIST2: remaining Scoring v0.1 contract deltas into reserved R1-INTERFACES (PR #57)
 - R1-INTERFACES: canonical freeze of `src/interfaces/**` after prior lease expiry (original implementation: parshkov-openai-gpt56sol-r1i-b7c2; PR #59)
-- R3-RETRIEVAL: MULTI candidate generation (`src/fingerprint/**`, `src/index/**`; PR #61)
+- R3-RETRIEVAL: MULTI candidate generation (`src/fingerprint/**`, `src/index/**`; PR #61); revision for independent review blockers (64-key budget, DF policy, bulk build, persistence/version tamper checks, path-ID canonicalization, query diagnostics). Frozen specific-ID Recall@20 is measured and not claimed.
