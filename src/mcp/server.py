@@ -42,6 +42,8 @@ class MCPServer:
                 "serverInfo": {"name": "resonance", "version": MCP_ADAPTER_VERSION}})
         if method == "notifications/initialized":
             return None                                  # notification: no reply
+        if method == "ping":
+            return self._result(msg_id, {})              # MCP utilities/ping
         if msg_id is None:
             return None                                  # ignore other notifications
         if not self.initialized:
@@ -61,14 +63,22 @@ class MCPServer:
             return self._error(msg_id, METHOD_NOT_FOUND, str(exc))
         except TypeError as exc:
             return self._error(msg_id, INVALID_PARAMS, f"bad arguments: {exc}")
-        except (ValueError, EngineIntegrityError) as exc:
+        except (ValueError, OSError, EngineIntegrityError) as exc:
             # engine-declared failures (unknown mode, validation, integrity)
-            # surface as tool errors with the engine's own message
+            # and filesystem failures on the persistence tools (missing or
+            # unreadable snapshot directory) surface as tool errors with the
+            # underlying message; a bad tool ARGUMENT must never terminate
+            # the transport.
             return self._result(msg_id, {
                 "content": [{"type": "text",
                              "text": json.dumps({"error": type(exc).__name__,
                                                  "message": str(exc)})}],
                 "isError": True})
+        except Exception as exc:  # noqa: BLE001 -- transport survival:
+            # one unexpected handler failure becomes INTERNAL_ERROR and the
+            # session continues; serve() must outlive any single tools/call.
+            return self._error(msg_id, INTERNAL_ERROR,
+                               f"{type(exc).__name__}: {exc}")
         return self._result(msg_id, {
             "content": [{"type": "text",
                          "text": json.dumps(payload, ensure_ascii=False, sort_keys=True)}],

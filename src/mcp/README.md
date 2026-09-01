@@ -28,8 +28,21 @@ relations and guarded paths, unmatched items, contradictions, the full
 explanation, and per-item span provenance.
 
 Manual Thought DNA (`provenance.kind=manual`) indexes and compares through
-the same validator with no LLM anywhere. Engine-declared failures (unknown
-mode via `require_mode`, Thought DNA validation, `EngineIntegrityError`)
-return `isError: true` with the engine's message; transport-level problems
-use JSON-RPC error codes. The engine itself remains import-independent of
+the same validator with no LLM anywhere.
+
+**Documented coupling beyond the frozen protocol (review N3):** `metadata()`
+reads `engine.verifier.config_hash` and `engine.candidate_index
+.corpus_snapshot`, and the snapshot tools call `ResonanceEngine.dump/load` —
+concrete accepted-engine APIs, not `EngineFacade` methods (the frozen facade
+exposes no config/snapshot/persistence surface, while the mission requires
+version/config metadata). R6-E2E must not treat these attributes as a public
+transport contract. **Framing (N5):** stdio is newline-delimited JSON only,
+per MCP 2024-11-05 — clients must not assume LSP-style Content-Length
+headers. `ping` replies `{}`. Engine-declared failures (unknown
+mode via `require_mode`, Thought DNA validation, `EngineIntegrityError`) and
+filesystem failures on the persistence tools (missing/unreadable snapshot
+directory) return `isError: true` with the underlying message; any other
+unexpected handler exception maps to JSON-RPC `-32603` — one bad `tools/call`
+can never terminate the stdio session (regression-tested: the stream keeps
+answering `tools/list`/`ping` afterwards). The engine itself remains import-independent of
 this package (subprocess-attributed test on the engine side).

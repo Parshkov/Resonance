@@ -107,7 +107,11 @@ def resonance_hit(h: ResonanceHit) -> dict[str, Any]:
                           "polarity_reliable": c.polarity_reliable,
                           "index_version": c.index_version,
                           "feature_version": c.feature_version,
-                          "corpus_snapshot": c.corpus_snapshot},
+                          "corpus_snapshot": c.corpus_snapshot,
+                          "config": {"component": c.config.component,
+                                     "component_version": c.config.component_version,
+                                     "config_hash": c.config.config_hash,
+                                     "schema_version": c.config.schema_version}},
             "verification": verifier_result(h.verification)}
 
 
