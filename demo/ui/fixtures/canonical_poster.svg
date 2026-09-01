@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+<rect width="1920" height="1080" fill="#0b1020"/>
+<text x="48" y="56" fill="#e8eefc" font-family="Georgia, serif" font-size="28">Resonance</text>
+<text x="1700" y="56" fill="#8fd3ff" font-family="ui-sans-serif, system-ui" font-size="20">REPLAY</text>
+<rect x="48" y="80" width="420" height="920" rx="18" fill="#151b2e"/>
+<rect x="492" y="80" width="720" height="920" rx="18" fill="#101628"/>
+<rect x="1236" y="80" width="636" height="920" rx="18" fill="#151b2e"/>
+<text x="72" y="120" fill="#9be7c4" font-size="16">CONSENT · Shared with Resonance</text>
+<text x="72" y="160" fill="#e8eefc" font-size="22">Aria K.</text>
+<text x="72" y="190" fill="#b7c3e0" font-size="16">plasma lens thermal bloom</text>
+<rect x="528" y="160" width="648" height="420" rx="12" fill="#0b1020"/>
+<circle cx="631.1" cy="263.8" r="8" fill="#8fd3ff" opacity="0.95"/>
+<circle cx="918.2" cy="373.0" r="8" fill="#f3c16b" opacity="0.95"/>
+<circle cx="676.1" cy="299.3" r="8" fill="#f3c16b" opacity="0.95"/>
+<circle cx="876.1" cy="247.5" r="8" fill="#f3c16b" opacity="0.95"/>
+<circle cx="812.6" cy="220.4" r="8" fill="#6f7a99" opacity="0.95"/>
+<circle cx="1104.2" cy="285.8" r="8" fill="#6f7a99" opacity="0.95"/>
+<circle cx="1096.4" cy="288.3" r="8" fill="#6f7a99" opacity="0.95"/>
+<circle cx="631.9" cy="258.9" r="8" fill="#6f7a99" opacity="0.95"/>
+<circle cx="641.0" cy="293.7" r="8" fill="#6f7a99" opacity="0.95"/>
+<circle cx="856.1" cy="255.9" r="8" fill="#6f7a99" opacity="0.95"/>
+<circle cx="858.7" cy="250.8" r="8" fill="#ef8b8b" opacity="0.95"/>
+<circle cx="991.7" cy="339.7" r="8" fill="#ef8b8b" opacity="0.95"/>
+<circle cx="630.4" cy="255.0" r="8" fill="#ef8b8b" opacity="0.95"/>
+<text x="1260" y="130" fill="#e8eefc" font-size="20">Gabe S. · analogical</text>
+<text x="1260" y="154" fill="#b7c3e0" font-size="14">logistics · location withheld · S=0.8875000000000001</text>
+<text x="1260" y="220" fill="#e8eefc" font-size="20">Kwame A. · analogical</text>
+<text x="1260" y="244" fill="#b7c3e0" font-size="14">urban-mobility · Nairobi · S=0.8875000000000001</text>
+<text x="1260" y="310" fill="#e8eefc" font-size="20">Mei L. · analogical</text>
+<text x="1260" y="334" fill="#b7c3e0" font-size="14">energy-storage · Austin · S=0.8875000000000001</text>
+<text x="1260" y="400" fill="#e8eefc" font-size="20">Noah R. · analogical</text>
+<text x="1260" y="424" fill="#b7c3e0" font-size="14">organizations · Berlin · S=0.8875000000000001</text>
+</svg>
