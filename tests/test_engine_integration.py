@@ -44,14 +44,17 @@ class FacadeTests(unittest.TestCase):
         self.assertIsInstance(engine, EngineFacade)
         self.assertIsInstance(engine.store, ThoughtStore)
 
-    def test_engine_runs_without_mcp_present(self):
-        self.assertNotIn("src.mcp", sys.modules)
-        with self.assertRaises(ModuleNotFoundError):
-            __import__("src.mcp")
+    def test_engine_never_imports_mcp(self):
+        """The guarantee is import-independence, not MCP's absence from the
+        repo -- after R6 lands a transport package this must keep passing."""
         engine = ResonanceEngine()
         g = engine.ingest("Heat causes failure.", source_id="mcp-free")
         engine.index(g)
+        engine.find(g, mode="structural", k=3)
         self.assertTrue(engine.get(g.thought_id) is g)
+        loaded = [name for name in sys.modules if name == "src.mcp"
+                  or name.startswith("src.mcp.")]
+        self.assertEqual(loaded, [], "engine pulled in MCP transport modules")
 
     def test_manual_bypass_reaches_the_same_interfaces(self):
         engine = ResonanceEngine()

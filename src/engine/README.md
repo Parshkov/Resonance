@@ -26,8 +26,13 @@ Stage-attributed outcome, preserved rather than compensated:
 
 - **Verification column: every owned gate passes end-to-end** — SOW 12/12,
   node-pair F1 1.0, directed-typed edge accuracy 1.0, precision 1.0, negative
-  FPR 0.0, polarity rejection 1.0, zero false contractions, deterministic
-  replay, p95 within budget.
+  FPR 0.0, polarity rejection 1.0, deterministic replay, p95 within budget.
+  The v0.1 `false_meaningful_contractions` gate also reads "pass", but that
+  gate sums the harness's self-reported `false_contractions: 0` (the audit
+  gap Benchmark v0.2 exists to close) -- it is NOT an independently derived
+  contraction result. The independently derived evidence is the v0.2
+  contraction audit, which the verifier passes in both path configs (see
+  PR #64's evidence trail).
 - **Retrieval recall fails on exactly three positive families**
   (`partial_graph`, `transparent_granularity`, `modest_extraction_error`,
   recall@5 = 0; overall 0.727 < 0.85). Attribution: the frozen corpus packs
