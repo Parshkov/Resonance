@@ -3,6 +3,7 @@
 from .protocols import CandidateIndex, ConfigSource, EngineFacade, Extractor, GraphValidator, StructuralVerifier, ThoughtStore
 from .types import (
     INTERFACE_VERSION,
+    REQUIRED_SCORE_WIRE_NAMES,
     SCORE_CONTRACT_VERSION,
     SCORE_WIRE_NAMES,
     CandidateResult,
@@ -23,6 +24,7 @@ from .types import (
 
 __all__ = [
     "INTERFACE_VERSION",
+    "REQUIRED_SCORE_WIRE_NAMES",
     "SCORE_CONTRACT_VERSION",
     "SCORE_WIRE_NAMES",
     "ConfigRef",

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from src.graph import ThoughtGraph
 from src.interfaces import (
+    REQUIRED_SCORE_WIRE_NAMES,
     SCORE_CONTRACT_VERSION,
     SCORE_WIRE_NAMES,
     CandidateIndex,
@@ -116,8 +117,9 @@ class FakeVerifier:
         mapping = (NodeMatch("n1", "n1", 1.0, qp, cp),)
         qrp = ItemProvenance(query.thought_id, "r0", query.provenance.kind, ())
         crp = ItemProvenance(candidate.thought_id, "r0a", candidate.provenance.kind, ())
+        xnp = ItemProvenance(candidate.thought_id, "x0", candidate.provenance.kind, ())
         paths = (
-            EdgePathMatch("r0", ("r0a",), ("x0",), 1.0, qrp, (crp,)),
+            EdgePathMatch("r0", ("r0a",), ("x0",), 1.0, qrp, (crp,), (xnp,)),
         )
         components = ScoreVector(
             structural=0.8,
@@ -132,11 +134,14 @@ class FakeVerifier:
             evidence_gate=0.5,
             n_role=0.1,
             r_direct=0.7,
+            r_direct_unweighted=0.65,
             r_path=0.1,
             y_systematicity=0.8,
             h_sign_conflict=False,
             e_nodes=2.0,
             e_relations=1.0,
+            knowledge_evidence_present=False,
+            rarity_weighting=False,
             retrieval_content=0.1,
             retrieval_structural=0.8,
         )
@@ -234,6 +239,11 @@ class InterfaceTests(unittest.TestCase):
         })
         self.assertEqual(hit.verification.explanation.unmatched_query_relations, ("r9",))
         self.assertEqual(hit.verification.edge_path_matches[0].candidate_provenances[0].item_id, "r0a")
+        self.assertEqual(hit.verification.edge_path_matches[0].realizes_node_provenances[0].item_id, "x0")
+        self.assertEqual(hit.verification.components.r_direct_unweighted, 0.65)
+        self.assertFalse(hit.verification.components.knowledge_evidence_present)
+        self.assertFalse(hit.verification.components.rarity_weighting)
+        self.assertEqual(hit.candidate.candidate_id, hit.verification.candidate_id)
         self.assertIs(engine.explain("q", "c"), hit.verification)
         self.assertIs(engine.get("c"), candidate)
 
@@ -256,8 +266,8 @@ class InterfaceTests(unittest.TestCase):
         fields = ScoreVector.__dataclass_fields__
         for required in (
             "structural", "semantic", "knowledge_about", "knowledge_requires", "contradiction",
-            "evidence_gate", "n_role", "r_direct", "r_path", "y_systematicity",
-            "h_sign_conflict", "e_nodes", "e_relations",
+            "evidence_gate", "n_role", "r_direct", "r_direct_unweighted", "r_path", "y_systematicity",
+            "h_sign_conflict", "e_nodes", "e_relations", "knowledge_evidence_present", "rarity_weighting",
         ):
             self.assertIn(required, fields)
         self.assertNotIn("score", fields)
@@ -277,22 +287,31 @@ class InterfaceTests(unittest.TestCase):
             evidence_gate=0.9,
             n_role=0.1,
             r_direct=0.7,
+            r_direct_unweighted=0.6,
             r_path=0.05,
             y_systematicity=0.8,
             h_sign_conflict=True,
             e_nodes=5.0,
             e_relations=4.0,
+            knowledge_evidence_present=True,
+            rarity_weighting=True,
             retrieval_content=0.2,
             retrieval_knowledge=0.0,
             retrieval_structural=0.7,
+            extras={"debug_margin": 0.01},
         )
         wire = vector.to_wire()
+        self.assertEqual(set(SCORE_WIRE_NAMES.values()), REQUIRED_SCORE_WIRE_NAMES)
         for python_name, wire_name in SCORE_WIRE_NAMES.items():
             self.assertIn(wire_name, wire)
             self.assertEqual(wire[wire_name], getattr(vector, python_name))
+        self.assertEqual(wire["extras"], {"debug_margin": 0.01})
         restored = ScoreVector.from_wire(wire)
         self.assertEqual(restored.to_wire(), wire)
         self.assertTrue(restored.h_sign_conflict)
+        self.assertTrue(restored.knowledge_evidence_present)
+        self.assertTrue(restored.rarity_weighting)
+        self.assertEqual(restored.r_direct_unweighted, 0.6)
         self.assertEqual(restored.q_containment, 0.5)
         self.assertEqual(restored.x_contradiction, 0.01)
 
@@ -340,6 +359,93 @@ class InterfaceTests(unittest.TestCase):
         result = engine.compare(query, candidate, mode="analogical")
         self.assertFalse(result.retrieval_flags.polarity_reliable)
         self.assertTrue(result.retrieval_flags.requires_structural_verification)
+
+    def test_from_wire_rejects_missing_required_field(self):
+        wire = FakeVerifier().verify(graph_with_id("q"), graph_with_id("c")).components.to_wire()
+        wire.pop("R_direct_unweighted")
+        with self.assertRaisesRegex(ValueError, "missing required score fields: R_direct_unweighted"):
+            ScoreVector.from_wire(wire)
+
+    def test_from_wire_rejects_unknown_top_level_field(self):
+        wire = FakeVerifier().verify(graph_with_id("q"), graph_with_id("c")).components.to_wire()
+        wire["N_rol"] = 0.1
+        with self.assertRaisesRegex(ValueError, "unknown score field: N_rol"):
+            ScoreVector.from_wire(wire)
+
+    def test_from_wire_keeps_extension_diagnostics_only_under_extras(self):
+        wire = FakeVerifier().verify(graph_with_id("q"), graph_with_id("c")).components.to_wire()
+        wire["extras"] = {"generic_motif_margin": 0.2}
+        restored = ScoreVector.from_wire(wire)
+        self.assertEqual(restored.extras["generic_motif_margin"], 0.2)
+        with self.assertRaisesRegex(ValueError, "unknown score field: generic_motif_margin"):
+            ScoreVector.from_wire({**wire, "generic_motif_margin": 0.2})
+
+    def test_edge_path_match_requires_parallel_node_provenance_and_matching_ids(self):
+        qrp = ItemProvenance("q", "r0", "manual")
+        crp = ItemProvenance("c", "r0a", "manual")
+        with self.assertRaisesRegex(ValueError, "realized node IDs and provenances must be parallel"):
+            EdgePathMatch("r0", ("r0a",), ("x0",), 1.0, qrp, (crp,))
+        with self.assertRaisesRegex(ValueError, "EdgePathMatch.realizes_node provenance item_id"):
+            EdgePathMatch("r0", ("r0a",), ("x0",), 1.0, qrp, (crp,), (ItemProvenance("c", "other", "manual"),))
+        with self.assertRaisesRegex(ValueError, "EdgePathMatch.query provenance item_id"):
+            EdgePathMatch("r0", ("r0a",), (), 1.0, ItemProvenance("q", "other", "manual"), (crp,))
+
+    def test_verifier_rejects_non_injective_mapping(self):
+        query = graph_with_id("q")
+        candidate = graph_with_id("c")
+        result = FakeVerifier().verify(query, candidate)
+        duplicate = result.mapping + (
+            NodeMatch(
+                result.mapping[0].query_node,
+                "n2",
+                0.5,
+                result.mapping[0].query_provenance,
+                ItemProvenance(candidate.thought_id, "n2", candidate.provenance.kind, ()),
+            ),
+        )
+        kwargs = {field: getattr(result, field) for field in result.__dataclass_fields__}
+        kwargs["mapping"] = duplicate
+        kwargs["explanation"] = Explanation(
+            **{**_empty_explanation_kwargs(query, mapping=duplicate, edge_path_matches=result.edge_path_matches)}
+        )
+        with self.assertRaisesRegex(ValueError, "mapping query node IDs must be unique"):
+            VerifierResult(**kwargs)
+        two_to_one = (
+            result.mapping[0],
+            NodeMatch(
+                "n2",
+                result.mapping[0].candidate_node,
+                0.5,
+                ItemProvenance(query.thought_id, "n2", query.provenance.kind, ()),
+                result.mapping[0].candidate_provenance,
+            ),
+        )
+        kwargs["mapping"] = two_to_one
+        kwargs["explanation"] = Explanation(
+            **{**_empty_explanation_kwargs(query, mapping=two_to_one, edge_path_matches=result.edge_path_matches)}
+        )
+        with self.assertRaisesRegex(ValueError, "mapping candidate node IDs must be unique"):
+            VerifierResult(**kwargs)
+
+    def test_resonance_hit_rejects_mixed_candidate_ids(self):
+        query = graph_with_id("q")
+        candidate = graph_with_id("c")
+        result = FakeVerifier().verify(query, candidate)
+        other = CandidateResult(
+            candidate_id="other",
+            channel_scores={"structural": 0.8},
+            channel_ranks={"structural": 1},
+            seed_correspondences=(),
+            usable_query_evidence=1.0,
+            requires_structural_verification=True,
+            polarity_reliable=False,
+            index_version="i",
+            feature_version="f",
+            corpus_snapshot="s",
+            config=CFG,
+        )
+        with self.assertRaisesRegex(ValueError, "hit candidate_id must match verification.candidate_id"):
+            ResonanceHit(other, result)
 
 
 if __name__ == "__main__":
