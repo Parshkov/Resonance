@@ -27,4 +27,4 @@ Canonical run: R7-CORPUS (consented multi-session demo corpus).
 
 ## Contributions
 
-- none yet
+- R7-CORPUS: `demo/corpus/**` (PR #77)
