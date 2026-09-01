@@ -24,4 +24,4 @@ sibling submission was read before this run's artifact was finalized.
 
 ## Contributions
 
-- none yet
+- [R0-E-REPEAT-V9K2 Knowledge DNA repeat](https://github.com/Parshkov/Resonance/pull/78)
