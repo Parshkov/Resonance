@@ -37,4 +37,4 @@ Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (e
 - R1-BENCHMARK-GOLD-REVIEW: `research/reviews/R1_BENCHMARK_gold_review_parshkov-xai-grok46-k3e8.md` (PR #52)
 - R1-INTERFACES-ASSIST: score-vector/flags/freeze patch into reserved R1-INTERFACES (PR #53)
 - R1-INTERFACES-ASSIST2: remaining Scoring v0.1 contract deltas into reserved R1-INTERFACES (PR #57)
-- R1-BENCHMARK-v0.2: independently auditable false-contraction gate (`benchmark/r0-v0.2/**`)
+- R1-BENCHMARK-v0.2: independently auditable false-contraction gate (`benchmark/r0-v0.2/**`, PR #58)
