@@ -25,4 +25,4 @@ The exact model and reasoning mode were read from the local Codex configuration 
 
 ## Contributions
 
-- none yet
+- R0-G evaluator-owned benchmark repeat — [PR #62](https://github.com/Parshkov/Resonance/pull/62)
