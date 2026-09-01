@@ -174,6 +174,11 @@ class ResonanceEngine:
             "verifier_version": VERIFIER_VERSION,
             "index_version": INDEX_VERSION,
             "extractor_version": EXTRACTOR_VERSION,
+            "components": {
+                "extractor": {"drop_threshold": self.extractor.drop_threshold},
+                "verifier": {"config": dict(self.verifier.config),
+                             "config_hash": self.verifier.config_hash},
+            },
             "corpus_snapshot": index_snapshot,
             "thought_ids": list(self.store.thought_ids()),
             "files": {
@@ -187,12 +192,28 @@ class ResonanceEngine:
 
     @classmethod
     def load(cls, directory: Path, **kwargs) -> "ResonanceEngine":
-        """Load a snapshot; any hash or snapshot mismatch fails closed."""
+        """Load a snapshot; any hash, version, snapshot, or component-config
+        mismatch fails closed. Extractor and verifier are RECONSTRUCTED from
+        the persisted configs, so the loaded engine behaves exactly like the
+        one that dumped; overriding them via kwargs is rejected."""
+        if "extractor" in kwargs or "verifier" in kwargs:
+            raise EngineIntegrityError(
+                "load() reconstructs extractor/verifier from the snapshot; "
+                "overrides would silently change behavior")
         directory = Path(directory)
         manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
-        if manifest.get("engine_version") != ENGINE_VERSION:
-            raise EngineIntegrityError(
-                f"unsupported engine snapshot version: {manifest.get('engine_version')!r}")
+        declared = {
+            "engine_version": ENGINE_VERSION,
+            "interface_version": INTERFACE_VERSION,
+            "schema_version": "thought-dna/0.1",
+            "verifier_version": VERIFIER_VERSION,
+            "index_version": INDEX_VERSION,
+            "extractor_version": EXTRACTOR_VERSION,
+        }
+        for key, expected in declared.items():
+            if manifest.get(key) != expected:
+                raise EngineIntegrityError(
+                    f"snapshot {key} mismatch: {manifest.get(key)!r} != {expected!r}")
         for name, expected in manifest["files"].items():
             actual = hashlib.sha256((directory / name).read_bytes()).hexdigest()
             if actual != expected:
@@ -207,4 +228,16 @@ class ResonanceEngine:
             raise EngineIntegrityError("manifest thought_ids do not match the store")
         if manifest["corpus_snapshot"] != index.corpus_snapshot:
             raise EngineIntegrityError("manifest corpus_snapshot mismatch")
-        return cls(store=store, index=index, **kwargs)
+        components = manifest.get("components") or {}
+        try:
+            extractor = CueExtractor(
+                drop_threshold=components["extractor"]["drop_threshold"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise EngineIntegrityError(f"invalid persisted extractor config: {exc}")
+        verifier_cfg = components.get("verifier") or {}
+        verifier = MultiRelFGWVerifier(dict(verifier_cfg.get("config") or {}))
+        if verifier.config_hash != verifier_cfg.get("config_hash"):
+            raise EngineIntegrityError(
+                "persisted verifier config does not reproduce its recorded hash")
+        return cls(store=store, index=index, extractor=extractor,
+                   verifier=verifier, **kwargs)

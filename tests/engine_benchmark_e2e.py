@@ -95,7 +95,7 @@ def main() -> int:
             seeds = hit.seed_correspondences
             channel_scores = dict(hit.channel_scores)
         else:
-            # candidate not in the (tie-expanded) top-k:真 end-to-end miss.
+            # candidate not in the (tie-expanded) top-k: a real retrieval miss.
             rank = 10**6
             seeds = ()
             channel_scores = {"structural": 0.0, "content": 0.0, "knowledge": 0.0}

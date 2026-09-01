@@ -24,13 +24,13 @@ no-oracle** (candidate_rank is the index's real tie-aware rank; a top-20 miss
 is rank 10^6), while the **verification column is oracle-candidate** (the
 evaluator-selected pair is always verified, retrieval misses included) so
 verifier gates measure the verifier in isolation rather than compounding
-retrieval failures. Committed report: `reports/r0-v0.1-end-to-end.json`
+retrieval failures. Committed report: `reports/r0-v0.1-mixed-mode.json`
 (volatile timings stripped). Its `overall_status` is **fail** -- carried
 verbatim, per the contract's non-compensation rule.
 
 Stage-attributed outcome, preserved rather than compensated:
 
-- **Verification column: every owned gate passes end-to-end** — SOW 12/12,
+- **Verification column (oracle-candidate mode): every owned gate passes** — SOW 12/12,
   node-pair F1 1.0, directed-typed edge accuracy 1.0, precision 1.0, negative
   FPR 0.0, polarity rejection 1.0, deterministic replay, p95 within budget.
   The v0.1 `false_meaningful_contractions` gate also reads "pass", but that
@@ -46,7 +46,7 @@ Stage-attributed outcome, preserved rather than compensated:
   class at rank 1; under competition ranking the next distinct score starts at
   rank ~72, so every *perturbed* positive is arithmetically outside recall@5
   regardless of retrieval quality. This is the corpus-degeneracy limit already
-  recorded on #41 during R3 acceptance, now quantified end-to-end.
+  recorded on #41 during R3 acceptance, now quantified at engine level in the real-rank retrieval column.
 - `extraction_prerequisite`, `structural_e1_matrix`, `structural_scale_replay`
   stay `not_evaluated` (R2 discloses the frozen-16 gap; full E1/scale files are
   R3-scope, with the independent repeat PR #66 carrying a full matrix).

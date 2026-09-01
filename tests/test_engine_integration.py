@@ -92,7 +92,7 @@ class RequiredDemoTests(unittest.TestCase):
         self.assertEqual(r.classification, "analogical")
         self.assertLess(r.components.semantic, 0.3)
         self.assertGreaterEqual(r.components.structural, 0.85)
-        # and end-to-end: the analogue is in the engine's tied-best group
+        # and through the live find() path: the analogue is in the tied-best group
         hits = self.engine.find(GRAPHS[pair["query_graph"]], mode="analogical", k=20)
         ids = {h.candidate.candidate_id for h in hits}
         self.assertIn(pair["candidate_graph"], ids)
@@ -165,6 +165,52 @@ class PersistenceCompositionTests(unittest.TestCase):
             engine.dump(Path(tmp))
             index_path = Path(tmp) / "index.json"
             index_path.write_bytes(index_path.read_bytes().replace(b"causes", b"caused", 1))
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
+
+    def test_custom_component_configs_survive_round_trip(self):
+        """A snapshot reconstructs the SAME extractor/verifier behavior
+        (reviewer residual 1 regression)."""
+        from src.extraction.cue import CueExtractor
+        from src.alignment import MultiRelFGWVerifier
+        engine = ResonanceEngine(
+            extractor=CueExtractor(drop_threshold=0.35),
+            verifier=MultiRelFGWVerifier({"path_matching": "off"}))
+        for g in list(GRAPHS.values())[:5]:
+            engine.index(g)
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            restored = ResonanceEngine.load(Path(tmp))
+        self.assertEqual(restored.extractor.drop_threshold, 0.35)
+        self.assertEqual(restored.verifier.config_hash, engine.verifier.config_hash)
+        self.assertEqual(restored.verifier.config["path_matching"], "off")
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp), verifier=MultiRelFGWVerifier())
+
+    def test_forged_component_metadata_is_rejected(self):
+        """Forged verifier_version and tampered verifier config both fail
+        closed (reviewer residual 1 reproductions)."""
+        import json as _json
+        engine, _ = self._engine(3)
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            mpath = Path(tmp) / "manifest.json"
+            manifest = _json.loads(mpath.read_text())
+            manifest["verifier_version"] = "resonance-verifier/9.9"
+            mpath.write_text(_json.dumps(manifest, sort_keys=True,
+                                         separators=(",", ":")) + "\n")
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            mpath = Path(tmp) / "manifest.json"
+            manifest = _json.loads(mpath.read_text())
+            manifest["components"]["verifier"]["config"]["path_matching"] = "guarded" \
+                if manifest["components"]["verifier"]["config"]["path_matching"] == "off" else "off"
+            mpath.write_text(_json.dumps(manifest, sort_keys=True,
+                                         separators=(",", ":")) + "\n")
             with self.assertRaises(EngineIntegrityError):
                 ResonanceEngine.load(Path(tmp))
 
