@@ -8,6 +8,7 @@ Expected conceptual modules, refined by accepted R1 interfaces:
 
 ```text
 graph/
+interfaces/
 extraction/
 fingerprint/
 index/
@@ -16,6 +17,9 @@ scoring/
 explanation/
 mcp/
 ```
+
+`src/fingerprint/` and `src/index/` implement R3 retrieval against the accepted
+interfaces. They must not import alignment, scoring, extraction internals, or MCP.
 
 The implementation sequence is operationally defined as:
 
