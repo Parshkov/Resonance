@@ -19,9 +19,11 @@ from src.interfaces import (
     VerifierResult,
     require_mode,
 )
-from src.extraction.cue import CueExtractor
-from src.index.store import InvertedCandidateIndex
+from src.extraction.cue import EXTRACTOR_VERSION, CueExtractor
+from src.index.store import INDEX_VERSION, InvertedCandidateIndex
 from src.alignment import MultiRelFGWVerifier
+from src.alignment.verifier import COMPONENT_VERSION as VERIFIER_VERSION
+from src.interfaces import INTERFACE_VERSION
 
 ENGINE_VERSION = "resonance-engine/0.1"
 
@@ -102,8 +104,18 @@ class ResonanceEngine:
         self.store.put(graph)
         self.candidate_index.upsert(graph)
 
+    def _require_bound(self) -> None:
+        """Use-time integrity: catches in-memory store/index drift that never
+        went through dump/load (R5-ASSIST 5b1a9f2's addition, adopted).
+        Full-recompute by design so direct mutation cannot hide behind a
+        cache; O(corpus) canonical hashing is milliseconds at v0.1 scale."""
+        if self.store.snapshot() != self.candidate_index.corpus_snapshot:
+            raise EngineIntegrityError(
+                "store and index corpus snapshots diverge; refuse to serve")
+
     def find(self, graph: ThoughtGraph, *, mode: str, k: int = 20) -> Sequence[ResonanceHit]:
         require_mode(mode)
+        self._require_bound()
         hits: list[ResonanceHit] = []
         for candidate in self.candidate_index.query(graph, mode=mode, k=k):
             target = self.store.get(candidate.candidate_id)
@@ -157,7 +169,13 @@ class ResonanceEngine:
                 "refusing to dump: store and index disagree on corpus snapshot")
         manifest = {
             "engine_version": ENGINE_VERSION,
+            "interface_version": INTERFACE_VERSION,
+            "schema_version": "thought-dna/0.1",
+            "verifier_version": VERIFIER_VERSION,
+            "index_version": INDEX_VERSION,
+            "extractor_version": EXTRACTOR_VERSION,
             "corpus_snapshot": index_snapshot,
+            "thought_ids": list(self.store.thought_ids()),
             "files": {
                 "store.json": hashlib.sha256(store_path.read_bytes()).hexdigest(),
                 "index.json": hashlib.sha256(index_path.read_bytes()).hexdigest(),
@@ -185,6 +203,8 @@ class ResonanceEngine:
         if store.snapshot() != index.corpus_snapshot:
             raise EngineIntegrityError(
                 "store and index snapshots diverge inside the manifest-verified payloads")
+        if list(store.thought_ids()) != list(manifest.get("thought_ids") or []):
+            raise EngineIntegrityError("manifest thought_ids do not match the store")
         if manifest["corpus_snapshot"] != index.corpus_snapshot:
             raise EngineIntegrityError("manifest corpus_snapshot mismatch")
         return cls(store=store, index=index, **kwargs)

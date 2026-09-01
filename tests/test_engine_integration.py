@@ -168,6 +168,17 @@ class PersistenceCompositionTests(unittest.TestCase):
             with self.assertRaises(EngineIntegrityError):
                 ResonanceEngine.load(Path(tmp))
 
+    def test_mismatched_direct_construction_fails_at_use(self):
+        """In-memory drift that never touched dump/load is caught at find()
+        time (R5-ASSIST use-time binding check, adopted)."""
+        built, subset = self._engine(5)
+        fresh_store = InMemoryThoughtStore()
+        fresh_store.put(subset[0])
+        frankenstein = ResonanceEngine(store=fresh_store,
+                                       index=built.candidate_index)
+        with self.assertRaises(EngineIntegrityError):
+            frankenstein.find(subset[0], mode="structural", k=5)
+
     def test_find_fails_closed_when_store_misses_a_candidate(self):
         """A retrieved candidate absent from the store raises; it is never
         silently skipped (reviewer finding 1 regression)."""
