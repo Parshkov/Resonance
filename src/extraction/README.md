@@ -7,6 +7,12 @@ v0.1 ships a **cue extractor**: explicit lexical relation cues only. Implicit
 causation without a cue is abstained. Every extracted node and edge has an
 exact source span. Objects below the drop threshold are deleted, not guessed.
 
+Within one extraction, nodes with the same case-folded label are unified
+(span lists are unioned). That is conservative identity, not coreference:
+"heat" and "heat accumulation" stay distinct. Modality is read from the
+cue's sentence, not a character window that crosses `.!?`. Reversed-cue
+argument windows drop leading/trailing be-verbs (`Failure is` → `Failure`).
+
 Manual graphs use the same Thought DNA validator with `provenance.kind=manual`
 and `extractor: null`.
 

@@ -1,5 +1,5 @@
 {
-  "config_hash": "ada952f2373346e27310fe078691583cfb404c1ddb256c8b1c448e31eb253c2c",
+  "config_hash": "0d35aff9c184b323911a411e21577deb69de4cacc4c06283aca4e278e44ee969",
   "cued_repeat_across_source_id": {
     "edge_f1": 1.0,
     "node_f1": 1.0,
@@ -9,7 +9,7 @@
   },
   "extraction_prerequisite_claimed": false,
   "extractor_id": "resonance-cue-extractor",
-  "extractor_version": "0.1.1",
+  "extractor_version": "0.1.2",
   "frozen_coverage": {
     "mean_nodes": 0.0,
     "mean_relations": 0.0,

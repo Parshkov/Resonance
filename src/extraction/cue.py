@@ -18,9 +18,11 @@ from src.graph import Node, Relation, ThoughtGraph, make_node_id, make_relation_
 from src.interfaces import ConfigRef, ExtractionResult
 
 EXTRACTOR_ID = "resonance-cue-extractor"
-EXTRACTOR_VERSION = "0.1.1"
+EXTRACTOR_VERSION = "0.1.2"
 DROP_THRESHOLD = 0.35
 IOU_MERGE = 0.5
+AUXILIARIES = frozenset({"is", "are", "was", "were", "be", "been", "being"})
+SENTENCE_PUNCT = frozenset(".!?")
 FROZEN_EXTRACTION_RUNS = Path(__file__).resolve().parents[2] / "benchmark" / "r0-v0.1" / "extraction_runs.jsonl"
 
 CUES: tuple[tuple[str, str, float, int], ...] = (
@@ -101,7 +103,33 @@ def _window(text: str, cue_start: int, cue_end: int, side: str) -> dict[str, obj
         abs_end -= 1
     if abs_end <= abs_start:
         return None
+    return _trim_auxiliaries(text, abs_start, abs_end)
+
+
+def _trim_auxiliaries(text: str, start: int, end: int) -> dict[str, object] | None:
+    """Drop leading/trailing be-verbs so reversed cues are not 'Failure is'."""
+    tokens = list(WORD.finditer(text[start:end]))
+    while tokens and tokens[0].group().strip(".,;:").lower() in AUXILIARIES:
+        tokens.pop(0)
+    while tokens and tokens[-1].group().strip(".,;:").lower() in AUXILIARIES:
+        tokens.pop()
+    if not tokens:
+        return None
+    abs_start = start + tokens[0].start()
+    abs_end = start + tokens[-1].end()
+    if abs_end <= abs_start:
+        return None
     return _span(text, abs_start, abs_end)
+
+
+def _sentence_slice(text: str, start: int, end: int) -> str:
+    left = start
+    while left > 0 and text[left - 1] not in SENTENCE_PUNCT:
+        left -= 1
+    right = end
+    while right < len(text) and text[right] not in SENTENCE_PUNCT:
+        right += 1
+    return text[left:right]
 
 
 def _role(label: str) -> tuple[str, float]:
@@ -118,7 +146,7 @@ def _slug(label: str) -> str:
 
 
 def _modality(text: str, start: int, end: int) -> str:
-    window = text[max(0, start - 24) : min(len(text), end + 24)].lower()
+    window = _sentence_slice(text, start, end).lower()
     if re.search(r"\b(if|unless)\b", window):
         return "conditional"
     if re.search(r"\b(may|might|could|possible)\b", window):
@@ -198,12 +226,15 @@ class CueExtractor:
             if conf < self.drop_threshold:
                 abstentions.append(f"dropped node {label!r} below threshold")
                 return None
+            key = label.casefold()
             for existing in nodes.values():
-                if _iou(span, existing["spans"][0]) >= IOU_MERGE:
+                spans = list(existing["spans"])
+                if any(_iou(span, item) >= IOU_MERGE for item in spans) or str(existing["label"]).casefold() == key:
+                    if span not in spans:
+                        spans.append(span)
+                        existing["spans"] = sorted(spans, key=lambda item: (int(item["start"]), int(item["end"])))
                     if conf > float(existing["extract_conf"]):
-                        existing["label"] = label
                         existing["role"] = role
-                        existing["spans"] = [span]
                         existing["extract_conf"] = conf
                     return str(existing["id"])
             node_id = make_node_id(role, spans=[span], namespace=thought_id)

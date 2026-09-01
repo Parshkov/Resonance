@@ -101,6 +101,41 @@ class ExtractionTests(unittest.TestCase):
         self.assertEqual(rel.type, "prevents")
         self.assertEqual(rel.assertion, "negated")
 
+    def test_same_label_unifies_and_forms_a_chain(self):
+        result = CueExtractor().extract(
+            "Heat causes degradation. Degradation causes failure.",
+            source_id="chain",
+        )
+        labels = {node.label.casefold(): node for node in result.graph.nodes}
+        self.assertIn("heat", labels)
+        self.assertIn("degradation", labels)
+        self.assertIn("failure", labels)
+        self.assertEqual(len(result.graph.nodes), 3)
+        self.assertEqual(len(labels["degradation"].spans), 2)
+        by_id = {node.id: node for node in result.graph.nodes}
+        types = {(by_id[rel.source].label.casefold(), rel.type, by_id[rel.target].label.casefold()) for rel in result.graph.relations}
+        self.assertEqual(types, {("heat", "causes", "degradation"), ("degradation", "causes", "failure")})
+
+    def test_byte_identical_mentions_unify(self):
+        result = CueExtractor().extract("Heat causes pressure. Heat causes failure.")
+        heats = [node for node in result.graph.nodes if node.label.casefold() == "heat"]
+        self.assertEqual(len(heats), 1)
+        self.assertEqual(len(heats[0].spans), 2)
+        self.assertEqual(len(result.graph.relations), 2)
+
+    def test_modality_does_not_bleed_across_sentences(self):
+        result = CueExtractor().extract("Cooling prevents failure. Load may cause overheating.")
+        by_type = {rel.type: rel for rel in result.graph.relations}
+        self.assertEqual(by_type["prevents"].modality, "actual")
+        self.assertEqual(by_type["causes"].modality, "possible")
+
+    def test_reversed_cue_drops_auxiliary_from_label(self):
+        result = CueExtractor().extract("Failure is caused by heat.")
+        labels = {node.label for node in result.graph.nodes}
+        self.assertIn("Failure", labels)
+        self.assertNotIn("Failure is", labels)
+        self.assertIn("heat", labels)
+
     def test_drop_threshold_must_be_finite_unit_interval(self):
         CueExtractor(drop_threshold=0.0)
         CueExtractor(drop_threshold=1.0)
