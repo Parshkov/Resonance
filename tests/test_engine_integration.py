@@ -174,14 +174,14 @@ class PersistenceCompositionTests(unittest.TestCase):
         from src.extraction.cue import CueExtractor
         from src.alignment import MultiRelFGWVerifier
         engine = ResonanceEngine(
-            extractor=CueExtractor(drop_threshold=0.35),
+            extractor=CueExtractor(drop_threshold=0.5),   # genuine non-default
             verifier=MultiRelFGWVerifier({"path_matching": "off"}))
         for g in list(GRAPHS.values())[:5]:
             engine.index(g)
         with tempfile.TemporaryDirectory() as tmp:
             engine.dump(Path(tmp))
             restored = ResonanceEngine.load(Path(tmp))
-        self.assertEqual(restored.extractor.drop_threshold, 0.35)
+        self.assertEqual(restored.extractor.drop_threshold, 0.5)
         self.assertEqual(restored.verifier.config_hash, engine.verifier.config_hash)
         self.assertEqual(restored.verifier.config["path_matching"], "off")
         with tempfile.TemporaryDirectory() as tmp:
@@ -209,6 +209,34 @@ class PersistenceCompositionTests(unittest.TestCase):
             manifest = _json.loads(mpath.read_text())
             manifest["components"]["verifier"]["config"]["path_matching"] = "guarded" \
                 if manifest["components"]["verifier"]["config"]["path_matching"] == "off" else "off"
+            mpath.write_text(_json.dumps(manifest, sort_keys=True,
+                                         separators=(",", ":")) + "\n")
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
+
+    def test_tampered_extractor_config_and_forged_scoring_are_rejected(self):
+        """Final integrity residuals: extractor config is hash-bound and the
+        effective scoring identity is validated against the runtime."""
+        import json as _json
+        engine, _ = self._engine(3)
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            mpath = Path(tmp) / "manifest.json"
+            manifest = _json.loads(mpath.read_text())
+            manifest["components"]["extractor"]["config"]["drop_threshold"] = 0.42
+            mpath.write_text(_json.dumps(manifest, sort_keys=True,
+                                         separators=(",", ":")) + "\n")
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            mpath = Path(tmp) / "manifest.json"
+            manifest = _json.loads(mpath.read_text())
+            # consistent forgery: rewrite score_model AND recompute the hash
+            from src.alignment.verifier import _config_hash
+            cfg = manifest["components"]["verifier"]["config"]
+            cfg["score_model"] = "forged-score/9.9"
+            manifest["components"]["verifier"]["config_hash"] = _config_hash(cfg)
             mpath.write_text(_json.dumps(manifest, sort_keys=True,
                                          separators=(",", ":")) + "\n")
             with self.assertRaises(EngineIntegrityError):

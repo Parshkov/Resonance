@@ -12,9 +12,16 @@ graph ──find(mode,k)──▶ retrieve ──▶ MultiRelFGWVerifier (R4) pe
 compare / explain / get           per the protocol
 ```
 
-Persistence composes from the parts: `store.dump/load` (canonical JSON) +
-`candidate_index.dump/load` (R3's tamper-checked payload); a restored engine
-reproduces `find` exactly (integration-tested).
+Persistence is ONE manifest-verified snapshot, not two unbound part files:
+`ResonanceEngine.dump(dir)` writes `store.json` + `index.json` + a manifest
+binding both payload hashes, the shared corpus snapshot, `thought_ids`, every
+component version (engine/interface/schema/extractor/index/verifier/scoring —
+all validated on load against runtime constants), and hash-bound component
+configs (extractor `drop_threshold`; full verifier config). `load()`
+reconstructs extractor and verifier from the persisted configs — the restored
+engine behaves exactly like the dumping one, reproduces `find` exactly, and
+fails closed on any hash, version, snapshot, config, or scoring-identity
+mismatch; `find()` additionally checks store/index binding at use time.
 
 ## Mixed-mode benchmark result (frozen v0.1)
 

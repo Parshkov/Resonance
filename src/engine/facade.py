@@ -22,7 +22,8 @@ from src.interfaces import (
 from src.extraction.cue import EXTRACTOR_VERSION, CueExtractor
 from src.index.store import INDEX_VERSION, InvertedCandidateIndex
 from src.alignment import MultiRelFGWVerifier
-from src.alignment.verifier import COMPONENT_VERSION as VERIFIER_VERSION
+from src import scoring as _scoring
+from src.alignment.verifier import COMPONENT_VERSION as VERIFIER_VERSION, _config_hash
 from src.interfaces import INTERFACE_VERSION
 
 ENGINE_VERSION = "resonance-engine/0.1"
@@ -174,8 +175,13 @@ class ResonanceEngine:
             "verifier_version": VERIFIER_VERSION,
             "index_version": INDEX_VERSION,
             "extractor_version": EXTRACTOR_VERSION,
+            "scoring_version": _scoring.SCORE_MODEL_VERSION,
             "components": {
-                "extractor": {"drop_threshold": self.extractor.drop_threshold},
+                "extractor": {
+                    "config": {"drop_threshold": self.extractor.drop_threshold},
+                    "config_hash": _config_hash(
+                        {"drop_threshold": self.extractor.drop_threshold}),
+                },
                 "verifier": {"config": dict(self.verifier.config),
                              "config_hash": self.verifier.config_hash},
             },
@@ -204,6 +210,7 @@ class ResonanceEngine:
         manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
         declared = {
             "engine_version": ENGINE_VERSION,
+            "scoring_version": _scoring.SCORE_MODEL_VERSION,
             "interface_version": INTERFACE_VERSION,
             "schema_version": "thought-dna/0.1",
             "verifier_version": VERIFIER_VERSION,
@@ -229,13 +236,23 @@ class ResonanceEngine:
         if manifest["corpus_snapshot"] != index.corpus_snapshot:
             raise EngineIntegrityError("manifest corpus_snapshot mismatch")
         components = manifest.get("components") or {}
+        ext_cfg = components.get("extractor") or {}
+        if _config_hash(dict(ext_cfg.get("config") or {})) != ext_cfg.get("config_hash"):
+            raise EngineIntegrityError(
+                "persisted extractor config does not reproduce its recorded hash")
         try:
             extractor = CueExtractor(
-                drop_threshold=components["extractor"]["drop_threshold"])
+                drop_threshold=ext_cfg["config"]["drop_threshold"])
         except (KeyError, TypeError, ValueError) as exc:
             raise EngineIntegrityError(f"invalid persisted extractor config: {exc}")
         verifier_cfg = components.get("verifier") or {}
-        verifier = MultiRelFGWVerifier(dict(verifier_cfg.get("config") or {}))
+        persisted_v = dict(verifier_cfg.get("config") or {})
+        if persisted_v.get("score_model") != _scoring.SCORE_MODEL_VERSION:
+            raise EngineIntegrityError(
+                "persisted verifier score_model does not match the runtime "
+                f"scoring contract {_scoring.SCORE_MODEL_VERSION!r}; the "
+                "adjudicator would silently use runtime formulas")
+        verifier = MultiRelFGWVerifier(persisted_v)
         if verifier.config_hash != verifier_cfg.get("config_hash"):
             raise EngineIntegrityError(
                 "persisted verifier config does not reproduce its recorded hash")
