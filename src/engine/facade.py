@@ -6,23 +6,41 @@ retrieve -> verify -> score -> explain. Pure Python; no MCP anywhere.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Sequence
 
-from src.graph import ThoughtGraph, validate_thought
+from src.graph import ThoughtGraph, canonical_sha256, validate_thought
+from src.graph.versioning import SCHEMA_VERSION
 from src.interfaces import (
+    INTERFACE_VERSION,
     CandidateResult,
     EngineFacade,
     ResonanceHit,
     VerifierResult,
     require_mode,
 )
-from src.extraction.cue import CueExtractor
-from src.index.store import InvertedCandidateIndex
+from src.extraction.cue import EXTRACTOR_ID, EXTRACTOR_VERSION, CueExtractor
+from src.index.store import INDEX_VERSION, InvertedCandidateIndex
+from src.fingerprint.keys import FEATURE_VERSION
 from src.alignment import MultiRelFGWVerifier
+from src.alignment.verifier import COMPONENT_VERSION
 
-ENGINE_VERSION = "resonance-engine/0.1"
+ENGINE_VERSION = "resonance-engine/0.1.1"
+MANIFEST_VERSION = "resonance-engine-manifest/0.1"
+
+
+def _canonical_sha(value: object) -> str:
+    raw = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def store_corpus_snapshot(store: "InMemoryThoughtStore") -> str:
+    """Same snapshot function the inverted index uses for corpus_snapshot."""
+    return _canonical_sha(
+        sorted((tid, canonical_sha256(store.get(tid).to_dict())) for tid in store.thought_ids())
+    )
 
 
 class InMemoryThoughtStore:
@@ -70,6 +88,7 @@ class ResonanceEngine:
         self.verifier = verifier or MultiRelFGWVerifier()
         self.store = store or InMemoryThoughtStore()
         self._explanations: dict[tuple[str, str], VerifierResult] = {}
+        self._require_bound()
 
     # -- EngineFacade -------------------------------------------------------
     def ingest(self, context: str, *, source_id: str | None = None) -> ThoughtGraph:
@@ -90,10 +109,13 @@ class ResonanceEngine:
     def find(self, graph: ThoughtGraph, *, mode: str, k: int = 20) -> Sequence[ResonanceHit]:
         require_mode(mode)
         hits: list[ResonanceHit] = []
+        self._require_bound()
         for candidate in self.candidate_index.query(graph, mode=mode, k=k):
             target = self.store.get(candidate.candidate_id)
             if target is None:
-                continue
+                raise ValueError(
+                    f"index candidate {candidate.candidate_id!r} is absent from the bound store"
+                )
             verification = self.verifier.verify(
                 graph, target, seeds=candidate.seed_correspondences)
             self._explanations[(graph.thought_id, candidate.candidate_id)] = verification
@@ -113,7 +135,64 @@ class ResonanceEngine:
     def get(self, thought_id: str) -> ThoughtGraph | None:
         return self.store.get(thought_id)
 
+    def manifest(self) -> dict[str, object]:
+        self._require_bound()
+        return {
+            "manifest_version": MANIFEST_VERSION,
+            "engine_version": ENGINE_VERSION,
+            "interface_version": INTERFACE_VERSION,
+            "schema_version": SCHEMA_VERSION,
+            "extractor_id": EXTRACTOR_ID,
+            "extractor_version": EXTRACTOR_VERSION,
+            "index_version": INDEX_VERSION,
+            "feature_version": FEATURE_VERSION,
+            "verifier_version": COMPONENT_VERSION,
+            "index_config_hash": self.candidate_index.config.config_hash,
+            "verifier_config_hash": self.verifier.config_hash,
+            "corpus_snapshot": self.candidate_index.corpus_snapshot,
+            "thought_ids": list(self.store.thought_ids()),
+        }
+
+    def dump(self, path: str | Path) -> None:
+        """Write a bound engine snapshot: store + index + manifest."""
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        self._require_bound()
+        self.store.dump(path / "store.json")
+        self.candidate_index.dump(path / "index.json")
+        (path / "manifest.json").write_text(
+            json.dumps(self.manifest(), ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    @classmethod
+    def load(cls, path: str | Path) -> "ResonanceEngine":
+        """Restore a bound snapshot. Rejects mixed store/index and tampered versions."""
+        path = Path(path)
+        manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+        if manifest.get("manifest_version") != MANIFEST_VERSION:
+            raise ValueError(
+                f"persisted manifest_version {manifest.get('manifest_version')!r} != {MANIFEST_VERSION!r}"
+            )
+        if manifest.get("engine_version") != ENGINE_VERSION:
+            raise ValueError(
+                f"persisted engine_version {manifest.get('engine_version')!r} != {ENGINE_VERSION!r}"
+            )
+        store = InMemoryThoughtStore.load(path / "store.json")
+        index = InvertedCandidateIndex.load(path / "index.json")
+        if list(store.thought_ids()) != list(manifest.get("thought_ids") or []):
+            raise ValueError("manifest thought_ids do not match store")
+        if index.corpus_snapshot != manifest.get("corpus_snapshot"):
+            raise ValueError("manifest corpus_snapshot does not match index")
+        if store_corpus_snapshot(store) != index.corpus_snapshot:
+            raise ValueError("store and index corpus snapshots diverge")
+        return cls(store=store, index=index)
+
     # -- helpers ------------------------------------------------------------
+    def _require_bound(self) -> None:
+        store_snap = store_corpus_snapshot(self.store)
+        if store_snap != self.candidate_index.corpus_snapshot:
+            raise ValueError("store and index corpus snapshots diverge")
     @staticmethod
     def _flag_synced(candidate: CandidateResult, verification: VerifierResult) -> CandidateResult:
         flags = verification.retrieval_flags

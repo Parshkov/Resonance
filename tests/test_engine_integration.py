@@ -17,7 +17,8 @@ sys.path.insert(0, str(REPO))
 
 from src.graph import ThoughtGraph
 from src.interfaces import EngineFacade, ThoughtStore
-from src.engine import InMemoryThoughtStore, ResonanceEngine
+from src.engine import ENGINE_VERSION, InMemoryThoughtStore, ResonanceEngine
+from src.index.store import InvertedCandidateIndex
 
 V01 = REPO / "benchmark" / "r0-v0.1"
 
@@ -123,26 +124,56 @@ class RequiredDemoTests(unittest.TestCase):
 
 
 class PersistenceCompositionTests(unittest.TestCase):
-    def test_store_and_index_round_trip_preserve_find(self):
+    def test_bound_snapshot_round_trip_preserves_find(self):
         engine = ResonanceEngine()
-        subset = list(GRAPHS.values())[:20]
+        subset = list(GRAPHS.values())[:8]
         for g in subset:
             engine.index(g)
         query = subset[0]
         before = [(h.candidate.candidate_id, h.verification.classification)
                   for h in engine.find(query, mode="structural", k=5)]
         with tempfile.TemporaryDirectory() as tmp:
-            store_path = Path(tmp) / "store.json"
-            index_path = Path(tmp) / "index.json"
-            engine.store.dump(store_path)
-            engine.candidate_index.dump(index_path)
-            from src.index.store import InvertedCandidateIndex
-            restored = ResonanceEngine(
-                store=InMemoryThoughtStore.load(store_path),
-                index=InvertedCandidateIndex.load(index_path))
+            root = Path(tmp) / "engine"
+            engine.dump(root)
+            restored = ResonanceEngine.load(root)
         after = [(h.candidate.candidate_id, h.verification.classification)
                  for h in restored.find(query, mode="structural", k=5)]
         self.assertEqual(before, after)
+        self.assertEqual(restored.manifest()["engine_version"], ENGINE_VERSION)
+        self.assertEqual(restored.manifest()["corpus_snapshot"],
+                         engine.candidate_index.corpus_snapshot)
+
+    def test_mixed_store_and_index_are_rejected(self):
+        store = InMemoryThoughtStore()
+        store.put(list(GRAPHS.values())[0])
+        index = InvertedCandidateIndex()
+        index.build(list(GRAPHS.values())[1:4])
+        with self.assertRaisesRegex(ValueError, "snapshots diverge"):
+            ResonanceEngine(store=store, index=index)
+
+    def test_find_fails_closed_if_index_candidate_missing_from_store(self):
+        engine = ResonanceEngine()
+        subset = [GRAPHS[key] for key in sorted(GRAPHS) if key.startswith("C01-")]
+        for g in subset:
+            engine.index(g)
+        query = GRAPHS["C01-Q"]
+        hits = engine.find(query, mode="structural", k=5)
+        self.assertTrue(hits)
+        engine.store._graphs.pop(hits[0].candidate.candidate_id)
+        with self.assertRaisesRegex(ValueError, "snapshots diverge|absent from the bound store"):
+            engine.find(query, mode="structural", k=5)
+
+    def test_tampered_manifest_version_is_rejected(self):
+        engine = ResonanceEngine()
+        engine.index(list(GRAPHS.values())[0])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "engine"
+            engine.dump(root)
+            payload = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+            payload["engine_version"] = "tampered-engine"
+            (root / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "engine_version"):
+                ResonanceEngine.load(root)
 
 
 if __name__ == "__main__":

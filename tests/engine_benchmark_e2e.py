@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""R5 end-to-end benchmark harness: REAL retrieval ranks, no oracle.
+"""R5 frozen-v0.1 harness: real retrieval ranks + oracle-inclusion verification.
 
-Builds the composed engine over all frozen v0.1 graphs, then for every frozen
-pair asks the index for the candidate's actual tie-aware rank and verifies the
-pair with retrieval seeds. Emits predictions.jsonl for the frozen runner.
+Two labelled paths, not one:
+
+1. Retrieval rank comes from the live index (`channel_ranks`, tie-aware).
+   A candidate absent from the (tie-expanded) top-k is a retrieval miss.
+2. Verification always runs on the evaluator-selected `candidate_graph`,
+   even on a retrieval miss. That is oracle-inclusion stage isolation, not
+   a no-oracle ``find()`` traversal.
 
 Usage:
   python3 tests/engine_benchmark_e2e.py --out preds.jsonl [--report report.json]
@@ -86,11 +90,12 @@ def main() -> int:
             seeds = hit.seed_correspondences
             channel_scores = dict(hit.channel_scores)
         else:
-            # candidate not in the (tie-expanded) top-k:真 end-to-end miss.
+            # Retrieval miss. Verification below is still oracle-inclusion.
             rank = 10**6
             seeds = ()
             channel_scores = {"structural": 0.0, "content": 0.0, "knowledge": 0.0}
         t2 = time.perf_counter()
+        # Oracle-inclusion verification of the evaluator-selected pair.
         verification = engine.verifier.verify(query, graphs[target_id], seeds=seeds)
         vlat = time.perf_counter() - t2
         wire = verification.components.to_wire()
@@ -146,7 +151,7 @@ def main() -> int:
 
     summary = {
         "engine_version": ENGINE_VERSION,
-        "mode": "end_to_end_no_oracle",
+        "mode": "real_retrieval_rank_plus_oracle_inclusion_verification",
         "graphs_indexed": len(graphs),
         "index_build_seconds": round(build_seconds, 3),
         "pairs": len(records),
