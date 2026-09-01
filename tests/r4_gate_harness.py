@@ -65,6 +65,9 @@ def predict(verifier, graphs, pair):
         "edge_mapping": sorted(edge_mapping, key=lambda x: (x[0], str(x[1]))),
         "bridge_mapping": bridge_mapping(r, q, c),
         "hard_rejection": r.hard_rejection,
+        # v0.1 sums this self-reported integer (the audit gap Benchmark v0.2
+        # closed); it is NOT contraction-safety evidence -- v0.2's evaluator
+        # derives the real count from gold and submitted mappings.
         "false_contractions": 0,
         "components": wire,
         "latency_seconds": dt,
