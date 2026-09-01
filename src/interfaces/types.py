@@ -5,14 +5,17 @@ These types contain no implementation logic and no MCP transport types.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from src.graph import Span, ThoughtGraph
 
 SCORE_CONTRACT_VERSION = "resonance-score/0.1"
 INTERFACE_VERSION = "resonance-interfaces/0.1"
+MINIMUM_PYTHON = (3, 10)
+RESONANCE_MODES: tuple[str, ...] = ("structural", "analogical", "complementary")
 
 # Python field -> Scoring v0.1 wire name. Required components stay typed;
 # extras is only for non-contract diagnostics.
@@ -65,6 +68,27 @@ def _require_item_id(provenance: ItemProvenance, item_id: str, label: str) -> No
 def _require_unique(ids: tuple[str, ...], label: str) -> None:
     if len(set(ids)) != len(ids):
         raise ValueError(f"{label} must be unique")
+
+
+def _require_disjoint(left: Sequence[str], right: Sequence[str], label: str) -> None:
+    overlap = sorted(set(left) & set(right))
+    if overlap:
+        raise ValueError(f"{label} must be disjoint; overlap={overlap}")
+
+
+def _require_finite_float(value: Any, key: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be a finite number")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{key} must be finite")
+    return number
+
+
+def require_mode(mode: str) -> str:
+    if mode not in RESONANCE_MODES:
+        raise ValueError(f"unsupported resonance mode: {mode!r}; expected one of {RESONANCE_MODES}")
+    return mode
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,7 +288,9 @@ class ScoreVector:
             if key == "extras":
                 if not isinstance(value, Mapping):
                     raise ValueError("extras must be an object")
-                extras.update({str(item): float(item_value) for item, item_value in dict(value).items()})
+                extras.update(
+                    {str(item): _require_finite_float(item_value, f"extras.{item}") for item, item_value in dict(value).items()}
+                )
                 continue
             if key not in inverse:
                 raise ValueError(f"unknown score field: {key}")
@@ -275,7 +301,7 @@ class ScoreVector:
                     raise ValueError(f"{key} must be a boolean")
                 kwargs[field_name] = value
             else:
-                kwargs[field_name] = float(value)
+                kwargs[field_name] = _require_finite_float(value, key)
         missing = sorted(REQUIRED_SCORE_WIRE_NAMES - seen_wire)
         if missing:
             raise ValueError("missing required score fields: " + ", ".join(missing))
@@ -344,6 +370,35 @@ class VerifierResult:
             raise ValueError("explanation config_hash must match solver_config.config_hash")
         _require_unique(tuple(match.query_node for match in self.mapping), "mapping query node IDs")
         _require_unique(tuple(match.candidate_node for match in self.mapping), "mapping candidate node IDs")
+        _require_unique(tuple(match.query_relation for match in self.matched_relations), "matched query relation IDs")
+        _require_unique(
+            tuple(match.candidate_relation for match in self.matched_relations),
+            "matched candidate relation IDs",
+        )
+        _require_unique(
+            tuple(match.query_relation for match in self.edge_path_matches),
+            "edge-path query relation IDs",
+        )
+        _require_unique(
+            tuple(rel for match in self.edge_path_matches for rel in match.candidate_relations),
+            "edge-path candidate relation IDs",
+        )
+        mapped_query_nodes = tuple(match.query_node for match in self.mapping)
+        mapped_candidate_nodes = tuple(match.candidate_node for match in self.mapping)
+        mapped_query_relations = tuple(match.query_relation for match in self.matched_relations) + tuple(
+            match.query_relation for match in self.edge_path_matches
+        )
+        mapped_candidate_relations = tuple(match.candidate_relation for match in self.matched_relations) + tuple(
+            rel for match in self.edge_path_matches for rel in match.candidate_relations
+        )
+        _require_disjoint(mapped_query_nodes, self.unmatched_query_nodes, "mapped and unmatched query nodes")
+        _require_disjoint(mapped_candidate_nodes, self.unmatched_candidate_nodes, "mapped and unmatched candidate nodes")
+        _require_disjoint(mapped_query_relations, self.unmatched_query_relations, "mapped and unmatched query relations")
+        _require_disjoint(
+            mapped_candidate_relations,
+            self.unmatched_candidate_relations,
+            "mapped and unmatched candidate relations",
+        )
 
 
 @dataclass(frozen=True, slots=True)

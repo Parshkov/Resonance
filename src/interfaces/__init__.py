@@ -3,7 +3,9 @@
 from .protocols import CandidateIndex, ConfigSource, EngineFacade, Extractor, GraphValidator, StructuralVerifier, ThoughtStore
 from .types import (
     INTERFACE_VERSION,
+    MINIMUM_PYTHON,
     REQUIRED_SCORE_WIRE_NAMES,
+    RESONANCE_MODES,
     SCORE_CONTRACT_VERSION,
     SCORE_WIRE_NAMES,
     CandidateResult,
@@ -20,13 +22,17 @@ from .types import (
     ScoreVector,
     SeedCorrespondence,
     VerifierResult,
+    require_mode,
 )
 
 __all__ = [
     "INTERFACE_VERSION",
+    "MINIMUM_PYTHON",
     "REQUIRED_SCORE_WIRE_NAMES",
+    "RESONANCE_MODES",
     "SCORE_CONTRACT_VERSION",
     "SCORE_WIRE_NAMES",
+    "require_mode",
     "ConfigRef",
     "RetrievalFlags",
     "ExtractionResult",

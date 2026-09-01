@@ -1,12 +1,16 @@
 import ast
 import hashlib
 import json
+import math
+import sys
 import unittest
 from pathlib import Path
 
 from src.graph import ThoughtGraph
 from src.interfaces import (
+    MINIMUM_PYTHON,
     REQUIRED_SCORE_WIRE_NAMES,
+    RESONANCE_MODES,
     SCORE_CONTRACT_VERSION,
     SCORE_WIRE_NAMES,
     CandidateIndex,
@@ -28,6 +32,7 @@ from src.interfaces import (
     StructuralVerifier,
     ThoughtStore,
     VerifierResult,
+    require_mode,
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "thought_dna" / "valid_manual.json"
@@ -72,6 +77,7 @@ class FakeIndex:
         self.graphs.pop(thought_id, None)
 
     def query(self, graph: ThoughtGraph, *, mode: str, k: int):
+        require_mode(mode)
         out = []
         for rank, candidate_id in enumerate(sorted(self.graphs)):
             if candidate_id == graph.thought_id:
@@ -189,6 +195,7 @@ class FakeEngine:
         self.indexer.upsert(graph)
 
     def find(self, graph: ThoughtGraph, *, mode: str, k: int = 20):
+        require_mode(mode)
         hits = []
         for candidate in self.indexer.query(graph, mode=mode, k=k):
             target = self.store.get(candidate.candidate_id)
@@ -198,6 +205,7 @@ class FakeEngine:
         return hits
 
     def compare(self, a: ThoughtGraph, b: ThoughtGraph, *, mode: str):
+        require_mode(mode)
         result = self.verifier.verify(a, b)
         self.comparisons[(a.thought_id, b.thought_id)] = result
         return result
@@ -446,6 +454,65 @@ class InterfaceTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "hit candidate_id must match verification.candidate_id"):
             ResonanceHit(other, result)
+
+    def test_from_wire_rejects_bool_nan_and_numeric_strings(self):
+        wire = FakeVerifier().verify(graph_with_id("q"), graph_with_id("c")).components.to_wire()
+        with self.assertRaisesRegex(ValueError, "N_role must be a finite number"):
+            ScoreVector.from_wire({**wire, "N_role": True})
+        with self.assertRaisesRegex(ValueError, "R_direct must be finite"):
+            ScoreVector.from_wire({**wire, "R_direct": math.nan})
+        with self.assertRaisesRegex(ValueError, "S_semantic must be a finite number"):
+            ScoreVector.from_wire({**wire, "S_semantic": "0.7"})
+
+    def test_v0_1_modes_are_frozen(self):
+        self.assertEqual(RESONANCE_MODES, ("structural", "analogical", "complementary"))
+        self.assertEqual(require_mode("analogical"), "analogical")
+        with self.assertRaisesRegex(ValueError, "unsupported resonance mode"):
+            require_mode("blend")
+        engine = FakeEngine()
+        query = engine.ingest("query", source_id="q")
+        engine.index(graph_with_id("c"))
+        with self.assertRaisesRegex(ValueError, "unsupported resonance mode"):
+            engine.find(query, mode="semantic", k=5)
+
+    def test_verifier_rejects_duplicate_relations_and_mapped_unmatched_overlap(self):
+        query = graph_with_id("q")
+        candidate = graph_with_id("c")
+        result = FakeVerifier().verify(query, candidate)
+        rel = RelationMatch(
+            "r1",
+            "r1",
+            1.0,
+            ItemProvenance(query.thought_id, "r1", query.provenance.kind, ()),
+            ItemProvenance(candidate.thought_id, "r1", candidate.provenance.kind, ()),
+        )
+        duplicated = (rel, rel)
+        kwargs = {field: getattr(result, field) for field in result.__dataclass_fields__}
+        kwargs["matched_relations"] = duplicated
+        kwargs["explanation"] = Explanation(
+            **{
+                **_empty_explanation_kwargs(
+                    query, mapping=result.mapping, matched_relations=duplicated, edge_path_matches=result.edge_path_matches
+                )
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "matched query relation IDs must be unique"):
+            VerifierResult(**kwargs)
+        overlap_nodes = ("n1",)
+        kwargs = {field: getattr(result, field) for field in result.__dataclass_fields__}
+        kwargs["unmatched_query_nodes"] = overlap_nodes
+        kwargs["explanation"] = Explanation(
+            **{
+                **_empty_explanation_kwargs(query, mapping=result.mapping, edge_path_matches=result.edge_path_matches),
+                "unmatched_query_nodes": overlap_nodes,
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "mapped and unmatched query nodes must be disjoint"):
+            VerifierResult(**kwargs)
+
+    def test_runtime_floor_is_python_3_10(self):
+        self.assertEqual(MINIMUM_PYTHON, (3, 10))
+        self.assertGreaterEqual(sys.version_info[:2], MINIMUM_PYTHON)
 
 
 if __name__ == "__main__":
