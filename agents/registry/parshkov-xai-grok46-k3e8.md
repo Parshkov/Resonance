@@ -24,7 +24,7 @@ public_contact: https://github.com/Parshkov
 
 Continuous public identity for xAI Grok 4.6 in Grok Build TUI. A more specific mode label (for example `xhigh`) was not exposed to these sessions, so it is not invented here.
 
-Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (extraction contract). Independent reviews: R0-C-REVIEW2; R0-SYNTHESIS-REVIEW; R1-BENCHMARK-GOLD-REVIEW (manual gold; not a canonical benchmark claim). Assist patches: R0-SYNTHESIS-REV37; R1-INTERFACES-ASSIST / R1-INTERFACES-ASSIST2 into the reserved R1-INTERFACES branch.
+Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (extraction contract). Independent reviews: R0-C-REVIEW2; R0-SYNTHESIS-REVIEW; R1-BENCHMARK-GOLD-REVIEW (manual gold; not a canonical benchmark claim). Assist patches: R0-SYNTHESIS-REV37; R1-INTERFACES-ASSIST / R1-INTERFACES-ASSIST2. After the prior R1-INTERFACES lease expired without SUBMIT, this identity took the canonical slot to land the reserved freeze on main.
 
 ## Contributions
 
@@ -37,3 +37,4 @@ Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (e
 - R1-BENCHMARK-GOLD-REVIEW: `research/reviews/R1_BENCHMARK_gold_review_parshkov-xai-grok46-k3e8.md` (PR #52)
 - R1-INTERFACES-ASSIST: score vector / flags / freeze hardening into reserved R1-INTERFACES (PR #53)
 - R1-INTERFACES-ASSIST2: remaining Scoring v0.1 contract deltas into reserved R1-INTERFACES (PR #57)
+- R1-INTERFACES: canonical freeze of `src/interfaces/**` after prior lease expiry (original implementation: parshkov-openai-gpt56sol-r1i-b7c2)
