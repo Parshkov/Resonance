@@ -162,3 +162,57 @@ class GateCandidateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class KnowledgeRuleTests(unittest.TestCase):
+    """Scoring v0.1 knowledge branch fires when both sides carry `about` ids."""
+
+    @staticmethod
+    def _graph(tid, about_id):
+        import hashlib
+        text = f"knowledge fixture {tid}"
+        return ThoughtGraph.from_dict({
+            "schema_version": "thought-dna/0.1", "thought_id": tid,
+            "provenance": {"kind": "manual", "human_id": "test", "extractor": None},
+            "source": {"text": text,
+                       "sha256": hashlib.sha256(text.encode()).hexdigest()},
+            "nodes": [
+                {"id": "n0", "label": "alpha driver", "role": "state", "spans": [],
+                 "extract_conf": 1.0, "atomic": True,
+                 "knowledge": {"about": [{"id": about_id, "conf": 1.0}], "requires": []}},
+                {"id": "n1", "label": "beta pressure", "role": "mechanism", "spans": [],
+                 "extract_conf": 1.0, "atomic": True},
+                {"id": "n2", "label": "gamma load", "role": "state", "spans": [],
+                 "extract_conf": 1.0, "atomic": True},
+                {"id": "n3", "label": "delta strain", "role": "mechanism", "spans": [],
+                 "extract_conf": 1.0, "atomic": True},
+                {"id": "n4", "label": "epsilon drift", "role": "state", "spans": [],
+                 "extract_conf": 1.0, "atomic": True},
+                {"id": "n5", "label": "zeta collapse", "role": "outcome", "spans": [],
+                 "extract_conf": 1.0, "atomic": True},
+            ],
+            "relations": [
+                {"id": "r0", "source": "n0", "target": "n1", "type": "causes",
+                 "extract_conf": 1.0, "spans": []},
+                {"id": "r1", "source": "n1", "target": "n2", "type": "increases"
+                 if False else "supports", "extract_conf": 1.0, "spans": []},
+                {"id": "r2", "source": "n2", "target": "n3", "type": "causes",
+                 "extract_conf": 1.0, "spans": []},
+                {"id": "r3", "source": "n3", "target": "n4", "type": "prevents",
+                 "extract_conf": 1.0, "spans": []},
+                {"id": "r4", "source": "n4", "target": "n5", "type": "causes",
+                 "extract_conf": 1.0, "spans": []},
+            ]})
+
+    def test_shared_about_ids_yield_direct_or_approximate(self):
+        a = self._graph("ka", "wd:Q1")
+        b = self._graph("kb", "wd:Q1")
+        r = MultiRelFGWVerifier().verify(a, b)
+        self.assertTrue(r.components.knowledge_evidence_present)
+        self.assertIn(r.classification, ("direct", "approximate"))
+
+    def test_disjoint_about_ids_yield_analogical(self):
+        a = self._graph("ka", "wd:Q1")
+        b = self._graph("kb", "wd:Q2")
+        r = MultiRelFGWVerifier().verify(a, b)
+        self.assertEqual(r.classification, "analogical")

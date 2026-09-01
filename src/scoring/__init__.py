@@ -247,6 +247,7 @@ def adjudicate(
     a_about, b_about = va.about_ids(), vb.about_ids()
     a_req, b_req = va.requires_ids(), vb.requires_ids()
     know_present = bool((a_about | a_req)) and bool((b_about | b_req))
+    about_evidence = bool(a_about) and bool(b_about)
     k_about = len(a_about & b_about) / len(a_about | b_about) if (a_about | b_about) else 0.0
     k_req = len(a_req & b_req) / len(a_req | b_req) if (a_req | b_req) else 0.0
     k_qc = len(a_req & b_about) / len(a_req) if a_req else 0.0
@@ -263,6 +264,7 @@ def adjudicate(
         "knowledge_evidence_present": know_present, "rarity_weighting": False,
         "complement_query_to_candidate": k_qc, "complement_candidate_to_query": k_cq,
         "_support_quality": support_quality,
+        "_about_evidence": about_evidence,
     }
     return Adjudication(
         mapping=tuple(mapping_pairs), preserved=tuple(preserved),
@@ -296,6 +298,26 @@ T_DIRECT_COVERAGE = 0.80
 T_ANALOGICAL_STRUCTURE = 0.85
 
 
+# Versioned adjudicator policy, carried in the verifier config hash.
+# Primary branch is Scoring v0.1's knowledge rule verbatim. The contract's
+# knowledge-absent outcome is "direct_or_analogical_unknown, not forced"; the
+# benchmark wire enum forces a choice, so the fallback resolves the unknown
+# with the only DNA-native domain proxy available (label semantics), guarded
+# by the calibrated analogical-structure floor. Measured basis: v0.1 carries
+# 16 `about` refs across 136 graphs (bridge families only) and K_about = 0.0
+# on all 128 pairs including paraphrase, so the knowledge branch cannot fire
+# outside bridge packs on these fixtures.
+CLASSIFY_POLICY = "scoring-v0.1-knowledge-first+semantic-fallback/0.1"
+
+
+def _direct_or_approximate(components: dict) -> str:
+    if (components["r_direct"] >= 0.999 and components["contradiction"] == 0.0
+            and components["coverage_symmetric"] >= 0.999
+            and not components["h_sign_conflict"]):
+        return "direct"
+    return "approximate"
+
+
 def classify(components: dict) -> str:
     if components["complement_query_to_candidate"] >= T_COMP or \
        components["complement_candidate_to_query"] >= T_COMP:
@@ -303,11 +325,13 @@ def classify(components: dict) -> str:
     if components["h_sign_conflict"]:
         return "negative"
     if components["structural"] >= T_STRUCTURE and components["contradiction"] <= T_CONTRADICTION:
+        if components.get("_about_evidence"):
+            # Scoring v0.1 knowledge rule, verbatim.
+            if components["knowledge_about"] < T_ABOUT:
+                return "analogical"
+            return _direct_or_approximate(components)
+        # knowledge-absent fallback (versioned policy above)
         if components["semantic"] < T_SEMANTIC_ANALOGICAL:
             return "analogical" if components["structural"] >= T_ANALOGICAL_STRUCTURE else "negative"
-        if (components["r_direct"] >= 0.999 and components["contradiction"] == 0.0
-                and components["coverage_symmetric"] >= 0.999
-                and not components["h_sign_conflict"]):
-            return "direct"
-        return "approximate"
+        return _direct_or_approximate(components)
     return "negative"

@@ -19,8 +19,26 @@ Deliberate implementation decisions, all recorded in the verifier config hash:
 - **Effective relation evidence diminishes for repeated patterns** (first
   occurrence 1.0, repeats 0.25) — a monotype generic chain cannot buy the
   evidence of diverse preserved structure.
-- **`T_ANALOGICAL_STRUCTURE = 0.85`** — an analogy claim has no semantic
-  support by definition and therefore demands stronger structural evidence;
-  calibrated on the v0.1 calibration split (cross-domain ≈ 0.888 vs generic
-  distractors ≈ 0.775). This is the DNA-native defence against generic motifs
-  while `rarity_weighting=false` (no corpus snapshot exists yet).
+- **Classification is knowledge-first with a versioned fallback**
+  (`CLASSIFY_POLICY = scoring-v0.1-knowledge-first+semantic-fallback/0.1`,
+  carried in the config hash). The Scoring v0.1 knowledge branch fires
+  verbatim whenever both graphs carry `about` ids. The contract's
+  knowledge-absent outcome is `direct_or_analogical_unknown`, which the
+  benchmark wire enum cannot express, so the fallback resolves the unknown by
+  the label-semantics proxy guarded by `T_ANALOGICAL_STRUCTURE = 0.85`
+  (calibrated on the calibration split; cross-domain ≈ 0.888 vs generic
+  distractors ≈ 0.775 — the DNA-native generic-motif defence while
+  `rarity_weighting=false`).
+- **Measured basis for the fallback** (v0.1 fixtures): 16 `about` refs across
+  136 graphs (bridge families only), `K_about = 0.0` on all 128 pairs
+  including paraphrase, `K_requires = 1.0` across paraphrase, vocabulary
+  substitution, cross-domain analogy AND generic distractors alike (pack-
+  scoped ids). Consequence, stated rather than hidden: on these fixtures
+  `vocabulary_substitution` (gold approximate) and `cross_domain_analogy`
+  (gold analogical) are indistinguishable in every knowledge channel and
+  differ in label overlap by 0.04 vs 0.00 — the class boundary between them
+  is not decidable from pair content, so the fallback keeps emitting
+  `analogical` for both and `vocabulary_substitution` reports
+  `classification_accuracy = 0` (no gate reads that metric). Real concept
+  IDs from R0-E/R2 extraction will activate the knowledge branch and retire
+  the fallback for annotated corpora.

@@ -47,6 +47,7 @@ DEFAULT_CONFIG = {
     "restarts": "unseeded+seeded",
     "hard_conflict_confidence": scoring.HARD_CONF,
     "score_model": scoring.SCORE_MODEL_VERSION,
+    "classify_policy": scoring.CLASSIFY_POLICY,
 }
 
 
