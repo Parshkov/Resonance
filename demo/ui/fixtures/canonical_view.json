@@ -1,0 +1,21 @@
+{
+  "featured": [
+    "ses-gabe-warehouse",
+    "ses-kwame-traffic",
+    "ses-mei-battery-heat",
+    "ses-noah-org-overload"
+  ],
+  "scores": [
+    0.8875000000000001,
+    0.8875000000000001,
+    0.8875000000000001,
+    0.8875000000000001
+  ],
+  "counts": {
+    "featured": 4,
+    "other_matches": 6,
+    "contradictions": 3,
+    "backend_matches": 10,
+    "backend_rejected": 3
+  }
+}

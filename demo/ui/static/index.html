@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resonance — live thought map</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="stage" id="stage">
+    <header class="top">
+      <div class="brand">
+        <span class="mark">◎</span>
+        <div>
+          <h1>Resonance</h1>
+          <p>Shazam for human thought</p>
+        </div>
+      </div>
+      <div class="meta">
+        <span class="mode" id="mode-indicator">REPLAY</span>
+        <span class="pin" id="pin-label">analogical · k=15</span>
+      </div>
+    </header>
+    <main class="grid">
+      <section class="panel chat" id="chat-panel">
+        <div class="consent" id="consent">Shared with Resonance</div>
+        <h2 id="query-name">Aria K.</h2>
+        <p class="topic" id="query-topic">plasma lens thermal bloom</p>
+        <p class="place" id="query-place">Portland · Pacific Northwest</p>
+        <div class="thread" id="thread"></div>
+        <div class="dna" id="dna"></div>
+      </section>
+      <section class="panel map-wrap">
+        <div class="map-caption">Coarse synthetic locations · presentation only</div>
+        <svg id="map" viewBox="0 0 1000 560" role="img" aria-label="offline resonance map"></svg>
+        <div class="agg" id="agg"></div>
+      </section>
+      <section class="panel cards" id="cards-panel">
+        <h2>Resonant thoughts</h2>
+        <p class="hint">First four analogical matches in backend order. Scores copied from Resonance.</p>
+        <div id="cards"></div>
+        <div class="secondary">
+          <h3>Also returned</h3>
+          <ul id="other"></ul>
+          <h3>Surfaced as contradiction</h3>
+          <ul id="rejected"></ul>
+        </div>
+        <button class="intro" disabled title="request_intro is not an R8 v0.1 MCP tool">Request intro · not wired</button>
+      </section>
+    </main>
+    <aside class="detail hidden" id="detail"></aside>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

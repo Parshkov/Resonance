@@ -57,3 +57,7 @@ R5-recorded 0.727 failure; this demo does not rerank or compensate.
 `demo/corpus/` is the consented multi-session demo corpus. It wraps accepted
 Thought DNA with consent/presentation metadata and does not implement
 retrieval, alignment, or scoring. See `demo/corpus/README.md`.
+
+## R9 visual demo
+
+`demo/ui/` is the competition visual client over accepted discovery. See `demo/ui/README.md`.
