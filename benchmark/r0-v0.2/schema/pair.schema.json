@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.2/schema/pair.schema.json",
+  "title": "Benchmark v0.2 contraction-audit pair gold",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id", "pack_id", "split", "family", "query_graph", "candidate_graph",
+    "gold_class", "evaluation_mode", "relevant", "gold_node_pairs", "gold_edge_pairs",
+    "meaningful_nodes", "must_preserve_nodes", "forbidden_edge_path_matches",
+    "transform_manifest", "rationale", "review"
+  ],
+  "properties": {
+    "case_id": {"type": "string", "pattern": "^V02-[0-9]{2}$"},
+    "pack_id": {"const": "V02"},
+    "split": {"enum": ["calibration", "gate"]},
+    "family": {"type": "string"},
+    "query_graph": {"type": "string"},
+    "candidate_graph": {"type": "string"},
+    "gold_class": {"enum": ["approximate", "negative"]},
+    "evaluation_mode": {"const": "structural"},
+    "relevant": {"type": "boolean"},
+    "gold_node_pairs": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}}},
+    "gold_edge_pairs": {"type": "array"},
+    "meaningful_nodes": {"type": "array", "items": {"type": "string"}},
+    "must_preserve_nodes": {"type": "array", "items": {"type": "string"}},
+    "forbidden_edge_path_matches": {"type": "array"},
+    "transform_manifest": {"type": "object"},
+    "rationale": {"type": "string", "minLength": 1},
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "status", "reviewer"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "status": {"enum": ["generated", "pending", "approved", "rejected"]},
+        "reviewer": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

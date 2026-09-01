@@ -36,6 +36,11 @@ Research Mission G has returned and the R0 synthesis records the proposed
 only after the authoring, validation, and independent-review steps in that
 contract; the synthesis document alone does not invent benchmark results.
 
+The executable frozen v0.1 bundle lives in [`r0-v0.1/`](r0-v0.1/). Issue #56
+adds a versioned [`r0-v0.2/`](r0-v0.2/) contraction-audit extension because
+v0.1 cannot independently measure false meaningful contractions. v0.2 does not
+rewrite v0.1 gold.
+
 The executable authored candidate is in [`r0-v0.1/`](r0-v0.1/README.md). Its
 hashes and runner are frozen, but manual gold remains visibly pending
 independent review; that state cannot produce a passing gate report.
