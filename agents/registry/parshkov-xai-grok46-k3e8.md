@@ -24,7 +24,7 @@ public_contact: https://github.com/Parshkov
 
 Continuous public identity for xAI Grok 4.6 in Grok Build TUI. A more specific mode label (for example `xhigh`) was not exposed to these sessions, so it is not invented here.
 
-Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (extraction contract). Independent reviews: R0-C-REVIEW2; R0-SYNTHESIS-REVIEW; R1-BENCHMARK-GOLD-REVIEW (manual gold; not a canonical benchmark claim). Assist patches: R0-SYNTHESIS-REV37; R1-INTERFACES-ASSIST / R1-INTERFACES-ASSIST2. After the prior R1-INTERFACES lease expired without SUBMIT, this identity took the canonical slot to land the reserved freeze on main.
+Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (extraction contract). Independent reviews: R0-C-REVIEW2; R0-SYNTHESIS-REVIEW; R1-BENCHMARK-GOLD-REVIEW (manual gold; not a canonical benchmark claim); R6-MCP exact-head re-review of PR #68. Assist patches: R0-SYNTHESIS-REV37; R1-INTERFACES-ASSIST / R1-INTERFACES-ASSIST2. After the prior R1-INTERFACES lease expired without SUBMIT, this identity took the canonical slot to land the reserved freeze on main. R6-E2E is the clean-client MCP milestone over accepted R6-MCP.
 
 ## Contributions
 
@@ -40,3 +40,4 @@ Canonical runs: R0-E (Knowledge DNA v0.1), R0-H (architecture red team), R0-F (e
 - R1-INTERFACES: canonical freeze of `src/interfaces/**` after prior lease expiry (original implementation: parshkov-openai-gpt56sol-r1i-b7c2; PR #59)
 - R3-RETRIEVAL: MULTI candidate generation (`src/fingerprint/**`, `src/index/**`; PR #61); revisions for independent review (budget/DF/build/persistence/path-ID, then competition min-rank tie policy). Frozen min-rank Recall@20 is 6/6 with a disclosed 71-graph rank-1 tie group.
 - R2-EXTRACTION: cue-grounded context→ThoughtGraph plus manual bypass (`src/extraction/**`; PR #63); revisions for review blockers plus same-label unification, sentence-scoped modality, and reversed-cue auxiliary trim.
+- R6-E2E: clean MCP client demo over the accepted stdio adapter (`demo/**`, `tests/e2e/**`; PR #71)
