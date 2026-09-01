@@ -247,11 +247,16 @@ class ResonanceEngine:
             raise EngineIntegrityError(f"invalid persisted extractor config: {exc}")
         verifier_cfg = components.get("verifier") or {}
         persisted_v = dict(verifier_cfg.get("config") or {})
-        if persisted_v.get("score_model") != _scoring.SCORE_MODEL_VERSION:
-            raise EngineIntegrityError(
-                "persisted verifier score_model does not match the runtime "
-                f"scoring contract {_scoring.SCORE_MODEL_VERSION!r}; the "
-                "adjudicator would silently use runtime formulas")
+        runtime_identity = {
+            "score_model": _scoring.SCORE_MODEL_VERSION,
+            "classify_policy": _scoring.CLASSIFY_POLICY,
+        }
+        for key, expected in runtime_identity.items():
+            if persisted_v.get(key) != expected:
+                raise EngineIntegrityError(
+                    f"persisted verifier {key} does not match the runtime "
+                    f"value {expected!r}; the adjudicator would silently use "
+                    "runtime behavior")
         verifier = MultiRelFGWVerifier(persisted_v)
         if verifier.config_hash != verifier_cfg.get("config_hash"):
             raise EngineIntegrityError(

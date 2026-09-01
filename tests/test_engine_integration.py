@@ -241,6 +241,18 @@ class PersistenceCompositionTests(unittest.TestCase):
                                          separators=(",", ":")) + "\n")
             with self.assertRaises(EngineIntegrityError):
                 ResonanceEngine.load(Path(tmp))
+        with tempfile.TemporaryDirectory() as tmp:
+            engine.dump(Path(tmp))
+            mpath = Path(tmp) / "manifest.json"
+            manifest = _json.loads(mpath.read_text())
+            from src.alignment.verifier import _config_hash
+            cfg = manifest["components"]["verifier"]["config"]
+            cfg["classify_policy"] = "forged-policy/9.9"
+            manifest["components"]["verifier"]["config_hash"] = _config_hash(cfg)
+            mpath.write_text(_json.dumps(manifest, sort_keys=True,
+                                         separators=(",", ":")) + "\n")
+            with self.assertRaises(EngineIntegrityError):
+                ResonanceEngine.load(Path(tmp))
 
     def test_mismatched_direct_construction_fails_at_use(self):
         """In-memory drift that never touched dump/load is caught at find()
