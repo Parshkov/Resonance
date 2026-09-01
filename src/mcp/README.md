@@ -9,7 +9,11 @@ contract §7; enforced by a source-scan test).
 ```bash
 python3 -m src.mcp.server                    # fresh engine
 python3 -m src.mcp.server --snapshot DIR     # from a manifest-verified snapshot
+python3 demo/run.py                          # clean-client E2E demo (no engine imports)
 ```
+
+The clean-client demo, five required scenarios, and expected identity hashes
+live in `demo/`. See `demo/README.md`.
 
 ## Tools
 

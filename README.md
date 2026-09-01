@@ -693,7 +693,18 @@ explain_resonance(a, b)
 get_thought(id)
 ```
 
-The exact API will follow the core architecture rather than define it prematurely.
+The accepted v0.1 stdio adapter implements those six operations plus explicit
+snapshot tools. A clean external client can exercise the five milestone
+scenarios without importing the engine:
+
+```bash
+python3 -m src.mcp.server
+python3 demo/run.py
+```
+
+See `demo/README.md`. This is the first working Resonance MCP milestone, not a
+corpus-scale or production claim. The exact API follows the accepted engine
+facade rather than defining the engine.
 
 ---
 

@@ -1,0 +1,121 @@
+{
+  "corpus": "benchmark/r0-v0.1/graphs.jsonl",
+  "benchmark_version": "r0-v0.1",
+  "graphs_sha256": "b749f10e4178a5b21a9bab03f01defbbb35f2688faa8103b952135c63ee1c9cd",
+  "identity": {
+    "adapter_version": "resonance-mcp/0.1",
+    "engine_version": "resonance-engine/0.1",
+    "interface_version": "resonance-interfaces/0.1",
+    "verifier_config_hash": "3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f893dbb1b1d"
+  },
+  "required_tools": [
+    "ingest_thought",
+    "index_thought",
+    "find_resonance",
+    "compare_thoughts",
+    "explain_resonance",
+    "get_thought"
+  ],
+  "scenarios": [
+    {
+      "id": "S1-same-words-wrong-structure",
+      "title": "same words / different structure",
+      "query_graph": "C01-Q",
+      "candidate_graph": "C01-C10",
+      "mode": "structural",
+      "expect": {
+        "classification": "negative",
+        "components": {
+          "S_semantic": {"gt": 0.9},
+          "structural_score": {"lt": 0.85}
+        }
+      }
+    },
+    {
+      "id": "S2-cross-domain-analogy",
+      "title": "different words / analogous structure",
+      "query_graph": "C01-Q",
+      "candidate_graph": "C01-C09",
+      "mode": "analogical",
+      "also_find": true,
+      "expect": {
+        "classification": "analogical",
+        "components": {
+          "S_semantic": {"lt": 0.3},
+          "structural_score": {"gte": 0.85}
+        }
+      }
+    },
+    {
+      "id": "S3a-partial-graph",
+      "title": "partial reasoning",
+      "query_graph": "C01-Q",
+      "candidate_graph": "C01-C04",
+      "mode": "structural",
+      "expect": {
+        "classification": "approximate",
+        "containment_gt_symmetric": true
+      }
+    },
+    {
+      "id": "S3b-transparent-granularity",
+      "title": "transparent-granularity reasoning",
+      "query_graph": "C01-Q",
+      "candidate_graph": "C01-C05",
+      "mode": "structural",
+      "expect": {
+        "classification": "approximate",
+        "components": {
+          "R_path": {"gt": 0.0}
+        }
+      }
+    },
+    {
+      "id": "S4-complementary-bridge",
+      "title": "complementary branch",
+      "query_graph": "C01-Q",
+      "candidate_graph": "C01-C16",
+      "mode": "complementary",
+      "expect": {
+        "classification": "complementary",
+        "complement_positive": true
+      }
+    },
+    {
+      "id": "S5-polarity-inversion",
+      "title": "polarity / causal inversion",
+      "query_graph": "G01-Q",
+      "candidate_graph": "G01-C10",
+      "mode": "structural",
+      "expect": {
+        "classification": "negative",
+        "hard_rejection_present": true,
+        "components": {
+          "H_sign_conflict": {"eq": true},
+          "structural_score": {"eq": 0.0}
+        }
+      }
+    },
+    {
+      "id": "U1-unsupported-mode",
+      "title": "unsupported mode is explicit",
+      "kind": "unsupported_mode",
+      "query_graph": "C01-Q",
+      "candidate_graph": "C01-C01",
+      "mode": "semantic",
+      "expect_error": {
+        "stage": "engine",
+        "message_contains": "unsupported resonance mode"
+      }
+    },
+    {
+      "id": "T1-unknown-method",
+      "title": "transport unknown method",
+      "kind": "transport_unknown_method",
+      "expect_error": {
+        "stage": "transport",
+        "code": -32601
+      }
+    }
+  ]
+}

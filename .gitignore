@@ -3,3 +3,5 @@ __pycache__/
 *$py.class
 .DS_Store
 .pytest_cache/
+demo/report.json
+demo/transcript.jsonl
