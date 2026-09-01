@@ -18,7 +18,7 @@ from src.engine import ENGINE_VERSION, ResonanceEngine
 from src.graph import ThoughtGraph
 from src.interfaces import INTERFACE_VERSION, ResonanceHit, require_mode
 
-from .metadata import METADATA_SCHEMA_VERSION, ConsentRegistry
+from .metadata import METADATA_SCHEMA_VERSION, ConsentRegistry, SessionProfile
 
 DISCOVERY_CONTRACT_VERSION = "resonance-discovery/0.1"
 ACTIONS = ("compare", "explain", "request_intro")
@@ -53,8 +53,10 @@ class DiscoveryService:
         matches, rejected = [], []
         for hit in hits:                       # engine order; filter-only pass
             profile = self.registry.get(hit.candidate.candidate_id)
-            if profile is None or profile.share_state != "discoverable":
+            if profile is None:
                 continue                       # hidden/unknown: absent entirely
+            if hit.candidate.candidate_id == graph.thought_id:
+                continue                       # never match the query itself
             entry = self._match(graph, hit, profile)
             # Segregation is driven by the ENGINE's own hard boundary, never
             # by a score threshold: a hard-rejected correspondence must be
@@ -92,10 +94,11 @@ class DiscoveryService:
                       "candidate_relation": m.candidate_relation}
                      for m in v.matched_relations[:MAX_EVIDENCE_ITEMS]]
         display: dict[str, Any] = {"share_state": profile.share_state,
-                                   "cluster_id": _sha(["cluster",
-                                                       profile.person_pseudonym])[:12]}
-        if profile.location_shareable and profile.location_bucket:
-            display["location_bucket"] = profile.location_bucket
+                                   "cluster_id": profile.cluster_id,
+                                   "topic": profile.topic,
+                                   "domain": profile.domain}
+        if profile.location is not None:
+            display["location"] = dict(profile.location)
         return {
             "match_id": match_id,
             "person_pseudonym": profile.person_pseudonym,
@@ -125,7 +128,8 @@ class DiscoveryService:
         never reach this function, so no count can reveal them."""
         buckets: dict[str, int] = {}
         for match in matches:
-            bucket = match["display"].get("location_bucket")
+            location = match["display"].get("location")
+            bucket = location.get("region") if location else None
             if bucket:
                 buckets[bucket] = buckets.get(bucket, 0) + 1
         total = sum(buckets.values())

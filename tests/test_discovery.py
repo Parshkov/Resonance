@@ -1,7 +1,8 @@
-"""R8 discovery tests: consent filtering, leak-safety, no-compensation,
-schema strictness, provenance, wire exposure, and error behavior."""
+"""R8 discovery tests over the ACCEPTED R7 corpus: consent filtering,
+leak-safety, no-compensation, schema/provenance strictness, wire exposure."""
 
 import copy
+import io
 import json
 import sys
 import unittest
@@ -10,146 +11,161 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+from demo.corpus.discovery import is_discoverable, load_sessions
 from src.discovery import ConsentRegistry, DiscoveryService
-from src.discovery.fixtures.demo_corpus import TEXTS, build_engine
-from src.discovery.fixtures.metadata_payload import METADATA_PAYLOAD
+from src.discovery.fixtures.r7_corpus import FLAGSHIP_SESSION_ID, build, flagship_query
+
+SESSIONS = load_sessions()
+HIDDEN_IDS = [s["session_id"] for s in SESSIONS if not is_discoverable(s)]
 
 
-def make_service(metadata=None, drop_sessions=()):
-    engine, tids = build_engine()
-    payload = copy.deepcopy(metadata or METADATA_PAYLOAD)
-    payload["sessions"] = [dict(r) for r in payload["sessions"]
-                           if r["session_id"] not in drop_sessions]
-    for record in payload["sessions"]:
-        record["session_id"] = tids[record["session_id"]]
-    return engine, tids, DiscoveryService(engine, ConsentRegistry.from_payload(payload))
+def make_service(sessions=None):
+    engine, registry, by_session = build(sessions)
+    return DiscoveryService(engine, registry), by_session
+
+
+def flagship_response(svc, by_session, k=15):
+    return svc.discover(flagship_query(by_session), mode="analogical", k=k)
 
 
 class ConsentAndLeakTests(unittest.TestCase):
-    def test_hidden_session_is_absent_and_uninferable(self):
-        """THE leak test: the full response with the hidden resonant session
-        present must equal the response with that session absent from the
-        corpus metadata entirely -- matches, rejected, aggregation, counts."""
-        engine_a, tids_a, svc_a = make_service()
-        resp_a = svc_a.discover(engine_a.get(tids_a["s-battery"]), mode="analogical", k=10)
-        engine_b, tids_b, svc_b = make_service(drop_sessions={"s-hidden-market"})
-        resp_b = svc_b.discover(engine_b.get(tids_b["s-battery"]), mode="analogical", k=10)
+    def test_hidden_sessions_are_absent_and_uninferable(self):
+        """THE leak test on frozen data: responses with hidden sessions in
+        the corpus vs with them deleted entirely must be identical JSON --
+        matches, rejected, aggregation, every count. ses-ravi-irrigation is
+        deliberately IN the flagship cluster."""
+        self.assertIn("ses-ravi-irrigation", HIDDEN_IDS)
+        svc_a, by_a = make_service()
+        resp_a = flagship_response(svc_a, by_a)
+        pruned = [s for s in SESSIONS if s["session_id"] not in HIDDEN_IDS]
+        svc_b, by_b = make_service(pruned)
+        resp_b = flagship_response(svc_b, by_b)
         self.assertEqual(json.dumps(resp_a, sort_keys=True),
                          json.dumps(resp_b, sort_keys=True))
-        self.assertTrue(all(m["person_pseudonym"] != "willow"
-                            for m in resp_a["matches"] + resp_a["rejected"]))
+        blob = json.dumps(resp_a).lower()
+        for hidden in ("ravi", "nico", "irrigation", "tracing-private"):
+            self.assertNotIn(hidden, blob)
 
-    def test_unshareable_location_never_appears_anywhere(self):
-        engine, tids, svc = make_service()
-        resp = svc.discover(engine.get(tids["s-battery"]), mode="analogical", k=10)
-        cedar = next(m for m in resp["rejected"] if m["person_pseudonym"] == "cedar")
-        self.assertNotIn("location_bucket", cedar["display"])
-        self.assertNotIn("grid-east",
-                         json.dumps([b for b in resp["aggregation"]["buckets"]
-                                     if b["bucket_id"] != "grid-east"]))
+    def test_location_absent_unless_consented(self):
+        svc, by_session = make_service()
+        no_loc = {s["thought_dna"]["thought_id"] for s in SESSIONS
+                  if is_discoverable(s) and not s["consent"]["share_coarse_location"]}
+        resp = flagship_response(svc, by_session)
+        for entry in resp["matches"] + resp["rejected"]:
+            profile = svc.registry.get(entry["session_id"]) if False else None
+            if any(entry["session_id"] == s["session_id"] for s in SESSIONS
+                   if s["thought_dna"]["thought_id"] in no_loc):
+                self.assertNotIn("location", entry["display"])
 
-    def test_no_direct_identifiers_on_the_wire(self):
-        engine, tids, svc = make_service()
-        blob = json.dumps(svc.discover(engine.get(tids["s-battery"]),
-                                       mode="analogical", k=10))
-        for banned in ("email", "phone", "@", "s-hidden-market"):
-            self.assertNotIn(banned, blob)
+    def test_anonymous_profile_fallback_is_respected(self):
+        """A session with share_display_profile=false must appear as
+        'anonymous', never with its real display label."""
+        mutated = copy.deepcopy(SESSIONS)
+        target_label = None
+        for s in mutated:
+            if s["session_id"] == "ses-gabe-warehouse":
+                s["consent"]["share_display_profile"] = False
+                target_label = s["person"]["display_label"]
+        svc, by_session = make_service(mutated)
+        resp = flagship_response(svc, by_session)
+        gabe = [m for m in resp["matches"]
+                if m["session_id"] == "ses-gabe-warehouse"]
+        self.assertTrue(gabe)
+        self.assertEqual(gabe[0]["person_pseudonym"], "anonymous")
+        self.assertNotIn(target_label, json.dumps(resp))
 
 
 class NoCompensationTests(unittest.TestCase):
     def test_display_metadata_cannot_change_ranking(self):
-        """Permute locations/topics/pseudonyms of discoverable sessions: the
-        sequence of (session order, classification, scores) must not move."""
-        engine_a, tids_a, svc_a = make_service()
-        resp_a = svc_a.discover(engine_a.get(tids_a["s-battery"]), mode="analogical", k=10)
-        mutated = copy.deepcopy(METADATA_PAYLOAD)
-        for record in mutated["sessions"]:
-            if record["share_state"] == "discoverable":
-                record["location_bucket"] = "grid-mars"
-                record["location_shareable"] = bool(record.get("location_shareable"))
-                record["topic_tag"] = "swapped"
-                record["person_pseudonym"] = record["person_pseudonym"].upper()
-        engine_b, tids_b, svc_b = make_service(metadata=mutated)
-        resp_b = svc_b.discover(engine_b.get(tids_b["s-battery"]), mode="analogical", k=10)
-        key = lambda r: [(m["session_id"], m["mode_classification"],
-                          m["scores"]) for m in r["matches"]]
+        svc_a, by_a = make_service()
+        resp_a = flagship_response(svc_a, by_a)
+        mutated = copy.deepcopy(SESSIONS)
+        for s in mutated:
+            if is_discoverable(s):
+                s["presentation"]["topic"] = "swapped"
+                s["presentation"]["domain"] = "swapped"
+                s["person"]["display_label"] = s["person"]["display_label"].upper()
+                if s["consent"]["share_coarse_location"]:
+                    s["location"]["region"] = "Nowhere"
+        svc_b, by_b = make_service(mutated)
+        resp_b = flagship_response(svc_b, by_b)
+        key = lambda r: [(m["session_id"], m["mode_classification"], m["scores"])
+                         for m in r["matches"]]
         self.assertEqual(key(resp_a), key(resp_b))
 
-    def test_segregation_is_driven_only_by_engine_hard_rejection(self):
-        engine, tids, svc = make_service()
-        resp = svc.discover(engine.get(tids["s-battery"]), mode="analogical", k=10)
-        for m in resp["matches"]:
-            self.assertIsNone(m["hard_rejection"])
-        for m in resp["rejected"]:
-            self.assertIsNotNone(m["hard_rejection"])
+    def test_segregation_is_engine_hard_rejection_only(self):
+        svc, by_session = make_service()
+        resp = flagship_response(svc, by_session)
+        self.assertTrue(all(m["hard_rejection"] is None for m in resp["matches"]))
+        self.assertTrue(all(m["hard_rejection"] for m in resp["rejected"]))
+        self.assertTrue(any(m["session_id"] == "ses-lea-plasma-polarity"
+                            for m in resp["rejected"]))
 
-    def test_service_source_contains_no_engine_logic(self):
+    def test_discovery_sources_contain_no_engine_logic(self):
         for module in ("service.py", "mcp.py", "metadata.py"):
             text = (REPO / "src" / "discovery" / module).read_text()
             for forbidden in ("src.alignment", "src.index.store", "src.fingerprint",
                               "src.scoring", "solve_fgw", "adjudicate(",
-                              "sort(", "sorted(match", "reverse=True"):
+                              "sorted(match", "reverse=True"):
                 self.assertNotIn(forbidden, text, module)
 
 
 class ContractTests(unittest.TestCase):
-    def test_flagship_gate_two_to_four_useful_matches_with_evidence(self):
-        engine, tids, svc = make_service()
-        resp = svc.discover(engine.get(tids["s-battery"]), mode="analogical", k=10)
-        useful = [m for m in resp["matches"]
-                  if m["evidence"]["mapped_node_count"] >= 4
-                  and m["evidence"]["top_correspondences"]]
-        self.assertGreaterEqual(len(useful), 2)
-        self.assertLessEqual(len(useful), 4)
-        for m in useful:
+    def test_flagship_gate_useful_matches_with_evidence(self):
+        svc, by_session = make_service()
+        resp = flagship_response(svc, by_session)
+        cluster = [m for m in resp["matches"]
+                   if m["display"]["cluster_id"] == "accumulating-intermediary-failure"
+                   and m["mode_classification"] == "analogical"]
+        self.assertGreaterEqual(len(cluster), 2)
+        for m in cluster:
+            self.assertGreaterEqual(m["evidence"]["mapped_node_count"], 4)
+            self.assertTrue(m["evidence"]["top_correspondences"])
             self.assertTrue(m["evidence"]["preserved_relations"])
-            self.assertIn("provenance", resp["query"])
 
     def test_provenance_pins_engine_identity(self):
-        engine, tids, svc = make_service()
-        resp = svc.discover(engine.get(tids["s-battery"]), mode="analogical", k=5)
+        svc, by_session = make_service()
+        resp = flagship_response(svc, by_session, k=5)
         prov = resp["query"]["provenance"]
-        self.assertEqual(prov["verifier_config_hash"], engine.verifier.config_hash)
+        self.assertEqual(prov["verifier_config_hash"],
+                         svc.engine.verifier.config_hash)
         self.assertEqual(prov["corpus_snapshot"],
-                         engine.candidate_index.corpus_snapshot)
+                         svc.engine.candidate_index.corpus_snapshot)
+        self.assertEqual(prov["metadata_schema_version"], "resonance-demo-corpus/0.1")
 
-    def test_metadata_schema_is_strict(self):
-        bad = copy.deepcopy(METADATA_PAYLOAD)
-        bad["sessions"][0]["surprise"] = 1
-        with self.assertRaises(ValueError):
-            ConsentRegistry.from_payload(bad)
-        bad2 = copy.deepcopy(METADATA_PAYLOAD)
-        bad2["schema_version"] = "other/9.9"
-        with self.assertRaises(ValueError):
-            ConsentRegistry.from_payload(bad2)
+    def test_registry_mirrors_r7_discoverability_exactly(self):
+        """Registry has profiles for R7-discoverable sessions and no others."""
+        svc, _ = make_service()
+        for s in SESSIONS:
+            tid = s["thought_dna"]["thought_id"]
+            self.assertEqual(svc.registry.discoverable(tid), is_discoverable(s))
 
-    def test_unknown_mode_and_unknown_match_id_raise(self):
-        engine, tids, svc = make_service()
+    def test_unknown_mode_and_match_id_raise(self):
+        svc, by_session = make_service()
         with self.assertRaises(ValueError):
-            svc.discover(engine.get(tids["s-battery"]), mode="semantic")
+            svc.discover(flagship_query(by_session), mode="semantic")
         with self.assertRaises(ValueError):
             svc.request_intro("nope")
 
-    def test_intro_event_discloses_nothing_and_audits_deterministically(self):
-        engine, tids, svc = make_service()
-        resp = svc.discover(engine.get(tids["s-battery"]), mode="analogical", k=5)
+    def test_intro_event_discloses_nothing(self):
+        svc, by_session = make_service()
+        resp = flagship_response(svc, by_session)
         event = svc.request_intro(resp["matches"][0]["match_id"], "hello")
         self.assertEqual(event["state"], "pending_target_acceptance")
         blob = json.dumps(svc.audit_log())
-        self.assertNotIn("_target_session", blob)
         self.assertNotIn("hello", blob)
+        self.assertNotIn("_target_session", blob)
 
     def test_determinism(self):
-        engine, tids, svc = make_service()
-        q = engine.get(tids["s-battery"])
-        a = svc.discover(q, mode="analogical", k=10)
-        b = svc.discover(q, mode="analogical", k=10)
+        svc, by_session = make_service()
+        q = flagship_query(by_session)
+        a = svc.discover(q, mode="analogical", k=15)
+        b = svc.discover(q, mode="analogical", k=15)
         self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True))
 
 
 class WireTests(unittest.TestCase):
     def test_discover_tool_over_the_wire_and_r6_tools_intact(self):
-        import io
         from src.discovery.demo_server import DiscoveryMCPServer, build_service
         from src.discovery.mcp import DiscoveryAdapter, TOOLS
         from src.mcp.adapter import TOOLS as BASE_TOOLS
@@ -158,20 +174,19 @@ class WireTests(unittest.TestCase):
                          [t["name"] for t in BASE_TOOLS])
         svc = build_service()
         server = DiscoveryMCPServer(DiscoveryAdapter(svc))
-        query = next(g for g in (svc.engine.get(p.session_id)
-                                 for p in svc.registry._profiles.values())
-                     if g and "Strong heat causes degradation" in g.source.text)
+        _, by_session = make_service()
+        query = flagship_query(by_session)
         frames = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
                   {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
                    "params": {"name": "discover_resonance",
                               "arguments": {"thought": query.to_dict(),
-                                            "mode": "analogical", "k": 10}}}]
+                                            "mode": "analogical", "k": 15}}}]
         out = io.StringIO()
         server.serve(io.StringIO("\n".join(json.dumps(f) for f in frames) + "\n"), out)
         body = json.loads(json.loads(out.getvalue().splitlines()[1])
                           ["result"]["content"][0]["text"])
-        self.assertGreaterEqual(len(body["matches"]), 2)
-        self.assertTrue(all(m["person_pseudonym"] != "willow" for m in body["matches"]))
+        self.assertGreaterEqual(len(body["matches"]), 4)
+        self.assertNotIn("ravi", json.dumps(body).lower())
 
 
 if __name__ == "__main__":

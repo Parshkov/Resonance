@@ -32,15 +32,16 @@ surface until R9 wires the action, at which point exposure is one schema.
 python3 -m src.discovery.demo_server        # discovery-enabled MCP over the demo corpus
 ```
 
-**Provisional pieces, named:** the metadata model
-(`resonance-demo-metadata/0.1-provisional`) and the fixture corpus await the
-R7-CORPUS (#72) schema freeze; both are strict-loaded so the freeze can only
-tighten them. Final acceptance of this mission is expected to include
-re-keying fixtures to the frozen R7 schema.
+**Keyed to the ACCEPTED R7 corpus** (`resonance-demo-corpus/0.1`): consent
+truth is single-sourced from `demo.corpus.discovery` (`is_discoverable`,
+`presentation_view`, `index_discoverable`) — this layer adds no consent rules
+of its own. Hidden sessions are never indexed AND get no registry profile
+(two independent layers); the anonymous-profile fallback and location gating
+come from R7's own view function.
 
-**Known honest surface for R9** (`fixtures/example_response.json` is the
-render contract): the flagship query returns the paraphrase as `direct` and
-the two cross-domain analogues with full scores/evidence but
-`mode_classification: negative` — the frozen `T_ANALOGICAL_STRUCTURE=0.85`
-calibration gap recorded at R4/R5 acceptance (analogues sit at 0.809–0.828).
-Discovery reports it verbatim; the calibration round owns the fix.
+**Flagship over the accepted corpus** (`fixtures/example_response.json` is
+the render contract): the plasma-lens query yields four cluster-mate
+analogues at `analogical` 0.888 (the curated corpus clears the frozen
+0.85 threshold), two `complementary` bridges, granularity/partial variants as
+`approximate`, the polarity inversion in `rejected[]` with its relation
+named, and the two hidden sessions absent from every list and count.

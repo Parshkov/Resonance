@@ -3,19 +3,49 @@
   "basis": "discoverable_matches_with_shareable_location_only",
   "buckets": [
    {
-    "bucket_id": "grid-east",
+    "bucket_id": "California",
     "count": 1,
-    "intensity": 0.3333
+    "intensity": 0.1111
    },
    {
-    "bucket_id": "grid-north",
+    "bucket_id": "Central Europe",
     "count": 1,
-    "intensity": 0.3333
+    "intensity": 0.1111
    },
    {
-    "bucket_id": "grid-west",
+    "bucket_id": "East Africa",
     "count": 1,
-    "intensity": 0.3333
+    "intensity": 0.1111
+   },
+   {
+    "bucket_id": "Kansai",
+    "count": 1,
+    "intensity": 0.1111
+   },
+   {
+    "bucket_id": "Kanto",
+    "count": 1,
+    "intensity": 0.1111
+   },
+   {
+    "bucket_id": "North Atlantic",
+    "count": 1,
+    "intensity": 0.1111
+   },
+   {
+    "bucket_id": "Pacific Northwest",
+    "count": 1,
+    "intensity": 0.1111
+   },
+   {
+    "bucket_id": "Texas",
+    "count": 1,
+    "intensity": 0.1111
+   },
+   {
+    "bucket_id": "Île-de-France",
+    "count": 1,
+    "intensity": 0.1111
    }
   ]
  },
@@ -29,83 +59,844 @@
    ],
    "confidence": "provisional",
    "display": {
-    "cluster_id": "50e797d4ed98",
-    "location_bucket": "grid-east",
-    "share_state": "discoverable"
+    "cluster_id": "complementary-bridge",
+    "domain": "thermal-engineering",
+    "location": {
+     "city": "Reykjavik",
+     "kind": "synthetic_coarse",
+     "lat": 64.1,
+     "lon": -21.9,
+     "precision": "city",
+     "region": "North Atlantic"
+    },
+    "share_state": "discoverable",
+    "topic": "closed-loop chiller design"
    },
    "evidence": {
     "contradiction_count": 0,
-    "mapped_node_count": 6,
-    "preserved_relation_count": 5,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
     "preserved_relations": [
      {
-      "candidate_relation": "r_d943944553ec6695bf19",
-      "query_relation": "r_09372208655088c36de1"
+      "candidate_relation": "r0",
+      "query_relation": "r0"
      },
      {
-      "candidate_relation": "r_f008f12f634934fa52a5",
-      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
+      "candidate_relation": "r1",
+      "query_relation": "r1"
      },
      {
-      "candidate_relation": "r_863612621875c9b5e951",
-      "query_relation": "r_4ee20642294e95799466"
+      "candidate_relation": "r2",
+      "query_relation": "r2"
      },
      {
-      "candidate_relation": "r_4783793d146aa40efd89",
-      "query_relation": "r_c0f7bed2bfe061cb6428"
+      "candidate_relation": "r3",
+      "query_relation": "r3"
      },
      {
-      "candidate_relation": "r_e1a9dec8614554fc31e4",
-      "query_relation": "r_d1d952d52a4f430f65fb"
+      "candidate_relation": "r4",
+      "query_relation": "r4"
      }
     ],
     "top_correspondences": [
      {
-      "candidate_label": "restructuring cost",
-      "candidate_node": "n_536c82b59e5ba97f9cbc",
-      "query_label": "replacement cost",
-      "query_node": "n_130a6e4f8c7ea815eeaf"
+      "candidate_label": "thermal-budget gap",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
      },
      {
-      "candidate_label": "collapse",
-      "candidate_node": "n_fa91cb8881ca9c6a8763",
-      "query_label": "failure",
-      "query_node": "n_2328344e11f2eb95a1e8"
+      "candidate_label": "heat-path analysis",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
      },
      {
-      "candidate_label": "Heavy workload",
-      "candidate_node": "n_11e9f05cce57e312dc90",
-      "query_label": "Heavy load",
-      "query_node": "n_2a4a979d06cd1e6f775f"
+      "candidate_label": "hot-spot map",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
      },
      {
-      "candidate_label": "Rapid growth",
-      "candidate_node": "n_6692110822c2cfda02ac",
-      "query_label": "Strong heat",
-      "query_node": "n_60f189c0326d6d6bcf88"
+      "candidate_label": "lab time limit",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
      },
      {
-      "candidate_label": "coordination loss",
-      "candidate_node": "n_e382e5e042331e89284f",
-      "query_label": "degradation",
-      "query_node": "n_75d2650a6fdf9967bb40"
+      "candidate_label": "closed-loop chiller design",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "2ddb9b3980c2ffa4164b3e49",
+   "match_id": "335db028b507f5a9cf88815a",
+   "mode_classification": "complementary",
+   "person_pseudonym": "Diego R.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.025,
+    "structural": 0.8875000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-diego-chiller"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "logistics",
+    "share_state": "discoverable",
+    "topic": "inbound staging pile-up"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "inbound surge",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "staging pile-up",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "dock congestion",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "labor cap",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "wave planning",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "6de5b151d633692fc2a4e58f",
+   "mode_classification": "analogical",
+   "person_pseudonym": "Gabe S.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.03333333333333333,
+    "structural": 0.8875000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-gabe-warehouse"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "urban-mobility",
+    "location": {
+     "city": "Nairobi",
+     "kind": "synthetic_coarse",
+     "lat": -1.3,
+     "lon": 36.8,
+     "precision": "city",
+     "region": "East Africa"
+    },
+    "share_state": "discoverable",
+    "topic": "peak-hour spillback"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "peak inflow",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "spillback wave",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "queue saturation",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "green-time budget",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "adaptive signal timing",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "755944ca8f03ead4f46fa344",
+   "mode_classification": "analogical",
+   "person_pseudonym": "Kwame A.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.08333333333333333,
+    "structural": 0.8875000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-kwame-traffic"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "energy-storage",
+    "location": {
+     "city": "Austin",
+     "kind": "synthetic_coarse",
+     "lat": 30.3,
+     "lon": -97.7,
+     "precision": "city",
+     "region": "Texas"
+    },
+    "share_state": "discoverable",
+    "topic": "cell heat degradation"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "cell heat",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "electrolyte breakdown",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "rising resistance",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "charge-rate cap",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "thermal control",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "65bd9604bd4cefdb0ba6d1fe",
+   "mode_classification": "analogical",
+   "person_pseudonym": "Mei L.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.05,
+    "structural": 0.8875000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-mei-battery-heat"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "organizations",
+    "location": {
+     "city": "Berlin",
+     "kind": "synthetic_coarse",
+     "lat": 52.5,
+     "lon": 13.4,
+     "precision": "city",
+     "region": "Central Europe"
+    },
+    "share_state": "discoverable",
+    "topic": "inbox overload cascade"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "inbox overload",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "meeting cascade",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "coordination lag",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "headcount freeze",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "delegation protocol",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "1ef7d6db8058fbfb3f92ce4f",
+   "mode_classification": "analogical",
+   "person_pseudonym": "Noah R.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.09166666666666666,
+    "structural": 0.8875000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-noah-org-overload"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "complementary-bridge",
+    "domain": "beam-control",
+    "location": {
+     "city": "Tsukuba",
+     "kind": "synthetic_coarse",
+     "lat": 36.1,
+     "lon": 140.1,
+     "precision": "city",
+     "region": "Kanto"
+    },
+    "share_state": "discoverable",
+    "topic": "wavefront stabilization"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "wavefront jitter",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "sensor lag",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "pointing wander",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "actuator stroke limit",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "adaptive-optics loop",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "d4405d3b8e60b1c181f06624",
+   "mode_classification": "complementary",
+   "person_pseudonym": "Yuki T.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.09166666666666666,
+    "structural": 0.8875000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-yuki-stabilization"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "plasma-optics",
+    "location": {
+     "city": "Kyoto",
+     "kind": "synthetic_coarse",
+     "lat": 35.0,
+     "lon": 135.8,
+     "precision": "city",
+     "region": "Kansai"
+    },
+    "share_state": "discoverable",
+    "topic": "partial plasma-lens chain"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 8,
+    "preserved_relation_count": 8,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "plasma lens heat",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "ionization cascade",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "beam wander",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "aperture budget",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "adaptive cooling",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "c07d7166eb0b1b07cf0c8cc5",
+   "mode_classification": "approximate",
+   "person_pseudonym": "Sora N.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 0.8,
+    "semantic": 1.0,
+    "structural": 0.8144444444444445,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-sora-plasma-partial"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "plasma-optics",
+    "location": {
+     "city": "Seattle",
+     "kind": "synthetic_coarse",
+     "lat": 47.6,
+     "lon": -122.3,
+     "precision": "city",
+     "region": "Pacific Northwest"
+    },
+    "share_state": "discoverable",
+    "topic": "transparent thermal mediator"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 9,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "plasma lens heat",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "ionization cascade",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "beam wander",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "aperture budget",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "adaptive cooling",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "b2a380d6f69c9644a45cb80a",
+   "mode_classification": "approximate",
+   "person_pseudonym": "Theo M.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 0.9,
+    "semantic": 1.0,
+    "structural": 0.8626190476190476,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-theo-plasma-granular"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "same-words-wrong-structure",
+    "domain": "plasma-optics",
+    "location": {
+     "city": "San Diego",
+     "kind": "synthetic_coarse",
+     "lat": 32.7,
+     "lon": -117.2,
+     "precision": "city",
+     "region": "California"
+    },
+    "share_state": "discoverable",
+    "topic": "plasma words rewired"
+   },
+   "evidence": {
+    "contradiction_count": 4,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 8,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "plasma lens heat",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "ionization cascade",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "beam wander",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "aperture budget",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "adaptive cooling",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "f3a9a64af223aba6662ef00b",
    "mode_classification": "negative",
-   "person_pseudonym": "birch",
+   "person_pseudonym": "Sam D.",
    "scores": {
-    "contradiction": 0.0,
+    "contradiction": 0.4,
     "coverage_containment": 1.0,
     "h_sign_conflict": false,
-    "r_direct": 1.0,
-    "semantic": 0.1111111111111111,
-    "structural": 0.8283333333333335,
+    "r_direct": 0.8,
+    "semantic": 1.0,
+    "structural": 0.7000000000000002,
     "y_systematicity": 1.0
    },
-   "session_id": "t_aa84d6c4999f7b5b458d"
+   "session_id": "ses-sam-plasma-rewire"
   },
   {
    "actions": [
@@ -115,239 +906,89 @@
    ],
    "confidence": "provisional",
    "display": {
-    "cluster_id": "a6c95912fe11",
-    "location_bucket": "grid-north",
-    "share_state": "discoverable"
+    "cluster_id": "unrelated-distractor",
+    "domain": "photography",
+    "location": {
+     "city": "Paris",
+     "kind": "synthetic_coarse",
+     "lat": 48.9,
+     "lon": 2.3,
+     "precision": "city",
+     "region": "Île-de-France"
+    },
+    "share_state": "discoverable",
+    "topic": "portrait lens choice"
    },
    "evidence": {
-    "contradiction_count": 0,
-    "mapped_node_count": 6,
-    "preserved_relation_count": 5,
-    "preserved_relations": [
-     {
-      "candidate_relation": "r_06bdfaddde3eebc63c27",
-      "query_relation": "r_09372208655088c36de1"
-     },
-     {
-      "candidate_relation": "r_f7e66b6cfadb29e69515",
-      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
-     },
-     {
-      "candidate_relation": "r_6b48857e1892a5b9b723",
-      "query_relation": "r_4ee20642294e95799466"
-     },
-     {
-      "candidate_relation": "r_c1662f13d21997629c6d",
-      "query_relation": "r_c0f7bed2bfe061cb6428"
-     },
-     {
-      "candidate_relation": "r_a898abec31ba75157a3d",
-      "query_relation": "r_d1d952d52a4f430f65fb"
-     }
-    ],
-    "top_correspondences": [
-     {
-      "candidate_label": "replacement cost",
-      "candidate_node": "n_2a9a172482ab44c89631",
-      "query_label": "replacement cost",
-      "query_node": "n_130a6e4f8c7ea815eeaf"
-     },
-     {
-      "candidate_label": "breakdown",
-      "candidate_node": "n_852bbe401dcc9a65b11a",
-      "query_label": "failure",
-      "query_node": "n_2328344e11f2eb95a1e8"
-     },
-     {
-      "candidate_label": "Big load",
-      "candidate_node": "n_b70765648d1ee9a7938f",
-      "query_label": "Heavy load",
-      "query_node": "n_2a4a979d06cd1e6f775f"
-     },
-     {
-      "candidate_label": "Intense heat",
-      "candidate_node": "n_473ec2b36d9a677766f2",
-      "query_label": "Strong heat",
-      "query_node": "n_60f189c0326d6d6bcf88"
-     },
-     {
-      "candidate_label": "wear",
-      "candidate_node": "n_6e44310e4c345f3262af",
-      "query_label": "degradation",
-      "query_node": "n_75d2650a6fdf9967bb40"
-     }
-    ]
-   },
-   "hard_rejection": null,
-   "match_id": "75614f0e7bdb5158b8f3da96",
-   "mode_classification": "direct",
-   "person_pseudonym": "grove",
-   "scores": {
-    "contradiction": 0.0,
-    "coverage_containment": 1.0,
-    "h_sign_conflict": false,
-    "r_direct": 1.0,
-    "semantic": 0.3333333333333333,
-    "structural": 0.8325000000000001,
-    "y_systematicity": 1.0
-   },
-   "session_id": "t_ad2c5f6343988dea2992"
-  },
-  {
-   "actions": [
-    "compare",
-    "explain",
-    "request_intro"
-   ],
-   "confidence": "provisional",
-   "display": {
-    "cluster_id": "5c9638b8ea5e",
-    "share_state": "discoverable"
-   },
-   "evidence": {
-    "contradiction_count": 0,
-    "mapped_node_count": 3,
+    "contradiction_count": 2,
+    "mapped_node_count": 8,
     "preserved_relation_count": 1,
     "preserved_relations": [
      {
-      "candidate_relation": "r_a629dca9b02a61b4d1f3",
-      "query_relation": "r_c0f7bed2bfe061cb6428"
+      "candidate_relation": "r2",
+      "query_relation": "r8"
      }
     ],
     "top_correspondences": [
      {
-      "candidate_label": "mistakes",
-      "candidate_node": "n_fdc23a272a15045d4274",
-      "query_label": "replacement cost",
-      "query_node": "n_130a6e4f8c7ea815eeaf"
+      "candidate_label": "soft portrait light",
+      "candidate_node": "n1",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
      },
      {
-      "candidate_label": "Practice",
-      "candidate_node": "n_6b6a111a3363ff86e24f",
-      "query_label": "Heavy load",
-      "query_node": "n_2a4a979d06cd1e6f775f"
+      "candidate_label": "bokeh preference",
+      "candidate_node": "n2",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
      },
      {
-      "candidate_label": "skill",
-      "candidate_node": "n_3b9189c47e953a07a47d",
-      "query_label": "Strong heat",
-      "query_node": "n_60f189c0326d6d6bcf88"
+      "candidate_label": "shallow focus",
+      "candidate_node": "n3",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "prime lens choice",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     },
+     {
+      "candidate_label": "histogram check",
+      "candidate_node": "n7",
+      "query_label": "interferometry",
+      "query_node": "n6"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "ad3e9802934da486d33b4900",
+   "match_id": "e28bc9cf9c1565e6fb7bb68d",
    "mode_classification": "negative",
-   "person_pseudonym": "ember",
+   "person_pseudonym": "Camille B.",
    "scores": {
-    "contradiction": 0.0,
+    "contradiction": 0.15,
     "coverage_containment": 1.0,
     "h_sign_conflict": false,
-    "r_direct": 0.20087336244541484,
+    "r_direct": 0.1,
     "semantic": 0.0,
-    "structural": 0.0594956768558952,
+    "structural": 0.09892361111111111,
     "y_systematicity": 0.5
    },
-   "session_id": "t_2f0dfd5fd5c5b42857d0"
-  },
-  {
-   "actions": [
-    "compare",
-    "explain",
-    "request_intro"
-   ],
-   "confidence": "provisional",
-   "display": {
-    "cluster_id": "e7f216a05528",
-    "location_bucket": "grid-west",
-    "share_state": "discoverable"
-   },
-   "evidence": {
-    "contradiction_count": 0,
-    "mapped_node_count": 6,
-    "preserved_relation_count": 5,
-    "preserved_relations": [
-     {
-      "candidate_relation": "r_210d6b4023795f683e54",
-      "query_relation": "r_09372208655088c36de1"
-     },
-     {
-      "candidate_relation": "r_d388ba356305b9398ad2",
-      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
-     },
-     {
-      "candidate_relation": "r_4168c26132fa738adee0",
-      "query_relation": "r_4ee20642294e95799466"
-     },
-     {
-      "candidate_relation": "r_28ef3d1809f2dcaddbd8",
-      "query_relation": "r_c0f7bed2bfe061cb6428"
-     },
-     {
-      "candidate_relation": "r_e3775bef0c6ca0b29a2e",
-      "query_relation": "r_d1d952d52a4f430f65fb"
-     }
-    ],
-    "top_correspondences": [
-     {
-      "candidate_label": "cleanup cost",
-      "candidate_node": "n_cb1574bcba0e69de3024",
-      "query_label": "replacement cost",
-      "query_node": "n_130a6e4f8c7ea815eeaf"
-     },
-     {
-      "candidate_label": "oxygen loss",
-      "candidate_node": "n_54ba6f31c4e858c297a4",
-      "query_label": "failure",
-      "query_node": "n_2328344e11f2eb95a1e8"
-     },
-     {
-      "candidate_label": "Farm runoff",
-      "candidate_node": "n_9fc99b0145fdbaa948e6",
-      "query_label": "Heavy load",
-      "query_node": "n_2a4a979d06cd1e6f775f"
-     },
-     {
-      "candidate_label": "Warm water",
-      "candidate_node": "n_248aa239e7a81375c7c2",
-      "query_label": "Strong heat",
-      "query_node": "n_60f189c0326d6d6bcf88"
-     },
-     {
-      "candidate_label": "algae growth",
-      "candidate_node": "n_4bd4204aea273eb9bef3",
-      "query_label": "degradation",
-      "query_node": "n_75d2650a6fdf9967bb40"
-     }
-    ]
-   },
-   "hard_rejection": null,
-   "match_id": "8cf6ce167afe5bbb937e3c96",
-   "mode_classification": "negative",
-   "person_pseudonym": "fjord",
-   "scores": {
-    "contradiction": 0.0,
-    "coverage_containment": 1.0,
-    "h_sign_conflict": false,
-    "r_direct": 0.982532751091703,
-    "semantic": 0.05555555555555555,
-    "structural": 0.8091048034934499,
-    "y_systematicity": 1.0
-   },
-   "session_id": "t_c474230dd3a4bba8342a"
+   "session_id": "ses-camille-portrait"
   }
  ],
  "query": {
   "mode": "analogical",
   "provenance": {
-   "corpus_snapshot": "ec39d1064aa0b2862a30d3aff8cf150f0986cca85e37ebc36159e12ae4dae3c9",
+   "corpus_snapshot": "5868db42ffdc385bd59f30dc2d3761292ff5e0ee7af777527a0b2ac8dbca222f",
    "discovery_contract_version": "resonance-discovery/0.1",
    "engine_version": "resonance-engine/0.1",
    "interface_version": "resonance-interfaces/0.1",
-   "metadata_schema_version": "resonance-demo-metadata/0.1-provisional",
+   "metadata_schema_version": "resonance-demo-corpus/0.1",
    "verifier_config_hash": "3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f893dbb1b1d"
   },
-  "thought_id": "t_88df6a0df52dc2c8d099"
+  "thought_id": "thought-aria-plasma-lens"
  },
  "rejected": [
   {
@@ -358,78 +999,270 @@
    ],
    "confidence": "provisional",
    "display": {
-    "cluster_id": "77d8918832b6",
-    "share_state": "discoverable"
+    "cluster_id": "polarity-inversion",
+    "domain": "plasma-optics",
+    "location": {
+     "city": "Ghent",
+     "kind": "synthetic_coarse",
+     "lat": 51.1,
+     "lon": 3.7,
+     "precision": "city",
+     "region": "Low Countries"
+    },
+    "share_state": "discoverable",
+    "topic": "causal inversion of heat cascade"
    },
    "evidence": {
     "contradiction_count": 1,
-    "mapped_node_count": 6,
-    "preserved_relation_count": 4,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 9,
     "preserved_relations": [
      {
-      "candidate_relation": "r_efb00d1ccf9801fac8c9",
-      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
+      "candidate_relation": "r1",
+      "query_relation": "r1"
      },
      {
-      "candidate_relation": "r_dc6146d4e2036edf711c",
-      "query_relation": "r_4ee20642294e95799466"
+      "candidate_relation": "r2",
+      "query_relation": "r2"
      },
      {
-      "candidate_relation": "r_1265dd09b9ed49d38679",
-      "query_relation": "r_c0f7bed2bfe061cb6428"
+      "candidate_relation": "r3",
+      "query_relation": "r3"
      },
      {
-      "candidate_relation": "r_878a6c0dfc11c0a5d2a9",
-      "query_relation": "r_d1d952d52a4f430f65fb"
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
      }
     ],
     "top_correspondences": [
      {
-      "candidate_label": "replacement cost",
-      "candidate_node": "n_420a88b82d8fd820e06d",
-      "query_label": "replacement cost",
-      "query_node": "n_130a6e4f8c7ea815eeaf"
+      "candidate_label": "plasma lens heat",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
      },
      {
-      "candidate_label": "failure",
-      "candidate_node": "n_19546d134ac86437598c",
-      "query_label": "failure",
-      "query_node": "n_2328344e11f2eb95a1e8"
+      "candidate_label": "ionization cascade",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
      },
      {
-      "candidate_label": "Heavy load",
-      "candidate_node": "n_6cb940af574220be25f9",
-      "query_label": "Heavy load",
-      "query_node": "n_2a4a979d06cd1e6f775f"
+      "candidate_label": "beam wander",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
      },
      {
-      "candidate_label": "strong heat",
-      "candidate_node": "n_d985eb9cc9f5f6ed2a49",
-      "query_label": "Strong heat",
-      "query_node": "n_60f189c0326d6d6bcf88"
+      "candidate_label": "aperture budget",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
      },
      {
-      "candidate_label": "Degradation",
-      "candidate_node": "n_3493956df148988e488b",
-      "query_label": "degradation",
-      "query_node": "n_75d2650a6fdf9967bb40"
+      "candidate_label": "adaptive cooling",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
      }
     ]
    },
-   "hard_rejection": "relation_type:r_09372208655088c36de1->r_20b0976308cd6b645a14",
-   "match_id": "9f3b377bddf0c5f5aa5d3926",
+   "hard_rejection": "relation_type:r0->r0",
+   "match_id": "dd29859c692c9b43bb0b5f13",
    "mode_classification": "negative",
-   "person_pseudonym": "cedar",
+   "person_pseudonym": "Lea V.",
    "scores": {
-    "contradiction": 0.19650655021834063,
+    "contradiction": 0.1,
     "coverage_containment": 1.0,
     "h_sign_conflict": true,
-    "r_direct": 0.7991266375545851,
+    "r_direct": 0.9,
     "semantic": 1.0,
     "structural": 0.0,
     "y_systematicity": 1.0
    },
-   "session_id": "t_e16372c530367321fa89"
+   "session_id": "ses-lea-plasma-polarity"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "method-resource-hub",
+    "domain": "reliability-engineering",
+    "location": {
+     "city": "Bengaluru",
+     "kind": "synthetic_coarse",
+     "lat": 13.0,
+     "lon": 77.6,
+     "precision": "city",
+     "region": "South India"
+    },
+    "share_state": "discoverable",
+    "topic": "blind production incidents"
+   },
+   "evidence": {
+    "contradiction_count": 2,
+    "mapped_node_count": 8,
+    "preserved_relation_count": 4,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r9"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "blind production incidents",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "error budget burn",
+      "candidate_node": "n7",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "cardinality budget",
+      "candidate_node": "n4",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "distributed tracing",
+      "candidate_node": "n1",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     },
+     {
+      "candidate_label": "mttr drop",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     }
+    ]
+   },
+   "hard_rejection": "relation_type:r4->r4",
+   "match_id": "687077cb78e5999b6052f93f",
+   "mode_classification": "negative",
+   "person_pseudonym": "Priya S.",
+   "scores": {
+    "contradiction": 0.2,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": true,
+    "r_direct": 0.4,
+    "semantic": 0.041666666666666664,
+    "structural": 0.0,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-priya-tracing"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "evidence-corroboration",
+    "domain": "climate-science",
+    "location": {
+     "city": "Vancouver",
+     "kind": "synthetic_coarse",
+     "lat": 49.3,
+     "lon": -123.1,
+     "precision": "city",
+     "region": "Pacific Canada"
+    },
+    "share_state": "discoverable",
+    "topic": "event attribution"
+   },
+   "evidence": {
+    "contradiction_count": 2,
+    "mapped_node_count": 8,
+    "preserved_relation_count": 3,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r9"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "disputed storm cause",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "station record",
+      "candidate_node": "n2",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "satellite plume",
+      "candidate_node": "n3",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "compute budget",
+      "candidate_node": "n6",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "attribution ensemble",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": "relation_type:r4->r6",
+   "match_id": "07cee3aec14b083d4d54f40b",
+   "mode_classification": "negative",
+   "person_pseudonym": "Wei C.",
+   "scores": {
+    "contradiction": 0.2,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": true,
+    "r_direct": 0.3,
+    "semantic": 0.041666666666666664,
+    "structural": 0.0,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-wei-climate"
   }
  ],
  "unsupported_fields": [
