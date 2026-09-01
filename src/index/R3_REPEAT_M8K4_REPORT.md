@@ -1,6 +1,6 @@
 # R3-RETRIEVAL-REPEAT-M8K4 report
 
-Status: **submitted result is a structural-gate NO-GO with working implementation evidence**
+Status: **submitted result is an over-budget structural-equivalence-class NO-GO with working implementation evidence**
 
 ## Provenance
 
@@ -26,16 +26,23 @@ Accepted inputs:
 - Benchmark v0.1 evaluation-config SHA-256:
   `96c28068b1798ef17e236e91de484f747ec9f33977edf6a49959a0f922e101f8`
 - retrieval config SHA-256:
-  `5fc73f8c17db710e8afe975144c3aa43907348d2c64c69ffabd81bc4d479306c`
+  `cda12f23d282806395c7f109adb54e489235871e46a0380291c9535ff81538aa`
+- index format: `resonance-candidate-index/0.2`
+- tie policy: `competition-min-rank+explicit-cutoff-group/0.1`
 - feature version:
   `resonance-relational-fingerprint/0.1+e6ec0f5918841164`
 - gate corpus snapshot:
-  `aa3a9d255d80acb8ba00a5fceb08b74eac62f649fa9f4f142ccfe98b0b1e6b0c`
+  `4aca0ea32762053e554856b45f53578c794efd7e73d98f3d18f332e5d8b0c140`
 
 The run read the public review finding on canonical PR #61 before implementation.
 It did not copy or modify that contributor's branch. The repeat was implemented
 from accepted ADR-0002, R1 interfaces, and frozen benchmark inputs in a clean
 worktree.
+
+After initial submission, independent review of canonical PR #61 identified
+F1: lexicographic hard-cap tie-breaking made Recall@K depend on graph names.
+This repeat revision applies that cross-run finding through competition/minimum
+rank, explicit tie diagnostics, and optional cutoff-tie expansion.
 
 ## Implementation handoff
 
@@ -48,6 +55,8 @@ The repeat adds:
 - an inverted structural index with mutually injective correspondence voting;
 - inverted content and Knowledge DNA channels without a corpus-wide query scan;
 - separate channel scores/ranks and deterministic seed correspondences;
+- competition/minimum ranks for equal scores plus explicit tied-best and cutoff
+  groups, with opt-in tie-aware expansion;
 - fail-closed polarity/verification flags;
 - incremental upsert/remove, lazy corpus snapshots, scale statistics, and
   channel-level postings/latency diagnostics; and
@@ -71,16 +80,19 @@ exactly 64 selected features and touched 4,334 postings.
 | Metric | Result | Gate | Outcome |
 |---|---:|---:|---|
 | SOW | 12/12 | >= 10/12 | PASS |
-| cross-domain structural Recall@20 | 2/6 = 0.333 | >= 0.50 | **FAIL** |
-| cross-domain structural Recall@5 | 0/6 | >= 4/6 | **FAIL** |
+| hard-cap specific-ID Recall@20 | 2/6 = 0.333 | >= 0.50 | **FAIL / name-dependent** |
+| hard-cap specific-ID Recall@5 | 0/6 | >= 4/6 | **FAIL / name-dependent** |
+| competition/min-rank Recall@5 | 6/6 | >= 4/6 | PASS |
+| tie-aware Recall@20 | 6/6 | >= 0.50 | PASS, but returns 48 |
 | analogue above generic distractor | 6/6 | 6/6 | PASS |
 | generic structural margin | +0.680614 in every pack | positive | PASS |
 | deterministic replay | identical rank/score/seed hash | required | PASS |
 | polarity flag | `polarity_reliable=false` | required | PASS |
 
-Pack-local C09 target ranks are `6, 14, 22, 30, 38, 46`.
+Pack-local C09 hard-order positions are `6, 14, 22, 30, 38, 46`, but every
+target now correctly carries structural channel rank 1.
 
-### Failure attribution: observational collision
+### Failure attribution: over-budget observational equivalence class
 
 All six gate queries have the same D0 roles and the same D1 directed,
 relation-typed neighborhoods. For every query, these eight families in every
@@ -95,6 +107,14 @@ the same-pack C09 as the cross-domain target. A structural-only system cannot
 identify that pack-local member from canonical structure. Breaking the tie by
 labels would blend semantic evidence into the structural score; breaking it by
 `Gxx-C09` IDs would leak benchmark identity. Both violate ADR-0002.
+
+The hard `CandidateIndex.query(..., k=20)` surface still returns at most 20 and
+now explicitly reports that it truncated a 48-member cutoff tie. The tie-aware
+diagnostic surface returns all 48 and gives every member competition rank 1.
+This removes graph naming from the metric, but the tie group remains larger
+than the roughly 20-candidate verifier budget. The gate therefore remains a
+NO-GO for the current representation/corpus combination rather than becoming a
+false PASS through tie semantics.
 
 This is why the repeat preserves the NO-GO instead of gaming Recall@K. The
 mechanics do distinguish the intended structure from same-words/wrong-structure
@@ -127,9 +147,9 @@ intended analogue. This is deliberately labelled synthetic.
 
 | Corpus IDs | Build cumulative | Target rank | Postings touched | Query p50 | Cold-inclusive p95 | Estimated bytes |
 |---:|---:|---:|---:|---:|---:|---:|
-| 1,000 | 0.370 s | 1 | 16 | 0.349 ms | 1.070 ms | 1,154,944 |
-| 10,000 | 3.780 s | 1 | 16 | 0.347 ms | 7.397 ms | 11,522,944 |
-| 100,000 | 39.200 s | 1 | 16 | 0.363 ms | 98.509 ms | 115,202,944 |
+| 1,000 | 0.384 s | 1 | 16 | 0.369 ms | 1.902 ms | 1,154,944 |
+| 10,000 | 3.906 s | 1 | 16 | 0.361 ms | 7.567 ms | 11,522,944 |
+| 100,000 | 40.063 s | 1 | 16 | 0.361 ms | 102.552 ms | 115,202,944 |
 
 Touched postings are constant under the fixed budget/commonness policy. The
 cold-inclusive p95 includes lazy corpus-snapshot hashing on the first query.
@@ -143,7 +163,7 @@ this run does **not** claim real-corpus scale or one-million-ID readiness.
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ```
 
-Result: 54 tests, all passing. Coverage includes accepted pre-existing tests,
+Result: 55 tests, all passing. Coverage includes accepted pre-existing tests,
 fixed-budget observability, no content full scan, separate Knowledge complement,
 injective seeds, equal-path/ID invariance, persistence replay/tamper rejection,
 incremental replacement/removal, configuration validation, and the frozen

@@ -2,6 +2,7 @@
 
 from .retrieval import (
     INDEX_FORMAT_VERSION,
+    TIE_POLICY_VERSION,
     CandidateRetrievalIndex,
     IndexConfig,
     IndexStats,
@@ -11,6 +12,7 @@ from .retrieval import (
 
 __all__ = [
     "INDEX_FORMAT_VERSION",
+    "TIE_POLICY_VERSION",
     "CandidateRetrievalIndex",
     "IndexConfig",
     "IndexStats",

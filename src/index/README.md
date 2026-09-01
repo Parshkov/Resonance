@@ -17,6 +17,14 @@ blended similarity. Every result carries per-channel scores/ranks, optional
 seed correspondences, index/feature/config/corpus versions,
 `requires_structural_verification=true`, and `polarity_reliable=false`.
 
+Equal channel scores use competition/minimum rank: a 48-way tied-best group is
+rank 1 for every member, never ranks 1 through 48 based on `thought_id`.
+`query()` preserves the accepted hard `k` surface and reports whether its
+cutoff split a tie. `query_with_diagnostics(..., include_cutoff_ties=True)`
+widens the result through the complete cutoff group. Diagnostics expose both
+the tied-best IDs and cutoff-tied IDs so callers cannot mistake lexical ID order
+for retrieval evidence.
+
 Use `query_with_diagnostics()` when postings touched, channel latency, selected
 feature count, skipped evidence, posting skew, estimated index bytes, and the
 deterministic replay hash are needed. `query()` remains compatible with the R1

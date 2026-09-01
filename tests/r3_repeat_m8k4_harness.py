@@ -49,6 +49,13 @@ def frozen_gate() -> dict[str, object]:
         query = graphs[f"{pack}-Q"]
         outcome = index.query_with_diagnostics(query, mode="analogical", k=96)
         replay = index.query_with_diagnostics(query, mode="analogical", k=96)
+        hard_cap = index.query_with_diagnostics(query, mode="analogical", k=20)
+        tie_aware = index.query_with_diagnostics(
+            query,
+            mode="analogical",
+            k=20,
+            include_cutoff_ties=True,
+        )
         replay_stable &= outcome.diagnostics.replay_sha256 == replay.diagnostics.replay_sha256
         ranks = {result.candidate_id: rank for rank, result in enumerate(outcome.results, 1)}
         scores = {result.candidate_id: result.channel_scores["structural"] for result in outcome.results}
@@ -56,10 +63,16 @@ def frozen_gate() -> dict[str, object]:
         vocabulary = f"{pack}-C02"
         wrong_words = f"{pack}-C10"
         generic = f"{pack}-C13"
+        target_result = next(result for result in outcome.results if result.candidate_id == target)
+        hard_cap_ids = {result.candidate_id for result in hard_cap.results}
+        tie_aware_ids = {result.candidate_id for result in tie_aware.results}
         packs.append(
             {
                 "pack": pack,
-                "target_rank": ranks[target],
+                "target_hard_order_position": ranks[target],
+                "target_min_structural_rank": target_result.channel_ranks["structural"],
+                "target_in_hard_cap_20": target in hard_cap_ids,
+                "target_in_tie_aware_20": target in tie_aware_ids,
                 "target_score": scores[target],
                 "vocabulary_score": scores[vocabulary],
                 "wrong_words_score": scores[wrong_words],
@@ -68,14 +81,19 @@ def frozen_gate() -> dict[str, object]:
                 "sow_passes": int(scores[vocabulary] > scores[wrong_words])
                 + int(scores[target] > scores[wrong_words]),
                 "perfect_score_tie_count": sum(value == 1.0 for value in scores.values()),
+                "hard_cap_cutoff_tie_size": len(hard_cap.diagnostics.cutoff_tied_candidate_ids),
+                "hard_cap_cutoff_tie_truncated": hard_cap.diagnostics.cutoff_tie_truncated,
+                "tie_aware_returned_candidates": len(tie_aware.results),
                 "selected_features": outcome.diagnostics.selected_structural_features,
                 "postings_touched": outcome.diagnostics.postings_touched_by_channel["structural"],
                 "query_latency_ms": outcome.diagnostics.total_latency_ms,
                 "replay_sha256": outcome.diagnostics.replay_sha256,
             }
         )
-    recall_at_20 = sum(item["target_rank"] <= 20 for item in packs) / len(packs)
-    recall_at_5 = sum(item["target_rank"] <= 5 for item in packs) / len(packs)
+    hard_cap_recall_at_20 = sum(item["target_in_hard_cap_20"] for item in packs) / len(packs)
+    hard_cap_recall_at_5 = sum(item["target_hard_order_position"] <= 5 for item in packs) / len(packs)
+    tie_aware_recall_at_20 = sum(item["target_in_tie_aware_20"] for item in packs) / len(packs)
+    min_rank_recall_at_5 = sum(item["target_min_structural_rank"] <= 5 for item in packs) / len(packs)
     sow = sum(item["sow_passes"] for item in packs)
     stats = index.stats()
     return {
@@ -86,19 +104,23 @@ def frozen_gate() -> dict[str, object]:
         "corpus_snapshot": index.corpus_snapshot,
         "pack_results": packs,
         "metrics": {
-            "structural_cross_domain_recall_at_20": recall_at_20,
-            "cross_domain_recall_at_5": recall_at_5,
+            "hard_cap_specific_id_recall_at_20": hard_cap_recall_at_20,
+            "hard_cap_specific_id_recall_at_5": hard_cap_recall_at_5,
+            "tie_aware_structural_recall_at_20": tie_aware_recall_at_20,
+            "competition_min_rank_recall_at_5": min_rank_recall_at_5,
             "sow": sow,
             "sow_total": 12,
             "all_generic_margins_positive": all(item["generic_margin"] > 0 for item in packs),
             "deterministic_replay": replay_stable,
             "perfect_score_candidates_per_query": packs[0]["perfect_score_tie_count"],
         },
-        "gate_status": "NO_GO_OBSERVATIONAL_COLLISION",
+        "gate_status": "NO_GO_OVER_BUDGET_EQUIVALENCE_CLASS",
         "attribution": (
             "All six gate query graphs have the same D0 roles and D1 typed/directed neighborhoods. "
             "Forty-eight gate candidates score 1.0 for every query. Pack-local target identity is "
-            "not observable to a structural-only index without forbidden semantic or benchmark-ID leakage."
+            "not observable to a structural-only index without forbidden semantic or benchmark-ID leakage. "
+            "Competition min-rank and tie-aware expansion prevent graph naming from becoming a metric, "
+            "but the 48-member equivalence class still exceeds the 20-candidate verifier budget."
         ),
         "index_stats": {
             "corpus_size": stats.corpus_size,

@@ -16,7 +16,8 @@ from src.fingerprint import FingerprintConfig, LandmarkFingerprint, content_toke
 from src.graph import ThoughtGraph, canonical_json
 from src.interfaces import CandidateResult, ConfigRef, SeedCorrespondence, require_mode
 
-INDEX_FORMAT_VERSION = "resonance-candidate-index/0.1"
+INDEX_FORMAT_VERSION = "resonance-candidate-index/0.2"
+TIE_POLICY_VERSION = "competition-min-rank+explicit-cutoff-group/0.1"
 _CHANNELS = ("structural", "content", "knowledge_about", "knowledge_complement")
 
 
@@ -34,6 +35,10 @@ def _freeze_float_map(value: Mapping[str, float]) -> Mapping[str, float]:
 
 def _freeze_int_map(value: Mapping[str, int]) -> Mapping[str, int]:
     return MappingProxyType({str(key): int(item) for key, item in value.items()})
+
+
+def _freeze_str_tuple_map(value: Mapping[str, Sequence[str]]) -> Mapping[str, tuple[str, ...]]:
+    return MappingProxyType({str(key): tuple(str(item) for item in items) for key, items in value.items()})
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,12 +154,25 @@ class QueryDiagnostics:
     total_latency_ms: float
     max_posting_length: int
     index_bytes_estimate: int
+    requested_k: int
+    returned_candidate_count: int
+    include_cutoff_ties: bool
+    tie_policy_version: str
+    tied_best_candidate_ids_by_channel: Mapping[str, tuple[str, ...]]
+    cutoff_tied_candidate_ids: tuple[str, ...]
+    cutoff_tie_truncated: bool
     replay_sha256: str
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "postings_touched_by_channel", _freeze_int_map(self.postings_touched_by_channel))
         object.__setattr__(self, "latency_ms_by_channel", _freeze_float_map(self.latency_ms_by_channel))
         object.__setattr__(self, "candidate_count_by_channel", _freeze_int_map(self.candidate_count_by_channel))
+        object.__setattr__(
+            self,
+            "tied_best_candidate_ids_by_channel",
+            _freeze_str_tuple_map(self.tied_best_candidate_ids_by_channel),
+        )
+        object.__setattr__(self, "cutoff_tied_candidate_ids", tuple(self.cutoff_tied_candidate_ids))
 
 
 @dataclass(frozen=True, slots=True)
@@ -331,12 +349,21 @@ class CandidateRetrievalIndex:
         self._snapshot_cache = None
 
     def query(self, graph: ThoughtGraph, *, mode: str, k: int) -> Sequence[CandidateResult]:
-        return self.query_with_diagnostics(graph, mode=mode, k=k).results
+        return self.query_with_diagnostics(graph, mode=mode, k=k, include_cutoff_ties=False).results
 
-    def query_with_diagnostics(self, graph: ThoughtGraph, *, mode: str, k: int) -> QueryOutcome:
+    def query_with_diagnostics(
+        self,
+        graph: ThoughtGraph,
+        *,
+        mode: str,
+        k: int,
+        include_cutoff_ties: bool = False,
+    ) -> QueryOutcome:
         require_mode(mode)
         if isinstance(k, bool) or not isinstance(k, int) or k < 1:
             raise ValueError("k must be an integer >= 1")
+        if not isinstance(include_cutoff_ties, bool):
+            raise ValueError("include_cutoff_ties must be boolean")
         graph.validate()
         query_started = time.perf_counter()
         evidence: dict[str, _ChannelEvidence] = {}
@@ -368,12 +395,20 @@ class CandidateRetrievalIndex:
         for channel, channel_evidence in evidence.items():
             ranked = sorted(channel_evidence.scores.items(), key=lambda item: (-item[1], item[0]))
             ranked_by_channel[channel] = ranked
-            ranks_by_channel[channel] = {thought_id: rank for rank, (thought_id, _) in enumerate(ranked, 1)}
+            competition_ranks: dict[str, int] = {}
+            previous_score: float | None = None
+            current_rank = 0
+            for position, (thought_id, score) in enumerate(ranked, 1):
+                if previous_score is None or score != previous_score:
+                    current_rank = position
+                    previous_score = score
+                competition_ranks[thought_id] = current_rank
+            ranks_by_channel[channel] = competition_ranks
 
         candidate_ids = set().union(*(item.scores for item in evidence.values())) if evidence else set()
         priority = {channel: offset for offset, channel in enumerate(_CHANNELS)}
 
-        def union_key(thought_id: str) -> tuple[object, ...]:
+        def union_group_key(thought_id: str) -> tuple[object, ...]:
             available = [
                 (ranks_by_channel[channel][thought_id], priority[channel])
                 for channel in ranks_by_channel
@@ -383,12 +418,26 @@ class CandidateRetrievalIndex:
             best_score = max(
                 channel.scores.get(thought_id, 0.0) for channel in evidence.values()
             )
-            return (best_rank, best_channel, -best_score, thought_id)
+            return (best_rank, best_channel, -best_score)
 
-        ordered_ids = sorted(candidate_ids, key=union_key)
+        ordered_ids = sorted(candidate_ids, key=lambda thought_id: (*union_group_key(thought_id), thought_id))
+        selected_ids = ordered_ids[:k]
+        cutoff_tied_ids: tuple[str, ...] = ()
+        if selected_ids:
+            cutoff_group = union_group_key(selected_ids[-1])
+            cutoff_tied_ids = tuple(
+                thought_id for thought_id in ordered_ids if union_group_key(thought_id) == cutoff_group
+            )
+            if include_cutoff_ties:
+                selected_ids = [
+                    thought_id
+                    for thought_id in ordered_ids
+                    if union_group_key(thought_id) <= cutoff_group
+                ]
+        cutoff_tie_truncated = any(thought_id not in selected_ids for thought_id in cutoff_tied_ids)
         usable = sum(channel.usable_query_evidence for channel in evidence.values())
         results: list[CandidateResult] = []
-        for thought_id in ordered_ids[:k]:
+        for thought_id in selected_ids:
             scores = {channel: evidence.get(channel, _ChannelEvidence()).scores.get(thought_id, 0.0) for channel in _CHANNELS}
             ranks = {
                 channel: channel_ranks[thought_id]
@@ -460,7 +509,28 @@ class CandidateRetrievalIndex:
             total_latency_ms=(time.perf_counter() - query_started) * 1000.0,
             max_posting_length=stats.max_posting_length,
             index_bytes_estimate=stats.index_bytes_estimate,
-            replay_sha256=_sha256(replay_payload),
+            requested_k=k,
+            returned_candidate_count=len(results),
+            include_cutoff_ties=include_cutoff_ties,
+            tie_policy_version=TIE_POLICY_VERSION,
+            tied_best_candidate_ids_by_channel={
+                channel: tuple(
+                    thought_id
+                    for thought_id, score in ranked
+                    if ranked and score == ranked[0][1]
+                )
+                for channel, ranked in ranked_by_channel.items()
+            },
+            cutoff_tied_candidate_ids=cutoff_tied_ids,
+            cutoff_tie_truncated=cutoff_tie_truncated,
+            replay_sha256=_sha256(
+                {
+                    "tie_policy_version": TIE_POLICY_VERSION,
+                    "include_cutoff_ties": include_cutoff_ties,
+                    "requested_k": k,
+                    "results": replay_payload,
+                }
+            ),
         )
         self._last_query = diagnostics
         return QueryOutcome(tuple(results), diagnostics)
@@ -698,6 +768,7 @@ class CandidateRetrievalIndex:
             "format_version": INDEX_FORMAT_VERSION,
             "index_version": self.index_version,
             "feature_version": self.feature_version,
+            "tie_policy_version": TIE_POLICY_VERSION,
             "config": self.config.to_dict(),
             "config_hash": self.config.config_hash,
             "corpus_snapshot": self.corpus_snapshot,
@@ -720,6 +791,7 @@ class CandidateRetrievalIndex:
             "format_version",
             "index_version",
             "feature_version",
+            "tie_policy_version",
             "config",
             "config_hash",
             "corpus_snapshot",
@@ -745,6 +817,8 @@ class CandidateRetrievalIndex:
             raise ValueError("persisted index version metadata mismatch")
         if payload["feature_version"] != index.feature_version:
             raise ValueError("persisted feature version metadata mismatch")
+        if payload["tie_policy_version"] != TIE_POLICY_VERSION:
+            raise ValueError("persisted tie policy version metadata mismatch")
         graphs = payload["graphs"]
         if not isinstance(graphs, list):
             raise ValueError("persisted graphs must be an array")

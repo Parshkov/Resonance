@@ -174,6 +174,31 @@ class CandidateIndexTests(unittest.TestCase):
             [(x.candidate_id, dict(x.channel_scores), x.seed_correspondences) for x in second.results],
         )
 
+    def test_ties_use_min_rank_and_expose_cutoff_group(self):
+        query = _manual_graph("query")
+        index = CandidateRetrievalIndex(IndexConfig(enabled_channels=("structural",)))
+        index.extend(
+            _manual_graph(candidate_id, labels=(candidate_id, "x", "y", "z"))
+            for candidate_id in ("a", "b", "c")
+        )
+        hard_cap = index.query_with_diagnostics(query, mode="analogical", k=2)
+        self.assertEqual([result.candidate_id for result in hard_cap.results], ["a", "b"])
+        self.assertEqual([result.channel_ranks["structural"] for result in hard_cap.results], [1, 1])
+        self.assertEqual(hard_cap.diagnostics.tied_best_candidate_ids_by_channel["structural"], ("a", "b", "c"))
+        self.assertEqual(hard_cap.diagnostics.cutoff_tied_candidate_ids, ("a", "b", "c"))
+        self.assertTrue(hard_cap.diagnostics.cutoff_tie_truncated)
+
+        tie_aware = index.query_with_diagnostics(
+            query,
+            mode="analogical",
+            k=2,
+            include_cutoff_ties=True,
+        )
+        self.assertEqual([result.candidate_id for result in tie_aware.results], ["a", "b", "c"])
+        self.assertEqual(tie_aware.diagnostics.returned_candidate_count, 3)
+        self.assertFalse(tie_aware.diagnostics.cutoff_tie_truncated)
+        self.assertNotEqual(hard_cap.diagnostics.replay_sha256, tie_aware.diagnostics.replay_sha256)
+
     def test_content_channel_uses_postings_not_a_corpus_scan(self):
         index = CandidateRetrievalIndex(IndexConfig(enabled_channels=("content",)))
         for offset in range(100):
@@ -272,8 +297,9 @@ class FrozenBenchmarkEvidenceTests(unittest.TestCase):
             if graph_id.startswith("G") and not graph_id.endswith("-Q")
         )
         sow = 0
-        target_hits_at_20 = 0
-        target_hits_at_5 = 0
+        hard_cap_target_hits_at_20 = 0
+        hard_cap_target_hits_at_5 = 0
+        tie_aware_target_hits_at_20 = 0
         for offset in range(1, 7):
             pack = f"G{offset:02d}"
             outcome = index.query_with_diagnostics(graphs[f"{pack}-Q"], mode="analogical", k=96)
@@ -285,10 +311,27 @@ class FrozenBenchmarkEvidenceTests(unittest.TestCase):
             generic = f"{pack}-C13"
             sow += int(scores[vocabulary] > scores[wrong_words])
             sow += int(scores[target] > scores[wrong_words])
-            target_hits_at_20 += int(ranks[target] <= 20)
-            target_hits_at_5 += int(ranks[target] <= 5)
+            hard_cap_target_hits_at_20 += int(ranks[target] <= 20)
+            hard_cap_target_hits_at_5 += int(ranks[target] <= 5)
             self.assertGreater(scores[target], scores[generic])
             self.assertEqual(scores[target], 1.0)
+            target_result = next(result for result in outcome.results if result.candidate_id == target)
+            self.assertEqual(target_result.channel_ranks["structural"], 1)
+
+            hard_cap = index.query_with_diagnostics(graphs[f"{pack}-Q"], mode="analogical", k=20)
+            tie_aware = index.query_with_diagnostics(
+                graphs[f"{pack}-Q"],
+                mode="analogical",
+                k=20,
+                include_cutoff_ties=True,
+            )
+            tie_aware_target_hits_at_20 += int(
+                target in {result.candidate_id for result in tie_aware.results}
+            )
+            self.assertTrue(hard_cap.diagnostics.cutoff_tie_truncated)
+            self.assertEqual(len(hard_cap.diagnostics.cutoff_tied_candidate_ids), 48)
+            self.assertFalse(tie_aware.diagnostics.cutoff_tie_truncated)
+            self.assertEqual(len(tie_aware.results), 48)
 
         # All six gate packs compile to the same structural query. For each
         # query, 48 differently labelled candidates are structurally identical
@@ -299,8 +342,9 @@ class FrozenBenchmarkEvidenceTests(unittest.TestCase):
         perfect = [result for result in first.results if result.channel_scores["structural"] == 1.0]
         self.assertEqual(len(perfect), 48)
         self.assertEqual(sow, 12)
-        self.assertEqual(target_hits_at_20, 2)
-        self.assertEqual(target_hits_at_5, 0)
+        self.assertEqual(hard_cap_target_hits_at_20, 2)
+        self.assertEqual(hard_cap_target_hits_at_5, 0)
+        self.assertEqual(tie_aware_target_hits_at_20, 6)
 
 
 if __name__ == "__main__":
