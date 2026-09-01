@@ -47,11 +47,18 @@ they do not import one another's internals.
   nodes **and relations**, retrieval flags, and structured provenance. There is
   no blended-only result type. Mapping/unmatched/contradiction payloads in
   `Explanation` must equal the parent `VerifierResult`.
-- `ScoreVector` types Scoring v0.1 components (`N_role`, `R_direct`, `R_path`,
-  `Y_systematicity`, `H_sign_conflict`, `E_nodes`, `E_relations`, …) and
-  round-trips through `to_wire()` / `from_wire()`.
+- `ScoreVector` types Scoring v0.1 components (`N_role`, `R_direct`,
+  `R_direct_unweighted`, `R_path`, `Y_systematicity`, `H_sign_conflict`,
+  `E_nodes`, `E_relations`, `knowledge_evidence_present`, `rarity_weighting`, …)
+  and round-trips through `to_wire()` / `from_wire()`. `from_wire()` requires
+  the complete v0.1 field set, rejects unknown top-level keys, and keeps
+  extension diagnostics only under `extras`.
 - `CandidateResult` snapshots channel maps; callers cannot alias-mutate them.
-- `EdgePathMatch` carries query provenance and per-relation candidate provenance.
+- `EdgePathMatch` carries query provenance, per-relation candidate provenance,
+  and parallel provenance for `realizes_nodes`. Provenance `item_id` values
+  must equal the canonical IDs they describe.
+- `VerifierResult` mappings are partial and mutually injective.
+- `ResonanceHit` requires `candidate.candidate_id == verification.candidate_id`.
 - `ConfigRef` carries schema/component/config identity through boundaries.
 - `EngineFacade` is a core Python protocol, not a transport protocol. R6 may
   adapt it, but must not move matching logic into handlers.

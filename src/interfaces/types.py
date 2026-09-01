@@ -20,6 +20,7 @@ SCORE_WIRE_NAMES: Mapping[str, str] = MappingProxyType(
     {
         "n_role": "N_role",
         "r_direct": "R_direct",
+        "r_direct_unweighted": "R_direct_unweighted",
         "r_path": "R_path",
         "y_systematicity": "Y_systematicity",
         "coverage_containment": "Q_containment",
@@ -33,12 +34,18 @@ SCORE_WIRE_NAMES: Mapping[str, str] = MappingProxyType(
         "semantic": "S_semantic",
         "knowledge_about": "K_about",
         "knowledge_requires": "K_requires",
+        "knowledge_evidence_present": "knowledge_evidence_present",
+        "rarity_weighting": "rarity_weighting",
         "complement_query_to_candidate": "K_comp_q_to_c",
         "complement_candidate_to_query": "K_comp_c_to_q",
         "retrieval_content": "retrieval_semantic",
         "retrieval_knowledge": "retrieval_knowledge",
         "retrieval_structural": "retrieval_structural",
     }
+)
+REQUIRED_SCORE_WIRE_NAMES = frozenset(SCORE_WIRE_NAMES.values())
+BOOL_SCORE_FIELDS = frozenset(
+    {"h_sign_conflict", "knowledge_evidence_present", "rarity_weighting"}
 )
 
 
@@ -48,6 +55,16 @@ def frozen_str_float_mapping(values: Mapping[str, float] | None = None) -> Mappi
 
 def frozen_str_int_mapping(values: Mapping[str, int] | None = None) -> Mapping[str, int]:
     return MappingProxyType({str(key): int(val) for key, val in dict(values or {}).items()})
+
+
+def _require_item_id(provenance: ItemProvenance, item_id: str, label: str) -> None:
+    if provenance.item_id != item_id:
+        raise ValueError(f"{label} provenance item_id must equal {item_id!r}")
+
+
+def _require_unique(ids: tuple[str, ...], label: str) -> None:
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"{label} must be unique")
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +149,10 @@ class NodeMatch:
     query_provenance: ItemProvenance
     candidate_provenance: ItemProvenance
 
+    def __post_init__(self) -> None:
+        _require_item_id(self.query_provenance, self.query_node, "NodeMatch.query")
+        _require_item_id(self.candidate_provenance, self.candidate_node, "NodeMatch.candidate")
+
 
 @dataclass(frozen=True, slots=True)
 class RelationMatch:
@@ -140,6 +161,10 @@ class RelationMatch:
     support: float
     query_provenance: ItemProvenance
     candidate_provenance: ItemProvenance
+
+    def __post_init__(self) -> None:
+        _require_item_id(self.query_provenance, self.query_relation, "RelationMatch.query")
+        _require_item_id(self.candidate_provenance, self.candidate_relation, "RelationMatch.candidate")
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,10 +175,18 @@ class EdgePathMatch:
     support: float
     query_provenance: ItemProvenance
     candidate_provenances: tuple[ItemProvenance, ...]
+    realizes_node_provenances: tuple[ItemProvenance, ...] = ()
 
     def __post_init__(self) -> None:
         if len(self.candidate_relations) != len(self.candidate_provenances):
             raise ValueError("edge-path candidate relation IDs and provenances must be parallel")
+        if len(self.realizes_nodes) != len(self.realizes_node_provenances):
+            raise ValueError("edge-path realized node IDs and provenances must be parallel")
+        _require_item_id(self.query_provenance, self.query_relation, "EdgePathMatch.query")
+        for relation_id, provenance in zip(self.candidate_relations, self.candidate_provenances):
+            _require_item_id(provenance, relation_id, "EdgePathMatch.candidate")
+        for node_id, provenance in zip(self.realizes_nodes, self.realizes_node_provenances):
+            _require_item_id(provenance, node_id, "EdgePathMatch.realizes_node")
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,11 +216,14 @@ class ScoreVector:
     evidence_gate: float
     n_role: float = 0.0
     r_direct: float = 0.0
+    r_direct_unweighted: float = 0.0
     r_path: float = 0.0
     y_systematicity: float = 0.0
     h_sign_conflict: bool = False
     e_nodes: float = 0.0
     e_relations: float = 0.0
+    knowledge_evidence_present: bool = False
+    rarity_weighting: bool = False
     retrieval_content: float = 0.0
     retrieval_knowledge: float = 0.0
     retrieval_structural: float = 0.0
@@ -218,17 +254,31 @@ class ScoreVector:
 
     @classmethod
     def from_wire(cls, payload: Mapping[str, Any]) -> ScoreVector:
+        if not isinstance(payload, Mapping):
+            raise ValueError("score payload must be an object")
         kwargs: dict[str, Any] = {}
         extras: dict[str, float] = {}
         inverse = {wire: field_name for field_name, wire in SCORE_WIRE_NAMES.items()}
+        seen_wire: set[str] = set()
         for key, value in payload.items():
             if key == "extras":
+                if not isinstance(value, Mapping):
+                    raise ValueError("extras must be an object")
                 extras.update({str(item): float(item_value) for item, item_value in dict(value).items()})
-            elif key in inverse:
-                field_name = inverse[key]
-                kwargs[field_name] = bool(value) if field_name == "h_sign_conflict" else value
+                continue
+            if key not in inverse:
+                raise ValueError(f"unknown score field: {key}")
+            seen_wire.add(key)
+            field_name = inverse[key]
+            if field_name in BOOL_SCORE_FIELDS:
+                if not isinstance(value, bool):
+                    raise ValueError(f"{key} must be a boolean")
+                kwargs[field_name] = value
             else:
-                extras[str(key)] = float(value)
+                kwargs[field_name] = float(value)
+        missing = sorted(REQUIRED_SCORE_WIRE_NAMES - seen_wire)
+        if missing:
+            raise ValueError("missing required score fields: " + ", ".join(missing))
         return cls(**kwargs, extras=extras)
 
 
@@ -292,6 +342,8 @@ class VerifierResult:
             raise ValueError("explanation score_model_version must match contract_version")
         if explanation.config_hash != self.solver_config.config_hash:
             raise ValueError("explanation config_hash must match solver_config.config_hash")
+        _require_unique(tuple(match.query_node for match in self.mapping), "mapping query node IDs")
+        _require_unique(tuple(match.candidate_node for match in self.mapping), "mapping candidate node IDs")
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,3 +357,5 @@ class ResonanceHit:
             raise ValueError("hit retrieval_flags.requires_structural_verification must match the candidate")
         if flags.polarity_reliable != self.candidate.polarity_reliable:
             raise ValueError("hit retrieval_flags.polarity_reliable must match the candidate")
+        if self.candidate.candidate_id != self.verification.candidate_id:
+            raise ValueError("hit candidate_id must match verification.candidate_id")
