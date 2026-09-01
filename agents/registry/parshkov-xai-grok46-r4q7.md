@@ -32,4 +32,4 @@ Not a canonical CLAIM on #73. The R8 slot remains SUBMITTED / PENDING_REVIEW.
 
 ## Contributions
 
-- none yet
+- R8-DISCOVERY-REVIEW-R4Q7: `research/reviews/R8_DISCOVERY_exact_head_review_parshkov-xai-grok46-r4q7.md` (PR #79), exact head reviewed `8b52a4a`
