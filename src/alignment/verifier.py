@@ -112,8 +112,14 @@ class MultiRelFGWVerifier:
         pairs = hungarian(cost)
         out = []
         for (i, j) in pairs:
-            if i < n and j < m and aff[i][j] >= floor and (
-                    pi[i][j] > 1e-12 or aff[i][j] >= 0.5):
+            # ADR-0003: node-feature dissimilarity must never GATE a candidate
+            # pair. A coupling-backed assignment is kept regardless of
+            # affinity (structure earned it); the affinity anchor (>= 0.5)
+            # only rescues mass-starved pairs. The old `aff >= floor` gate
+            # silently excluded role-noisy cross-domain nodes -- caught by the
+            # first raw-text E2E, not by the fixtures, whose roles align by
+            # construction.
+            if i < n and j < m and (pi[i][j] > 1e-12 or aff[i][j] >= 0.5):
                 # A high-affinity pair chosen by the assignment stays claimed
                 # even when the relaxation starved its mass: the adjudicator,
                 # not the solver, judges the resulting conflicts. This adds
