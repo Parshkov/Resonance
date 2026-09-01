@@ -145,8 +145,8 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(meaningful["must_preserve_nodes"], ["x0"])
         self.assertNotEqual(transparent["gold_edge_pairs"], meaningful["gold_edge_pairs"])
         self.assertTrue(meaningful["review"]["required"])
-        self.assertEqual(meaningful["review"]["status"], "pending")
-        self.assertIsNone(meaningful["review"]["reviewer"])
+        self.assertEqual(meaningful["review"]["status"], "approved")
+        self.assertEqual(meaningful["review"]["reviewer"], "dima2010-anthropic-fable5-7328")
         self.assertNotEqual(meaningful["review"]["reviewer"], "parshkov-xai-grok46-k3e8")
 
     def test_gold_is_not_in_engine_graph_inputs(self):
@@ -158,9 +158,14 @@ class FixtureTests(unittest.TestCase):
             serialized = json.dumps(wrapper["thought_dna"], sort_keys=True)
             self.assertTrue(all(f'"{field}"' not in serialized for field in forbidden))
 
-    def test_author_cannot_self_approve_required_gold(self):
-        self.assertEqual(self.bundle.manifest["freeze_state"], "candidate_frozen_pending_independent_review")
-        self.assertEqual(self.bundle.manifest["counts"]["manual_reviews_pending"], 1)
+    def test_required_gold_is_approved_by_independent_reviewer_not_author(self):
+        self.assertEqual(self.bundle.manifest["freeze_state"], "independent_review_complete")
+        self.assertEqual(self.bundle.manifest["counts"]["manual_reviews_pending"], 0)
+        approvals = json.loads((V02 / "review_approvals.json").read_text(encoding="utf-8"))
+        author = approvals["author_agent_id"]
+        self.assertTrue(approvals["pair_approvals"])
+        for case_id, reviewer in approvals["pair_approvals"].items():
+            self.assertNotEqual(reviewer, author, case_id)
 
     def test_cli_validate_is_deterministic(self):
         command = [sys.executable, str(V02 / "runner.py"), "validate"]
@@ -169,7 +174,7 @@ class FixtureTests(unittest.TestCase):
         self.assertEqual(first, second)
         payload = json.loads(first)
         self.assertEqual(payload["benchmark_version"], "r0-v0.2")
-        self.assertFalse(payload["gate_execution_ready"])
+        self.assertTrue(payload["gate_execution_ready"])
 
 
 class EvaluationTests(unittest.TestCase):
@@ -182,7 +187,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(report["gates"]["transparent_positives_pass"]["status"], "pass")
         self.assertEqual(report["gates"]["self_report_ignored"]["status"], "pass")
         self.assertEqual(report["overall_status"], "pass")
-        self.assertEqual(report["gates"]["independent_gold_review"]["status"], "fail")
+        self.assertEqual(report["gates"]["independent_gold_review"]["status"], "pass")
 
     def test_cheating_self_report_zero_fails_when_mappings_violate_gold(self):
         report = runner.evaluate(self.bundle, cheating_predictions(self.bundle))
