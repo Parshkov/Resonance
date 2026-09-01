@@ -7,6 +7,7 @@ MCP-absence guarantee.
 """
 
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -47,14 +48,30 @@ class FacadeTests(unittest.TestCase):
     def test_engine_never_imports_mcp(self):
         """The guarantee is import-independence, not MCP's absence from the
         repo -- after R6 lands a transport package this must keep passing."""
-        engine = ResonanceEngine()
-        g = engine.ingest("Heat causes failure.", source_id="mcp-free")
-        engine.index(g)
-        engine.find(g, mode="structural", k=3)
-        self.assertTrue(engine.get(g.thought_id) is g)
-        loaded = [name for name in sys.modules if name == "src.mcp"
-                  or name.startswith("src.mcp.")]
-        self.assertEqual(loaded, [], "engine pulled in MCP transport modules")
+        probe = """
+import json
+import sys
+from src.engine import ResonanceEngine
+
+engine = ResonanceEngine()
+graph = engine.ingest("Heat causes failure.", source_id="mcp-free")
+engine.index(graph)
+engine.find(graph, mode="structural", k=3)
+loaded = sorted(name for name in sys.modules
+                if name == "src.mcp" or name.startswith("src.mcp."))
+print(json.dumps({"stored": engine.get(graph.thought_id) is graph,
+                  "loaded": loaded}))
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", probe],
+            cwd=REPO,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        result = json.loads(completed.stdout)
+        self.assertTrue(result["stored"])
+        self.assertEqual(result["loaded"], [], "engine pulled in MCP transport modules")
 
     def test_manual_bypass_reaches_the_same_interfaces(self):
         engine = ResonanceEngine()
