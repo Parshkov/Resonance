@@ -1,0 +1,440 @@
+{
+ "aggregation": {
+  "basis": "discoverable_matches_with_shareable_location_only",
+  "buckets": [
+   {
+    "bucket_id": "grid-east",
+    "count": 1,
+    "intensity": 0.3333
+   },
+   {
+    "bucket_id": "grid-north",
+    "count": 1,
+    "intensity": 0.3333
+   },
+   {
+    "bucket_id": "grid-west",
+    "count": 1,
+    "intensity": 0.3333
+   }
+  ]
+ },
+ "contract_version": "resonance-discovery/0.1",
+ "matches": [
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "50e797d4ed98",
+    "location_bucket": "grid-east",
+    "share_state": "discoverable"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 6,
+    "preserved_relation_count": 5,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r_d943944553ec6695bf19",
+      "query_relation": "r_09372208655088c36de1"
+     },
+     {
+      "candidate_relation": "r_f008f12f634934fa52a5",
+      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
+     },
+     {
+      "candidate_relation": "r_863612621875c9b5e951",
+      "query_relation": "r_4ee20642294e95799466"
+     },
+     {
+      "candidate_relation": "r_4783793d146aa40efd89",
+      "query_relation": "r_c0f7bed2bfe061cb6428"
+     },
+     {
+      "candidate_relation": "r_e1a9dec8614554fc31e4",
+      "query_relation": "r_d1d952d52a4f430f65fb"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "restructuring cost",
+      "candidate_node": "n_536c82b59e5ba97f9cbc",
+      "query_label": "replacement cost",
+      "query_node": "n_130a6e4f8c7ea815eeaf"
+     },
+     {
+      "candidate_label": "collapse",
+      "candidate_node": "n_fa91cb8881ca9c6a8763",
+      "query_label": "failure",
+      "query_node": "n_2328344e11f2eb95a1e8"
+     },
+     {
+      "candidate_label": "Heavy workload",
+      "candidate_node": "n_11e9f05cce57e312dc90",
+      "query_label": "Heavy load",
+      "query_node": "n_2a4a979d06cd1e6f775f"
+     },
+     {
+      "candidate_label": "Rapid growth",
+      "candidate_node": "n_6692110822c2cfda02ac",
+      "query_label": "Strong heat",
+      "query_node": "n_60f189c0326d6d6bcf88"
+     },
+     {
+      "candidate_label": "coordination loss",
+      "candidate_node": "n_e382e5e042331e89284f",
+      "query_label": "degradation",
+      "query_node": "n_75d2650a6fdf9967bb40"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "2ddb9b3980c2ffa4164b3e49",
+   "mode_classification": "negative",
+   "person_pseudonym": "birch",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.1111111111111111,
+    "structural": 0.8283333333333335,
+    "y_systematicity": 1.0
+   },
+   "session_id": "t_aa84d6c4999f7b5b458d"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "a6c95912fe11",
+    "location_bucket": "grid-north",
+    "share_state": "discoverable"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 6,
+    "preserved_relation_count": 5,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r_06bdfaddde3eebc63c27",
+      "query_relation": "r_09372208655088c36de1"
+     },
+     {
+      "candidate_relation": "r_f7e66b6cfadb29e69515",
+      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
+     },
+     {
+      "candidate_relation": "r_6b48857e1892a5b9b723",
+      "query_relation": "r_4ee20642294e95799466"
+     },
+     {
+      "candidate_relation": "r_c1662f13d21997629c6d",
+      "query_relation": "r_c0f7bed2bfe061cb6428"
+     },
+     {
+      "candidate_relation": "r_a898abec31ba75157a3d",
+      "query_relation": "r_d1d952d52a4f430f65fb"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "replacement cost",
+      "candidate_node": "n_2a9a172482ab44c89631",
+      "query_label": "replacement cost",
+      "query_node": "n_130a6e4f8c7ea815eeaf"
+     },
+     {
+      "candidate_label": "breakdown",
+      "candidate_node": "n_852bbe401dcc9a65b11a",
+      "query_label": "failure",
+      "query_node": "n_2328344e11f2eb95a1e8"
+     },
+     {
+      "candidate_label": "Big load",
+      "candidate_node": "n_b70765648d1ee9a7938f",
+      "query_label": "Heavy load",
+      "query_node": "n_2a4a979d06cd1e6f775f"
+     },
+     {
+      "candidate_label": "Intense heat",
+      "candidate_node": "n_473ec2b36d9a677766f2",
+      "query_label": "Strong heat",
+      "query_node": "n_60f189c0326d6d6bcf88"
+     },
+     {
+      "candidate_label": "wear",
+      "candidate_node": "n_6e44310e4c345f3262af",
+      "query_label": "degradation",
+      "query_node": "n_75d2650a6fdf9967bb40"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "75614f0e7bdb5158b8f3da96",
+   "mode_classification": "direct",
+   "person_pseudonym": "grove",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.3333333333333333,
+    "structural": 0.8325000000000001,
+    "y_systematicity": 1.0
+   },
+   "session_id": "t_ad2c5f6343988dea2992"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "5c9638b8ea5e",
+    "share_state": "discoverable"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 3,
+    "preserved_relation_count": 1,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r_a629dca9b02a61b4d1f3",
+      "query_relation": "r_c0f7bed2bfe061cb6428"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "mistakes",
+      "candidate_node": "n_fdc23a272a15045d4274",
+      "query_label": "replacement cost",
+      "query_node": "n_130a6e4f8c7ea815eeaf"
+     },
+     {
+      "candidate_label": "Practice",
+      "candidate_node": "n_6b6a111a3363ff86e24f",
+      "query_label": "Heavy load",
+      "query_node": "n_2a4a979d06cd1e6f775f"
+     },
+     {
+      "candidate_label": "skill",
+      "candidate_node": "n_3b9189c47e953a07a47d",
+      "query_label": "Strong heat",
+      "query_node": "n_60f189c0326d6d6bcf88"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "ad3e9802934da486d33b4900",
+   "mode_classification": "negative",
+   "person_pseudonym": "ember",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 0.20087336244541484,
+    "semantic": 0.0,
+    "structural": 0.0594956768558952,
+    "y_systematicity": 0.5
+   },
+   "session_id": "t_2f0dfd5fd5c5b42857d0"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "e7f216a05528",
+    "location_bucket": "grid-west",
+    "share_state": "discoverable"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 6,
+    "preserved_relation_count": 5,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r_210d6b4023795f683e54",
+      "query_relation": "r_09372208655088c36de1"
+     },
+     {
+      "candidate_relation": "r_d388ba356305b9398ad2",
+      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
+     },
+     {
+      "candidate_relation": "r_4168c26132fa738adee0",
+      "query_relation": "r_4ee20642294e95799466"
+     },
+     {
+      "candidate_relation": "r_28ef3d1809f2dcaddbd8",
+      "query_relation": "r_c0f7bed2bfe061cb6428"
+     },
+     {
+      "candidate_relation": "r_e3775bef0c6ca0b29a2e",
+      "query_relation": "r_d1d952d52a4f430f65fb"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "cleanup cost",
+      "candidate_node": "n_cb1574bcba0e69de3024",
+      "query_label": "replacement cost",
+      "query_node": "n_130a6e4f8c7ea815eeaf"
+     },
+     {
+      "candidate_label": "oxygen loss",
+      "candidate_node": "n_54ba6f31c4e858c297a4",
+      "query_label": "failure",
+      "query_node": "n_2328344e11f2eb95a1e8"
+     },
+     {
+      "candidate_label": "Farm runoff",
+      "candidate_node": "n_9fc99b0145fdbaa948e6",
+      "query_label": "Heavy load",
+      "query_node": "n_2a4a979d06cd1e6f775f"
+     },
+     {
+      "candidate_label": "Warm water",
+      "candidate_node": "n_248aa239e7a81375c7c2",
+      "query_label": "Strong heat",
+      "query_node": "n_60f189c0326d6d6bcf88"
+     },
+     {
+      "candidate_label": "algae growth",
+      "candidate_node": "n_4bd4204aea273eb9bef3",
+      "query_label": "degradation",
+      "query_node": "n_75d2650a6fdf9967bb40"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "8cf6ce167afe5bbb937e3c96",
+   "mode_classification": "negative",
+   "person_pseudonym": "fjord",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 0.982532751091703,
+    "semantic": 0.05555555555555555,
+    "structural": 0.8091048034934499,
+    "y_systematicity": 1.0
+   },
+   "session_id": "t_c474230dd3a4bba8342a"
+  }
+ ],
+ "query": {
+  "mode": "analogical",
+  "provenance": {
+   "corpus_snapshot": "ec39d1064aa0b2862a30d3aff8cf150f0986cca85e37ebc36159e12ae4dae3c9",
+   "discovery_contract_version": "resonance-discovery/0.1",
+   "engine_version": "resonance-engine/0.1",
+   "interface_version": "resonance-interfaces/0.1",
+   "metadata_schema_version": "resonance-demo-metadata/0.1-provisional",
+   "verifier_config_hash": "3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f893dbb1b1d"
+  },
+  "thought_id": "t_88df6a0df52dc2c8d099"
+ },
+ "rejected": [
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "provisional",
+   "display": {
+    "cluster_id": "77d8918832b6",
+    "share_state": "discoverable"
+   },
+   "evidence": {
+    "contradiction_count": 1,
+    "mapped_node_count": 6,
+    "preserved_relation_count": 4,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r_efb00d1ccf9801fac8c9",
+      "query_relation": "r_4cc6f9bf8ad3ee52c5a9"
+     },
+     {
+      "candidate_relation": "r_dc6146d4e2036edf711c",
+      "query_relation": "r_4ee20642294e95799466"
+     },
+     {
+      "candidate_relation": "r_1265dd09b9ed49d38679",
+      "query_relation": "r_c0f7bed2bfe061cb6428"
+     },
+     {
+      "candidate_relation": "r_878a6c0dfc11c0a5d2a9",
+      "query_relation": "r_d1d952d52a4f430f65fb"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "replacement cost",
+      "candidate_node": "n_420a88b82d8fd820e06d",
+      "query_label": "replacement cost",
+      "query_node": "n_130a6e4f8c7ea815eeaf"
+     },
+     {
+      "candidate_label": "failure",
+      "candidate_node": "n_19546d134ac86437598c",
+      "query_label": "failure",
+      "query_node": "n_2328344e11f2eb95a1e8"
+     },
+     {
+      "candidate_label": "Heavy load",
+      "candidate_node": "n_6cb940af574220be25f9",
+      "query_label": "Heavy load",
+      "query_node": "n_2a4a979d06cd1e6f775f"
+     },
+     {
+      "candidate_label": "strong heat",
+      "candidate_node": "n_d985eb9cc9f5f6ed2a49",
+      "query_label": "Strong heat",
+      "query_node": "n_60f189c0326d6d6bcf88"
+     },
+     {
+      "candidate_label": "Degradation",
+      "candidate_node": "n_3493956df148988e488b",
+      "query_label": "degradation",
+      "query_node": "n_75d2650a6fdf9967bb40"
+     }
+    ]
+   },
+   "hard_rejection": "relation_type:r_09372208655088c36de1->r_20b0976308cd6b645a14",
+   "match_id": "9f3b377bddf0c5f5aa5d3926",
+   "mode_classification": "negative",
+   "person_pseudonym": "cedar",
+   "scores": {
+    "contradiction": 0.19650655021834063,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": true,
+    "r_direct": 0.7991266375545851,
+    "semantic": 1.0,
+    "structural": 0.0,
+    "y_systematicity": 1.0
+   },
+   "session_id": "t_e16372c530367321fa89"
+  }
+ ],
+ "unsupported_fields": [
+  "realtime_presence",
+  "exact_location",
+  "contact_details"
+ ]
+}
