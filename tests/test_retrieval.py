@@ -7,7 +7,7 @@ from pathlib import Path
 
 from src.fingerprint.keys import FEATURE_VERSION, fingerprints, path_signature
 from src.graph import ThoughtGraph
-from src.index import INDEX_VERSION, QUERY_BUDGET, InvertedCandidateIndex
+from src.index import INDEX_VERSION, QUERY_BUDGET, TIE_POLICY, InvertedCandidateIndex
 from src.interfaces import CandidateIndex, require_mode
 
 
@@ -268,6 +268,32 @@ class RetrievalTests(unittest.TestCase):
             tampered.write_text(json.dumps(payload), encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "index_version"):
                 InvertedCandidateIndex.load(tampered)
+
+    def test_tied_best_share_min_rank_and_are_not_truncated_by_name(self):
+        twin = battery("z-org", "city")
+        index = InvertedCandidateIndex(max_df_frac=1.0, min_df_cutoff=100)
+        index.build((self.query, self.analogue, twin, self.chain))
+        hits = index.query(self.query, mode="structural", k=1)
+        ids = {hit.candidate_id for hit in hits}
+        self.assertIn("c-org", ids)
+        self.assertIn("z-org", ids)
+        self.assertGreaterEqual(len(hits), 2)
+        analogue = next(hit for hit in hits if hit.candidate_id == "c-org")
+        other = next(hit for hit in hits if hit.candidate_id == "z-org")
+        self.assertEqual(analogue.channel_scores["structural"], other.channel_scores["structural"])
+        self.assertEqual(analogue.channel_ranks["structural"], 1)
+        self.assertEqual(other.channel_ranks["structural"], 1)
+        self.assertEqual(index.last_query.tie_policy, TIE_POLICY)
+        self.assertTrue(index.last_query.tie_group_expanded)
+        self.assertEqual(index.last_query.requested_k, 1)
+        self.assertEqual(index.last_query.returned, len(hits))
+
+    def test_dump_accepts_pathlike_str(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "index.json")
+            self.index.dump(path)
+            restored = InvertedCandidateIndex.load(path)
+        self.assertEqual(restored.corpus_snapshot, self.index.corpus_snapshot)
 
     def test_query_rejects_non_positive_k_and_records_diagnostics(self):
         with self.assertRaises(ValueError):

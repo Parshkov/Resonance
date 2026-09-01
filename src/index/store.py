@@ -21,11 +21,12 @@ from src.interfaces import (
     require_mode,
 )
 
-INDEX_VERSION = "resonance-index/0.1.1"
+INDEX_VERSION = "resonance-index/0.1.2"
 TOKEN_RE = re.compile(r"[a-z0-9]+")
 QUERY_BUDGET = 64
 SCALE_FLOOR = 1000
 SMALL_CORPUS_MAX_DF_FRAC = 0.90
+TIE_POLICY = "competition_min_rank_include_boundary_ties"
 
 
 def _canonical_bytes(value: Any) -> bytes:
@@ -54,6 +55,10 @@ class QueryDiagnostics:
     budget_used: int
     usable_query_evidence: float
     content_scanned: bool
+    requested_k: int = 0
+    returned: int = 0
+    tie_group_expanded: bool = False
+    tie_policy: str = TIE_POLICY
 
 
 class InvertedCandidateIndex:
@@ -89,6 +94,7 @@ class InvertedCandidateIndex:
             "scale_floor": self.scale_floor,
             "small_corpus_max_df_frac": self.small_corpus_max_df_frac,
             "default_variant": "MULTI",
+            "tie_policy": TIE_POLICY,
         }
 
     def _cutoff(self, n: int) -> float:
@@ -268,8 +274,20 @@ class InvertedCandidateIndex:
         return dict(about_scores), dict(complement_scores)
 
     def _ranks(self, scores: Mapping[str, float]) -> dict[str, int]:
+        """Competition ranking: equal scores share the minimum rank.
+
+        thought_id is only a stable display order inside a tie, never a rank key.
+        """
         ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
-        return {thought_id: rank for rank, (thought_id, _) in enumerate(ordered, start=1)}
+        ranks: dict[str, int] = {}
+        last_score: float | None = None
+        last_rank = 0
+        for index, (thought_id, score) in enumerate(ordered, start=1):
+            if last_score is None or score != last_score:
+                last_rank = index
+                last_score = score
+            ranks[thought_id] = last_rank
+        return ranks
 
     def query(self, graph: ThoughtGraph, *, mode: str, k: int) -> Sequence[CandidateResult]:
         require_mode(mode)
@@ -295,7 +313,8 @@ class InvertedCandidateIndex:
         content_ranks = self._ranks(content)
         knowledge_ranks = self._ranks({**knowledge_about, **knowledge_comp})
         primary_ranks = self._ranks({cid: primary.get(cid, 0.0) for cid in candidates} if candidates else {})
-        ordered = sorted(candidates, key=lambda cid: (primary_ranks.get(cid, 10**9), cid))[:k]
+        eligible = [cid for cid in candidates if primary_ranks.get(cid, 10**9) <= k]
+        ordered = sorted(eligible, key=lambda cid: (primary_ranks.get(cid, 10**9), cid))
         results: list[CandidateResult] = []
         for candidate_id in ordered:
             results.append(
@@ -330,6 +349,10 @@ class InvertedCandidateIndex:
             budget_used=budget_used,
             usable_query_evidence=usable,
             content_scanned=content_scanned,
+            requested_k=k,
+            returned=len(results),
+            tie_group_expanded=len(results) > k,
+            tie_policy=TIE_POLICY,
         )
         return results
 
@@ -347,7 +370,8 @@ class InvertedCandidateIndex:
         ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))[:k]
         return ranked, touched
 
-    def dump(self, path: Path) -> None:
+    def dump(self, path: str | Path) -> None:
+        path = Path(path)
         payload = {
             **self._policy(),
             "corpus_snapshot": self.corpus_snapshot,
@@ -360,7 +384,14 @@ class InvertedCandidateIndex:
         path.write_bytes(_canonical_bytes(payload) + b"\n")
 
     @classmethod
-    def load(cls, path: Path) -> "InvertedCandidateIndex":
+    def load(cls, path: str | Path) -> "InvertedCandidateIndex":
+        """Restore an index from ``dump()``.
+
+        Replays graphs under the persisted DF/budget policy. Rejects a
+        tampered ``index_version``, ``feature_version``, ``corpus_snapshot``,
+        or ``thought_ids`` field rather than silently applying class defaults.
+        """
+        path = Path(path)
         payload = json.loads(path.read_text(encoding="utf-8"))
         if payload.get("index_version") != INDEX_VERSION:
             raise ValueError(

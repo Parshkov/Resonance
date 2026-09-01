@@ -29,5 +29,10 @@ budget.
 
 Small corpora (n < 1000) use a 0.90 DF fraction so analogical keys are
 not all killed by `min_df_cutoff=5`. Large corpora keep the 0.005 / 5
-policy. Frozen Benchmark v0.1 packs are MULTI-identical across domains;
-specific-ID Recall@20 among 72 ties is not claimed as a pass.
+policy.
+
+**Tie policy:** equal primary scores share competition min-rank.
+`thought_id` is only a stable display order inside a tie, never a rank
+key. `query(..., k=K)` returns every candidate whose primary rank is
+`<= K`, so a tied-best group is not truncated by graph name. Rank- and
+recall-consuming gates must read `channel_ranks`, not list position.

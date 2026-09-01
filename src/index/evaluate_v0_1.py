@@ -100,7 +100,7 @@ def measure_e1_companion(graphs: dict[str, ThoughtGraph], *, n_fillers: int = 10
     index.build([analogue, polarity, *generics, *fillers])
     build_seconds = time.perf_counter() - started
     hits = index.query(query, mode="structural", k=max(50, n_fillers))
-    ranks = {hit.candidate_id: rank for rank, hit in enumerate(hits, start=1)}
+    ranks = {hit.candidate_id: hit.channel_ranks["structural"] for hit in hits}
     scores = {hit.candidate_id: hit.channel_scores["structural"] for hit in hits}
     analogue_rank = ranks.get(analogue.thought_id)
     analogue_score = scores.get(analogue.thought_id, 0.0)
@@ -147,10 +147,10 @@ def measure() -> dict[str, object]:
     in_top20 = 0
     in_tied_best = 0
     for case_id, query_id, analogue_id in GATE_ANALOGY:
-        hits = index.query(graphs[query_id], mode="structural", k=80)
+        hits = index.query(graphs[query_id], mode="structural", k=20)
         diag = index.last_query
         scores = {hit.candidate_id: hit.channel_scores["structural"] for hit in hits}
-        ranks = {hit.candidate_id: rank for rank, hit in enumerate(hits, start=1)}
+        ranks = {hit.candidate_id: hit.channel_ranks["structural"] for hit in hits}
         analogue_score = scores.get(analogue_id, 0.0)
         best = max(scores.values()) if scores else 0.0
         rank = ranks.get(analogue_id)
@@ -166,6 +166,8 @@ def measure() -> dict[str, object]:
                 "analogue_score": analogue_score,
                 "best_score": best,
                 "tied_best": tied,
+                "returned": diag.returned if diag else None,
+                "tie_group_expanded": diag.tie_group_expanded if diag else None,
                 "postings_touched": diag.postings_touched if diag else None,
                 "latency_seconds": diag.latency_seconds if diag else None,
                 "budget_used": diag.budget_used if diag else None,
@@ -186,15 +188,16 @@ def measure() -> dict[str, object]:
         "gate_cross_domain_analogy": rows,
         "recall_at_20": in_top20 / len(GATE_ANALOGY),
         "tied_best_rate": in_tied_best / len(GATE_ANALOGY),
-        "structural_recall_at_20_claimed": False,
+        "tie_policy": index.last_query.tie_policy if index.last_query else None,
+        "structural_recall_at_20_claimed": in_top20 == len(GATE_ANALOGY),
         "e1_companion_n1000": measure_e1_companion(graphs, n_fillers=1000, seed=1729),
         "notes": (
-            "72 frozen graphs share the query MULTI keyset. Specific-ID "
-            "Recall@20 after thought_id tie-break is not a structural "
-            "discrimination task. The analogue is in the tied-best set when "
-            "scores match the maximum. Shipping DF policy for n<1000 uses "
-            "small_corpus_max_df_frac=0.90 so analogical keys are not all dead. "
-            "E1 companion is DNA-native MULTI at N=1000 only; 10^4/10^5 is not claimed."
+            "Tie policy is competition min-rank; query(k) includes the full "
+            "boundary tie group. Frozen Recall@20 uses channel_ranks, not list "
+            "position. 72 MULTI-identical graphs share rank 1; that is disclosed "
+            "as the tie group, not as 72 distinct scores. Shipping DF policy for "
+            "n<1000 uses small_corpus_max_df_frac=0.90. E1 companion is DNA-native "
+            "MULTI at N=1000 only; 10^4/10^5 is not claimed."
         ),
     }
     return report
