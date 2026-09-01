@@ -51,3 +51,9 @@ verifier_config_hash:   3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f89
 This is the first working Resonance MCP milestone. It is not a corpus-scale or
 production claim. Retrieval recall on the full frozen v0.1 gate remains the
 R5-recorded 0.727 failure; this demo does not rerank or compensate.
+
+## R7 corpus
+
+`demo/corpus/` is the consented multi-session demo corpus. It wraps accepted
+Thought DNA with consent/presentation metadata and does not implement
+retrieval, alignment, or scoring. See `demo/corpus/README.md`.

@@ -253,3 +253,58 @@ missions:
     prerequisites:
       - R6-MCP
     phase: R6
+
+  - run_id: R7-CORPUS
+    issue: 72
+    mission_file: engineering/missions/R7_CORPUS.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "demo/corpus/**; schemas/demo-corpus-0.1.schema.json; tests/test_demo_corpus.py"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R6-MCP
+    phase: R7
+
+  - run_id: R8-DISCOVERY
+    issue: 73
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "discovery DTO/schema; MCP-facing read model; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R7-CORPUS
+    phase: R8
+
+  - run_id: R9-VISUAL
+    issue: 74
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "demo UI surface; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R8-DISCOVERY
+    phase: R9
+
+  - run_id: R10-SHOWCASE
+    issue: 75
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "showcase runbook; demo manifest; README showcase section"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R6-E2E
+      - R7-CORPUS
+      - R8-DISCOVERY
+      - R9-VISUAL
+    phase: R10
