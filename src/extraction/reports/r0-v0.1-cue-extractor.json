@@ -1,0 +1,30 @@
+{
+  "config_hash": "ada952f2373346e27310fe078691583cfb404c1ddb256c8b1c448e31eb253c2c",
+  "cued_repeat_across_source_id": {
+    "edge_f1": 1.0,
+    "node_f1": 1.0,
+    "nodes": 4,
+    "relations": 2,
+    "text": "Heat accumulation causes degradation but cooling prevents failure."
+  },
+  "extraction_prerequisite_claimed": false,
+  "extractor_id": "resonance-cue-extractor",
+  "extractor_version": "0.1.1",
+  "frozen_coverage": {
+    "mean_nodes": 0.0,
+    "mean_relations": 0.0,
+    "n_records": 16,
+    "nonempty_graph_rate": 0.0,
+    "total_nodes": 0,
+    "total_relations": 0
+  },
+  "notes": "Frozen v0.1 extraction inputs contain no explicit relation cues. Cue-only extraction therefore has zero coverage on that corpus. Duplicate empty/empty F1 is not used as a pass. The non-vacuous repeat is the cued sentence under two source_id namespaces.",
+  "official_runner": {
+    "duplicate_edge_f1": 1.0,
+    "duplicate_node_f1": 1.0,
+    "edge_f1_to_reference": 0.0,
+    "node_f1_to_reference": 0.0,
+    "span_hash_schema_rate": 1.0,
+    "ungrounded_extracted_objects": 0
+  }
+}

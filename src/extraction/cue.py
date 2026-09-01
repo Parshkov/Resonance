@@ -7,20 +7,26 @@ abstained. No live-network Knowledge DNA lookups.
 from __future__ import annotations
 
 import hashlib
+import json
+import math
 import re
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Mapping
 
-from src.graph import ThoughtGraph, make_node_id, make_relation_id, make_thought_id, validate_thought
+from src.graph import Node, Relation, ThoughtGraph, make_node_id, make_relation_id, make_thought_id, validate_thought
 from src.interfaces import ConfigRef, ExtractionResult
 
 EXTRACTOR_ID = "resonance-cue-extractor"
-EXTRACTOR_VERSION = "0.1"
+EXTRACTOR_VERSION = "0.1.1"
 DROP_THRESHOLD = 0.35
 IOU_MERGE = 0.5
+FROZEN_EXTRACTION_RUNS = Path(__file__).resolve().parents[2] / "benchmark" / "r0-v0.1" / "extraction_runs.jsonl"
 
 CUES: tuple[tuple[str, str, float, int], ...] = (
     (r"\bcaused by\b", "causes", 0.86, 1),
     (r"\bcauses\b", "causes", 0.92, 0),
+    (r"\bcause\b", "causes", 0.84, 0),
     (r"\bleads to\b", "causes", 0.8, 0),
     (r"\bprevents\b", "prevents", 0.9, 0),
     (r"\bprevent\b", "prevents", 0.82, 0),
@@ -33,6 +39,11 @@ CUES: tuple[tuple[str, str, float, int], ...] = (
 )
 BOUNDARY = re.compile(r"\b(?:but|and|however|although|while|because|so|then)\b|[.;:!?]", re.I)
 WORD = re.compile(r"\S+")
+# Cue-attached verbal negation only. Bare "no" is too wide (no doubt, no wonder).
+CUE_NEGATION = re.compile(
+    r"(?:do\s+not|does\s+not|did\s+not|cannot|can(?:no)?t|will\s+not|won'?t|never|not)\s+$",
+    re.I,
+)
 ROLE_HINTS = (
     ("constraint", ("constraint", "limit", "budget", "must not")),
     ("evidence", ("evidence", "observation", "measured")),
@@ -54,7 +65,7 @@ def _span(text: str, start: int, end: int) -> dict[str, object]:
     return {"start": start, "end": end, "text": text[start:end]}
 
 
-def _iou(a: dict[str, object], b: dict[str, object]) -> float:
+def _iou(a: Mapping[str, object], b: Mapping[str, object]) -> float:
     left, right = max(int(a["start"]), int(b["start"])), min(int(a["end"]), int(b["end"]))
     inter = max(0, right - left)
     union = int(a["end"]) - int(a["start"]) + int(b["end"]) - int(b["start"]) - inter
@@ -116,15 +127,59 @@ def _modality(text: str, start: int, end: int) -> str:
 
 
 def _assertion(text: str, start: int, end: int) -> str:
-    window = text[max(0, start - 16) : end].lower()
-    if re.search(r"\b(not|never|no)\b", window):
+    """Negate only when a verbal negator immediately precedes the cue."""
+    prefix = text[max(0, start - 32) : start]
+    if CUE_NEGATION.search(prefix):
         return "negated"
     return "asserted"
+
+
+def _require_drop_threshold(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("drop_threshold must be a finite number in [0, 1]")
+    number = float(value)
+    if not math.isfinite(number) or not 0.0 <= number <= 1.0:
+        raise ValueError("drop_threshold must be a finite number in [0, 1]")
+    return number
+
+
+def _node_signature(node: Node) -> tuple[object, ...]:
+    spans = tuple(sorted((span.start, span.end, span.text) for span in node.spans))
+    return (node.role, spans, node.assertion, node.modality)
+
+
+def _edge_signature(graph: ThoughtGraph, relation: Relation) -> tuple[object, ...] | None:
+    by_id = {node.id: node for node in graph.nodes}
+    source = by_id.get(relation.source)
+    target = by_id.get(relation.target)
+    if source is None or target is None:
+        return None
+    return (
+        _node_signature(source),
+        relation.type,
+        _node_signature(target),
+        relation.assertion,
+        relation.modality,
+    )
+
+
+def _f1(predicted: set[object], gold: set[object]) -> float:
+    if not predicted and not gold:
+        return 1.0
+    if not predicted or not gold:
+        return 0.0
+    overlap = len(predicted & gold)
+    precision = overlap / len(predicted)
+    recall = overlap / len(gold)
+    return 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
 
 
 @dataclass(frozen=True)
 class CueExtractor:
     drop_threshold: float = DROP_THRESHOLD
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "drop_threshold", _require_drop_threshold(self.drop_threshold))
 
     def extract(self, context: str, *, source_id: str | None = None) -> ExtractionResult:
         if not isinstance(context, str) or not context.strip():
@@ -132,7 +187,7 @@ class CueExtractor:
         warnings: list[str] = []
         abstentions: list[str] = []
         thought_id = make_thought_id(context, namespace=source_id or "")
-        nodes: dict[tuple[int, int], dict[str, object]] = {}
+        nodes: dict[str, dict[str, object]] = {}
         relations: list[dict[str, object]] = []
 
         def add_node(span: dict[str, object]) -> str | None:
@@ -143,15 +198,16 @@ class CueExtractor:
             if conf < self.drop_threshold:
                 abstentions.append(f"dropped node {label!r} below threshold")
                 return None
-            key = (int(span["start"]), int(span["end"]))
-            for existing_key, existing in list(nodes.items()):
+            for existing in nodes.values():
                 if _iou(span, existing["spans"][0]) >= IOU_MERGE:
                     if conf > float(existing["extract_conf"]):
-                        nodes.pop(existing_key)
-                        break
+                        existing["label"] = label
+                        existing["role"] = role
+                        existing["spans"] = [span]
+                        existing["extract_conf"] = conf
                     return str(existing["id"])
             node_id = make_node_id(role, spans=[span], namespace=thought_id)
-            payload: dict[str, object] = {
+            nodes[node_id] = {
                 "id": node_id,
                 "label": label,
                 "role": role,
@@ -161,7 +217,6 @@ class CueExtractor:
                 "assertion": "asserted",
                 "modality": "actual",
             }
-            nodes[key] = payload
             return node_id
 
         for pattern, rel_type, conf, reverse in CUES:
@@ -204,12 +259,12 @@ class CueExtractor:
                     "modality": modality,
                 }
                 if rel_type == "requires":
-                    dst_node = next(item for item in nodes.values() if item["id"] == dst)
+                    dst_node = nodes[dst]
                     dst_node["knowledge"] = {
                         "about": [{"id": f"local:{_slug(str(dst_node['label']))}", "conf": max(conf, 0.5), "via": "extractor"}],
                         "requires": [],
                     }
-                    src_node = next(item for item in nodes.values() if item["id"] == src)
+                    src_node = nodes[src]
                     src_node["knowledge"] = {
                         "about": [],
                         "requires": [{"id": f"local:{_slug(str(dst_node['label']))}", "conf": max(conf, 0.5), "via": "extractor"}],
@@ -251,29 +306,49 @@ class ManualIngest:
 
 
 def repeat_extraction_f1(first: ThoughtGraph, second: ThoughtGraph) -> dict[str, float]:
-    def node_spans(graph: ThoughtGraph) -> list[dict[str, object]]:
-        return [span.to_dict() for node in graph.nodes for span in node.spans]
+    """Node/edge F1 after span/role/assertion/modality alignment, not local IDs.
 
-    def edge_keys(graph: ThoughtGraph) -> set[tuple[str, str, str]]:
-        return {(rel.source, rel.type, rel.target) for rel in graph.relations}
+    Matches Benchmark v0.1 `runner._extraction_sets`: Thought DNA does not
+    promise run-identical IDs, so typed-edge agreement is computed through
+    aligned node signatures.
+    """
+    a_nodes = {_node_signature(node) for node in first.nodes}
+    b_nodes = {_node_signature(node) for node in second.nodes}
+    a_edges = {sig for rel in first.relations if (sig := _edge_signature(first, rel)) is not None}
+    b_edges = {sig for rel in second.relations if (sig := _edge_signature(second, rel)) is not None}
+    return {"node_f1": _f1(a_nodes, b_nodes), "edge_f1": _f1(a_edges, b_edges)}
 
-    a, b = node_spans(first), node_spans(second)
-    matched = 0
-    used: set[int] = set()
-    for span in a:
-        for index, other in enumerate(b):
-            if index in used:
-                continue
-            if _iou(span, other) >= IOU_MERGE:
-                matched += 1
-                used.add(index)
-                break
-    node_p = matched / len(a) if a else 1.0
-    node_r = matched / len(b) if b else 1.0
-    node_f1 = 0.0 if node_p + node_r == 0 else 2 * node_p * node_r / (node_p + node_r)
-    ea, eb = edge_keys(first), edge_keys(second)
-    inter = len(ea & eb)
-    edge_p = inter / len(ea) if ea else 1.0
-    edge_r = inter / len(eb) if eb else 1.0
-    edge_f1 = 0.0 if edge_p + edge_r == 0 else 2 * edge_p * edge_r / (edge_p + edge_r)
-    return {"node_f1": node_f1, "edge_f1": edge_f1}
+
+def frozen_v0_1_predictions(
+    extractor: CueExtractor | None = None,
+    *,
+    path: Path = FROZEN_EXTRACTION_RUNS,
+) -> list[dict[str, object]]:
+    """Adapter: CueExtractor over the frozen 16 extraction observations."""
+    extractor = extractor or CueExtractor()
+    predictions: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        case_id = str(record["extraction_case_id"])
+        text = str(record["input"]["text"])
+        graph = extractor.extract(text, source_id=case_id).graph
+        predictions.append({"extraction_case_id": case_id, "thought_dna": graph.to_dict()})
+    return predictions
+
+
+def frozen_v0_1_coverage(predictions: list[dict[str, object]]) -> dict[str, float | int]:
+    """Honest coverage for cue-only extraction. Empty graphs are not hidden."""
+    node_counts = [len(item["thought_dna"]["nodes"]) for item in predictions]
+    rel_counts = [len(item["thought_dna"]["relations"]) for item in predictions]
+    n = len(predictions) or 1
+    nonempty = sum(1 for nodes, rels in zip(node_counts, rel_counts) if nodes or rels)
+    return {
+        "n_records": len(predictions),
+        "mean_nodes": sum(node_counts) / n,
+        "mean_relations": sum(rel_counts) / n,
+        "nonempty_graph_rate": nonempty / n,
+        "total_nodes": sum(node_counts),
+        "total_relations": sum(rel_counts),
+    }
