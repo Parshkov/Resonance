@@ -171,6 +171,19 @@ missions:
       - R1-SCHEMA
     phase: R1
 
+  - run_id: R1-BENCHMARK-v0.2
+    issue: 56
+    mission_file: engineering/missions/R1_BENCHMARK_v0.2.md
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "benchmark/r0-v0.2/**; tests/test_benchmark_v0_2.py"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-BENCHMARK
+    phase: R1
+
   - run_id: R2-EXTRACTION
     issue: 40
     mission_file: engineering/missions/R2_EXTRACTION.md
