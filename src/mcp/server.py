@@ -1,6 +1,6 @@
 """Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited, protocol
 2024-11-05) over the ResonanceAdapter. Transport only: framing, handshake,
-tools/list, tools/call, JSON-RPC errors. stdlib-only.
+tools/list, tools/call, ping, JSON-RPC errors. stdlib-only.
 
 Run:  python3 -m src.mcp.server [--snapshot DIR]
 """
@@ -34,6 +34,8 @@ class MCPServer:
         method = message["method"]
         msg_id = message.get("id")
         params = message.get("params") or {}
+        if not isinstance(params, dict):
+            return self._error(msg_id, INVALID_PARAMS, "params must be an object")
         if method == "initialize":
             self.initialized = True
             return self._result(msg_id, {
@@ -46,6 +48,8 @@ class MCPServer:
             return None                                  # ignore other notifications
         if not self.initialized:
             return self._error(msg_id, INVALID_REQUEST, "initialize first")
+        if method == "ping":
+            return self._result(msg_id, {})
         if method == "tools/list":
             return self._result(msg_id, {"tools": TOOLS})
         if method == "tools/call":
@@ -55,20 +59,26 @@ class MCPServer:
     def _tool_call(self, msg_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         name = params.get("name")
         arguments = params.get("arguments") or {}
+        if not isinstance(arguments, dict):
+            return self._error(msg_id, INVALID_PARAMS, "arguments must be an object")
         try:
             payload = self.adapter.dispatch(name, arguments)
         except KeyError as exc:
             return self._error(msg_id, METHOD_NOT_FOUND, str(exc))
         except TypeError as exc:
             return self._error(msg_id, INVALID_PARAMS, f"bad arguments: {exc}")
-        except (ValueError, EngineIntegrityError) as exc:
-            # engine-declared failures (unknown mode, validation, integrity)
-            # surface as tool errors with the engine's own message
+        except (ValueError, EngineIntegrityError, OSError) as exc:
+            # Engine-declared failures plus filesystem failures from snapshot
+            # loading/saving are tool errors, not transport failures. Keep the
+            # stdio session alive so the client can issue another request.
             return self._result(msg_id, {
                 "content": [{"type": "text",
                              "text": json.dumps({"error": type(exc).__name__,
                                                  "message": str(exc)})}],
                 "isError": True})
+        except Exception as exc:  # defensive transport boundary
+            return self._error(msg_id, INTERNAL_ERROR,
+                               f"internal error: {type(exc).__name__}: {exc}")
         return self._result(msg_id, {
             "content": [{"type": "text",
                          "text": json.dumps(payload, ensure_ascii=False, sort_keys=True)}],
@@ -94,7 +104,14 @@ class MCPServer:
             except json.JSONDecodeError:
                 reply = self._error(None, PARSE_ERROR, "parse error")
             else:
-                reply = self.handle(message)
+                if not isinstance(message, dict):
+                    reply = self._error(None, INVALID_REQUEST, "invalid request")
+                else:
+                    try:
+                        reply = self.handle(message)
+                    except Exception as exc:  # never let one frame kill stdio
+                        reply = self._error(message.get("id"), INTERNAL_ERROR,
+                                            f"internal error: {type(exc).__name__}: {exc}")
             if reply is not None:
                 stdout.write(json.dumps(reply, ensure_ascii=False) + "\n")
                 stdout.flush()
