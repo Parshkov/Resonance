@@ -45,16 +45,27 @@ class FacadeTests(unittest.TestCase):
         self.assertIsInstance(engine.store, ThoughtStore)
 
     def test_engine_never_imports_mcp(self):
-        """The guarantee is import-independence, not MCP's absence from the
-        repo -- after R6 lands a transport package this must keep passing."""
-        engine = ResonanceEngine()
-        g = engine.ingest("Heat causes failure.", source_id="mcp-free")
-        engine.index(g)
-        engine.find(g, mode="structural", k=3)
-        self.assertTrue(engine.get(g.thought_id) is g)
-        loaded = [name for name in sys.modules if name == "src.mcp"
-                  or name.startswith("src.mcp.")]
-        self.assertEqual(loaded, [], "engine pulled in MCP transport modules")
+        """The guarantee is import-independence OF THE ENGINE, attributed in a
+        clean interpreter: running the whole suite legitimately loads src.mcp
+        via the transport tests, so an in-process sys.modules check would
+        blame the engine for its neighbours. A subprocess isolates the
+        attribution -- and keeps passing after R6, exactly as the R4-era
+        review asked."""
+        import subprocess
+        code = (
+            "import sys; sys.path.insert(0, '.');\n"
+            "from src.engine import ResonanceEngine\n"
+            "e = ResonanceEngine()\n"
+            "g = e.ingest('Heat causes failure.', source_id='mcp-free')\n"
+            "e.index(g); e.find(g, mode='structural', k=3)\n"
+            "assert e.get(g.thought_id) is g\n"
+            "bad = [m for m in sys.modules if m == 'src.mcp' or m.startswith('src.mcp.')]\n"
+            "assert not bad, f'engine imported MCP: {bad}'\n"
+            "print('MCP-FREE-OK')\n")
+        proc = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                              text=True, cwd=REPO, timeout=120)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("MCP-FREE-OK", proc.stdout)
 
     def test_manual_bypass_reaches_the_same_interfaces(self):
         engine = ResonanceEngine()
