@@ -252,6 +252,15 @@ class CandidateIndexTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "version metadata mismatch"):
                 CandidateRetrievalIndex.load(path)
 
+            index.save(path)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            payload["tie_policy_version"] = "forged-tie-policy"
+            body = {key: value for key, value in payload.items() if key != "integrity_sha256"}
+            payload["integrity_sha256"] = _integrity(body)
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "tie policy version metadata mismatch"):
+                CandidateRetrievalIndex.load(path)
+
     def test_incremental_replace_and_remove_preserve_other_documents(self):
         index = CandidateRetrievalIndex(IndexConfig(enabled_channels=("structural",)))
         first = _manual_graph("first")
