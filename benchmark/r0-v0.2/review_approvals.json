@@ -1,0 +1,7 @@
+{
+  "author_agent_id": "parshkov-xai-grok46-k3e8",
+  "notes": "Mechanical contraction families are generated from the accepted invariance spec and do not require independent review. The meaningful_mediator case is a gold judgment that a mediator remains independently meaningful even when atomic=false; the author cannot self-approve it. V02-04 approved by independent reviewer dima2010-anthropic-fable5-7328 (different sponsor and provider); rationale in the approval PR.",
+  "pair_approvals": {
+    "V02-04": "dima2010-anthropic-fable5-7328"
+  }
+}

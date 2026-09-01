@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.2/schema/prediction.schema.json",
+  "title": "Benchmark v0.2 contraction-audit prediction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "retrieval", "verification"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "retrieval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate_rank", "requires_structural_verification", "polarity_reliable"],
+      "properties": {
+        "candidate_rank": {"type": "integer", "minimum": 1},
+        "requires_structural_verification": {"type": "boolean"},
+        "polarity_reliable": {"type": "boolean"}
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predicted_class", "node_mapping", "edge_mapping", "edge_path_matches"],
+      "properties": {
+        "predicted_class": {"enum": ["approximate", "negative", "unsupported"]},
+        "node_mapping": {"type": "array"},
+        "edge_mapping": {"type": "array"},
+        "edge_path_matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["query_relation", "candidate_relations", "realizes_nodes"],
+            "properties": {
+              "query_relation": {"type": "string"},
+              "candidate_relations": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+              "realizes_nodes": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "false_contractions": {"type": "integer", "minimum": 0, "description": "Ignored by the v0.2 gate. Present only as a diagnostic that engines may still emit."}
+      }
+    }
+  }
+}

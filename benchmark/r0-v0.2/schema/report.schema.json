@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.2/schema/report.schema.json",
+  "title": "Benchmark v0.2 contraction-audit report",
+  "type": "object",
+  "required": ["report_version", "benchmark_version", "gates", "overall_status"],
+  "properties": {
+    "report_version": {"const": "resonance-benchmark-report/0.2"},
+    "benchmark_version": {"const": "r0-v0.2"},
+    "overall_status": {"enum": ["pass", "fail"]},
+    "gates": {"type": "object"}
+  }
+}

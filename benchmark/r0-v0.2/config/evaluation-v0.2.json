@@ -1,0 +1,9 @@
+{
+  "benchmark_version": "r0-v0.2",
+  "config_id": "resonance-benchmark-evaluation/0.2",
+  "max_path_relations": 4,
+  "safe_intermediate_roles": ["mechanism", "state"],
+  "ignore_self_reported_false_contractions": true,
+  "gate_false_meaningful_contractions_max": 0,
+  "stage_for_contraction_failure": "verifier_mapping"
+}
