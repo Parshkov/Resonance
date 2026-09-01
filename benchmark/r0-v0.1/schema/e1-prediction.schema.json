@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/e1-prediction.schema.json",
+  "title": "DNA-native E1 prediction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "descriptor_results", "polarity_flip_rank", "polarity_flip_score", "polarity_rejected_end_to_end", "polarity_reliable", "postings_touched", "build_seconds", "query_seconds", "live_keys", "dead_keys", "replay_hash", "rerun_hash"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "descriptor_results": {
+      "type": "object", "additionalProperties": false,
+      "required": ["D0", "D1", "MULTI"],
+      "properties": {
+        "D0": {"$ref": "#/$defs/descriptor"},
+        "D1": {"$ref": "#/$defs/descriptor"},
+        "MULTI": {"$ref": "#/$defs/descriptor"}
+      }
+    },
+    "polarity_flip_rank": {"type": "integer", "minimum": 1},
+    "polarity_flip_score": {"type": "number"},
+    "polarity_rejected_end_to_end": {"type": "boolean"},
+    "polarity_reliable": {"const": false},
+    "postings_touched": {"type": "integer", "minimum": 0},
+    "build_seconds": {"type": "number", "minimum": 0},
+    "query_seconds": {"type": "number", "minimum": 0},
+    "live_keys": {"type": "integer", "minimum": 0},
+    "dead_keys": {"type": "integer", "minimum": 0},
+    "replay_hash": {"type": "string", "minLength": 1},
+    "rerun_hash": {"type": "string", "minLength": 1}
+  },
+  "$defs": {
+    "descriptor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["true_rank", "true_score", "best_generic_rank", "best_generic_score"],
+      "properties": {
+        "true_rank": {"type": "integer", "minimum": 1},
+        "true_score": {"type": "number"},
+        "best_generic_rank": {"type": "integer", "minimum": 1},
+        "best_generic_score": {"type": "number"}
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "benchmark_version": "r0-v0.1",
+  "counts": {
+    "calibration_packs": 2,
+    "e1_matrix_cases": 12,
+    "extraction_runs": 16,
+    "gate_packs": 6,
+    "graphs": 136,
+    "packs": 8,
+    "pairs": 128
+  },
+  "files": {
+    "config/evaluation-v0.1.json": {
+      "bytes": 1711,
+      "sha256": "b1e8c341aa3a44952a12101cd159f574fc658935aaaf17c8cd85d7e42c7bdbd0"
+    },
+    "e1_cases.jsonl": {
+      "bytes": 7900,
+      "records": 12,
+      "sha256": "8467bcdda7c73a685afaca3c9179672b8a0c7ab4d6224a032cac6608c7efbd5b"
+    },
+    "extraction_runs.jsonl": {
+      "bytes": 97512,
+      "records": 16,
+      "sha256": "f2601b4424af7457993a0e28219764f9e92de63f162bba26ce13c138a05476c9"
+    },
+    "graphs.jsonl": {
+      "bytes": 454633,
+      "records": 136,
+      "sha256": "b749f10e4178a5b21a9bab03f01defbbb35f2688faa8103b952135c63ee1c9cd"
+    },
+    "pairs.jsonl": {
+      "bytes": 83990,
+      "records": 128,
+      "sha256": "f5f345dcf142203105b221014659cdaa6f7d7abb5ac372ccdea3cae2f33739a1"
+    },
+    "review_approvals.json": {
+      "bytes": 4074,
+      "sha256": "26a28999aac23467c9edf1a7b0c34e5903be317a0ffcda22d6a91df20f6123c5"
+    },
+    "schema/e1-case.schema.json": {
+      "bytes": 1161,
+      "sha256": "33eaad7b6b99a61191879cc1af5f72a2218caf786e08f8d63c8d4fe92b6a6091"
+    },
+    "schema/e1-prediction.schema.json": {
+      "bytes": 1891,
+      "sha256": "663260a68e39f353c67a9e7571e4451a2bc400862cbfefe176b477bdec3b8815"
+    },
+    "schema/extraction-prediction.schema.json": {
+      "bytes": 437,
+      "sha256": "88d95458849ee71b4dbd777900a6b626c2307417678eb1a0e03c3eb9b1584c56"
+    },
+    "schema/extraction-run.schema.json": {
+      "bytes": 833,
+      "sha256": "1b41798895dbe8234d3d5bcf9572e3c0e95b90b165f8974b09663b5d5017ccd0"
+    },
+    "schema/graph.schema.json": {
+      "bytes": 505,
+      "sha256": "3f1af99ba424af0dc7a8d4a6c2264ddef8260da63af68fb552791cf6e1c8d602"
+    },
+    "schema/pair.schema.json": {
+      "bytes": 2254,
+      "sha256": "6586de95673a2b7a1218341f39e1e655e242d573629c625457cd7d0930817c9b"
+    },
+    "schema/prediction.schema.json": {
+      "bytes": 2872,
+      "sha256": "19c8bf39255420a7781331c8e0f2ab955650be9801182d068b566c7c09ef2bd1"
+    },
+    "schema/report.schema.json": {
+      "bytes": 1045,
+      "sha256": "9c13313323a815bccc51d6a889cb7ca51d760483f89e2b0fef1c13eab2607e59"
+    },
+    "schema/scale-prediction.schema.json": {
+      "bytes": 1881,
+      "sha256": "53b89b482a136b320e30d8974946dfc41a55e76c86dd121814592463994e67a3"
+    }
+  },
+  "freeze_state": "independent_review_complete",
+  "manifest_version": "resonance-benchmark-manifest/0.1",
+  "provenance": {
+    "agent_id": "parshkov-openai-gpt5-codex-s7d3",
+    "human_sponsor": "Parshkov",
+    "model": "GPT-5-based Codex (exact deployed model/version not exposed to this run)",
+    "provider": "OpenAI",
+    "runtime": "Python 3.12 stdlib; src.graph Thought DNA validator",
+    "source_commit": "set by git; content hash is authoritative"
+  },
+  "thought_dna_schema": "thought-dna/0.1"
+}

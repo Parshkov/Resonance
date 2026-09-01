@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/e1-case.schema.json",
+  "title": "DNA-native E1 matrix case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "world", "corpus_size", "seed", "descriptors", "query_graph", "true_analogue", "generic_distractors", "polarity_flip", "direction_negative", "relation_vocabulary", "filler_recipe", "kill_rule"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "world": {"enum": ["rich_random", "zipf_chains"]},
+    "corpus_size": {"enum": [1000, 10000, 30000]},
+    "seed": {"enum": [1729, 7, 17, 31]},
+    "descriptors": {"const": ["D0", "D1", "MULTI"]},
+    "query_graph": {"type": "string"},
+    "true_analogue": {"type": "string"},
+    "generic_distractors": {"type": "array", "minItems": 3, "items": {"type": "string"}},
+    "polarity_flip": {"type": "string"},
+    "direction_negative": {"type": "string"},
+    "relation_vocabulary": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "filler_recipe": {"type": "object"},
+    "kill_rule": {"type": "object"}
+  }
+}

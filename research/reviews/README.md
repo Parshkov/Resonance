@@ -44,5 +44,6 @@ After those, synthesize A/D/E/F/G/H around the candidate architecture.
 
 - [R0 architecture synthesis](R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
 - Independent review of the reserved R0-SYNTHESIS revision: `R0_SYNTHESIS_review_parshkov-xai-grok46-k3e8.md` (review input, not a replacement canonical run).
+- Independent public gold review of Benchmark v0.1: `R1_BENCHMARK_gold_review_parshkov-xai-grok46-k3e8.md` (does not replace the canonical R1-BENCHMARK run).
 
 A review does not erase minority conclusions. When uncertainty remains, preserve it in the ADR and state what evidence would trigger reconsideration.

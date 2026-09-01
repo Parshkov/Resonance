@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Parshkov/Resonance/benchmark/r0-v0.1/schema/prediction.schema.json",
+  "title": "Benchmark v0.1 pair prediction",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "retrieval", "verification", "replay"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "retrieval": {"$ref": "#/$defs/retrieval"},
+    "verification": {"$ref": "#/$defs/verification"},
+    "replay": {"$ref": "#/$defs/replay"}
+  },
+  "$defs": {
+    "mapping": {"type": "array", "items": {"type": "array", "minItems": 2, "maxItems": 2}},
+    "retrieval": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidate_rank", "channel_scores", "requires_structural_verification", "polarity_reliable", "latency_seconds", "postings_touched"],
+      "properties": {
+        "candidate_rank": {"type": "integer", "minimum": 1},
+        "channel_scores": {"type": "object", "additionalProperties": {"type": "number"}},
+        "requires_structural_verification": {"type": "boolean"},
+        "polarity_reliable": {"type": "boolean"},
+        "latency_seconds": {"type": "number", "minimum": 0},
+        "postings_touched": {"type": "integer", "minimum": 0}
+      }
+    },
+    "verification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["predicted_class", "node_mapping", "edge_mapping", "bridge_mapping", "hard_rejection", "false_contractions", "components", "latency_seconds"],
+      "properties": {
+        "predicted_class": {"enum": ["direct", "approximate", "analogical", "complementary", "negative", "unsupported"]},
+        "node_mapping": {"$ref": "#/$defs/mapping"},
+        "edge_mapping": {"$ref": "#/$defs/mapping"},
+        "bridge_mapping": {"$ref": "#/$defs/mapping"},
+        "hard_rejection": {"type": ["string", "null"]},
+        "false_contractions": {"type": "integer", "minimum": 0},
+        "components": {"type": "object", "additionalProperties": {"type": ["number", "boolean"]}},
+        "latency_seconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "replay": {
+      "type": "object", "additionalProperties": false,
+      "required": ["candidate_rank", "predicted_class", "node_mapping", "edge_mapping", "bridge_mapping", "hard_rejection", "components"],
+      "properties": {
+        "candidate_rank": {"type": "integer", "minimum": 1},
+        "predicted_class": {"enum": ["direct", "approximate", "analogical", "complementary", "negative", "unsupported"]},
+        "node_mapping": {"$ref": "#/$defs/mapping"},
+        "edge_mapping": {"$ref": "#/$defs/mapping"},
+        "bridge_mapping": {"$ref": "#/$defs/mapping"},
+        "hard_rejection": {"type": ["string", "null"]},
+        "components": {"type": "object", "additionalProperties": {"type": ["number", "boolean"]}}
+      }
+    }
+  }
+}

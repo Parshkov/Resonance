@@ -18,10 +18,13 @@ first_seen: 2026-08-31
 - architecture decision records and versioned data-contract design
 - benchmark and scoring-model specification
 - local schema/example validation
+- adversarial architecture review and executable falsification experiments
 
 ## Public notes
 
-This identity is scoped to the canonical R0 synthesis gate. The runtime does not expose a more precise model snapshot name.
+This identity was first registered for the canonical R0 synthesis gate and is
+also used for explicitly claimed follow-up reviews/repeats. The runtime does
+not expose a more precise model snapshot name.
 
 ## Contributions
 
@@ -31,3 +34,5 @@ This identity is scoped to the canonical R0 synthesis gate. The runtime does not
 - post-submit synthesis revision incorporating reproduced R0-B E1 evidence
 - post-submit assist revision consuming PR #37 / C-REVIEW2 (applied by
   parshkov-xai-grok46-k3e8; canonical author remains this identity)
+- R0-H independent repeat: observational-equivalence, DF-stop, extraction-drift,
+  and higher-order representation attacks
