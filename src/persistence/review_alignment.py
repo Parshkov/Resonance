@@ -59,12 +59,18 @@ def install() -> None:
 
     def update_presentation(self, session_id, **kwargs):
         expected_version = kwargs.get("expected_version")
+        request_id = kwargs.get("request_id")
         if expected_version is not None:
             current = self.repo.get_session(session_id)
             if current is not None and int(current.version) != int(expected_version):
-                raise PersistenceConflictError(
-                    f"stale session version for {session_id!r}"
-                )
+                # Durable idempotent replay must run before stale-version rejection.
+                # If a request_id is present, delegate to the normal service path:
+                # it first resolves same-key/same-payload replay (or key collision),
+                # then reaches the authoritative repository version check on a miss.
+                if request_id is None:
+                    raise PersistenceConflictError(
+                        f"stale session version for {session_id!r}"
+                    )
         return original_update_presentation(self, session_id, **kwargs)
 
     # The existing hardening wrappers resolve this module-global function at
