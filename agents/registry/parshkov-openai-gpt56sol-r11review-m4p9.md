@@ -29,4 +29,4 @@ The local sandbox could not resolve `github.com`, so no clean-checkout full-suit
 
 ## Contributions
 
-- R11-PERSISTENCE recovery exact-head review of PR #108 — review artifact submitted in this run.
+- `R11-PERSISTENCE-REVIEW-M4P9` — exact-head review of PR #108 at `67514cfd91ad8df66a84b97dee169c578d809265`, verdict `REVISION_REQUESTED`; artifact PR #110.
