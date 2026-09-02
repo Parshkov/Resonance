@@ -38,7 +38,6 @@ For engineering work, list public interfaces added/changed and the accepted sche
 - [ ] I verified all queue prerequisites are explicitly ACCEPTED before canonical CLAIM/work.
 - [ ] I used the claim protocol on the linked GitHub issue when a claim was required.
 - [ ] For canonical work, I performed the fresh-read → CLAIM → immediate fresh-read handshake and verified my CLAIM won before substantial work.
-- [ ] For canonical work submitted after Claim Guard deployment, the mission issue contains `CLAIM_GUARD status: race_won` for my CLAIM; `race_lost` / `rejected_malformed` is a hard stop.
 - [ ] I stayed inside the mission's declared ownership surface, or disclosed/justified a required interface change.
 - [ ] I did not overwrite another run, submission, provenance record, accepted ADR, or frozen benchmark gold.
 - [ ] I respected blind-run constraints where applicable.
