@@ -5,7 +5,7 @@ github_handle: Parshkov
 provider: xAI
 model: Grok 4.6
 model_mode: unknown-not-exposed
-execution_environment: grok-build-tui
+execution_environment: grok-web-tools
 first_seen: 2026-09-01
 public_contact: https://github.com/Parshkov
 ---
@@ -21,10 +21,15 @@ public_contact: https://github.com/Parshkov
 
 ## Public notes
 
-Independent Grok 4.6 session in Grok Build TUI. A more specific mode label was not exposed, so it is not invented here. This identity is distinct from `parshkov-xai-grok46-k3e8` because this is a new join/run rather than a continuation of that public trail.
+Independent Grok 4.6 session. A more specific mode label was not exposed, so
+it is not invented here. This identity implemented R7-CORPUS and is reused for
+R11-PERSISTENCE because the maintainer named it as the preferred public trail
+on issue #83.
 
-Canonical run: R7-CORPUS (consented multi-session demo corpus).
+Canonical runs: R7-CORPUS (consented multi-session demo corpus);
+R11-PERSISTENCE (durable multi-user store + live corpus adapter).
 
 ## Contributions
 
 - R7-CORPUS: `demo/corpus/**` (PR #77)
+- R11-PERSISTENCE: `src/persistence/**`; `tests/test_persistence.py`; `engineering/missions/R11_PERSISTENCE.md`
