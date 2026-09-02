@@ -1,0 +1,147 @@
+"""Transport-neutral persistence records. No matching semantics live here."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Mapping
+
+PERSISTENCE_SCHEMA_VERSION = "resonance-persistence/0.1"
+THOUGHT_DNA_SCHEMA_VERSION = "thought-dna/0.1"
+CORPUS_SCHEMA_VERSION = "resonance-demo-corpus/0.1"
+
+DISCOVERABLE = "discoverable"
+HIDDEN = "hidden"
+REVOKED = "revoked"
+DELETED = "deleted"
+
+
+@dataclass(frozen=True, slots=True)
+class ConsentState:
+    share_enabled: bool
+    share_thought_dna: bool
+    share_coarse_location: bool
+    share_display_profile: bool
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "ConsentState":
+        return cls(
+            share_enabled=bool(data["share_enabled"]),
+            share_thought_dna=bool(data["share_thought_dna"]),
+            share_coarse_location=bool(data["share_coarse_location"]),
+            share_display_profile=bool(data["share_display_profile"]),
+        )
+
+    def to_dict(self) -> dict[str, bool]:
+        return {
+            "share_enabled": self.share_enabled,
+            "share_thought_dna": self.share_thought_dna,
+            "share_coarse_location": self.share_coarse_location,
+            "share_display_profile": self.share_display_profile,
+        }
+
+    def is_discoverable(self) -> bool:
+        return bool(self.share_enabled and self.share_thought_dna)
+
+
+@dataclass(frozen=True, slots=True)
+class UserRecord:
+    user_id: str
+    display_label: str
+    avatar_placeholder: str
+    created_at: str
+    updated_at: str
+    revoked_at: str | None = None
+
+    @property
+    def hidden(self) -> bool:
+        return self.revoked_at is not None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "user_id": self.user_id,
+            "display_label": self.display_label,
+            "avatar_placeholder": self.avatar_placeholder,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "revoked_at": self.revoked_at,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRecord:
+    session_id: str
+    user_id: str
+    thought_id: str
+    schema_version: str
+    thought_dna: Mapping[str, Any]
+    thought_dna_sha256: str
+    thought_dna_schema_version: str
+    consent: ConsentState
+    location: Mapping[str, Any]
+    presentation: Mapping[str, Any]
+    record_kind: str
+    builder_id: str
+    notes: str
+    created_at: str
+    updated_at: str
+    revoked_at: str | None = None
+    deleted_at: str | None = None
+
+    @property
+    def share_state(self) -> str:
+        if self.deleted_at is not None:
+            return DELETED
+        if self.revoked_at is not None:
+            return REVOKED
+        if self.consent.is_discoverable():
+            return DISCOVERABLE
+        return HIDDEN
+
+    def is_live(self) -> bool:
+        return self.revoked_at is None and self.deleted_at is None
+
+    def is_discoverable(self) -> bool:
+        return self.is_live() and self.consent.is_discoverable()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "user_id": self.user_id,
+            "thought_id": self.thought_id,
+            "schema_version": self.schema_version,
+            "thought_dna": dict(self.thought_dna),
+            "thought_dna_sha256": self.thought_dna_sha256,
+            "thought_dna_schema_version": self.thought_dna_schema_version,
+            "consent": self.consent.to_dict(),
+            "location": dict(self.location),
+            "presentation": dict(self.presentation),
+            "record_kind": self.record_kind,
+            "builder_id": self.builder_id,
+            "notes": self.notes,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "revoked_at": self.revoked_at,
+            "deleted_at": self.deleted_at,
+            "share_state": self.share_state,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AuditEvent:
+    event_id: str
+    event_type: str
+    user_id: str | None
+    session_id: str | None
+    payload: Mapping[str, Any] = field(default_factory=dict)
+    created_at: str = ""
+
+    def to_public_dict(self) -> dict[str, Any]:
+        """Public audit view: never includes raw conversation text."""
+        return {
+            "event_id": self.event_id,
+            "event_type": self.event_type,
+            "user_id": self.user_id,
+            "session_id": self.session_id,
+            "payload": dict(self.payload),
+            "created_at": self.created_at,
+        }
