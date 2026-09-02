@@ -1,4 +1,4 @@
-version: 3
+version: 4
 project: Resonance
 live_status_source: github_issues
 state_machine: work/STATE_MACHINE.md
@@ -293,18 +293,188 @@ missions:
       - R8-DISCOVERY
     phase: R9
 
-  - run_id: R10-SHOWCASE
-    issue: 75
+  - run_id: R10-WEBMCP-COMPLIANCE
+    issue: 82
     mission_file: null
     contract: engineering/MISSION_CONTRACT.md
-    output_pattern: "showcase runbook; demo manifest; README showcase section"
+    output_pattern: "browser WebMCP tools; demo/ui/**; tests/test_webmcp.py; HACKATHON/README compliance"
     recommended_model: best_available_coding_agent
     claim_mode: exclusive
     repeat_policy: allowed_after_unique_run_id
     blind_group: null
     prerequisites:
-      - R6-E2E
-      - R7-CORPUS
-      - R8-DISCOVERY
       - R9-VISUAL
     phase: R10
+
+  - run_id: R11-PERSISTENCE
+    issue: 83
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/persistence/**; ops/migrations/**; tests/test_persistence*.py; persistence run docs"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R8-DISCOVERY
+    phase: R11
+
+  - run_id: R12-IDENTITY-CONSENT
+    issue: 84
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "identity/auth/consent service; UI/API hooks; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R8-DISCOVERY
+    phase: R12
+
+  - run_id: R12B-SECURITY-DATA-GOVERNANCE
+    issue: 89
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "security policy enforcement; audit/abuse/privacy controls; tests/**; security docs"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R8-DISCOVERY
+    phase: R12B
+
+  - run_id: R12C-SESSION-INGESTION
+    issue: 92
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "Thought DNA preparation/preview/share service; WebMCP/remote hooks; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R1-SCHEMA
+      - R2-EXTRACTION
+      - R8-DISCOVERY
+    phase: R12C
+
+  - run_id: R13-LIVE-PRODUCT
+    issue: 85
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "live product service/API; DB-backed discovery; UI integration; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R9-VISUAL
+      - R10-WEBMCP-COMPLIANCE
+      - R11-PERSISTENCE
+      - R12-IDENTITY-CONSENT
+      - R12B-SECURITY-DATA-GOVERNANCE
+      - R12C-SESSION-INGESTION
+    phase: R13
+
+  - run_id: R13B-RICH-RESULTS
+    issue: 90
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "authorized structured discovery result; map/structural visuals; MCP rich content; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R12B-SECURITY-DATA-GOVERNANCE
+      - R13-LIVE-PRODUCT
+    phase: R13B
+
+  - run_id: R14-COLLABORATION
+    issue: 86
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "intro/connection/message state machine; UI/WebMCP service; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R12-IDENTITY-CONSENT
+      - R12B-SECURITY-DATA-GOVERNANCE
+      - R13-LIVE-PRODUCT
+    phase: R14
+
+  - run_id: R14B-WORKSPACES
+    issue: 91
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "multi-person workspaces; artifacts/notes/tasks/messages; UI/WebMCP/remote service; tests/**"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R11-PERSISTENCE
+      - R12-IDENTITY-CONSENT
+      - R12B-SECURITY-DATA-GOVERNANCE
+      - R14-COLLABORATION
+    phase: R14B
+
+  - run_id: R15-REMOTE-MCP
+    issue: 87
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "src/remote/**; authenticated Streamable HTTP; rich product MCP tools; tests/**; interop docs"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R8-DISCOVERY
+    phase: R15
+
+  - run_id: R16-DEPLOYMENT-PILOT
+    issue: 88
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "hosted HTTPS deployment; 100-user pilot; browser acceptance evidence; ops/runbook"
+    recommended_model: best_available_coding_agent
+    claim_mode: exclusive
+    repeat_policy: allowed_after_unique_run_id
+    blind_group: null
+    prerequisites:
+      - R10-WEBMCP-COMPLIANCE
+      - R11-PERSISTENCE
+      - R12-IDENTITY-CONSENT
+      - R12B-SECURITY-DATA-GOVERNANCE
+      - R12C-SESSION-INGESTION
+      - R13-LIVE-PRODUCT
+      - R13B-RICH-RESULTS
+      - R14-COLLABORATION
+      - R14B-WORKSPACES
+    phase: R16
+
+  - run_id: R17-SUBMISSION
+    issue: 75
+    mission_file: null
+    contract: engineering/MISSION_CONTRACT.md
+    output_pattern: "submission package; live URL; release manifest; README/HACKATHON; <3min video; Devpost freeze"
+    recommended_model: human_agent_orchestration
+    claim_mode: coordinator
+    repeat_policy: review_only
+    blind_group: null
+    prerequisites:
+      - R10-WEBMCP-COMPLIANCE
+      - R11-PERSISTENCE
+      - R12-IDENTITY-CONSENT
+      - R12B-SECURITY-DATA-GOVERNANCE
+      - R12C-SESSION-INGESTION
+      - R13-LIVE-PRODUCT
+      - R13B-RICH-RESULTS
+      - R14-COLLABORATION
+      - R14B-WORKSPACES
+      - R16-DEPLOYMENT-PILOT
+    phase: R17
