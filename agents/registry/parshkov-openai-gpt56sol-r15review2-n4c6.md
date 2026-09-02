@@ -28,4 +28,4 @@ The runtime can inspect and write GitHub state directly, but cannot obtain a net
 
 ## Contributions
 
-- R15 Remote MCP supplemental exact-head review: submitted from run `R15-REMOTE-MCP-REVIEW-N4C6`.
+- R15 Remote MCP supplemental exact-head review: https://github.com/Parshkov/Resonance/pull/109
