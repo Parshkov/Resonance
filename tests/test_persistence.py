@@ -16,6 +16,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
@@ -117,6 +118,53 @@ class MigrationAndHealthTests(unittest.TestCase):
             self.assertIn("version", columns)
             self.assertEqual(repo.get_corpus_generation(), 0)
             repo.close()
+
+    def test_interrupted_sqlite_migration_rolls_back_schema_and_marker(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "interrupted.sqlite"
+            conn = sqlite3.connect(path)
+            conn.executescript(
+                (REPO / "ops" / "migrations" / "0001_init.sql").read_text()
+            )
+            conn.execute(
+                "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                ("0001_init", "old"),
+            )
+            conn.commit()
+            conn.close()
+
+            original = SQLiteRepository._record_migration
+
+            def fail_before_marker(repo, version):
+                if version == "0002_recovery_generation":
+                    raise RuntimeError("simulated loss before migration marker")
+                return original(repo, version)
+
+            with patch.object(SQLiteRepository, "_record_migration", fail_before_marker):
+                with self.assertRaisesRegex(RuntimeError, "before migration marker"):
+                    SQLiteRepository(path)
+
+            conn = sqlite3.connect(path)
+            columns = {
+                row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
+            }
+            markers = {
+                row[0] for row in conn.execute("SELECT version FROM schema_migrations")
+            }
+            conn.close()
+            self.assertNotIn("version", columns)
+            self.assertEqual(markers, {"0001_init"})
+
+            recovered = SQLiteRepository(path)
+            self.assertIn(
+                "version",
+                {row[1] for row in recovered._conn.execute("PRAGMA table_info(sessions)")},
+            )
+            self.assertEqual(
+                recovered.health()["migrations"],
+                ["0001_init", "0002_recovery_generation"],
+            )
+            recovered.close()
 
     def test_invalid_thought_dna_is_rejected_before_storage(self):
         service = LiveCorpusService(SQLiteRepository(":memory:"))
@@ -314,6 +362,91 @@ class GenerationFailClosedTests(unittest.TestCase):
 
 
 class OwnershipConcurrencyAndRetryTests(unittest.TestCase):
+    def test_stale_profile_upsert_cannot_clear_committed_user_revocation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "user-revoke-race.sqlite"
+            first = file_service(path)
+            first.create_user("person-race", display_label="Before")
+            stale = first.get_user("person-race")
+            second = SQLiteRepository(path)
+            second.put_user(
+                replace(stale, revoked_at="committed-revoke", updated_at="newer")
+            )
+
+            stored = first.repo.put_user(
+                replace(
+                    stale,
+                    display_label="Stale writer",
+                    updated_at="stale-later-write",
+                    revoked_at=None,
+                )
+            )
+            self.assertEqual(stored.revoked_at, "committed-revoke")
+            self.assertEqual(
+                first.repo.get_user("person-race").revoked_at,
+                "committed-revoke",
+            )
+            second.close()
+            first.repo.close()
+
+    def test_user_create_request_id_replays_one_committed_mutation(self):
+        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        first = service.create_user(
+            "person-retry-user",
+            display_label="Retry User",
+            request_id="user-create-once",
+        )
+        generation = service.repo.get_corpus_generation()
+        replay = service.create_user(
+            "person-retry-user",
+            display_label="Retry User",
+            request_id="user-create-once",
+        )
+        self.assertEqual(replay, first)
+        self.assertEqual(service.repo.get_corpus_generation(), generation)
+        self.assertEqual(
+            len([e for e in service.audit_log() if e["event_type"] == "user.upsert"]),
+            1,
+        )
+        with self.assertRaises(PersistenceConflictError):
+            service.create_user(
+                "person-retry-user",
+                display_label="Different payload",
+                request_id="user-create-once",
+            )
+
+    def test_user_revoke_retry_heals_after_committed_rebuild_failure(self):
+        service, session = single_service()
+        original_rebuild = service.rebuild_index
+        calls = [0]
+
+        def fail_once():
+            calls[0] += 1
+            if calls[0] == 1:
+                raise RuntimeError("timeout after committed user revoke")
+            return original_rebuild()
+
+        service.rebuild_index = fail_once
+        with self.assertRaisesRegex(RuntimeError, "committed user revoke"):
+            service.revoke_user("person-a", request_id="user-revoke-once")
+        generation = service.repo.get_corpus_generation()
+        self.assertIsNotNone(service.get_user("person-a").revoked_at)
+        self.assertIsNotNone(service.get_session(session.session_id).revoked_at)
+        self.assertFalse(service.health().ok)
+
+        replay = service.revoke_user("person-a", request_id="user-revoke-once")
+        self.assertIsNotNone(replay.revoked_at)
+        self.assertEqual(service.repo.get_corpus_generation(), generation)
+        self.assertTrue(service.health().ok)
+        self.assertEqual(
+            len([e for e in service.audit_log() if e["event_type"] == "user.revoke"]),
+            1,
+        )
+        self.assertEqual(
+            len([e for e in service.audit_log() if e["event_type"] == "session.revoke"]),
+            1,
+        )
+
     def test_session_ownership_is_immutable_at_repository_boundary(self):
         service, stored = single_service()
         service.create_user("person-b", display_label="B")

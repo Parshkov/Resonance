@@ -57,7 +57,7 @@ subject-scoped services should pass the version they exposed to the caller.
 
 ### Durable retry / idempotency
 
-State-changing session methods accept an optional `request_id`. The repository
+State-changing user and session methods accept an optional `request_id`. The repository
 stores `(request_id, operation, request_hash, response)` transactionally with
 the mutation, audit event, and generation bump.
 

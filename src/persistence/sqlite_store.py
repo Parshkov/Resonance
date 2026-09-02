@@ -27,6 +27,7 @@ from .sql import (
     dumps,
     export_document,
     load_migration_sql,
+    loads,
     row_audit,
     row_idempotency,
     row_session,
@@ -53,7 +54,27 @@ class SQLiteRepository:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.execute("PRAGMA journal_mode = WAL")
-        self.migrate()
+        try:
+            self.migrate()
+        except Exception:
+            self._conn.close()
+            raise
+
+    def _execute_migration_sql(self, sql: str) -> None:
+        statement = ""
+        for line in sql.splitlines(keepends=True):
+            statement += line
+            if sqlite3.complete_statement(statement):
+                self._conn.execute(statement)
+                statement = ""
+        if statement.strip():
+            self._conn.execute(statement)
+
+    def _record_migration(self, version: str) -> None:
+        self._conn.execute(
+            "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+            (version, _now()),
+        )
 
     def migrate(self) -> tuple[str, ...]:
         with self._lock:
@@ -69,11 +90,14 @@ class SQLiteRepository:
             for version, sql in load_migration_sql():
                 if version in have:
                     continue
-                self._conn.executescript(sql)
-                self._conn.execute(
-                    "INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)",
-                    (version, _now()),
-                )
+                self._begin()
+                try:
+                    self._execute_migration_sql(sql)
+                    self._record_migration(version)
+                    self._conn.commit()
+                except Exception:
+                    self._conn.rollback()
+                    raise
                 applied.append(version)
             return tuple(applied)
 
@@ -165,17 +189,29 @@ class SQLiteRepository:
             ),
         )
 
-    def put_user(self, user: UserRecord, *, audit: AuditEvent | None = None) -> UserRecord:
+    def put_user(
+        self,
+        user: UserRecord,
+        *,
+        idempotency: IdempotencyKey | None = None,
+        audit: AuditEvent | None = None,
+    ) -> UserRecord:
         with self._lock:
             self._begin()
             try:
+                replay = self._claim_idempotency(idempotency)
+                if replay is not None:
+                    self._conn.commit()
+                    return UserRecord.from_mapping(replay)
                 self._conn.execute(
                     "INSERT INTO users(user_id, display_label, avatar_placeholder, "
                     "created_at, updated_at, revoked_at) VALUES (?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT(user_id) DO UPDATE SET "
                     "display_label=excluded.display_label, "
                     "avatar_placeholder=excluded.avatar_placeholder, "
-                    "updated_at=excluded.updated_at, revoked_at=excluded.revoked_at",
+                    "updated_at=excluded.updated_at, "
+                    "revoked_at=CASE WHEN users.revoked_at IS NOT NULL "
+                    "THEN users.revoked_at ELSE excluded.revoked_at END",
                     (
                         user.user_id,
                         user.display_label,
@@ -185,10 +221,17 @@ class SQLiteRepository:
                         user.revoked_at,
                     ),
                 )
+                row = self._conn.execute(
+                    "SELECT * FROM users WHERE user_id = ?", (user.user_id,)
+                ).fetchone()
+                if row is None:
+                    raise PersistenceConflictError("user upsert did not persist a row")
+                stored = row_user(row)
                 self._insert_audit(audit)
+                self._finish_idempotency(idempotency, stored.to_dict())
                 self._bump_generation()
                 self._conn.commit()
-                return user
+                return stored
             except Exception:
                 self._conn.rollback()
                 raise
@@ -205,7 +248,7 @@ class SQLiteRepository:
             rows = self._conn.execute("SELECT * FROM users ORDER BY user_id").fetchall()
             return tuple(row_user(r) for r in rows)
 
-    def _claim_idempotency(self, key: IdempotencyKey | None) -> SessionRecord | None:
+    def _claim_idempotency(self, key: IdempotencyKey | None) -> Mapping[str, Any] | None:
         if key is None:
             return None
         cur = self._conn.execute(
@@ -227,9 +270,9 @@ class SQLiteRepository:
             )
         if not row["response_json"]:
             raise PersistenceConflictError(f"request_id {key.request_id!r} is still in progress")
-        return SessionRecord.from_mapping(__import__("json").loads(row["response_json"]))
+        return loads(row["response_json"])
 
-    def lookup_idempotency(self, key: IdempotencyKey) -> SessionRecord | None:
+    def lookup_idempotency(self, key: IdempotencyKey) -> Mapping[str, Any] | None:
         with self._lock:
             row = self._conn.execute(
                 "SELECT * FROM idempotency_keys WHERE request_id = ?", (key.request_id,)
@@ -242,14 +285,16 @@ class SQLiteRepository:
                 )
             if not row["response_json"]:
                 raise PersistenceConflictError(f"request_id {key.request_id!r} is still in progress")
-            return SessionRecord.from_mapping(__import__("json").loads(row["response_json"]))
+            return loads(row["response_json"])
 
-    def _finish_idempotency(self, key: IdempotencyKey | None, stored: SessionRecord) -> None:
+    def _finish_idempotency(
+        self, key: IdempotencyKey | None, response: Mapping[str, Any]
+    ) -> None:
         if key is None:
             return
         self._conn.execute(
             "UPDATE idempotency_keys SET response_json = ? WHERE request_id = ?",
-            (dumps(stored.to_dict()), key.request_id),
+            (dumps(response), key.request_id),
         )
 
     def put_session(
@@ -266,7 +311,7 @@ class SQLiteRepository:
                 replay = self._claim_idempotency(idempotency)
                 if replay is not None:
                     self._conn.commit()
-                    return replay
+                    return SessionRecord.from_mapping(replay)
 
                 row = self._conn.execute(
                     "SELECT * FROM sessions WHERE session_id = ?", (session.session_id,)
@@ -325,7 +370,7 @@ class SQLiteRepository:
                         )
 
                 self._insert_audit(audit)
-                self._finish_idempotency(idempotency, stored)
+                self._finish_idempotency(idempotency, stored.to_dict())
                 self._bump_generation()
                 self._conn.commit()
                 return stored

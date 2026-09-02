@@ -263,6 +263,7 @@ class LiveCorpusService:
         *,
         display_label: str,
         avatar_placeholder: str | None = None,
+        request_id: str | None = None,
         rebuild: bool = True,
     ) -> UserRecord:
         with self._lock:
@@ -270,12 +271,25 @@ class LiveCorpusService:
                 raise PersistenceValidationError("user_id must start with 'person-'")
             if not display_label.strip():
                 raise PersistenceValidationError("display_label must be non-empty")
+            avatar = avatar_placeholder or display_label
+            key = self._idempotency_key(
+                request_id,
+                "user.upsert",
+                {
+                    "user_id": user_id,
+                    "display_label": display_label,
+                    "avatar_placeholder": avatar,
+                },
+            )
+            replay = self._replay_user(key, heal_index=rebuild)
+            if replay is not None:
+                return replay
             now = _now()
             existing = self.repo.get_user(user_id)
             user = UserRecord(
                 user_id=user_id,
                 display_label=display_label,
-                avatar_placeholder=avatar_placeholder or display_label,
+                avatar_placeholder=avatar,
                 created_at=existing.created_at if existing else now,
                 updated_at=now,
                 # Ordinary profile upsert cannot silently un-revoke an identity.
@@ -286,31 +300,49 @@ class LiveCorpusService:
                 user_id=user_id,
                 payload={"profile_updated": bool(existing)},
             )
-            before_db, before_serving = self._mark_stale_before_write()
-            try:
-                stored = self.repo.put_user(user, audit=audit)
-            except Exception:
-                self._restore_if_write_did_not_commit(before_db, before_serving)
-                raise
-            if rebuild:
-                self.rebuild_index()
-            return stored
+            return self._store_user(
+                user,
+                idempotency=key,
+                audit=audit,
+                rebuild=rebuild,
+            )
 
-    def revoke_user(self, user_id: str) -> UserRecord:
+    def revoke_user(
+        self,
+        user_id: str,
+        *,
+        request_id: str | None = None,
+        rebuild: bool = True,
+    ) -> UserRecord:
         with self._lock:
-            user = self.repo.get_user(user_id)
-            if user is None:
-                raise PersistenceNotFoundError(user_id)
-            if user.revoked_at is not None:
-                return user
-            now = _now()
-            hidden = replace(user, revoked_at=now, updated_at=now)
-            before_db, before_serving = self._mark_stale_before_write()
-            try:
-                stored_user = self.repo.put_user(
+            key = self._idempotency_key(
+                request_id,
+                "user.revoke",
+                {"user_id": user_id},
+            )
+            stored_user = self._replay_user(key, heal_index=False)
+            if stored_user is None:
+                user = self.repo.get_user(user_id)
+                if user is None:
+                    raise PersistenceNotFoundError(user_id)
+                if user.revoked_at is not None:
+                    if key is not None:
+                        raise PersistenceStateError(
+                            f"{user_id} is already revoked; use the original request_id for retry"
+                        )
+                    if rebuild and not self._index_current():
+                        self.rebuild_index()
+                    return user
+                now = _now()
+                hidden = replace(user, revoked_at=now, updated_at=now)
+                stored_user = self._store_user(
                     hidden,
+                    idempotency=key,
                     audit=self._audit_event("user.revoke", user_id=user_id),
+                    rebuild=False,
                 )
+            now = stored_user.revoked_at or _now()
+            try:
                 for session in self.repo.list_sessions():
                     if session.user_id != user_id or not session.is_live():
                         continue
@@ -331,9 +363,10 @@ class LiveCorpusService:
                         ),
                     )
             except Exception:
-                self._restore_if_write_did_not_commit(before_db, before_serving)
+                self._serving_generation = None
                 raise
-            self.rebuild_index()
+            if rebuild:
+                self.rebuild_index()
             return stored_user
 
     # ------------------------------------------------------------------
@@ -358,13 +391,50 @@ class LiveCorpusService:
     def _replay(self, key: IdempotencyKey | None) -> SessionRecord | None:
         if key is None:
             return None
-        replay = self.repo.lookup_idempotency(key)
+        payload = self.repo.lookup_idempotency(key)
+        replay = SessionRecord.from_mapping(payload) if payload is not None else None
         if replay is not None and not self._index_current():
             # A previous attempt may have committed DB state and timed out during
             # rebuild. Retrying the same request heals the serving generation
             # without applying the mutation twice.
             self.rebuild_index()
         return replay
+
+    def _replay_user(
+        self,
+        key: IdempotencyKey | None,
+        *,
+        heal_index: bool,
+    ) -> UserRecord | None:
+        if key is None:
+            return None
+        payload = self.repo.lookup_idempotency(key)
+        replay = UserRecord.from_mapping(payload) if payload is not None else None
+        if replay is not None and heal_index and not self._index_current():
+            self.rebuild_index()
+        return replay
+
+    def _store_user(
+        self,
+        candidate: UserRecord,
+        *,
+        idempotency: IdempotencyKey | None,
+        audit: AuditEvent,
+        rebuild: bool,
+    ) -> UserRecord:
+        before_db, before_serving = self._mark_stale_before_write()
+        try:
+            stored = self.repo.put_user(
+                candidate,
+                idempotency=idempotency,
+                audit=audit,
+            )
+        except Exception:
+            self._restore_if_write_did_not_commit(before_db, before_serving)
+            raise
+        if rebuild:
+            self.rebuild_index()
+        return stored
 
     def _store_session(
         self,
