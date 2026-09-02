@@ -1,0 +1,180 @@
+name: Canonical Claim Guard
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: claim-guard-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  arbitrate:
+    if: >-
+      github.event.issue.pull_request == null &&
+      startsWith(github.event.comment.body, 'CLAIM')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve canonical claim race
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const trigger = context.payload.comment;
+            const firstLine = (trigger.body || '').trimStart().split(/\r?\n/, 1)[0].trim();
+            if (firstLine !== 'CLAIM') {
+              core.info('Not a canonical CLAIM event; ignoring.');
+              return;
+            }
+
+            const issueNumber = context.issue.number;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            });
+
+            comments.sort((a, b) => {
+              const ta = Date.parse(a.created_at);
+              const tb = Date.parse(b.created_at);
+              return ta === tb ? a.id - b.id : ta - tb;
+            });
+
+            const fields = body => {
+              const out = {};
+              for (const line of (body || '').split(/\r?\n/)) {
+                const m = line.match(/^([A-Za-z_]+):\s*(.*?)\s*$/);
+                if (m) out[m[1].toLowerCase()] = m[2];
+              }
+              return out;
+            };
+            const eventName = body => (body || '').trimStart().split(/\r?\n/, 1)[0].trim();
+            const maintainer = c => ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(c.author_association);
+
+            let slot = null;
+            let verdict = null;
+
+            const expireIfNeeded = now => {
+              if (slot && !slot.submitted && slot.expiresAt !== null && now >= slot.expiresAt) {
+                slot = null;
+              }
+            };
+
+            for (const c of comments) {
+              const now = Date.parse(c.created_at);
+              expireIfNeeded(now);
+              const ev = eventName(c.body);
+              const f = fields(c.body);
+
+              if (ev === 'REOPEN_CANONICAL' && maintainer(c)) {
+                slot = null;
+                continue;
+              }
+
+              if (ev === 'CLAIM') {
+                const lease = Number.parseInt(f.lease_minutes || '240', 10);
+                const structurallyUsable = Boolean(f.agent_id && f.run_id && Number.isFinite(lease) && lease > 0);
+                let won = false;
+                let blocker = null;
+
+                if (structurallyUsable && slot === null) {
+                  slot = {
+                    agentId: f.agent_id,
+                    runId: f.run_id,
+                    claimCommentId: c.id,
+                    claimUrl: c.html_url,
+                    expiresAt: now + lease * 60_000,
+                    submitted: false,
+                  };
+                  won = true;
+                } else if (slot !== null) {
+                  blocker = slot;
+                }
+
+                if (c.id === trigger.id) {
+                  verdict = { won, blocker, fields: f, structurallyUsable };
+                  break;
+                }
+                continue;
+              }
+
+              if (!slot) continue;
+
+              if (ev === 'HEARTBEAT' && f.agent_id === slot.agentId && f.run_id === slot.runId && !slot.submitted) {
+                const additional = Number.parseInt(f.additional_minutes || '0', 10);
+                if (Number.isFinite(additional) && additional > 0) {
+                  slot.expiresAt = now + additional * 60_000;
+                }
+                continue;
+              }
+
+              if (ev === 'SUBMIT' && f.agent_id === slot.agentId && f.run_id === slot.runId) {
+                slot.submitted = true;
+                slot.expiresAt = null;
+                continue;
+              }
+
+              if (ev === 'RELEASE' && f.agent_id === slot.agentId && f.run_id === slot.runId) {
+                const status = (f.status || '').toLowerCase();
+                if (status === 'submitted') {
+                  slot.submitted = true;
+                  slot.expiresAt = null;
+                } else if (status === 'abandoned' && !slot.submitted) {
+                  slot = null;
+                }
+              }
+            }
+
+            if (!verdict) {
+              core.setFailed('Claim guard could not locate the triggering CLAIM in the issue event stream.');
+              return;
+            }
+
+            const agentId = verdict.fields.agent_id || 'unknown';
+            const runId = verdict.fields.run_id || 'unknown';
+            let body;
+
+            if (!verdict.structurallyUsable) {
+              body = [
+                'CLAIM_GUARD',
+                `agent_id: ${agentId}`,
+                `run_id: ${runId}`,
+                'status: rejected_malformed',
+                `claim_comment: ${trigger.html_url}`,
+                'reason: CLAIM is missing agent_id/run_id or has an invalid lease_minutes value.',
+                'action: do_not_begin_canonical_work; fix coordination event before proceeding',
+              ].join('\n');
+            } else if (verdict.won) {
+              body = [
+                'CLAIM_GUARD',
+                `agent_id: ${agentId}`,
+                `run_id: ${runId}`,
+                'status: race_won',
+                `claim_comment: ${trigger.html_url}`,
+                'note: This guard verifies canonical slot occupancy/race order only. Queue prerequisites and other protocol validity rules still apply.',
+              ].join('\n');
+            } else {
+              body = [
+                'CLAIM_GUARD',
+                `agent_id: ${agentId}`,
+                `run_id: ${runId}`,
+                'status: race_lost',
+                `claim_comment: ${trigger.html_url}`,
+                `winning_agent: ${verdict.blocker.agentId}`,
+                `winning_run_id: ${verdict.blocker.runId}`,
+                `winning_claim: ${verdict.blocker.claimUrl}`,
+                'action: do_not_begin_or_continue_canonical_work; select another AVAILABLE mission or use REPEAT_CLAIM if allowed',
+              ].join('\n');
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body,
+            });
