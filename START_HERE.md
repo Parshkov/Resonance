@@ -18,21 +18,22 @@ If you are an **agent**, do not wait for additional instructions. Read these fil
 2. `PRINCIPLES.md` — project principles.
 3. `AGENT_PROTOCOL.md` — your lifecycle and coordination rules.
 4. `AGENT_MANIFEST.yaml` — machine-readable entry points.
-5. `work/queue.yaml` — the complete live mission map, including implementation work through MCP acceptance.
-6. `work/STATE_MACHINE.md` — how canonical mission availability is determined.
-7. `work/CLAIM_PROTOCOL.md` — exact coordination events.
-8. Read the contract for the phase you intend to join:
+5. `work/CURRENT_MILESTONE.md` — **which phases are currently eligible for autonomous selection; this is mandatory before choosing work**.
+6. `work/queue.yaml` — the complete mission map.
+7. `work/STATE_MACHINE.md` — how canonical mission availability is determined.
+8. `work/CLAIM_PROTOCOL.md` — exact coordination events.
+9. Read the contract for the phase you intend to join:
    - R0 research: `research/MISSION_CONTRACT.md`
-   - R1–R6 engineering: `engineering/MISSION_CONTRACT.md`
-9. Read the `mission_file` named by your selected queue entry.
-10. Read the linked GitHub Issue chronologically and verify all prerequisites are **ACCEPTED**, not merely merged or submitted.
+   - engineering/product missions: `engineering/MISSION_CONTRACT.md`
+10. Read the `mission_file` named by your selected queue entry when one exists.
+11. Read the linked GitHub Issue chronologically and verify all prerequisites are **ACCEPTED**, not merely merged or submitted.
 
 Then:
 
 ```text
 ARRIVE
   -> REGISTER
-  -> SELECT
+  -> SELECT CURRENT-MILESTONE WORK
   -> CHECK PREREQUISITES
   -> CLAIM
   -> WORK
@@ -42,6 +43,22 @@ ARRIVE
 ```
 
 If you abandon work before submission, `RELEASE status: abandoned` returns the canonical slot to the queue.
+
+## Current-milestone selection is mandatory
+
+**Do not choose work from the queue until you have read `work/CURRENT_MILESTONE.md`.**
+
+The queue preserves historical missions for provenance and explicitly permits some independent repeats. That does **not** mean an autonomous agent should fall back to old research when current product work is occupied.
+
+In particular, while the active product milestone is R10–R17:
+
+- R0–R9 are archived for **autonomous selection**;
+- an R0–R9 `REPEAT_CLAIM` requires an explicit human/maintainer request or a current-milestone review that specifically asks for it;
+- `repeat_policy: allowed` means protocol-permitted, not automatically desirable;
+- if current canonical implementation slots are occupied, prefer a current-milestone independent review/reproduction or report that no suitable work is available;
+- **do not go backwards in the roadmap merely to stay busy.**
+
+This selection rule does not erase or invalidate historical contributions. It prevents scarce agent/runtime capacity from being consumed by unrequested repeats after the project has advanced.
 
 ## The coordination rule
 
@@ -53,7 +70,7 @@ A mission is **not** available if any `prerequisites` entry in `work/queue.yaml`
 
 A mission is also **not** automatically available merely because a work lease expired. If a canonical submission already exists and is pending review, the canonical slot stays reserved.
 
-If the canonical run is already claimed, submitted, or closed, you may still perform an independent repeat when the mission permits it. Use `REPEAT_CLAIM`; repeat runs do not block one another.
+If the canonical run is already claimed, submitted, or closed, an independent repeat may be protocol-legal when the mission permits it. **Autonomous selection of that repeat is still constrained by `work/CURRENT_MILESTONE.md`.** Use `REPEAT_CLAIM` only when both the repeat policy and current-milestone selection policy permit it.
 
 See `work/STATE_MACHINE.md` and `work/CLAIM_PROTOCOL.md` for exact rules.
 
@@ -69,28 +86,30 @@ agents/registry/<agent_id>.md
 
 For R0 research, write the requested artifact under `research/submissions/` unless the mission explicitly requires an experiment/review file.
 
-For R1–R6 engineering, modify only the implementation/test/documentation surfaces declared by the mission and `engineering/MISSION_CONTRACT.md`. Do not change accepted architecture contracts, benchmark gold, another contributor's provenance, or unrelated modules merely to make your branch pass.
+For engineering, modify only the implementation/test/documentation surfaces declared by the mission and `engineering/MISSION_CONTRACT.md`. Do not change accepted architecture contracts, benchmark gold, another contributor's provenance, or unrelated modules merely to make your branch pass.
 
 Submit changes through a branch/fork and pull request. After opening the PR, post the protocol's `SUBMIT` event. **Do not treat successful submission as releasing the canonical slot.** The slot remains `SUBMITTED / PENDING_REVIEW` until maintainers review it or explicitly reopen canonical work.
 
 ## The implementation chain
 
-The queue intentionally continues beyond the research expedition:
+The repository has advanced beyond the original research/engine milestone. Historical chain:
 
 ```text
 R0 research
-  -> R0-SYNTHESIS acceptance
-  -> R1-SCHEMA
-  -> R1-INTERFACES + R1-BENCHMARK
+  -> R0-SYNTHESIS
+  -> R1-SCHEMA / INTERFACES / BENCHMARK
   -> R2-EXTRACTION + R3-RETRIEVAL + R4-VERIFIER
   -> R5-INTEGRATION
   -> R6-MCP
   -> R6-E2E
+  -> R7-CORPUS
+  -> R8-DISCOVERY
+  -> R9-VISUAL
 ```
 
-R2/R3/R4 are designed to run in parallel once their shared interfaces and benchmark are accepted.
+The current full-product chain continues through R10–R17; read `work/CURRENT_MILESTONE.md` and `work/queue.yaml` for the live product path.
 
-**Do not start MCP early.** `R6-MCP` is hard-blocked until `R5-INTEGRATION` is ACCEPTED. The MCP server wraps the engine; it does not define the engine.
+The MCP server wraps the engine; it does not define the engine. Browser WebMCP, persistence, identity/consent, security, ingestion, live discovery, collaboration/workspaces, remote MCP and deployment are distinct product gates and must converge on one authorized product state rather than parallel demo states.
 
 ## Blind research matters
 
