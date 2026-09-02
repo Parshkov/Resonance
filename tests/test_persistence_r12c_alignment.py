@@ -99,6 +99,51 @@ class PrivateSparseDraftAlignmentTests(unittest.TestCase):
         self.assertEqual(self.service.repo.get_corpus_generation(), before_generation)
         self.assertTrue(self.service.health().ok)
 
+    def test_metadata_request_id_replays_before_stale_version_and_rejects_collision(self):
+        stored = self.service.create_session(
+            session_id="ses-idempotent-meta",
+            user_id="person-a",
+            thought_dna=minimal_thought("thought-idempotent-meta", "heat"),
+            consent=DISCOVER,
+            location=LOCATION,
+            presentation=PRESENTATION,
+        )
+        updated_presentation = {
+            "domain": "updated",
+            "topic": "updated",
+            "cluster_id": "updated",
+        }
+        first = self.service.update_presentation(
+            stored.session_id,
+            presentation=updated_presentation,
+            expected_version=stored.version,
+            request_id="meta-key-1",
+        )
+        generation = self.service.repo.get_corpus_generation()
+
+        replay = self.service.update_presentation(
+            stored.session_id,
+            presentation=updated_presentation,
+            expected_version=stored.version,
+            request_id="meta-key-1",
+        )
+        self.assertEqual(replay.version, first.version)
+        self.assertEqual(dict(replay.presentation), updated_presentation)
+        self.assertEqual(self.service.repo.get_corpus_generation(), generation)
+
+        with self.assertRaises(PersistenceConflictError):
+            self.service.update_presentation(
+                stored.session_id,
+                presentation={
+                    "domain": "different",
+                    "topic": "updated",
+                    "cluster_id": "updated",
+                },
+                expected_version=stored.version,
+                request_id="meta-key-1",
+            )
+        self.assertEqual(self.service.repo.get_corpus_generation(), generation)
+
 
 if __name__ == "__main__":
     unittest.main()
