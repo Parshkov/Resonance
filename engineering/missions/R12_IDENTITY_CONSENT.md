@@ -34,21 +34,34 @@ R11 canonical PR #95 was inspected during implementation. The declared handoff s
 - identity audit payloads omit raw Thought DNA and plaintext credentials;
 - city-level coarse location only; obvious exact-address/GPS fields rejected;
 - manual UI and browser WebMCP share the same cookie-session authorization adapter;
-- agent-facing adapters mark returned UGC as untrusted.
+- agent-facing adapters mark returned UGC as untrusted;
+- already-discoverable Thought DNA cannot be silently replaced: sharing must be revoked first.
 
 ## Validation evidence
 
 Runtime: Python 3 (container runtime; stdlib only for R12 module/tests).
 
-Commands executed against the exact authored files before GitHub submission:
+Commands executed after normalizing the local test file to the exact GitHub blob:
 
 ```text
 python3 -m unittest tests.test_identity_consent -v
-Ran 11 tests in 0.006s
+Ran 11 tests in 0.003s
 OK
 
 python3 -m compileall -q src tests
 exit 0
+```
+
+Verified GitHub blob SHA == locally tested/authored blob SHA for the implementation surface:
+
+```text
+src/identity/service.py       4f9d1a03483dfbd6bd164c45fdd78e53bcd46526
+src/identity/models.py        74f93021869ec1103199ab0e6429e90034fcb977
+src/identity/backend.py       5415b89755c1725fe96a9bc27533b54a98b7427d
+src/identity/adapters.py      9923eef6537b61072b2bc53c75c051f184bf6ac8
+src/identity/__init__.py      292a7be5d10b9b2a7d3f53b10e6fb80698b1ed99
+src/identity/README.md        7b76acc93622d16c4b6dc11d3183d003ac04a986
+tests/test_identity_consent.py 8e2b49ba1a3e5f0c3792ea07ad350709a9822307
 ```
 
 Covered acceptance scenarios:
