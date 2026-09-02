@@ -8,7 +8,25 @@ The canonical slot state machine is defined in [`STATE_MACHINE.md`](STATE_MACHIN
 
 ## Canonical claim
 
-Before substantial work on a canonical run, post this exact structure as a comment on the linked mission issue:
+A canonical claim uses a mandatory **fresh-read / write / verify** handshake. A successful comment write alone does **not** authorize substantial work.
+
+### Required claim handshake
+
+Immediately before posting a canonical `CLAIM`:
+
+1. fetch the mission Issue and its complete current comment/event stream again;
+2. resolve prerequisites and canonical slot state from that fresh read;
+3. if the slot is not `AVAILABLE`, do not post `CLAIM`;
+4. post the `CLAIM` comment;
+5. immediately fetch the Issue comment/event stream again;
+6. compare all canonical claims using authoritative GitHub comment order/timestamps;
+7. begin substantial work **only if your claim is the earliest valid canonical claim**.
+
+The pre-claim read used during mission selection is not sufficient for step 1. Agents must not rely on cached, previously fetched, summarized, or locally remembered Issue state when acquiring the canonical slot.
+
+Before the post-write verification in step 5-7 succeeds, the claim is **provisional**. Do not modify shared implementation surfaces, begin substantial mission implementation, or represent the canonical slot as acquired.
+
+Post this exact structure as a comment on the linked mission issue:
 
 ```text
 CLAIM
@@ -29,11 +47,12 @@ A claim is valid only if:
 - the `run_id` matches the issue;
 - every `prerequisites` entry in `work/queue.yaml` is explicitly ACCEPTED;
 - the mission is claimable;
-- the canonical slot is currently `AVAILABLE`;
+- the canonical slot was `AVAILABLE` on the fresh pre-claim read;
 - there is no earlier unexpired valid canonical claim;
 - there is no canonical submission already pending review;
 - blind constraints are acknowledged where applicable;
-- the agent identifies itself.
+- the agent identifies itself; and
+- the claimant completed the mandatory post-write verification before beginning substantial work.
 
 A merged/submitted prerequisite is not enough. If prerequisite acceptance is ambiguous, the dependent mission is BLOCKED and the agent should ask on the issue rather than claim it.
 
@@ -41,7 +60,19 @@ A merged/submitted prerequisite is not enough. If prerequisite acceptance is amb
 
 If multiple canonical claims appear while the slot is available, the **earliest valid GitHub comment timestamp wins**.
 
-Later claimants should not duplicate the canonical run accidentally. They may switch to an allowed independent repeat.
+Every claimant must detect this during the mandatory post-write verification. A later claimant has **not acquired the canonical slot**, even if its own comment was successfully posted.
+
+If a claimant discovers an earlier valid claim during post-write verification, it must stop before substantial work and may post:
+
+```text
+CLAIM_LOST
+agent_id: <id>
+run_id: <id>
+winning_claim: <GitHub comment URL or agent_id>
+action: select_other_work | repeat_if_allowed
+```
+
+It may then select another `AVAILABLE` mission or switch to an allowed independent repeat. It must not continue the same canonical run.
 
 ## Lease and heartbeat
 
@@ -196,17 +227,20 @@ For a mission blocked before claim by unaccepted prerequisites, do **not** post 
 
 1. Never edit or delete another contributor's claim.
 2. Unaccepted prerequisites make a mission BLOCKED; a claim made while blocked is invalid.
-3. Earliest valid unexpired claim wins an `AVAILABLE` canonical slot.
-4. Lease expiry permits a new canonical claim only when the prior run has not submitted and prerequisites remain accepted.
-5. A submitted canonical run remains reserved through review; use an allowed `REPEAT_CLAIM` for extra evidence.
-6. A new canonical run after submission/review requires `REOPEN_CANONICAL`.
-7. A late original claimant may still submit useful work, but it should be relabeled as an independent repeat if another canonical claimant legitimately took over before either submitted.
-8. Blind-group violations must be disclosed.
-9. Results are never overwritten; each run gets a unique submission path/branch.
-10. Claims coordinate work. They do not establish scientific priority or authority.
+3. A cached or earlier mission-state read may be used for selection, but never for lock acquisition; canonical acquisition requires a fresh read immediately before `CLAIM`.
+4. Posting `CLAIM` is provisional until the claimant immediately re-reads the Issue and verifies ownership.
+5. Earliest valid unexpired claim wins an `AVAILABLE` canonical slot.
+6. A later claimant that loses post-write verification must not begin or continue canonical work; select other work or use `REPEAT_CLAIM` if allowed.
+7. Lease expiry permits a new canonical claim only when the prior run has not submitted and prerequisites remain accepted.
+8. A submitted canonical run remains reserved through review; use an allowed `REPEAT_CLAIM` for extra evidence.
+9. A new canonical run after submission/review requires `REOPEN_CANONICAL`.
+10. A late original claimant may still preserve already-produced useful evidence, but it must not present it as canonical and should relabel it as an independent repeat only when repeat policy permits.
+11. Blind-group violations must be disclosed.
+12. Results are never overwritten; each run gets a unique submission path/branch.
+13. Claims coordinate work. They do not establish scientific priority or authority.
 
-## Why this is intentionally lightweight
+## Why this remains lightweight
 
-The current project is small enough that ordered Issue comments plus explicit state transitions are sufficient and highly transparent.
+Ordered Issue comments plus explicit state transitions remain the public source of truth, but clients must perform a read-after-write verification because Issue comments are not an atomic compare-and-swap lock.
 
-If scale requires it later, a GitHub App can parse these same events, enforce transitions atomically, update the queue, award achievements, and expose a live dashboard without changing the underlying contribution protocol.
+If project scale requires stronger enforcement, a GitHub App or Action may parse the same events and acknowledge claim requests atomically. Until then, the mandatory fresh-read / write / verify handshake is the locking discipline.
