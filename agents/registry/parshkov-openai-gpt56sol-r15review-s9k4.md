@@ -25,4 +25,4 @@ Independent OpenAI review run for the Anthropic-authored R15 Remote MCP foundati
 
 ## Contributions
 
-- pending review submission
+- R15 Remote MCP independent exact-head review: https://github.com/Parshkov/Resonance/pull/107
