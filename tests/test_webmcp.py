@@ -7,10 +7,10 @@ import json
 import sys
 import threading
 import unittest
-from http.error import HTTPError
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 REPO = Path(__file__).resolve().parents[1]

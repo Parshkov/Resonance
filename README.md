@@ -706,6 +706,23 @@ See `demo/README.md`. This is the first working Resonance MCP milestone, not a
 corpus-scale or production claim. The exact API follows the accepted engine
 facade rather than defining the engine.
 
+### WebMCP Challenge judge test
+
+The challenge build exposes six **browser-native WebMCP** tools through
+`document.modelContext.registerTool(...)`: `resonance_prepare_thought`,
+`resonance_get_share_preview`, `resonance_share_prepared_thought`,
+`resonance_discover`, `resonance_get_match`, and
+`resonance_update_consent`. This browser API is distinct from Resonance's stdio
+and remote MCP transports. See [`HACKATHON.md`](HACKATHON.md) for the build
+record and [`demo/ui/README.md`](demo/ui/README.md) for the complete judge flow.
+
+```bash
+python3 -m demo.ui.webmcp_server --source replay
+```
+
+Open `http://127.0.0.1:8765/` in current Chrome 149+ with WebMCP enabled, then
+inspect and invoke the tools through `document.modelContext`.
+
 ---
 
 ## Where the project is now
