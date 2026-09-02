@@ -1,11 +1,12 @@
-"""Focused hardening for independent R11 exact-head review findings.
+"""Focused hardening for independent R11/R12 exact-head review findings.
 
-This module keeps the recovery diff small while closing two repository-boundary
+This module keeps the recovery diff small while closing repository-boundary
 failures discovered by the independent Fable review:
 
-* backend uniqueness violations must never escape as raw driver exceptions; and
+* backend uniqueness violations must never escape as raw driver exceptions;
 * malformed presentation/location state must be rejected before durable writes
-  and must not make a process permanently unbootable after restart.
+  and must not make a process permanently unbootable after restart; and
+* credential-verifier/auth-session events must not enter the public audit view.
 
 `install()` patches the already-defined R11 classes in place at package import.
 That preserves the public class identities/import paths consumed by R12/R12B
@@ -20,15 +21,11 @@ import sqlite3
 from dataclasses import replace
 from typing import Any, Mapping
 
-from src.discovery import ConsentRegistry, DiscoveryService
-from src.engine import ResonanceEngine
-
 from .errors import (
     PersistenceConflictError,
     PersistenceStateError,
     PersistenceValidationError,
 )
-from .models import ConsentState
 from .postgres_store import PostgresRepository
 from .service import LiveCorpusService
 from .sqlite_store import SQLiteRepository
@@ -38,6 +35,7 @@ _INSTALLED = False
 _LOCATION_KEYS = frozenset({"kind", "region", "city", "lat", "lon", "precision"})
 _PRESENTATION_KEYS = frozenset({"domain", "topic", "cluster_id"})
 _LOCATION_KINDS = frozenset({"synthetic_coarse", "consented_coarse"})
+_PRIVATE_AUDIT_EVENT_TYPES = frozenset({"identity.account.registered"})
 
 
 def _consent_mapping(value: Any) -> dict[str, Any]:
@@ -142,8 +140,11 @@ def _postgres_unique_violation(exc: BaseException) -> bool:
     code = getattr(exc, "sqlstate", None) or getattr(exc, "pgcode", None)
     if code == "23505":
         return True
-    text = str(exc).lower()
-    return "duplicate key value violates unique constraint" in text
+    return "duplicate key value violates unique constraint" in str(exc).lower()
+
+
+def _is_private_public_audit_event(event_type: str) -> bool:
+    return event_type.startswith("identity.auth.") or event_type in _PRIVATE_AUDIT_EVENT_TYPES
 
 
 def install() -> None:
@@ -162,14 +163,12 @@ def install() -> None:
     service_update_consent = LiveCorpusService.update_consent
     service_rebuild = LiveCorpusService.rebuild_index
     service_public_view = LiveCorpusService.public_session_view
+    service_audit_log = LiveCorpusService.audit_log
 
     def guarded_sqlite_put_session(self, session, **kwargs):
         try:
             return sqlite_put_session(self, session, **kwargs)
         except sqlite3.IntegrityError as exc:
-            # The persistence boundary must never leak backend-specific UNIQUE
-            # errors. The public conflict message intentionally does not reveal
-            # which other owner/session reserved the identifier.
             raise PersistenceConflictError(
                 "session identifier or thought_id conflicts with durable state"
             ) from exc
@@ -190,8 +189,8 @@ def install() -> None:
             self._startup_degraded_reason = None
         except PersistenceStateError as exc:
             # Base __init__ initializes repo/lock/engine/registry before calling
-            # rebuild_index. Preserve that object in a fail-closed degraded state
-            # so an authorized repair/revoke path can recover the bad row.
+            # rebuild_index. Keep the object alive in a fail-closed degraded
+            # state so an authorized repair/revoke path can recover the bad row.
             self._serving_generation = None
             self._startup_degraded_reason = str(exc)
 
@@ -221,9 +220,9 @@ def install() -> None:
         if isinstance(thought_id, str):
             prior = self.repo.get_session_by_thought(thought_id)
             if prior is not None and prior.session_id != session_id:
-                # Explicit v0.1 policy: a durable thought_id is never reclaimed by
-                # a new session, including after deletion. Re-sharing after a
-                # delete therefore requires a newly generated Thought DNA id.
+                # v0.1 policy: a durable thought_id is never rebound to a new
+                # session, including after deletion. Re-sharing requires a new
+                # Thought DNA id, preserving tombstone/history semantics.
                 raise PersistenceConflictError(
                     "thought_id is already reserved; a new session (including "
                     "re-share after delete) requires a new Thought DNA id"
@@ -281,6 +280,19 @@ def install() -> None:
             _validate_stored_session(session)
         return service_public_view(self, session_id)
 
+    def guarded_audit_log(self):
+        # The durable audit table is also the R12 identity-event backing store.
+        # Authentication verifier hashes and auth-session identifiers are
+        # internal security state, not public audit data. Internal identity
+        # replay uses repo.list_audit() directly and is therefore unaffected.
+        public_rows = []
+        for row in service_audit_log(self):
+            event_type = str(row.get("event_type", ""))
+            if _is_private_public_audit_event(event_type):
+                continue
+            public_rows.append(row)
+        return public_rows
+
     SQLiteRepository.put_session = guarded_sqlite_put_session
     PostgresRepository.put_session = guarded_postgres_put_session
     LiveCorpusService.__init__ = guarded_init
@@ -290,3 +302,4 @@ def install() -> None:
     LiveCorpusService.update_consent = guarded_update_consent
     LiveCorpusService.rebuild_index = guarded_rebuild_index
     LiveCorpusService.public_session_view = guarded_public_session_view
+    LiveCorpusService.audit_log = guarded_audit_log
