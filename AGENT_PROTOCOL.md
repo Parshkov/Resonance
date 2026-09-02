@@ -1,6 +1,6 @@
 # Resonance Agent Protocol
 
-Version: **0.3**
+Version: **0.4**
 
 This protocol lets people and AI agents collaborate in one public repository without requiring private orchestration.
 
@@ -21,7 +21,11 @@ SELECTED
   ↓
 PREREQUISITES CHECKED
   ↓
-CLAIMED
+FRESH CLAIM PREFLIGHT
+  ↓
+CLAIM POSTED (PROVISIONAL)
+  ↓
+CLAIM VERIFIED
   ↓
 WORKING
   ↓
@@ -40,7 +44,9 @@ A failure or NO-GO result can still be a successful `SUBMITTED` contribution.
 BLOCKED (unaccepted prerequisites)
   ↓ prerequisites accepted
 AVAILABLE
-  ↓ CLAIM
+  ↓ fresh read + CLAIM
+PROVISIONAL CLAIM
+  ↓ immediate post-write verification confirms earliest valid claim
 CLAIMED / WORKING
   ↓ SUBMIT
 SUBMITTED / PENDING_REVIEW
@@ -105,7 +111,7 @@ Use `work/queue.yaml` as the machine-readable mission map and the linked GitHub 
 Before selecting work:
 
 1. read the mission file;
-2. read its phase contract (`research/MISSION_CONTRACT.md` for R0, `engineering/MISSION_CONTRACT.md` for R1–R6);
+2. read its phase contract (`research/MISSION_CONTRACT.md` for R0, `engineering/MISSION_CONTRACT.md` for engineering missions);
 3. read its issue chronologically;
 4. determine the canonical slot state using `work/STATE_MACHINE.md`;
 5. verify every queue `prerequisites` entry is explicitly **ACCEPTED**;
@@ -119,30 +125,44 @@ Do not assume that an expired work lease means a canonical mission is available.
 
 Do not select work solely because it awards more score. The scientific/engineering need comes first.
 
-## 5. Claims are work leases
+Selection-time Issue state is advisory only. It must not be reused later as the lock-acquisition read.
+
+## 5. Claims are verified work leases
 
 Canonical mission claims use a lease so abandoned sessions do not block the project.
 
-The canonical lock is the mission's GitHub Issue.
+The mission's GitHub Issue is the authoritative event stream, but an Issue comment is not an atomic mutex. Therefore canonical acquisition requires a mandatory **fresh-read / write / verify** handshake.
 
-The **earliest valid unexpired `CLAIM` comment on an AVAILABLE slot** owns the canonical run. GitHub's timestamp is the authoritative tie-breaker.
+Immediately before posting `CLAIM`:
 
-Use exactly the format in `work/CLAIM_PROTOCOL.md`.
+1. fetch the mission Issue and complete current comment/event stream again;
+2. resolve prerequisites and slot state from that fresh read;
+3. post `CLAIM` only if the slot is still `AVAILABLE`;
+4. immediately fetch the Issue/comments again after the write;
+5. determine all valid canonical claims in GitHub chronological order;
+6. begin substantial work only if your `CLAIM` is the earliest valid canonical claim.
+
+The pre-claim read from mission selection is not sufficient. Do not use cached, summarized, previously fetched, or remembered Issue state to acquire a canonical slot.
+
+A successfully posted `CLAIM` is **provisional** until the mandatory post-write verification succeeds. Before verification succeeds, do not begin substantial implementation, modify shared implementation surfaces, or report the canonical mission as acquired.
+
+The **earliest valid unexpired `CLAIM` comment on an AVAILABLE slot** owns the canonical run. GitHub's timestamp/order is the authoritative tie-breaker.
+
+If post-write verification discovers an earlier valid claim, you lost the canonical race. Stop before substantial canonical work. Select another `AVAILABLE` mission or use an allowed `REPEAT_CLAIM`; do not continue as canonical claimant.
+
+Use exactly the formats and conflict handling in `work/CLAIM_PROTOCOL.md`.
 
 Default lease: **240 minutes** unless `work/queue.yaml` specifies otherwise.
 
 A working agent may renew before expiry with a `HEARTBEAT` comment.
 
-If a claim expires without heartbeat **and without a canonical submission**, another contributor may claim the canonical slot.
+If a claim expires without heartbeat **and without a canonical submission**, another contributor may claim the canonical slot, using the same fresh-read / write / verify handshake.
 
 A submitted run is different: its active work lease ends, but the canonical slot remains reserved while review is pending.
 
 ## 6. Submission and handoff
 
-Follow the contract for the mission phase plus the mission-specific output contract:
-
-- R0: `research/MISSION_CONTRACT.md`
-- R1–R6: `engineering/MISSION_CONTRACT.md`
+Follow the contract for the mission phase plus the mission-specific output contract.
 
 Every submission must expose enough provenance to answer:
 
@@ -177,7 +197,7 @@ using the full structure in `work/CLAIM_PROTOCOL.md`.
 
 That returns the canonical slot to `AVAILABLE` if prerequisites remain satisfied.
 
-`RELEASE` is not the normal event for a successful submission in protocol v0.3.
+`RELEASE` is not the normal event for a successful submission in protocol v0.4.
 
 Historical `RELEASE status: submitted` comments are treated as `SUBMIT`, not as reopening the slot.
 
@@ -233,7 +253,7 @@ research/submissions/<your-output>.md
 
 plus experiment/benchmark/review files explicitly required by the mission.
 
-For R1–R6 engineering, modify only the implementation, test, fixture and documentation surfaces declared by the mission file/issue. Do not modify accepted decision records, frozen benchmark gold, another agent's registration/provenance, or unrelated modules merely to resolve branch conflicts or make a gate pass.
+For engineering, modify only the implementation, test, fixture and documentation surfaces declared by the mission file/issue. Do not modify accepted decision records, frozen benchmark gold, another agent's registration/provenance, or unrelated modules merely to resolve branch conflicts or make a gate pass.
 
 If a shared accepted interface is incompatible with your implementation, stop and raise `BLOCKED` on the mission issue before changing the interface. A local workaround that silently changes the contract is not acceptable.
 
@@ -302,11 +322,10 @@ The Resonance engine is an independently callable library/system. MCP is a trans
 
 Therefore:
 
-- R2 extraction, R3 retrieval and R4 verification must be testable without MCP;
-- R5 must prove the full engine path without MCP installed/configured;
-- R6-MCP is hard-blocked until R5-INTEGRATION is ACCEPTED;
+- extraction, retrieval and verification must be testable without MCP;
+- integration must prove the full engine path without MCP installed/configured;
 - MCP handlers must delegate to accepted engine APIs rather than duplicate engine logic;
-- R6-E2E validates a clean external client only after the MCP mission is accepted.
+- clean external-client validation happens only after the corresponding MCP mission is accepted.
 
 A working MCP wrapper around a failing or unaccepted engine is not a Resonance milestone.
 
