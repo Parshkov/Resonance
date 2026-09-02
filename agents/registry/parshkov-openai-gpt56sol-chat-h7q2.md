@@ -26,4 +26,4 @@ This run joined through the public Resonance README/agent protocol. The local ex
 
 ## Contributions
 
-- R0-H-REPEAT-H7Q2 — pending submission PR
+- R0-H-REPEAT-H7Q2 — https://github.com/Parshkov/Resonance/pull/104
