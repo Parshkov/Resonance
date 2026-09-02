@@ -28,6 +28,14 @@ from .postgres_store import PostgresRepository, postgres_available
 from .repository import PersistenceRepository
 from .service import LiveCorpusService, PersistenceHealth
 from .sqlite_store import SQLiteRepository
+from .review_hardening import install as _install_review_hardening
+
+# Independent exact-head review found two boundary failures after the original
+# recovery fixes. Install the focused guards at package initialization so all
+# existing import paths/classes keep their identity while the recovery remains
+# a small, auditable delta.
+_install_review_hardening()
+del _install_review_hardening
 
 __all__ = [
     "PERSISTENCE_SCHEMA_VERSION",
