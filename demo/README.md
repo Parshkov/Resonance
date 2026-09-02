@@ -57,3 +57,11 @@ R5-recorded 0.727 failure; this demo does not rerank or compensate.
 `demo/corpus/` is the consented multi-session demo corpus. It wraps accepted
 Thought DNA with consent/presentation metadata and does not implement
 retrieval, alignment, or scoring. See `demo/corpus/README.md`.
+
+## R9 visual client
+
+`demo/ui/` is the presentation-only, competition-recordable discovery client.
+It supports deterministic REPLAY from the accepted R8 fixture and LIVE through
+the accepted `discover_resonance` MCP path, both pinned to `analogical / k=15`.
+See [`ui/README.md`](ui/README.md) for launch, recording, privacy, and
+validation instructions.
