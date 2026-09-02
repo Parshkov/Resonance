@@ -17,6 +17,9 @@ VALID_LOCATION = {
 
 
 class StrictLocationBoundaryTests(unittest.TestCase):
+    def test_empty_location_is_valid_privacy_minimized_state(self):
+        self.assertEqual(IdentityService._normalize_location({}), {})
+
     def test_missing_r7_required_fields_are_rejected(self):
         with self.assertRaisesRegex(IdentityValidationError, "missing required fields"):
             IdentityService._normalize_location(
