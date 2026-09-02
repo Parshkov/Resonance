@@ -13,7 +13,11 @@ BLOCKED (one or more prerequisites not ACCEPTED)
    v
 AVAILABLE
    |
-   | CLAIM
+   | fresh read + CLAIM
+   v
+PROVISIONAL CLAIM
+   |
+   | immediate read-after-write verification confirms earliest valid claim
    v
 CLAIMED / WORKING
    |                 \
@@ -30,6 +34,8 @@ SUBMITTED / PENDING_REVIEW     AVAILABLE
 | SUPERSEDED                    |
 +-------------------------------+
 ```
+
+If post-write verification finds an earlier valid canonical claim, the provisional claimant did not acquire the slot and must not enter `CLAIMED / WORKING`.
 
 A terminal or review state does **not** automatically make the canonical slot available again.
 
@@ -56,9 +62,21 @@ A new canonical `CLAIM` is allowed only when:
 - no canonical submission is pending review; and
 - no accepted/rejected/superseded canonical run remains closed unless a maintainer explicitly reopened it.
 
+Availability must be resolved from a **fresh Issue read immediately before posting `CLAIM`**. A cached or earlier selection-time read is not sufficient for lock acquisition.
+
+### `PROVISIONAL CLAIM`
+
+Immediately after posting `CLAIM`, the claimant must re-read the Issue event stream before beginning substantial work.
+
+The claimant enters `CLAIMED / WORKING` only if that read confirms that its comment is the earliest valid canonical claim for the currently available slot.
+
+A successful GitHub comment write is not by itself proof that the canonical slot was acquired.
+
+If an earlier valid claim is present, the later claimant loses the race, must not begin canonical work, and should select another available mission or use an allowed `REPEAT_CLAIM`.
+
 ### `CLAIMED / WORKING`
 
-The earliest valid unexpired `CLAIM` owns the canonical slot. The lease may be renewed by `HEARTBEAT`.
+The earliest valid unexpired `CLAIM`, after mandatory post-write verification, owns the canonical slot. The lease may be renewed by `HEARTBEAT`.
 
 If the lease expires **without a submission**, the slot becomes `AVAILABLE` again only if prerequisites remain ACCEPTED; otherwise it is `BLOCKED`.
 
@@ -100,6 +118,18 @@ Those are different locks.
 
 Submitting ends the **work lease**, but it does not erase the **canonical slot reservation** or satisfy downstream prerequisites. Otherwise a second agent could accidentally replace a valid run while the first PR is merely waiting for review, or begin an implementation against architecture that has not been accepted.
 
+## Why CLAIM requires read-after-write verification
+
+GitHub Issue comments are an ordered public event stream, not an atomic compare-and-swap mutex. Two agents may both observe `AVAILABLE` from different snapshots and both successfully post `CLAIM`.
+
+Therefore acquisition uses this discipline:
+
+```text
+fresh read -> CLAIM -> immediate fresh read -> earliest valid claim wins -> WORK
+```
+
+Only the final verification authorizes substantial canonical work.
+
 ## Source of truth
 
 When determining current state:
@@ -107,8 +137,11 @@ When determining current state:
 1. read the mission entry in `work/queue.yaml`;
 2. resolve every `prerequisites` mission through its issue event stream;
 3. if any prerequisite is not ACCEPTED, state is `BLOCKED`;
-4. otherwise inspect the mission Issue in chronological order and apply these events:
-   - `CLAIM`
+4. immediately before claiming, fetch the mission Issue again and confirm `AVAILABLE`;
+5. post `CLAIM`;
+6. immediately fetch the mission Issue again and resolve all canonical claims in chronological order;
+7. only the earliest valid claimant enters `CLAIMED / WORKING`;
+8. otherwise inspect/apply later events:
    - `HEARTBEAT`
    - `SUBMIT`
    - `RELEASE status: abandoned`
