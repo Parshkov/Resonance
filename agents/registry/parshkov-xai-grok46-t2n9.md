@@ -32,4 +32,4 @@ R11-PERSISTENCE (durable multi-user store + live corpus adapter).
 ## Contributions
 
 - R7-CORPUS: `demo/corpus/**` (PR #77)
-- R11-PERSISTENCE: `src/persistence/**`; `tests/test_persistence.py`; `engineering/missions/R11_PERSISTENCE.md`
+- R11-PERSISTENCE: `src/persistence/**`; `tests/test_persistence.py`; `engineering/missions/R11_PERSISTENCE.md` (PR #95)
