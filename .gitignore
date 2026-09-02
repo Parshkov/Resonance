@@ -5,3 +5,7 @@ __pycache__/
 .pytest_cache/
 demo/report.json
 demo/transcript.jsonl
+var/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
