@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
 import secrets
 import time
 from dataclasses import asdict, is_dataclass
@@ -26,6 +27,7 @@ from .models import (
 AUTH_ISSUED = "identity.auth.issued"
 AUTH_REVOKED = "identity.auth.revoked"
 CONSENT_SET = "identity.consent.set"
+INTRO_CONSENT_SET = "identity.intro_consent.set"
 THOUGHT_CREATED = "identity.thought.created"
 THOUGHT_UPDATED = "identity.thought.updated"
 THOUGHT_REVOKED = "identity.thought.revoked"
@@ -122,7 +124,7 @@ class IdentityService:
     def register_guest(self, *, actor_type: str = "human") -> SessionCredentials:
         return self.register(f"guest-{secrets.token_hex(3)}", actor_type=actor_type)
 
-    def authenticate(self, access_token: str, *, actor_type: str = "human") -> ActorContext:
+    def authenticate(self, access_token: str, *, actor_type: str | None = None) -> ActorContext:
         if not access_token:
             raise AuthenticationError("missing access token")
         wanted = _hash_secret(access_token)
@@ -137,7 +139,7 @@ class IdentityService:
             return ActorContext(
                 user_id=state["user_id"],
                 auth_session_id=state["auth_session_id"],
-                actor_type=actor_type,
+                actor_type=state["actor_type"],
             )
         raise AuthenticationError("unknown or revoked access token")
 
@@ -148,7 +150,7 @@ class IdentityService:
     def rotate_session(self, access_token: str, *, actor_type: str = "human") -> SessionCredentials:
         actor = self.authenticate(access_token, actor_type=actor_type)
         self._revoke_auth_session(actor, reason="rotation")
-        return self._issue_session(actor.user_id, actor_type=actor_type)
+        return self._issue_session(actor.user_id, actor_type=actor.actor_type)
 
     def revoke_account(self, access_token: str, *, confirmed: bool) -> None:
         self._require_confirmation(confirmed)
@@ -174,17 +176,21 @@ class IdentityService:
         presentation: Mapping[str, Any],
         record_kind: str = "volunteer",
         notes: str = "",
+        csrf_token: str | None = None,
+        cookie_authenticated: bool = False,
         actor_type: str = "human",
     ) -> Any:
         actor = self.authenticate(access_token, actor_type=actor_type)
-        self._validate_location(location)
+        if cookie_authenticated:
+            self._require_csrf(actor, csrf_token)
+        coarse_location = self._normalize_location(location)
         session_id = f"ses-{secrets.token_hex(8)}"
         stored = self.backend.create_session(
             session_id=session_id,
             user_id=actor.user_id,
             thought_dna=thought_dna,
             consent=ConsentChoices().to_corpus_consent(),
-            location=dict(location),
+            location=coarse_location,
             presentation=dict(presentation),
             record_kind=record_kind,
             builder_id="r12-identity-consent",
@@ -206,17 +212,24 @@ class IdentityService:
         thought_dna: Mapping[str, Any],
         location: Mapping[str, Any] | None = None,
         presentation: Mapping[str, Any] | None = None,
+        csrf_token: str | None = None,
+        cookie_authenticated: bool = False,
         actor_type: str = "human",
     ) -> Any:
         actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
+        if cookie_authenticated:
+            self._require_csrf(actor, csrf_token)
         if bool(self._corpus_consent(current).get("share_thought_dna", False)):
             raise ConfirmationRequiredError(
                 "revoke sharing before replacing a discoverable Thought DNA artifact"
             )
         current_location = dict(_field(current, "location", {}) or {})
         current_presentation = dict(_field(current, "presentation", {}) or {})
-        next_location = dict(location) if location is not None else current_location
-        self._validate_location(next_location)
+        next_location = (
+            self._normalize_location(location)
+            if location is not None
+            else self._normalize_location(current_location)
+        )
         consent = self._corpus_consent(current)
         stored = self.backend.create_session(
             session_id=session_id,
@@ -228,6 +241,7 @@ class IdentityService:
             record_kind=str(_field(current, "record_kind", "volunteer")),
             builder_id="r12-identity-consent",
             notes=str(_field(current, "notes", "")),
+            expected_version=int(_field(current, "version", 0)),
         )
         self._append(
             THOUGHT_UPDATED,
@@ -249,10 +263,18 @@ class IdentityService:
         actor_type: str = "human",
     ) -> ConsentChoices:
         self._require_confirmation(confirmed)
-        actor, _ = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
         if cookie_authenticated:
             self._require_csrf(actor, csrf_token)
-        self.backend.update_consent(session_id, choices.to_corpus_consent())
+        current_choices = self._consent_choices(current)
+        disabling_intro = current_choices.allow_intro_requests and not choices.allow_intro_requests
+        if disabling_intro:
+            self._append_intro_consent(actor, session_id, False)
+        self.backend.update_consent(
+            session_id,
+            choices.to_corpus_consent(),
+            expected_version=int(_field(current, "version", 0)),
+        )
         self._append(
             CONSENT_SET,
             user_id=actor.user_id,
@@ -265,6 +287,12 @@ class IdentityService:
                 "actor_type": actor.actor_type,
             },
         )
+        if not disabling_intro:
+            self._append_intro_consent(
+                actor,
+                session_id,
+                choices.allow_intro_requests,
+            )
         return choices
 
     def update_metadata(
@@ -278,15 +306,16 @@ class IdentityService:
         cookie_authenticated: bool = False,
         actor_type: str = "human",
     ) -> Any:
-        actor, _ = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
         if cookie_authenticated:
             self._require_csrf(actor, csrf_token)
         if location is not None:
-            self._validate_location(location)
+            location = self._normalize_location(location)
         return self.backend.update_presentation(
             session_id,
             location=dict(location) if location is not None else None,
             presentation=dict(presentation) if presentation is not None else None,
+            expected_version=int(_field(current, "version", 0)),
         )
 
     def revoke_thought_session(
@@ -300,10 +329,15 @@ class IdentityService:
         actor_type: str = "human",
     ) -> Any:
         self._require_confirmation(confirmed)
-        actor, _ = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
         if cookie_authenticated:
             self._require_csrf(actor, csrf_token)
-        stored = self.backend.revoke_session(session_id, reason="user_revoked")
+        self._append_intro_consent(actor, session_id, False)
+        stored = self.backend.revoke_session(
+            session_id,
+            reason="user_revoked",
+            expected_version=int(_field(current, "version", 0)),
+        )
         self._append(
             CONSENT_SET,
             user_id=actor.user_id,
@@ -335,10 +369,14 @@ class IdentityService:
         actor_type: str = "human",
     ) -> Any:
         self._require_confirmation(confirmed)
-        actor, _ = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
         if cookie_authenticated:
             self._require_csrf(actor, csrf_token)
-        stored = self.backend.delete_session(session_id)
+        self._append_intro_consent(actor, session_id, False)
+        stored = self.backend.delete_session(
+            session_id,
+            expected_version=int(_field(current, "version", 0)),
+        )
         self._append(
             CONSENT_SET,
             user_id=actor.user_id,
@@ -379,6 +417,8 @@ class IdentityService:
 
     # -- internal policy -------------------------------------------------
     def _issue_session(self, user_id: str, *, actor_type: str) -> SessionCredentials:
+        if actor_type not in {"human", "agent"}:
+            raise IdentityValidationError("actor_type must be human or agent")
         access_token = secrets.token_urlsafe(32)
         csrf_token = secrets.token_urlsafe(24)
         auth_session_id = f"auth-{secrets.token_hex(12)}"
@@ -422,6 +462,7 @@ class IdentityService:
                     "token_sha256": str(event.payload.get("token_sha256", "")),
                     "csrf_sha256": str(event.payload.get("csrf_sha256", "")),
                     "expires_at": str(event.payload.get("expires_at", "")),
+                    "actor_type": str(event.payload.get("actor_type", "human")),
                 }
             elif event.event_type == AUTH_REVOKED and event.session_id:
                 states.pop(event.session_id, None)
@@ -430,7 +471,7 @@ class IdentityService:
     def _latest_intro_consent(self, session_id: str) -> bool:
         value = False
         for event in self.backend.list_identity_events():
-            if event.event_type == CONSENT_SET and event.session_id == session_id:
+            if event.event_type in {CONSENT_SET, INTRO_CONSENT_SET} and event.session_id == session_id:
                 value = bool(event.payload.get("allow_intro_requests", False))
         return value
 
@@ -477,7 +518,7 @@ class IdentityService:
             raise ConfirmationRequiredError("explicit user confirmation is required")
 
     @staticmethod
-    def _validate_location(location: Mapping[str, Any]) -> None:
+    def _normalize_location(location: Mapping[str, Any]) -> dict[str, Any]:
         # R7's current corpus shape represents city-level coarse location with
         # a synthetic centroid.  Reject accidental exact-address/GPS fields;
         # schema validation itself remains R11's responsibility.
@@ -488,6 +529,45 @@ class IdentityService:
         precision = location.get("precision")
         if precision is not None and precision != "city":
             raise IdentityValidationError("location precision must be city-level")
+        coarse = dict(location)
+        has_lat = "lat" in coarse
+        has_lon = "lon" in coarse
+        if has_lat != has_lon:
+            raise IdentityValidationError("coarse location requires both lat and lon")
+        if has_lat:
+            lat = coarse["lat"]
+            lon = coarse["lon"]
+            if (
+                isinstance(lat, bool)
+                or isinstance(lon, bool)
+                or not isinstance(lat, (int, float))
+                or not isinstance(lon, (int, float))
+                or not math.isfinite(float(lat))
+                or not math.isfinite(float(lon))
+                or not -90 <= float(lat) <= 90
+                or not -180 <= float(lon) <= 180
+            ):
+                raise IdentityValidationError("coarse location coordinates are invalid")
+            coarse["lat"] = round(float(lat), 1)
+            coarse["lon"] = round(float(lon), 1)
+            coarse["precision"] = "city"
+        return coarse
+
+    def _append_intro_consent(
+        self,
+        actor: ActorContext,
+        session_id: str,
+        allowed: bool,
+    ) -> None:
+        self._append(
+            INTRO_CONSENT_SET,
+            user_id=actor.user_id,
+            session_id=session_id,
+            payload={
+                "allow_intro_requests": bool(allowed),
+                "actor_type": actor.actor_type,
+            },
+        )
 
     def _append(
         self,

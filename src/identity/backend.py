@@ -14,13 +14,20 @@ from .models import IdentityEvent
 
 
 class IdentityBackend(Protocol):
-    def create_user(self, user_id: str, *, display_label: str, avatar_placeholder: str | None = None) -> Any:
+    def create_user(
+        self,
+        user_id: str,
+        *,
+        display_label: str,
+        avatar_placeholder: str | None = None,
+        request_id: str | None = None,
+    ) -> Any:
         ...
 
     def get_user(self, user_id: str) -> Any | None:
         ...
 
-    def revoke_user(self, user_id: str) -> Any:
+    def revoke_user(self, user_id: str, *, request_id: str | None = None) -> Any:
         ...
 
     def create_session(
@@ -35,6 +42,8 @@ class IdentityBackend(Protocol):
         record_kind: str,
         builder_id: str,
         notes: str,
+        expected_version: int | None = None,
+        request_id: str | None = None,
     ) -> Any:
         ...
 
@@ -44,7 +53,14 @@ class IdentityBackend(Protocol):
     def list_sessions(self) -> Sequence[Any]:
         ...
 
-    def update_consent(self, session_id: str, consent: Mapping[str, Any]) -> Any:
+    def update_consent(
+        self,
+        session_id: str,
+        consent: Mapping[str, Any],
+        *,
+        expected_version: int | None = None,
+        request_id: str | None = None,
+    ) -> Any:
         ...
 
     def update_presentation(
@@ -53,13 +69,28 @@ class IdentityBackend(Protocol):
         *,
         location: Mapping[str, Any] | None = None,
         presentation: Mapping[str, Any] | None = None,
+        expected_version: int | None = None,
+        request_id: str | None = None,
     ) -> Any:
         ...
 
-    def revoke_session(self, session_id: str, *, reason: str = "revoked") -> Any:
+    def revoke_session(
+        self,
+        session_id: str,
+        *,
+        reason: str = "revoked",
+        expected_version: int | None = None,
+        request_id: str | None = None,
+    ) -> Any:
         ...
 
-    def delete_session(self, session_id: str) -> Any:
+    def delete_session(
+        self,
+        session_id: str,
+        *,
+        expected_version: int | None = None,
+        request_id: str | None = None,
+    ) -> Any:
         ...
 
     def append_identity_event(self, event: IdentityEvent) -> None:
@@ -89,8 +120,8 @@ class R11IdentityBackend:
     def get_user(self, user_id: str) -> Any | None:
         return self.live_corpus.get_user(user_id)
 
-    def revoke_user(self, user_id: str) -> Any:
-        return self.live_corpus.revoke_user(user_id)
+    def revoke_user(self, user_id: str, **kwargs: Any) -> Any:
+        return self.live_corpus.revoke_user(user_id, **kwargs)
 
     def create_session(self, **kwargs: Any) -> Any:
         return self.live_corpus.create_session(**kwargs)
@@ -101,17 +132,19 @@ class R11IdentityBackend:
     def list_sessions(self) -> Sequence[Any]:
         return self.repo.list_sessions()
 
-    def update_consent(self, session_id: str, consent: Mapping[str, Any]) -> Any:
-        return self.live_corpus.update_consent(session_id, consent)
+    def update_consent(
+        self, session_id: str, consent: Mapping[str, Any], **kwargs: Any
+    ) -> Any:
+        return self.live_corpus.update_consent(session_id, consent, **kwargs)
 
     def update_presentation(self, session_id: str, **kwargs: Any) -> Any:
         return self.live_corpus.update_presentation(session_id, **kwargs)
 
-    def revoke_session(self, session_id: str, *, reason: str = "revoked") -> Any:
-        return self.live_corpus.revoke_session(session_id, reason=reason)
+    def revoke_session(self, session_id: str, **kwargs: Any) -> Any:
+        return self.live_corpus.revoke_session(session_id, **kwargs)
 
-    def delete_session(self, session_id: str) -> Any:
-        return self.live_corpus.delete_session(session_id)
+    def delete_session(self, session_id: str, **kwargs: Any) -> Any:
+        return self.live_corpus.delete_session(session_id, **kwargs)
 
     def append_identity_event(self, event: IdentityEvent) -> None:
         # Lazy import keeps the R12 branch buildable while R11 is still a

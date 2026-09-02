@@ -41,6 +41,7 @@ class FakeSession:
     notes: str = ""
     revoked_at: str | None = None
     deleted_at: str | None = None
+    version: int = 1
 
     def to_dict(self):
         return self.__dict__.copy()
@@ -54,8 +55,11 @@ class FakeR11Backend:
         self.users = durable_users if durable_users is not None else {}
         self.sessions = durable_sessions if durable_sessions is not None else {}
         self.index = set()
+        self.fail_next_consent_update = False
 
-    def create_user(self, user_id, *, display_label, avatar_placeholder=None):
+    def create_user(
+        self, user_id, *, display_label, avatar_placeholder=None, request_id=None
+    ):
         user = FakeUser(user_id, display_label, avatar_placeholder or display_label)
         self.users[user_id] = user
         return user
@@ -63,13 +67,17 @@ class FakeR11Backend:
     def get_user(self, user_id):
         return self.users.get(user_id)
 
-    def revoke_user(self, user_id):
+    def revoke_user(self, user_id, *, request_id=None):
         user = self.users[user_id]
         user = replace(user, revoked_at="revoked")
         self.users[user_id] = user
         for sid, session in list(self.sessions.items()):
             if session.user_id == user_id and session.deleted_at is None:
-                self.revoke_session(sid, reason="user_revoked")
+                self.revoke_session(
+                    sid,
+                    reason="user_revoked",
+                    expected_version=session.version,
+                )
         return user
 
     def create_session(self, **kwargs):
@@ -85,7 +93,16 @@ class FakeR11Backend:
         )
         old = self.sessions.get(session.session_id)
         if old:
-            session = replace(session, revoked_at=old.revoked_at, deleted_at=old.deleted_at)
+            if kwargs.get("expected_version") != old.version:
+                raise RuntimeError("stale session version")
+            session = replace(
+                session,
+                revoked_at=old.revoked_at,
+                deleted_at=old.deleted_at,
+                version=old.version + 1,
+            )
+        elif kwargs.get("expected_version") not in (None, 0):
+            raise RuntimeError("new session cannot have a nonzero expected version")
         self.sessions[session.session_id] = session
         self._sync_index(session)
         return session
@@ -96,24 +113,61 @@ class FakeR11Backend:
     def list_sessions(self):
         return list(self.sessions.values())
 
-    def update_consent(self, session_id, consent):
-        session = replace(self.sessions[session_id], consent=dict(consent))
+    def update_consent(
+        self,
+        session_id,
+        consent,
+        *,
+        expected_version=None,
+        request_id=None,
+    ):
+        if self.fail_next_consent_update:
+            self.fail_next_consent_update = False
+            raise RuntimeError("injected consent storage failure")
+        current = self.sessions[session_id]
+        if expected_version != current.version:
+            raise RuntimeError("stale session version")
+        session = replace(
+            current,
+            consent=dict(consent),
+            version=current.version + 1,
+        )
         self.sessions[session_id] = session
         self._sync_index(session)
         return session
 
-    def update_presentation(self, session_id, *, location=None, presentation=None):
+    def update_presentation(
+        self,
+        session_id,
+        *,
+        location=None,
+        presentation=None,
+        expected_version=None,
+        request_id=None,
+    ):
         session = self.sessions[session_id]
+        if expected_version != session.version:
+            raise RuntimeError("stale session version")
         session = replace(
             session,
             location=dict(location) if location is not None else session.location,
             presentation=dict(presentation) if presentation is not None else session.presentation,
+            version=session.version + 1,
         )
         self.sessions[session_id] = session
         return session
 
-    def revoke_session(self, session_id, *, reason="revoked"):
+    def revoke_session(
+        self,
+        session_id,
+        *,
+        reason="revoked",
+        expected_version=None,
+        request_id=None,
+    ):
         session = self.sessions[session_id]
+        if expected_version != session.version:
+            raise RuntimeError("stale session version")
         session = replace(
             session,
             consent={
@@ -123,14 +177,30 @@ class FakeR11Backend:
                 "share_display_profile": False,
             },
             revoked_at="revoked",
+            version=session.version + 1,
         )
         self.sessions[session_id] = session
         self.index.discard(session_id)
         return session
 
-    def delete_session(self, session_id):
-        session = self.revoke_session(session_id)
-        session = replace(session, deleted_at="deleted")
+    def delete_session(
+        self, session_id, *, expected_version=None, request_id=None
+    ):
+        session = self.sessions[session_id]
+        if expected_version != session.version:
+            raise RuntimeError("stale session version")
+        session = replace(
+            session,
+            consent={
+                "share_enabled": False,
+                "share_thought_dna": False,
+                "share_coarse_location": False,
+                "share_display_profile": False,
+            },
+            revoked_at=session.revoked_at or "revoked",
+            deleted_at="deleted",
+            version=session.version + 1,
+        )
         self.sessions[session_id] = session
         return session
 
@@ -220,8 +290,21 @@ class IdentityConsentTests(unittest.TestCase):
 
     def test_cookie_mutations_require_csrf_and_visible_confirmation(self):
         ui = ManualUIAdapter(self.service)
+        with self.assertRaises(CsrfError):
+            ui.create_thought_session(
+                self.alice.access_token,
+                "wrong",
+                thought_dna=dna(),
+                location=location(),
+                presentation=presentation(),
+            )
+        self.assertEqual(len(self.backend.sessions), 0)
         session = ui.create_thought_session(
-            self.alice.access_token, thought_dna=dna(), location=location(), presentation=presentation()
+            self.alice.access_token,
+            self.alice.csrf_token,
+            thought_dna=dna(),
+            location=location(),
+            presentation=presentation(),
         )
         with self.assertRaises(ConfirmationRequiredError):
             ui.set_consent(
@@ -246,6 +329,74 @@ class IdentityConsentTests(unittest.TestCase):
             ConsentChoices(share_thought_dna=True),
             confirmed=True,
         )
+
+    def test_private_update_carries_current_optimistic_version(self):
+        session = self.service.create_thought_session(
+            self.alice.access_token,
+            thought_dna=dna(),
+            location=location(),
+            presentation=presentation(),
+        )
+        updated = self.service.update_thought_session(
+            self.alice.access_token,
+            session.session_id,
+            thought_dna=dna("thought-updated"),
+        )
+        self.assertEqual(updated.version, session.version + 1)
+        self.assertEqual(updated.thought_dna["thought_id"], "thought-updated")
+
+    def test_precise_coordinates_are_normalized_before_storage(self):
+        precise = location() | {"lat": 32.71573642, "lon": -117.16108791}
+        session = self.service.create_thought_session(
+            self.alice.access_token,
+            thought_dna=dna(),
+            location=precise,
+            presentation=presentation(),
+        )
+        self.assertEqual(session.location["lat"], 32.7)
+        self.assertEqual(session.location["lon"], -117.2)
+        self.assertNotEqual(session.location["lat"], precise["lat"])
+        self.assertNotEqual(session.location["lon"], precise["lon"])
+
+    def test_intro_opt_out_is_durable_before_fallible_corpus_write(self):
+        session = self.service.create_thought_session(
+            self.alice.access_token,
+            thought_dna=dna(),
+            location=location(),
+            presentation=presentation(),
+        )
+        self.service.set_consent(
+            self.alice.access_token,
+            session.session_id,
+            ConsentChoices(share_thought_dna=True, allow_intro_requests=True),
+            confirmed=True,
+        )
+        self.backend.fail_next_consent_update = True
+        with self.assertRaisesRegex(RuntimeError, "consent storage failure"):
+            self.service.set_consent(
+                self.alice.access_token,
+                session.session_id,
+                ConsentChoices(share_thought_dna=False, allow_intro_requests=False),
+                confirmed=True,
+            )
+
+        restarted = IdentityService(
+            FakeR11Backend(
+                durable_events=self.backend.events,
+                durable_users=self.backend.users,
+                durable_sessions=self.backend.sessions,
+            )
+        )
+        self.assertFalse(
+            restarted.consent_for(
+                self.alice.access_token,
+                session.session_id,
+            ).allow_intro_requests
+        )
+
+    def test_actor_type_is_reconstructed_from_issued_auth_state(self):
+        actor = self.service.authenticate(self.alice.access_token, actor_type="agent")
+        self.assertEqual(actor.actor_type, "human")
 
     def test_logout_then_pseudonymous_login_preserves_owned_state_without_email(self):
         session = self.service.create_thought_session(
@@ -325,10 +476,18 @@ class IdentityConsentTests(unittest.TestCase):
         ui = ManualUIAdapter(self.service)
         webmcp = WebMCPAdapter(self.service)
         first = ui.create_thought_session(
-            self.alice.access_token, thought_dna=dna("thought-ui"), location=location(), presentation=presentation()
+            self.alice.access_token,
+            self.alice.csrf_token,
+            thought_dna=dna("thought-ui"),
+            location=location(),
+            presentation=presentation(),
         )
         second = webmcp.create_thought_session(
-            self.alice.access_token, thought_dna=dna("thought-agent"), location=location(), presentation=presentation()
+            self.alice.access_token,
+            self.alice.csrf_token,
+            thought_dna=dna("thought-agent"),
+            location=location(),
+            presentation=presentation(),
         )
         choices = ConsentChoices(True, True, False, True)
         ui.set_consent(self.alice.access_token, self.alice.csrf_token, first.session_id, choices, confirmed=True)

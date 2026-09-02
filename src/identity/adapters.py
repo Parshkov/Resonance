@@ -22,6 +22,7 @@ class CookieSessionAdapter:
     def create_thought_session(
         self,
         access_token: str,
+        csrf_token: str,
         *,
         thought_dna: Mapping[str, Any],
         location: Mapping[str, Any],
@@ -32,6 +33,29 @@ class CookieSessionAdapter:
             thought_dna=thought_dna,
             location=location,
             presentation=presentation,
+            csrf_token=csrf_token,
+            cookie_authenticated=True,
+            actor_type=self.actor_type,
+        )
+
+    def update_thought_session(
+        self,
+        access_token: str,
+        csrf_token: str,
+        session_id: str,
+        *,
+        thought_dna: Mapping[str, Any],
+        location: Mapping[str, Any] | None = None,
+        presentation: Mapping[str, Any] | None = None,
+    ) -> Any:
+        return self.service.update_thought_session(
+            access_token,
+            session_id,
+            thought_dna=thought_dna,
+            location=location,
+            presentation=presentation,
+            csrf_token=csrf_token,
+            cookie_authenticated=True,
             actor_type=self.actor_type,
         )
 
