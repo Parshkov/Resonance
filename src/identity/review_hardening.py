@@ -30,6 +30,11 @@ def install() -> None:
     def strict_normalize(location: Mapping[str, Any]) -> dict[str, Any]:
         if not isinstance(location, Mapping):
             raise IdentityValidationError("location must be an object")
+        # Privacy minimization: location is optional. An empty object means the
+        # user has not supplied location data at all. R11 separately prevents
+        # enabling share_coarse_location until a complete coarse location exists.
+        if not location:
+            return {}
         keys = set(location)
         missing = sorted(_LOCATION_KEYS - keys)
         unknown = sorted(keys - _LOCATION_KEYS)
