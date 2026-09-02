@@ -15,6 +15,10 @@ from .models import (
     SessionCredentials,
 )
 from .service import IdentityService
+from .review_hardening import install as _install_review_hardening
+
+_install_review_hardening()
+del _install_review_hardening
 
 __all__ = [
     "IDENTITY_CONTRACT_VERSION",
