@@ -74,6 +74,29 @@ availability.
   replies through the UI, B reads the thread through the tool; pseudonymous
   identities only, no contact data, final `intro_state = accepted`.
 
+## Review revision (REVIEW_INPUT 5106136846 — three blockers closed)
+
+1. **Human UI** — additive `demo/ui/collab_ui.mjs` injects a visible collaboration
+   panel: a "Request intro" control on discoverable match cards, an
+   incoming/outgoing request list with accept/decline/cancel buttons, and a
+   channel thread with a message composer. Every control drives the same
+   `/api/product/*` endpoints the WebMCP tools use. All user text is inserted
+   via `textContent` (never `innerHTML`) — displayed, never interpreted.
+2. **CSRF/session bootstrap** — `demo/ui/session.mjs` persists the CSRF token in
+   `sessionStorage` at issue time and, on a reload that carries only the cookie,
+   mints a fresh token for the same subject via new `POST /api/product/rotate`.
+   No page global, no harness secret injection. Both `collab.mjs` (tools) and
+   `collab_ui.mjs` (human UI) share this one `apiFetch` bootstrap.
+3. **Channel one-to-one atomicity** — acceptance now runs through a single
+   repository `accept_intro` transaction (CAS `state='requested'→'accepted'`
+   plus channel insert), the channel id is deterministic in the intro id, and
+   migration `0003` adds `UNIQUE(channels.intro_id)`, so any concurrent or
+   replayed accept converges on exactly one channel.
+
+Verified live in headless Chrome 152: request → accept → open channel → send →
+read entirely through the visible UI controls; and a page reload keeps the
+CSRF working (authorized read/write) with no injection.
+
 ```
 python3 -m unittest tests.test_collaboration -v
 python3 -m unittest tests.test_product_http

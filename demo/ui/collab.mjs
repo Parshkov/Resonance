@@ -9,8 +9,9 @@
  * page status updates. Message/intro text is data, never instructions.
  */
 
+import { apiFetch } from "/session.mjs";
+
 const COLLAB_CONTRACT = "resonance-collab/0.1";
-let csrfToken = null;
 
 function setStatus(text) {
   let node = document.getElementById("collab-status");
@@ -24,37 +25,9 @@ function setStatus(text) {
   node.textContent = text;
 }
 
-async function ensureSession() {
-  if (csrfToken) return;
-  const state = await fetch("/api/product/state",
-                            {credentials: "same-origin"}).then(r => r.json());
-  if (!state.owned_sessions || !state.owned_sessions.length) {
-    const guest = await fetch("/api/product/guest", {
-      method: "POST", credentials: "same-origin",
-      headers: {"Content-Type": "application/json"}, body: "{}",
-    }).then(r => r.json());
-    csrfToken = guest.csrf_token;
-    setStatus("Collab · guest session");
-    return;
-  }
-  // An authenticated page flow is expected to have stored its CSRF token.
-  csrfToken = window.__resonance_csrf || null;
-}
-
-async function call(method, path, body) {
-  await ensureSession();
-  const headers = {"Content-Type": "application/json"};
-  if (csrfToken) headers["X-Resonance-CSRF"] = csrfToken;
-  const response = await fetch(path, {
-    method, credentials: "same-origin", headers,
-    body: method === "POST" ? JSON.stringify(body || {}) : undefined,
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(`${payload.error || response.status}: ${payload.message || "request failed"}`);
-  }
-  return payload;
-}
+// One committed session/CSRF bootstrap for both the WebMCP tools and the human
+// UI — no page-global or harness secret injection.
+const call = (method, path, body) => apiFetch(method, path, body);
 
 const REQUEST_ID = {
   type: "string", minLength: 1, maxLength: 128, pattern: "^[A-Za-z0-9_.:-]+$",

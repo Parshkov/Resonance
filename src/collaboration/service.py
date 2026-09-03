@@ -16,6 +16,7 @@ intro/message text is stored raw but always surfaced with an
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 from datetime import datetime, timezone
 from typing import Any, Mapping
@@ -95,7 +96,7 @@ class CollaborationService:
     def _intro_dto(self, viewer_id: str, intro: IntroRecord) -> dict[str, Any]:
         outgoing = intro.from_user_id == viewer_id
         counterpart = intro.to_user_id if outgoing else intro.from_user_id
-        return {
+        dto = {
             "intro_id": intro.intro_id,
             "direction": "outgoing" if outgoing else "incoming",
             "state": intro.state,
@@ -107,6 +108,13 @@ class CollaborationService:
             "created_at": intro.created_at,
             "updated_at": intro.updated_at,
         }
+        if intro.state == "accepted":
+            # Expose the channel id so a participant can open the thread
+            # without re-issuing the (already-consumed) acceptance transition.
+            channel = self.repo.get_channel_by_intro(intro.intro_id)
+            if channel is not None:
+                dto["channel_id"] = channel.channel_id
+        return dto
 
     # ------------------------------------------------------------------
     # intro state machine
@@ -208,31 +216,36 @@ class CollaborationService:
                 intro.from_user_id, intro.to_user_id):
             raise CollaborationError(UNAVAILABLE)
         to_state = "accepted" if accept else "declined"
-        field = "accepted_at" if accept else "declined_at"
         key = _sha_key("collab.intro.respond", request_id,
                        {"intro_id": intro_id, "to_state": to_state})
+        if accept:
+            # Deterministic channel id from the intro id: a replay or a
+            # concurrent accept produces the SAME id, and the unique
+            # channels.intro_id index makes the INSERT converge — so one
+            # accepted intro can never map to two channels.
+            channel_id = "chan-" + hashlib.sha256(
+                intro_id.encode("utf-8")).hexdigest()[:24]
+            try:
+                stored, channel = self.repo.accept_intro(
+                    intro_id, channel_id=channel_id, now=_now(), idempotency=key,
+                    audit=self._audit("collab.intro.accepted",
+                                      user_id=actor.user_id,
+                                      payload={"intro_id": intro_id}))
+            except PersistenceConflictError as exc:
+                raise CollaborationError("request is no longer pending") from exc
+            result = self._intro_dto(actor.user_id, stored)
+            result["channel_id"] = channel.channel_id
+            return result
         try:
             stored = self.repo.transition_intro(
-                intro_id, from_state="requested", to_state=to_state,
-                timestamp_field=field, now=_now(), idempotency=key,
-                audit=self._audit(f"collab.intro.{to_state}",
+                intro_id, from_state="requested", to_state="declined",
+                timestamp_field="declined_at", now=_now(), idempotency=key,
+                audit=self._audit("collab.intro.declined",
                                   user_id=actor.user_id,
                                   payload={"intro_id": intro_id}))
         except PersistenceConflictError as exc:
-            raise CollaborationError(
-                f"request is no longer pending") from exc
-        result = self._intro_dto(actor.user_id, stored)
-        if accept:
-            channel = self.repo.get_channel_by_intro(intro_id)
-            if channel is None:
-                channel = self.repo.create_channel(
-                    ChannelRecord(channel_id="chan-" + secrets.token_hex(12),
-                                  intro_id=intro_id, created_at=_now()),
-                    audit=self._audit("collab.channel.created",
-                                      user_id=actor.user_id,
-                                      payload={"intro_id": intro_id}))
-            result["channel_id"] = channel.channel_id
-        return result
+            raise CollaborationError("request is no longer pending") from exc
+        return self._intro_dto(actor.user_id, stored)
 
     def cancel_intro(
         self,

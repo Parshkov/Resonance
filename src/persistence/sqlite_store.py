@@ -597,6 +597,53 @@ class SQLiteRepository:
                 self._conn.rollback()
                 raise
 
+    def accept_intro(self, intro_id, *, channel_id, now,
+                     idempotency=None, audit=None):
+        """Atomic accept: transition requested->accepted AND create the single
+        channel in ONE transaction. The unique channels.intro_id index makes a
+        replay/concurrent accept converge on the existing channel rather than
+        minting a second one."""
+        from .models import IntroRecord
+        from .sql import row_intro, row_channel
+        with self._lock:
+            self._begin()
+            try:
+                replay = self._claim_idempotency(idempotency)
+                if replay is not None:
+                    self._conn.commit()
+                    return IntroRecord.from_mapping(replay), self._channel_for(intro_id)
+                cur = self._conn.execute(
+                    "UPDATE intros SET state = 'accepted', updated_at = ?, "
+                    "accepted_at = ? WHERE intro_id = ? AND state = 'requested'",
+                    (now, now, intro_id))
+                if cur.rowcount != 1:
+                    raise PersistenceConflictError(
+                        f"intro {intro_id!r} is not in state 'requested'")
+                # INSERT OR IGNORE + unique(intro_id): idempotent channel row.
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO channels(channel_id, intro_id, "
+                    "created_at, closed_at) VALUES (?, ?, ?, NULL)",
+                    (channel_id, intro_id, now))
+                row = self._conn.execute(
+                    "SELECT * FROM intros WHERE intro_id = ?", (intro_id,)).fetchone()
+                stored = row_intro(row)
+                chan_row = self._conn.execute(
+                    "SELECT * FROM channels WHERE intro_id = ?", (intro_id,)).fetchone()
+                channel = row_channel(chan_row)
+                self._insert_audit(audit)
+                self._finish_idempotency(idempotency, stored.to_dict())
+                self._conn.commit()
+                return stored, channel
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def _channel_for(self, intro_id):
+        from .sql import row_channel
+        row = self._conn.execute(
+            "SELECT * FROM channels WHERE intro_id = ?", (intro_id,)).fetchone()
+        return row_channel(row) if row else None
+
     def list_intros_for_user(self, user_id):
         from .sql import row_intro
         with self._lock:

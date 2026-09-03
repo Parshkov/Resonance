@@ -125,6 +125,15 @@ class LiveProductService:
     def logout(self, access_token: str) -> None:
         self.identity.logout(access_token)
 
+    def rotate_session(self, access_token: str):
+        """Issue a fresh access token + CSRF for the current subject.
+
+        Lets an authenticated page recover a usable CSRF token after reload
+        (the cookie survives, but the CSRF value is only revealed at issue
+        time) without any test-harness secret injection.
+        """
+        return self.identity.rotate_session(access_token)
+
     def owned_sessions(self, access_token: str, **kwargs: Any) -> list[dict[str, Any]]:
         return self.identity.owned_sessions(access_token, **kwargs)
 

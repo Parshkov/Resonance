@@ -65,6 +65,8 @@ STATIC = {
     "/webmcp.mjs": ("webmcp.mjs", "text/javascript; charset=utf-8"),
     "/deeplink.mjs": ("deeplink.mjs", "text/javascript; charset=utf-8"),
     "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
+    "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
+    "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
 }
 
 
@@ -227,7 +229,9 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script>window.RESONANCE_MODE = "live";</script>\n'
                 '  <script type="module" src="/webmcp.mjs"></script>\n'
                 '  <script type="module" src="/deeplink.mjs"></script>\n'
-                '  <script type="module" src="/collab.mjs"></script>\n</body>',
+                '  <script type="module" src="/session.mjs"></script>\n'
+                '  <script type="module" src="/collab.mjs"></script>\n'
+                '  <script type="module" src="/collab_ui.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
@@ -342,6 +346,13 @@ class ProductHandler(BaseHTTPRequestHandler):
             product.logout(self._token())
             self._send_json({"logged_out": True},
                             cookie=f"{COOKIE_NAME}=; Max-Age=0; Path=/")
+            return
+        if path == "/api/product/rotate":
+            creds = product.rotate_session(self._token())
+            self._send_json(
+                {"user_id": creds.user_id, "csrf_token": creds.csrf_token,
+                 "expires_at": creds.expires_at},
+                cookie=self._cookie_for(creds.access_token))
             return
 
         token = self._token()

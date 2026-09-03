@@ -307,7 +307,44 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('window.RESONANCE_MODE = "live"', html)
         self.assertIn('src="/webmcp.mjs"', html)
         self.assertIn('src="/deeplink.mjs"', html)
+        self.assertIn('src="/session.mjs"', html)
         self.assertIn('src="/collab.mjs"', html)
+        self.assertIn('src="/collab_ui.mjs"', html)
+        # the human-UI collaboration module is committed and served
+        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+            ui = response.read().decode("utf-8")
+        self.assertIn("Request intro", ui)
+        self.assertIn("/api/product/intro/request", ui)
+        self.assertIn("textContent", ui)  # UGC displayed, never assigned to innerHTML
+        self.assertNotIn(".innerHTML =", ui)
+        self.assertNotIn(".innerHTML=", ui)
+
+    def test_session_bootstrap_csrf_survives_reload_without_injection(self):
+        # A committed page flow: establish a session, then a "reload" that only
+        # carries the cookie must still be able to mint a usable CSRF via
+        # /api/product/rotate — no harness secret injection.
+        client = self.client()
+        first = client.guest()
+        original_csrf = first["csrf_token"]
+        # simulate reload: same cookie, CSRF value no longer in hand
+        rotated_headers = {"Content-Type": "application/json",
+                           "Origin": self.origin, "Cookie": client.cookie}
+        request = Request(self.base + "/api/product/rotate", data=b"{}",
+                          headers=rotated_headers, method="POST")
+        with urlopen(request, timeout=10) as response:
+            rotated = json.loads(response.read())
+            set_cookie = response.headers.get("Set-Cookie")
+        self.assertEqual(rotated["user_id"], first["user_id"])
+        self.assertTrue(rotated["csrf_token"])
+        self.assertNotEqual(rotated["csrf_token"], original_csrf)
+        # the rotated csrf actually authorizes a write on the same identity
+        new_cookie = SimpleCookie(set_cookie).get("resonance_token")
+        client.cookie = f"resonance_token={new_cookie.value}"
+        client.csrf = rotated["csrf_token"]
+        status, prepared, _ = client.request("POST", "/api/product/prepare", {
+            "candidate": r7_dna(QUERY_DNA, "thought-reload"),
+            "presentation": dict(PRES)})
+        self.assertEqual(prepared["status"], "prepared_private")
         with urlopen(Request(self.base + "/deeplink.mjs"), timeout=10) as response:
             script = response.read().decode("utf-8")
         self.assertIn("FRAGMENT_RE", script)

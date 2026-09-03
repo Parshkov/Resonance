@@ -613,6 +613,45 @@ class PostgresRepository:
                 self._conn.rollback()
                 raise
 
+    def accept_intro(self, intro_id, *, channel_id, now,
+                     idempotency=None, audit=None):
+        from .models import IntroRecord
+        from .sql import row_intro, row_channel
+        with self._lock:
+            try:
+                replay = self._claim_idempotency(idempotency)
+                if replay is not None:
+                    self._conn.commit()
+                    chan = self._fetchone_map(
+                        "SELECT * FROM channels WHERE intro_id = ?", (intro_id,))
+                    return (IntroRecord.from_mapping(replay),
+                            row_channel(chan) if chan else None)
+                cur = self._execute(
+                    "UPDATE intros SET state = 'accepted', updated_at = ?, "
+                    "accepted_at = ? WHERE intro_id = ? AND state = 'requested'",
+                    (now, now, intro_id))
+                if cur.rowcount != 1:
+                    raise PersistenceConflictError(
+                        f"intro {intro_id!r} is not in state 'requested'")
+                self._execute(
+                    "INSERT INTO channels(channel_id, intro_id, created_at, "
+                    "closed_at) VALUES (?, ?, ?, NULL) "
+                    "ON CONFLICT (intro_id) DO NOTHING",
+                    (channel_id, intro_id, now))
+                row = self._fetchone_map(
+                    "SELECT * FROM intros WHERE intro_id = ?", (intro_id,))
+                stored = row_intro(row)
+                chan = self._fetchone_map(
+                    "SELECT * FROM channels WHERE intro_id = ?", (intro_id,))
+                channel = row_channel(chan)
+                self._insert_audit(audit)
+                self._finish_idempotency(idempotency, stored.to_dict())
+                self._conn.commit()
+                return stored, channel
+            except Exception:
+                self._conn.rollback()
+                raise
+
     def list_intros_for_user(self, user_id):
         from .sql import row_intro
         with self._lock:

@@ -198,6 +198,29 @@ class IntroStateMachineTests(unittest.TestCase):
                                       "still there?", request_id="m3",
                                       confirmed=True)
 
+    def test_accept_is_atomic_one_channel_per_intro(self):
+        intro = request(self.product, self.bob, self.b_session, self.a_session)
+        iid = self.product.list_requests(
+            self.alice.access_token)["incoming"][0]["intro_id"]
+        first = self.product.respond_intro(
+            self.alice.access_token, iid, accept=True, request_id="acc-x",
+            confirmed=True)
+        # idempotent replay: same channel, no second row
+        replay = self.product.respond_intro(
+            self.alice.access_token, iid, accept=True, request_id="acc-x",
+            confirmed=True)
+        self.assertEqual(first["channel_id"], replay["channel_id"])
+        # a fresh request_id after already-accepted also cannot mint a channel
+        with self.assertRaises(CollaborationError):
+            self.product.respond_intro(self.alice.access_token, iid,
+                                       accept=True, request_id="acc-y",
+                                       confirmed=True)
+        self.assertEqual(
+            self.live.repo.get_channel_by_intro(iid).channel_id,
+            first["channel_id"])
+        # channel id is deterministic in the intro id (replay-convergent)
+        self.assertTrue(first["channel_id"].startswith("chan-"))
+
     def test_message_idempotent_replay_and_collision(self):
         intro = request(self.product, self.bob, self.b_session, self.a_session)
         accepted = self.product.respond_intro(
