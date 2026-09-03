@@ -31,3 +31,6 @@ submitted canonical slot.
   bridge, deterministic 1920×1080 artifact, and presentation-boundary tests
 - `.superdesign/design-system.md`: design-system handoff for the approved R9
   direction
+- Continuous R10–R12 recovery: exact-head fixes and integration for WebMCP,
+  persistence, identity/consent, security policy, and durable session ingestion
+  under the maintainer continuous-execution directive
