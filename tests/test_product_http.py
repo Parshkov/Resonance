@@ -244,6 +244,62 @@ class ProductHttpTests(unittest.TestCase):
             structure = response.read().decode("utf-8")
         self.assertIn("preserved relations", structure)
 
+    def test_collaboration_two_account_flow_over_http(self):
+        alice = self.client(); alice.guest()
+        a_session = self._shared_session(alice, "ses-gabe-warehouse",
+                                         "thought-collab-alice")
+        # opt into intro requests
+        alice.request("POST", "/api/product/consent", {
+            "session_id": a_session,
+            "choices": {"share_thought_dna": True, "share_display_profile": True,
+                        "share_coarse_location": False, "allow_intro_requests": True},
+            "confirmed": True})
+        bob = self.client(); bob.guest()
+        b_session = self._shared_session(bob, QUERY_DNA, "thought-collab-bob")
+        status, disc, _ = bob.request(
+            "GET", f"/api/product/discover?session_id={b_session}&k=20")
+        self.assertIn(a_session, [m["session_id"] for m in disc["matches"]])
+
+        status, intro, _ = bob.request("POST", "/api/product/intro/request", {
+            "from_session_id": b_session, "target_session_id": a_session,
+            "message": "compare mitigations?", "request_id": "http-req",
+            "confirmed": True})
+        self.assertEqual(intro["state"], "requested")
+        # confirmation is required
+        with self.assertRaises(HTTPError) as ctx:
+            bob.request("POST", "/api/product/intro/request", {
+                "from_session_id": b_session, "target_session_id": a_session,
+                "message": "again", "request_id": "http-req-2", "confirmed": False})
+        self.assertEqual(ctx.exception.code, 409)
+
+        status, incoming, _ = alice.request("GET", "/api/product/intro/list")
+        self.assertEqual(len(incoming["incoming"]), 1)
+        status, accepted, _ = alice.request("POST", "/api/product/intro/respond", {
+            "intro_id": incoming["incoming"][0]["intro_id"], "accept": True,
+            "request_id": "http-acc", "confirmed": True})
+        channel = accepted["channel_id"]
+        bob.request("POST", "/api/product/channel/send", {
+            "channel_id": channel, "body": "throttle input power",
+            "request_id": "http-m1", "confirmed": True})
+        alice.request("POST", "/api/product/channel/send", {
+            "channel_id": channel, "body": "stage inbound docks",
+            "request_id": "http-m2", "confirmed": True})
+        status, thread, _ = bob.request(
+            "GET", f"/api/product/channel/messages?channel_id={channel}")
+        self.assertEqual([m["body"] for m in thread["messages"]],
+                         ["throttle input power", "stage inbound docks"])
+        self.assertTrue(all(m["untrusted"] for m in thread["messages"]))
+        # a third party cannot read the channel
+        carol = self.client(); carol.guest()
+        with self.assertRaises(HTTPError) as ctx:
+            carol.request("GET", f"/api/product/channel/messages?channel_id={channel}")
+        self.assertEqual(ctx.exception.code, 400)
+        # rich intro_state is now accepted for Bob's view
+        status, rich, _ = bob.request(
+            "GET", f"/api/product/rich_discover?session_id={b_session}&k=20")
+        row = next(m for m in rich["matches"] if m["session_id"] == a_session)
+        self.assertEqual(row["intro_state"], "accepted")
+
     def test_ui_is_served_with_live_injection(self):
         request = Request(self.base + "/", headers={"Origin": self.origin})
         with urlopen(request, timeout=10) as response:
@@ -251,6 +307,7 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('window.RESONANCE_MODE = "live"', html)
         self.assertIn('src="/webmcp.mjs"', html)
         self.assertIn('src="/deeplink.mjs"', html)
+        self.assertIn('src="/collab.mjs"', html)
         with urlopen(Request(self.base + "/deeplink.mjs"), timeout=10) as response:
             script = response.read().decode("utf-8")
         self.assertIn("FRAGMENT_RE", script)

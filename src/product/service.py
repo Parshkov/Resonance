@@ -363,20 +363,52 @@ class LiveProductService:
         )
 
     # ------------------------------------------------------------------
+    # collaboration (R14) — one boundary, accepted semantics underneath
+    # ------------------------------------------------------------------
+    @property
+    def collaboration(self):
+        from src.collaboration import CollaborationService
+        if not hasattr(self, "_collaboration"):
+            self._collaboration = CollaborationService(self.identity)
+        return self._collaboration
+
+    def request_intro(self, access_token: str, **kwargs: Any):
+        return self.collaboration.request_intro(access_token, **kwargs)
+
+    def list_requests(self, access_token: str):
+        return self.collaboration.list_requests(access_token)
+
+    def respond_intro(self, access_token: str, intro_id: str, **kwargs: Any):
+        return self.collaboration.respond_intro(access_token, intro_id, **kwargs)
+
+    def cancel_intro(self, access_token: str, intro_id: str, **kwargs: Any):
+        return self.collaboration.cancel_intro(access_token, intro_id, **kwargs)
+
+    def send_message(self, access_token: str, channel_id: str, body: str, **kwargs: Any):
+        return self.collaboration.send_message(access_token, channel_id, body, **kwargs)
+
+    def read_messages(self, access_token: str, channel_id: str):
+        return self.collaboration.read_messages(access_token, channel_id)
+
+    # ------------------------------------------------------------------
     # rich results (R13B) — presentation wrappers over the same authorized data
     # ------------------------------------------------------------------
     def rich_discover(self, access_token: str, session_id: str, **kwargs: Any) -> dict[str, Any]:
         from src.product.rich import build_rich_result
+        viewer = self.identity.authenticate(access_token)
         payload = self.discover(access_token, session_id, **kwargs)
         return build_rich_result({**payload, "query_session_id": session_id},
-                                 policy_source=self.identity.policy_source)
+                                 policy_source=self.identity.policy_source,
+                                 viewer_id=viewer.user_id)
 
     def rich_result(self, access_token: str, result_id: str) -> dict[str, Any]:
         """Rich wrapper over a stored result, re-authorized at read time."""
         from src.product.rich import build_rich_result
+        viewer = self.identity.authenticate(access_token)
         payload = self.load_result_payload(access_token, result_id)
         return build_rich_result(payload,
-                                 policy_source=self.identity.policy_source)
+                                 policy_source=self.identity.policy_source,
+                                 viewer_id=viewer.user_id)
 
     def visual_map(self, access_token: str, result_id: str) -> str:
         from src.product.rich import build_rich_result, render_map_svg

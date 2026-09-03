@@ -522,3 +522,173 @@ class SQLiteRepository:
             except Exception:
                 self._conn.rollback()
                 raise
+
+    # -- collaboration (R14) --------------------------------------------
+    # Connection state is not discoverable corpus content: none of these
+    # methods bump the corpus generation, so chat can never force a rebuild.
+    def create_intro(self, intro, *, idempotency=None, audit=None):
+        from .models import IntroRecord
+        with self._lock:
+            self._begin()
+            try:
+                replay = self._claim_idempotency(idempotency)
+                if replay is not None:
+                    self._conn.commit()
+                    return IntroRecord.from_mapping(replay)
+                try:
+                    self._conn.execute(
+                        "INSERT INTO intros(intro_id, from_session_id, to_session_id, "
+                        "state, created_at, accepted_at, declined_at, message, "
+                        "from_user_id, to_user_id, cancelled_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (intro.intro_id, intro.from_session_id, intro.to_session_id,
+                         intro.state, intro.created_at, intro.accepted_at,
+                         intro.declined_at, intro.message, intro.from_user_id,
+                         intro.to_user_id, intro.cancelled_at, intro.updated_at),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise PersistenceConflictError(
+                        "intro identifier conflicts with durable state") from exc
+                self._insert_audit(audit)
+                self._finish_idempotency(idempotency, intro.to_dict())
+                self._conn.commit()
+                return intro
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def get_intro(self, intro_id):
+        from .sql import row_intro
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM intros WHERE intro_id = ?", (intro_id,)).fetchone()
+            return row_intro(row) if row else None
+
+    def transition_intro(self, intro_id, *, from_state, to_state,
+                         timestamp_field, now, idempotency=None, audit=None):
+        """State-machine transition enforced at the durable row level."""
+        from .models import IntroRecord
+        from .sql import row_intro
+        if timestamp_field not in {"accepted_at", "declined_at", "cancelled_at"}:
+            raise PersistenceConflictError("unknown intro timestamp field")
+        with self._lock:
+            self._begin()
+            try:
+                replay = self._claim_idempotency(idempotency)
+                if replay is not None:
+                    self._conn.commit()
+                    return IntroRecord.from_mapping(replay)
+                cur = self._conn.execute(
+                    f"UPDATE intros SET state = ?, updated_at = ?, "
+                    f"{timestamp_field} = ? WHERE intro_id = ? AND state = ?",
+                    (to_state, now, now, intro_id, from_state),
+                )
+                if cur.rowcount != 1:
+                    raise PersistenceConflictError(
+                        f"intro {intro_id!r} is not in state {from_state!r}")
+                row = self._conn.execute(
+                    "SELECT * FROM intros WHERE intro_id = ?", (intro_id,)).fetchone()
+                stored = row_intro(row)
+                self._insert_audit(audit)
+                self._finish_idempotency(idempotency, stored.to_dict())
+                self._conn.commit()
+                return stored
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def list_intros_for_user(self, user_id):
+        from .sql import row_intro
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM intros WHERE from_user_id = ? OR to_user_id = ? "
+                "ORDER BY created_at, intro_id", (user_id, user_id)).fetchall()
+            return tuple(row_intro(r) for r in rows)
+
+    def latest_intro_between(self, user_a, user_b):
+        from .sql import row_intro
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM intros WHERE (from_user_id = ? AND to_user_id = ?) "
+                "OR (from_user_id = ? AND to_user_id = ?) "
+                "ORDER BY created_at DESC, intro_id DESC LIMIT 1",
+                (user_a, user_b, user_b, user_a)).fetchone()
+            return row_intro(row) if row else None
+
+    def accepted_user_pairs(self):
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT from_user_id, to_user_id FROM intros "
+                "WHERE state = 'accepted'").fetchall()
+            return {frozenset((r[0], r[1])) for r in rows}
+
+    def create_channel(self, channel, *, audit=None):
+        with self._lock:
+            self._begin()
+            try:
+                try:
+                    self._conn.execute(
+                        "INSERT INTO channels(channel_id, intro_id, created_at, "
+                        "closed_at) VALUES (?, ?, ?, ?)",
+                        (channel.channel_id, channel.intro_id,
+                         channel.created_at, channel.closed_at),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise PersistenceConflictError(
+                        "channel identifier conflicts with durable state") from exc
+                self._insert_audit(audit)
+                self._conn.commit()
+                return channel
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def get_channel_by_intro(self, intro_id):
+        from .sql import row_channel
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM channels WHERE intro_id = ? "
+                "ORDER BY created_at, channel_id LIMIT 1", (intro_id,)).fetchone()
+            return row_channel(row) if row else None
+
+    def get_channel(self, channel_id):
+        from .sql import row_channel
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM channels WHERE channel_id = ?", (channel_id,)).fetchone()
+            return row_channel(row) if row else None
+
+    def add_message(self, message, *, idempotency=None, audit=None):
+        from .models import MessageRecord
+        with self._lock:
+            self._begin()
+            try:
+                replay = self._claim_idempotency(idempotency)
+                if replay is not None:
+                    self._conn.commit()
+                    return MessageRecord(**replay)
+                try:
+                    self._conn.execute(
+                        "INSERT INTO messages(message_id, channel_id, author_user_id, "
+                        "body, created_at) VALUES (?, ?, ?, ?, ?)",
+                        (message.message_id, message.channel_id,
+                         message.author_user_id, message.body, message.created_at),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise PersistenceConflictError(
+                        "message identifier conflicts with durable state") from exc
+                self._insert_audit(audit)
+                self._finish_idempotency(idempotency, message.to_dict())
+                self._conn.commit()
+                return message
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def list_messages(self, channel_id):
+        from .sql import row_message
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM messages WHERE channel_id = ? "
+                "ORDER BY created_at, message_id", (channel_id,)).fetchall()
+            return tuple(row_message(r) for r in rows)
