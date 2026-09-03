@@ -221,6 +221,43 @@ class IntroStateMachineTests(unittest.TestCase):
         # channel id is deterministic in the intro id (replay-convergent)
         self.assertTrue(first["channel_id"].startswith("chan-"))
 
+    def test_message_idempotency_is_per_author(self):
+        """026B-N2: two different senders reusing the same request_id must NOT
+        collide — each author's key namespace is independent."""
+        intro = request(self.product, self.bob, self.b_session, self.a_session)
+        iid = self.product.list_requests(
+            self.alice.access_token)["incoming"][0]["intro_id"]
+        acc = self.product.respond_intro(self.alice.access_token, iid,
+                                         accept=True, request_id="acc",
+                                         confirmed=True)
+        ch = acc["channel_id"]
+        b_msg = self.product.send_message(self.bob.access_token, ch, "hello",
+                                          request_id="shared", confirmed=True)
+        a_msg = self.product.send_message(self.alice.access_token, ch, "hello",
+                                          request_id="shared", confirmed=True)
+        self.assertNotEqual(a_msg["message_id"], b_msg["message_id"])
+        thread = self.product.read_messages(self.alice.access_token, ch)["messages"]
+        self.assertEqual(len(thread), 2)
+        self.assertEqual({m["author_display"] for m in thread}, {"Alice", "Bob"})
+
+    def test_requester_obtains_channel_id_from_list_not_acceptor_response(self):
+        """F1 / 026B-N1: the requester (B) never sees A's respond response, so
+        the channel id must be reachable from B's own list_requests."""
+        request(self.product, self.bob, self.b_session, self.a_session)
+        iid = self.product.list_requests(
+            self.alice.access_token)["incoming"][0]["intro_id"]
+        self.product.respond_intro(self.alice.access_token, iid, accept=True,
+                                   request_id="acc", confirmed=True)
+        # B only ever calls list_requests — never A's response.
+        outgoing = self.product.list_requests(self.bob.access_token)["outgoing"]
+        accepted = next(r for r in outgoing if r["state"] == "accepted")
+        self.assertIn("channel_id", accepted)
+        # and that id actually works for B to send.
+        sent = self.product.send_message(self.bob.access_token,
+                                         accepted["channel_id"], "reachable",
+                                         request_id="b-first", confirmed=True)
+        self.assertTrue(sent["delivered"])
+
     def test_message_idempotent_replay_and_collision(self):
         intro = request(self.product, self.bob, self.b_session, self.a_session)
         accepted = self.product.respond_intro(

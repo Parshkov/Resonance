@@ -179,7 +179,14 @@ class LiveProductService:
     def state(self, access_token: str | None = None) -> dict[str, Any]:
         health = self.live.health()
         owned = []
+        authenticated = False
         if access_token:
+            try:
+                self.identity.authenticate(access_token)
+                authenticated = True
+            except Exception:
+                authenticated = False
+        if authenticated:
             owned = [
                 {
                     "session_id": row.get("session_id"),
@@ -199,6 +206,7 @@ class LiveProductService:
             "users": health.users,
             "sessions": health.sessions,
             "discoverable": health.discoverable,
+            "authenticated": authenticated,
             "owned_sessions": owned,
         }
 

@@ -326,6 +326,14 @@ class ProductHttpTests(unittest.TestCase):
         client = self.client()
         first = client.guest()
         original_csrf = first["csrf_token"]
+        # F2: an authenticated visitor reports authenticated=true; an anon one
+        # false — so the bootstrap never mints a guest for an authenticated user.
+        status, state, _ = client.request("GET", "/api/product/state")
+        self.assertTrue(state["authenticated"])
+        anon = self.client()
+        status, anon_state, _ = anon.request("GET", "/api/product/state",
+                                             origin=False, csrf=False)
+        self.assertFalse(anon_state["authenticated"])
         # simulate reload: same cookie, CSRF value no longer in hand
         rotated_headers = {"Content-Type": "application/json",
                            "Origin": self.origin, "Cookie": client.cookie}

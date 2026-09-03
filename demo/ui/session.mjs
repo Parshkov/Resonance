@@ -55,10 +55,13 @@ async function ensureSession() {
   if (bootstrapPromise) return bootstrapPromise;
   bootstrapPromise = (async () => {
     const state = await currentState();
-    const authenticated = !!(state && state.owned_sessions);
-    if (authenticated) {
-      // Owned session survived (cookie present) but the CSRF value is not in
-      // this tab — mint a fresh one for the same subject.
+    // Branch on the explicit authenticated flag, never on owned_sessions
+    // length: a registered user who has not shared yet must NOT have a guest
+    // silently created for them by a tool/UI call (F2). Only a genuinely
+    // unauthenticated visitor gets a fresh guest.
+    if (state && state.authenticated) {
+      // Cookie survived but the CSRF value is not in this tab — mint a fresh
+      // one for the SAME subject; no identity change.
       const rotated = await fetch("/api/product/rotate", {
         method: "POST", credentials: "same-origin",
         headers: {"Content-Type": "application/json"}, body: "{}",

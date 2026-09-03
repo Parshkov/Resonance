@@ -40,6 +40,13 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
+def _scoped(actor, request_id: str | None) -> str | None:
+    """Namespace an idempotency request_id by the acting subject."""
+    if request_id is None:
+        return None
+    return f"{actor.user_id}:{request_id}"
+
+
 def _sha_key(operation: str, request_id: str | None, payload: Mapping[str, Any]) -> IdempotencyKey | None:
     if request_id is None:
         return None
@@ -157,7 +164,7 @@ class CollaborationService:
         # Durable idempotent replay resolves BEFORE the pair guard, so a
         # lost-response retry of the committed request never trips
         # "already requested" (the R11-B4 ordering lesson).
-        key = _sha_key("collab.intro.request", request_id, {
+        key = _sha_key("collab.intro.request", _scoped(actor, request_id), {
             "from": actor.user_id, "to": owner,
             "to_session": target_session_id, "message": message.strip()})
         if key is not None:
@@ -216,7 +223,7 @@ class CollaborationService:
                 intro.from_user_id, intro.to_user_id):
             raise CollaborationError(UNAVAILABLE)
         to_state = "accepted" if accept else "declined"
-        key = _sha_key("collab.intro.respond", request_id,
+        key = _sha_key("collab.intro.respond", _scoped(actor, request_id),
                        {"intro_id": intro_id, "to_state": to_state})
         if accept:
             # Deterministic channel id from the intro id: a replay or a
@@ -263,7 +270,8 @@ class CollaborationService:
         intro = self._intro_for_participant(actor.user_id, intro_id)
         if intro.from_user_id != actor.user_id:
             raise CollaborationError(UNAVAILABLE)
-        key = _sha_key("collab.intro.cancel", request_id, {"intro_id": intro_id})
+        key = _sha_key("collab.intro.cancel", _scoped(actor, request_id),
+                       {"intro_id": intro_id})
         try:
             stored = self.repo.transition_intro(
                 intro_id, from_state="requested", to_state="cancelled",
@@ -318,7 +326,10 @@ class CollaborationService:
                                 channel_id=channel_id,
                                 author_user_id=actor.user_id,
                                 body=body, created_at=_now())
-        key = _sha_key("collab.message.send", request_id,
+        # Idempotency is per-author: the stored key is namespaced by the
+        # actor, so two senders reusing the same request_id neither collide nor
+        # false-conflict (026B-N2).
+        key = _sha_key("collab.message.send", _scoped(actor, request_id),
                        {"channel_id": channel_id, "body": body})
         stored = self.repo.add_message(
             message, idempotency=key,

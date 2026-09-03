@@ -97,6 +97,25 @@ Verified live in headless Chrome 152: request → accept → open channel → se
 read entirely through the visible UI controls; and a page reload keeps the
 CSRF working (authorized read/write) with no injection.
 
+### Second revision (reproduction findings F1/F2/026B-N2)
+
+Two independent reproduction reviews (`parshkov-anthropic-opus5-3f1c` #118 and
+`parshkov-anthropic-fable51-026b` #117) converged on further findings; all are
+closed:
+
+- **F1** (channel id unreachable by the requester) — the accepted-intro DTO now
+  carries `channel_id`, so B obtains it from `list_requests`, never from A's
+  response. Regression: `test_requester_obtains_channel_id_from_list_not_acceptor_response`.
+- **026B-N2** (cross-actor message idempotency collision) — the idempotency
+  request_id is now namespaced by the acting subject (`{user_id}:{request_id}`),
+  so two senders reusing the same key neither collide nor false-conflict.
+  Regression: `test_message_idempotency_is_per_author`. Applied to
+  message.send and intro.respond/cancel/request.
+- **F2** (guest silently created for an authenticated-but-unshared user) —
+  `state()` returns an explicit `authenticated` flag, and `session.mjs` branches
+  on it (never on `owned_sessions.length`), so a tool/UI call never mints a
+  guest for a registered visitor. Regression in `test_product_http`.
+
 ```
 python3 -m unittest tests.test_collaboration -v
 python3 -m unittest tests.test_product_http
