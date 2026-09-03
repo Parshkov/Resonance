@@ -263,7 +263,37 @@ class ProductHandler(BaseHTTPRequestHandler):
             session_id = (params.get("session_id") or [""])[0]
             self._send_json(product.get_match(self._token(), result_id, session_id))
             return
+        if path == "/api/product/rich_discover":
+            session_id = (params.get("session_id") or [""])[0]
+            mode = (params.get("mode") or ["analogical"])[0]
+            k = int((params.get("k") or ["8"])[0])
+            self._send_json(product.rich_discover(self._token(), session_id,
+                                                  mode=mode, k=k))
+            return
+        if path == "/api/product/visual/map":
+            result_id = (params.get("result_id") or [""])[0]
+            svg = product.visual_map(self._token(), result_id)
+            self._send_svg(svg)
+            return
+        if path == "/api/product/visual/structure":
+            result_id = (params.get("result_id") or [""])[0]
+            session_id = (params.get("session_id") or [""])[0]
+            svg = product.visual_structure(self._token(), result_id, session_id)
+            self._send_svg(svg)
+            return
         self._send_error_json(HTTPStatus.NOT_FOUND, "not_found", "unknown path")
+
+    def _send_svg(self, svg: str) -> None:
+        """User-specific visuals: authorized per request, never cached across
+        identities, no long-lived URLs (result_id-scoped, staleness-checked)."""
+        body = svg.encode("utf-8")
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "image/svg+xml; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "private, no-store")
+        self._security_headers()
+        self.end_headers()
+        self.wfile.write(body)
 
     # -- POST --------------------------------------------------------------
     def _route_post(self, path: str) -> None:

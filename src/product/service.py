@@ -277,6 +277,41 @@ class LiveProductService:
                 self._results.pop(expired, None)
         return payload
 
+    def load_result_payload(self, access_token: str, result_id: str) -> dict[str, Any]:
+        """Authorized read of a stored discovery result, re-filtered NOW.
+
+        Subject and generation checks mirror `get_match`; every row is then
+        re-projected against current blocks/consent, so anything derived from
+        this payload (rich results, images) can only shrink relative to what
+        the viewer was originally shown — never grow.
+        """
+        actor = self.identity.authenticate(access_token)
+        with self._lock:
+            record = self._results.get(result_id)
+        if record is None or record["subject"] != actor.user_id:
+            raise ProductError(
+                "discovery result is unknown, expired, or not yours; run discovery again"
+            )
+        current = self.freshness()
+        if (not current["index_current"]
+                or record["serving_generation"] != current["serving_generation"]):
+            with self._lock:
+                self._results.pop(result_id, None)
+            raise StaleResultError(
+                "durable corpus changed after this discovery; run discovery again"
+            )
+        payload = dict(record["payload"])
+        payload["freshness"] = current
+        for key, allow_rejected in (("matches", False), ("rejected", True)):
+            refreshed = []
+            for row in payload.get(key, []):
+                projected = self._project_row(actor.user_id, row, None,
+                                              allow_hard_rejected=allow_rejected)
+                if projected is not None:
+                    refreshed.append(projected)
+            payload[key] = refreshed
+        return payload
+
     def get_match(
         self,
         access_token: str,
@@ -328,6 +363,44 @@ class LiveProductService:
         )
 
     # ------------------------------------------------------------------
+    # rich results (R13B) — presentation wrappers over the same authorized data
+    # ------------------------------------------------------------------
+    def rich_discover(self, access_token: str, session_id: str, **kwargs: Any) -> dict[str, Any]:
+        from src.product.rich import build_rich_result
+        payload = self.discover(access_token, session_id, **kwargs)
+        return build_rich_result({**payload, "query_session_id": session_id},
+                                 policy_source=self.identity.policy_source)
+
+    def rich_result(self, access_token: str, result_id: str) -> dict[str, Any]:
+        """Rich wrapper over a stored result, re-authorized at read time."""
+        from src.product.rich import build_rich_result
+        payload = self.load_result_payload(access_token, result_id)
+        return build_rich_result(payload,
+                                 policy_source=self.identity.policy_source)
+
+    def visual_map(self, access_token: str, result_id: str) -> str:
+        from src.product.rich import build_rich_result, render_map_svg
+        payload = self.load_result_payload(access_token, result_id)
+        rich = build_rich_result(payload,
+                                 policy_source=self.identity.policy_source)
+        return render_map_svg(rich)
+
+    def visual_structure(self, access_token: str, result_id: str,
+                         session_id: str) -> str:
+        from src.product.rich import render_structure_svg
+        evidence = self.get_match(access_token, result_id, session_id)
+        return render_structure_svg(evidence["match"])
+
+    def mcp_rich_discover(self, access_token: str, session_id: str,
+                          *, include_visual: bool = True,
+                          **kwargs: Any) -> dict[str, Any]:
+        """MCP-content-model response for remote clients (R15 mounts this)."""
+        from src.product.rich import render_map_svg, to_mcp_content
+        rich = self.rich_discover(access_token, session_id, **kwargs)
+        map_svg = render_map_svg(rich) if include_visual else None
+        return to_mcp_content(rich, map_svg=map_svg)
+
+    # ------------------------------------------------------------------
     # projection helpers (redact/drop only; never reorder or rescore)
     # ------------------------------------------------------------------
     def _project_row(
@@ -359,6 +432,7 @@ class LiveProductService:
                 display.pop(field, None)
         if consent and not consent.get("share_coarse_location"):
             display.pop("location", None)
+            display.pop("distance_context", None)
         candidate_coords = _coords(display.get("location"))
         if viewer_coords is not None and candidate_coords is not None:
             km = _haversine_km(*viewer_coords, *candidate_coords)

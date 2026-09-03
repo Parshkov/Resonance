@@ -201,6 +201,49 @@ class ProductHttpTests(unittest.TestCase):
         status, state, _ = client.request("GET", "/api/product/state")
         self.assertEqual(state["mode"], "live")
 
+    def test_rich_discover_and_authorized_visuals_over_http(self):
+        alice = self.client(); alice.guest()
+        a_session = self._shared_session(alice, "ses-gabe-warehouse",
+                                         "thought-rich-alice", loc=location("R"))
+        bob = self.client(); bob.guest()
+        b_session = self._shared_session(bob, QUERY_DNA, "thought-rich-bob",
+                                         loc=location("R", lat=55.9, lon=37.7))
+        status, rich, _ = bob.request(
+            "GET", f"/api/product/rich_discover?session_id={b_session}&k=8")
+        self.assertEqual(rich["contract_version"], "resonance-rich-result/0.1")
+        row = next(m for m in rich["matches"] if m["session_id"] == a_session)
+        self.assertIn(row["intro_state"], {"available", "unavailable"})
+        self.assertTrue(row["ui_ref"].startswith("/#match="))
+
+        request = Request(
+            self.base + f"/api/product/visual/map?result_id={rich['result_id']}",
+            headers={"Origin": self.origin, "Cookie": bob.cookie})
+        with urlopen(request, timeout=10) as response:
+            self.assertEqual(response.headers.get("Content-Type"),
+                             "image/svg+xml; charset=utf-8")
+            self.assertEqual(response.headers.get("Cache-Control"),
+                             "private, no-store")
+            svg = response.read().decode("utf-8")
+        self.assertTrue(svg.startswith("<svg"))
+        self.assertNotIn("ses-", svg)
+
+        # visuals are viewer-bound: Alice cannot reuse Bob's result_id
+        with self.assertRaises(HTTPError) as ctx:
+            alice.request("GET",
+                          f"/api/product/visual/map?result_id={rich['result_id']}")
+        self.assertEqual(ctx.exception.code, 400)
+
+        status, evidence, _ = bob.request(
+            "GET", f"/api/product/match?result_id={rich['result_id']}"
+                   f"&session_id={a_session}")
+        request = Request(
+            self.base + f"/api/product/visual/structure"
+                        f"?result_id={rich['result_id']}&session_id={a_session}",
+            headers={"Origin": self.origin, "Cookie": bob.cookie})
+        with urlopen(request, timeout=10) as response:
+            structure = response.read().decode("utf-8")
+        self.assertIn("preserved relations", structure)
+
     def test_ui_is_served_with_live_injection(self):
         request = Request(self.base + "/", headers={"Origin": self.origin})
         with urlopen(request, timeout=10) as response:
