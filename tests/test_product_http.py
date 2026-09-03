@@ -250,6 +250,46 @@ class ProductHttpTests(unittest.TestCase):
             html = response.read().decode("utf-8")
         self.assertIn('window.RESONANCE_MODE = "live"', html)
         self.assertIn('src="/webmcp.mjs"', html)
+        self.assertIn('src="/deeplink.mjs"', html)
+        with urlopen(Request(self.base + "/deeplink.mjs"), timeout=10) as response:
+            script = response.read().decode("utf-8")
+        self.assertIn("FRAGMENT_RE", script)
+        self.assertIn("hashchange", script)
+        self.assertIn("/api/product/match", script)
+
+    def test_ui_ref_deep_link_round_trip_with_fail_closed_rejections(self):
+        import re
+        alice = self.client(); alice.guest()
+        a_session = self._shared_session(alice, "ses-noah-org-overload",
+                                         "thought-link-alice")
+        bob = self.client(); bob.guest()
+        b_session = self._shared_session(bob, QUERY_DNA, "thought-link-bob")
+        status, rich, _ = bob.request(
+            "GET", f"/api/product/rich_discover?session_id={b_session}&k=20")
+        row = next(m for m in rich["matches"] if m["session_id"] == a_session)
+        # The emitted ui_ref resolves through the SAME authorized match path
+        # the deeplink script calls — full round trip.
+        parsed = re.fullmatch(r"/#match=(result-[0-9a-f]{24}):([A-Za-z0-9._-]+)",
+                              row["ui_ref"])
+        self.assertIsNotNone(parsed)
+        result_id, session_id = parsed.group(1), parsed.group(2)
+        self.assertEqual(session_id, a_session)
+        status, evidence, _ = bob.request(
+            "GET", f"/api/product/match?result_id={result_id}"
+                   f"&session_id={session_id}")
+        self.assertEqual(evidence["match"]["session_id"], a_session)
+        # foreign viewer: fail closed
+        with self.assertRaises(HTTPError) as ctx:
+            alice.request("GET", f"/api/product/match?result_id={result_id}"
+                                 f"&session_id={session_id}")
+        self.assertEqual(ctx.exception.code, 400)
+        # stale after revoke: fail closed
+        alice.request("POST", "/api/product/revoke",
+                      {"session_id": a_session, "confirmed": True})
+        with self.assertRaises(HTTPError) as ctx:
+            bob.request("GET", f"/api/product/match?result_id={result_id}"
+                               f"&session_id={session_id}")
+        self.assertEqual(ctx.exception.code, 409)
 
 
 if __name__ == "__main__":

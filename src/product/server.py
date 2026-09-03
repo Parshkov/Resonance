@@ -61,6 +61,7 @@ STATIC = {
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
     "/webmcp.mjs": ("webmcp.mjs", "text/javascript; charset=utf-8"),
+    "/deeplink.mjs": ("deeplink.mjs", "text/javascript; charset=utf-8"),
 }
 
 
@@ -220,7 +221,8 @@ class ProductHandler(BaseHTTPRequestHandler):
             injected = html.replace(
                 "</body>",
                 '  <script>window.RESONANCE_MODE = "live";</script>\n'
-                '  <script type="module" src="/webmcp.mjs"></script>\n</body>',
+                '  <script type="module" src="/webmcp.mjs"></script>\n'
+                '  <script type="module" src="/deeplink.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
