@@ -52,7 +52,7 @@ class R11IdentityIntegrationTests(unittest.TestCase):
     def test_private_create_versioned_update_consent_restart_revoke_delete(self):
         alice = self.identity.register("alice")
         bob = self.identity.register("bob")
-        ui = ManualUIAdapter(self.identity)
+        ui = ManualUIAdapter(self.identity, request_origin="https://resonance.local")
         created = ui.create_thought_session(
             alice.access_token,
             alice.csrf_token,
@@ -90,7 +90,7 @@ class R11IdentityIntegrationTests(unittest.TestCase):
         self.live.repo.close()
         self.live = LiveCorpusService(SQLiteRepository(self.path))
         self.identity = IdentityService(R11IdentityBackend(self.live))
-        ui = ManualUIAdapter(self.identity)
+        ui = ManualUIAdapter(self.identity, request_origin="https://resonance.local")
         self.assertEqual(
             self.identity.authenticate(alice.access_token).actor_type,
             "human",

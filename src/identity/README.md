@@ -7,11 +7,11 @@
 - Pseudonymous accounts are sufficient; no email or legal identity is required.
 - Opaque browser access, CSRF, and account-recovery secrets are returned only to the client. Persistence receives SHA-256 digests, never plaintext credentials.
 - Browser sessions are durable and revocable because issuance/revocation is event-sourced into R11 audit storage through `R11IdentityBackend`.
-- A caller never supplies the acting `user_id` to a protected mutation. `IdentityService` resolves it from the credential and checks the durable thought-session owner server-side.
+- A caller never supplies the acting `user_id` to a protected mutation. `IdentityService` resolves it from the credential, then delegates owner/action checks to R12B `SecurityPolicy.authorize()` over the durable `IdentityPolicySource` adapter.
 - Thought sessions are private on creation. Sharing is a separate confirmed `set_consent` operation.
 - Discovery, display profile, coarse location, and intro availability are independent user choices. The first three project exactly into the accepted R11/R7 consent record; intro availability remains a non-ranking identity-policy flag whose opt-out is durably recorded before a fallible corpus write.
 - Revoke/delete fail closed: intro permission is disabled first, then R11 clears corpus consent using the current optimistic session version.
-- Human UI and browser WebMCP use the same cookie-session adapter policy, including CSRF checks on private creation and every exposed write. A later bearer remote-MCP/API path calls the same service authorization policy.
+- Human UI and browser WebMCP use the same cookie-session adapter policy, including exact-origin plus CSRF checks on private creation and every exposed write. Bearer agent/API paths call the same service authorization policy without browser CSRF.
 - Location is presentation-only. Identity rejects exact-address/GPS fields and deterministically rounds coordinates to a one-decimal city-scale grid before persistence; schema validation remains R11's responsibility.
 - Authenticated actor type is reconstructed from the durable issued-session event, never from the adapter label supplied at authentication time.
 - Other-user content is treated as untrusted UGC by agent-facing adapters (`untrusted_content_hint = True`).
@@ -20,7 +20,7 @@
 
 `R11IdentityBackend` wraps the declared R11 `LiveCorpusService` plus its `PersistenceRepository`. R12 does not implement a database, migration, index, matcher, or alternative persistence path. The adapter's `src.persistence.models.AuditEvent` import is lazy so this branch remains testable while canonical R11 is still pending review.
 
-The identity event payload intentionally excludes raw Thought DNA, contact details, plaintext tokens, plaintext CSRF values, and plaintext recovery credentials.
+The identity event payload intentionally excludes raw Thought DNA, contact details, plaintext tokens, plaintext CSRF values, and plaintext recovery credentials. R12B allow/deny/confirm decisions are also persisted through this seam using a strict metadata projection. Blocks and reports are durable identity-policy events, so restart and backup/restore do not silently restore access.
 
 ## Validation
 

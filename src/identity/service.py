@@ -9,7 +9,21 @@ import secrets
 import time
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Mapping
+from typing import Any, FrozenSet, Mapping
+
+from src.security import (
+    AuthorizationDenied as SecurityAuthorizationDenied,
+    ConfirmationRequired as SecurityConfirmationRequired,
+    CsrfGuard,
+    CsrfRejected,
+    DeterministicRateLimiter,
+    PayloadBounds,
+    PayloadRejected,
+    RequestContext,
+    ResourceRef,
+    SecurityPolicy,
+    SessionGrantRegistry,
+)
 
 from .backend import IdentityBackend
 from .models import (
@@ -23,6 +37,7 @@ from .models import (
     IdentityValidationError,
     SessionCredentials,
 )
+from .security import DurableIdentityAuditTrail, IdentityPolicySource
 
 AUTH_ISSUED = "identity.auth.issued"
 AUTH_REVOKED = "identity.auth.revoked"
@@ -76,11 +91,29 @@ class IdentityService:
     against the durable R11 record before touching a user-owned object.
     """
 
-    def __init__(self, backend: IdentityBackend, *, session_ttl_seconds: int = 7 * 24 * 3600) -> None:
+    def __init__(
+        self,
+        backend: IdentityBackend,
+        *,
+        session_ttl_seconds: int = 7 * 24 * 3600,
+        allowed_origins: FrozenSet[str] = frozenset({"https://resonance.local"}),
+        payload_bounds: PayloadBounds | None = None,
+        rate_limiter: DeterministicRateLimiter | None = None,
+    ) -> None:
         if session_ttl_seconds <= 0:
             raise ValueError("session_ttl_seconds must be positive")
         self.backend = backend
         self.session_ttl_seconds = session_ttl_seconds
+        self.policy_source = IdentityPolicySource(backend)
+        self.security_policy = SecurityPolicy(
+            source=self.policy_source,
+            sessions=SessionGrantRegistry(self.policy_source),
+            audit=DurableIdentityAuditTrail(self.policy_source),
+            limiter=rate_limiter
+            or DeterministicRateLimiter(capacity=30, refill_per_second=1.0),
+        )
+        self.csrf_guard = CsrfGuard(allowed_origins)
+        self.payload_bounds = payload_bounds or PayloadBounds()
 
     # -- accounts / auth -------------------------------------------------
     def register(self, display_label: str, *, actor_type: str = "human") -> SessionCredentials:
@@ -152,9 +185,27 @@ class IdentityService:
         self._revoke_auth_session(actor, reason="rotation")
         return self._issue_session(actor.user_id, actor_type=actor.actor_type)
 
-    def revoke_account(self, access_token: str, *, confirmed: bool) -> None:
-        self._require_confirmation(confirmed)
+    def revoke_account(
+        self,
+        access_token: str,
+        *,
+        confirmed: bool,
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> None:
         actor = self.authenticate(access_token)
+        self._authorize(
+            actor,
+            "account:delete",
+            ResourceRef("user", actor.user_id),
+            confirmed=confirmed,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
+        # Minimize display-profile data first. If a later revocation write
+        # fails, the still-authenticated user can retry without leaving PII in
+        # the public-profile columns.
+        self.backend.anonymize_user(actor.user_id)
         self.backend.revoke_user(actor.user_id)
         for auth in self._active_auth_states().values():
             if auth["user_id"] == actor.user_id:
@@ -165,6 +216,36 @@ class IdentityService:
                     payload={"reason": "account_revoked"},
                 )
         self._append(ACCOUNT_REVOKED, user_id=actor.user_id, session_id=None, payload={})
+
+    def export_account(
+        self,
+        access_token: str,
+        *,
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the authenticated owner's stored profile and Thought sessions.
+
+        Authentication hashes and recovery material are intentionally absent.
+        """
+        actor = self.authenticate(access_token)
+        self._authorize(
+            actor,
+            "account:export",
+            ResourceRef("user", actor.user_id),
+            confirmed=True,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
+        user = self.backend.get_user(actor.user_id)
+        return {
+            "user": _mapping(user) if user is not None else None,
+            "sessions": [
+                _mapping(session)
+                for session in self.backend.list_sessions()
+                if _field(session, "user_id") == actor.user_id
+            ],
+        }
 
     # -- owned thought sessions -----------------------------------------
     def create_thought_session(
@@ -177,12 +258,29 @@ class IdentityService:
         record_kind: str = "volunteer",
         notes: str = "",
         csrf_token: str | None = None,
+        origin: str | None = None,
         cookie_authenticated: bool = False,
         actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
     ) -> Any:
         actor = self.authenticate(access_token, actor_type=actor_type)
         if cookie_authenticated:
-            self._require_csrf(actor, csrf_token)
+            self._require_csrf(actor, csrf_token, origin)
+        self._authorize(
+            actor,
+            "session:create",
+            ResourceRef("user", actor.user_id),
+            confirmed=True,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
+        try:
+            self.payload_bounds.validate_thought_dna(thought_dna)
+            self.payload_bounds.validate_json(location)
+            self.payload_bounds.validate_json(presentation)
+        except PayloadRejected as exc:
+            raise IdentityValidationError(str(exc)) from exc
         coarse_location = self._normalize_location(location)
         session_id = f"ses-{secrets.token_hex(8)}"
         stored = self.backend.create_session(
@@ -213,12 +311,30 @@ class IdentityService:
         location: Mapping[str, Any] | None = None,
         presentation: Mapping[str, Any] | None = None,
         csrf_token: str | None = None,
+        origin: str | None = None,
         cookie_authenticated: bool = False,
         actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
     ) -> Any:
-        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(
+            access_token,
+            session_id,
+            actor_type=actor_type,
+            action="session:update",
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         if cookie_authenticated:
-            self._require_csrf(actor, csrf_token)
+            self._require_csrf(actor, csrf_token, origin)
+        try:
+            self.payload_bounds.validate_thought_dna(thought_dna)
+            if location is not None:
+                self.payload_bounds.validate_json(location)
+            if presentation is not None:
+                self.payload_bounds.validate_json(presentation)
+        except PayloadRejected as exc:
+            raise IdentityValidationError(str(exc)) from exc
         if bool(self._corpus_consent(current).get("share_thought_dna", False)):
             raise ConfirmationRequiredError(
                 "revoke sharing before replacing a discoverable Thought DNA artifact"
@@ -259,13 +375,23 @@ class IdentityService:
         *,
         confirmed: bool,
         csrf_token: str | None = None,
+        origin: str | None = None,
         cookie_authenticated: bool = False,
         actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
     ) -> ConsentChoices:
-        self._require_confirmation(confirmed)
-        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(
+            access_token,
+            session_id,
+            actor_type=actor_type,
+            action="session:share",
+            confirmed=confirmed,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         if cookie_authenticated:
-            self._require_csrf(actor, csrf_token)
+            self._require_csrf(actor, csrf_token, origin)
         current_choices = self._consent_choices(current)
         disabling_intro = current_choices.allow_intro_requests and not choices.allow_intro_requests
         if disabling_intro:
@@ -303,12 +429,29 @@ class IdentityService:
         location: Mapping[str, Any] | None = None,
         presentation: Mapping[str, Any] | None = None,
         csrf_token: str | None = None,
+        origin: str | None = None,
         cookie_authenticated: bool = False,
         actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
     ) -> Any:
-        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(
+            access_token,
+            session_id,
+            actor_type=actor_type,
+            action="session:update",
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         if cookie_authenticated:
-            self._require_csrf(actor, csrf_token)
+            self._require_csrf(actor, csrf_token, origin)
+        try:
+            if location is not None:
+                self.payload_bounds.validate_json(location)
+            if presentation is not None:
+                self.payload_bounds.validate_json(presentation)
+        except PayloadRejected as exc:
+            raise IdentityValidationError(str(exc)) from exc
         if location is not None:
             location = self._normalize_location(location)
         return self.backend.update_presentation(
@@ -325,13 +468,23 @@ class IdentityService:
         *,
         confirmed: bool,
         csrf_token: str | None = None,
+        origin: str | None = None,
         cookie_authenticated: bool = False,
         actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
     ) -> Any:
-        self._require_confirmation(confirmed)
-        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(
+            access_token,
+            session_id,
+            actor_type=actor_type,
+            action="session:revoke",
+            confirmed=confirmed,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         if cookie_authenticated:
-            self._require_csrf(actor, csrf_token)
+            self._require_csrf(actor, csrf_token, origin)
         self._append_intro_consent(actor, session_id, False)
         stored = self.backend.revoke_session(
             session_id,
@@ -365,13 +518,23 @@ class IdentityService:
         *,
         confirmed: bool,
         csrf_token: str | None = None,
+        origin: str | None = None,
         cookie_authenticated: bool = False,
         actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
     ) -> Any:
-        self._require_confirmation(confirmed)
-        actor, current = self._require_owned(access_token, session_id, actor_type=actor_type)
+        actor, current = self._require_owned(
+            access_token,
+            session_id,
+            actor_type=actor_type,
+            action="session:delete",
+            confirmed=confirmed,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         if cookie_authenticated:
-            self._require_csrf(actor, csrf_token)
+            self._require_csrf(actor, csrf_token, origin)
         self._append_intro_consent(actor, session_id, False)
         stored = self.backend.delete_session(
             session_id,
@@ -398,12 +561,27 @@ class IdentityService:
         return stored
 
     # -- owner views -----------------------------------------------------
-    def owned_sessions(self, access_token: str, *, actor_type: str = "human") -> list[dict[str, Any]]:
+    def owned_sessions(
+        self,
+        access_token: str,
+        *,
+        actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         actor = self.authenticate(access_token, actor_type=actor_type)
         result: list[dict[str, Any]] = []
         for session in self.backend.list_sessions():
             if _field(session, "user_id") != actor.user_id:
                 continue
+            self._authorize(
+                actor,
+                "session:read_private",
+                ResourceRef("session", str(_field(session, "session_id"))),
+                confirmed=True,
+                client_id=client_id,
+                protocol_session_id=protocol_session_id,
+            )
             raw = _mapping(session)
             raw["consent_choices"] = self._consent_choices(session).to_corpus_consent() | {
                 "allow_intro_requests": self._consent_choices(session).allow_intro_requests
@@ -411,9 +589,141 @@ class IdentityService:
             result.append(raw)
         return result
 
-    def consent_for(self, access_token: str, session_id: str, *, actor_type: str = "human") -> ConsentChoices:
-        _, session = self._require_owned(access_token, session_id, actor_type=actor_type)
+    def consent_for(
+        self,
+        access_token: str,
+        session_id: str,
+        *,
+        actor_type: str = "human",
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> ConsentChoices:
+        _, session = self._require_owned(
+            access_token,
+            session_id,
+            actor_type=actor_type,
+            action="session:read_private",
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         return self._consent_choices(session)
+
+    def authorize_discovery(
+        self,
+        access_token: str,
+        session_id: str,
+        *,
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Authorize and return a consent-minimized candidate presentation."""
+        actor = self.authenticate(access_token)
+        resource = ResourceRef("session", session_id)
+        self._authorize(
+            actor,
+            "discovery:read",
+            resource,
+            confirmed=True,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
+        session = self.backend.get_session(session_id)
+        if session is None:
+            raise AuthorizationError("session unavailable to authenticated subject")
+        owner_id = str(_field(session, "user_id"))
+        owner = self.backend.get_user(owner_id)
+        consent = self.policy_source.session_consent(session_id)
+        result: dict[str, Any] = {
+            "session_id": session_id,
+            "thought_id": str(_mapping(_field(session, "thought_dna", {})).get("thought_id", "")),
+            "presentation": _mapping(_field(session, "presentation", {})),
+            "record_kind": str(_field(session, "record_kind", "")),
+            "person": {
+                "person_id": owner_id,
+                "display_label": "anonymous",
+                "avatar_placeholder": "anonymous",
+            },
+        }
+        if consent.get("share_display_profile") and owner is not None:
+            result["person"] = {
+                "person_id": owner_id,
+                "display_label": str(_field(owner, "display_label", "anonymous")),
+                "avatar_placeholder": str(_field(owner, "avatar_placeholder", "anonymous")),
+            }
+        if consent.get("share_coarse_location"):
+            result["location"] = _mapping(_field(session, "location", {}))
+        return result
+
+    def bind_protocol_session(
+        self,
+        access_token: str,
+        *,
+        client_id: str,
+        protocol_session_id: str | None = None,
+    ) -> str:
+        context = self.request_context(access_token, client_id=client_id)
+        checkpoint = self.security_policy.sessions.bind(
+            context,
+            protocol_session_id=protocol_session_id,
+        )
+        return checkpoint.protocol_session_id
+
+    def request_context(self, access_token: str, *, client_id: str) -> RequestContext:
+        """Resolve an authenticated transport context without caller identity claims."""
+        actor = self.authenticate(access_token)
+        return self._request_context(actor, client_id=client_id)
+
+    def block_user(
+        self,
+        access_token: str,
+        peer_id: str,
+        *,
+        confirmed: bool,
+        csrf_token: str | None = None,
+        origin: str | None = None,
+        cookie_authenticated: bool = False,
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> None:
+        actor = self.authenticate(access_token)
+        if cookie_authenticated:
+            self._require_csrf(actor, csrf_token, origin)
+        self._authorize(
+            actor,
+            "security:block",
+            ResourceRef("user", peer_id),
+            confirmed=confirmed,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
+        self.policy_source.block(actor.user_id, peer_id)
+
+    def report_user(
+        self,
+        access_token: str,
+        peer_id: str,
+        reason_code: str,
+        *,
+        csrf_token: str | None = None,
+        origin: str | None = None,
+        cookie_authenticated: bool = False,
+        client_id: str = "resonance-product",
+        protocol_session_id: str | None = None,
+    ) -> None:
+        if not reason_code or len(reason_code) > 64:
+            raise IdentityValidationError("reason_code must be 1..64 characters")
+        actor = self.authenticate(access_token)
+        if cookie_authenticated:
+            self._require_csrf(actor, csrf_token, origin)
+        self._authorize(
+            actor,
+            "security:report",
+            ResourceRef("user", peer_id),
+            confirmed=True,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
+        self.policy_source.report(actor.user_id, peer_id, reason_code)
 
     # -- internal policy -------------------------------------------------
     def _issue_session(self, user_id: str, *, actor_type: str) -> SessionCredentials:
@@ -496,8 +806,26 @@ class IdentityService:
             "share_display_profile": bool(_field(raw, "share_display_profile", False)),
         }
 
-    def _require_owned(self, access_token: str, session_id: str, *, actor_type: str) -> tuple[ActorContext, Any]:
+    def _require_owned(
+        self,
+        access_token: str,
+        session_id: str,
+        *,
+        actor_type: str,
+        action: str,
+        confirmed: bool = True,
+        client_id: str,
+        protocol_session_id: str | None,
+    ) -> tuple[ActorContext, Any]:
         actor = self.authenticate(access_token, actor_type=actor_type)
+        self._authorize(
+            actor,
+            action,
+            ResourceRef("session", session_id),
+            confirmed=confirmed,
+            client_id=client_id,
+            protocol_session_id=protocol_session_id,
+        )
         session = self.backend.get_session(session_id)
         if session is None or _field(session, "user_id") != actor.user_id:
             # Deliberately do not distinguish not-found from somebody-else's
@@ -505,12 +833,54 @@ class IdentityService:
             raise AuthorizationError("session unavailable to authenticated subject")
         return actor, session
 
-    def _require_csrf(self, actor: ActorContext, csrf_token: str | None) -> None:
-        if not csrf_token:
-            raise CsrfError("missing CSRF token")
+    def _require_csrf(
+        self,
+        actor: ActorContext,
+        csrf_token: str | None,
+        origin: str | None,
+    ) -> None:
         state = self._active_auth_states().get(actor.auth_session_id)
-        if state is None or not hmac.compare_digest(state["csrf_sha256"], _hash_secret(csrf_token)):
-            raise CsrfError("invalid CSRF token")
+        try:
+            self.csrf_guard.validate(
+                cookie_authenticated=True,
+                origin=origin,
+                csrf_token=csrf_token,
+                expected_csrf_digest=(state or {}).get("csrf_sha256"),
+            )
+        except CsrfRejected as exc:
+            raise CsrfError(str(exc)) from exc
+
+    @staticmethod
+    def _request_context(actor: ActorContext, *, client_id: str) -> RequestContext:
+        return RequestContext(
+            subject=actor.user_id,
+            client_id=client_id,
+            auth_session_id=actor.auth_session_id,
+            actor_type=actor.actor_type,
+        )
+
+    def _authorize(
+        self,
+        actor: ActorContext,
+        action: str,
+        resource: ResourceRef,
+        *,
+        confirmed: bool,
+        client_id: str,
+        protocol_session_id: str | None,
+    ) -> None:
+        try:
+            self.security_policy.authorize(
+                self._request_context(actor, client_id=client_id),
+                action,
+                resource,
+                confirmed=confirmed,
+                protocol_session_id=protocol_session_id,
+            )
+        except SecurityConfirmationRequired as exc:
+            raise ConfirmationRequiredError(str(exc)) from exc
+        except SecurityAuthorizationDenied as exc:
+            raise AuthorizationError(str(exc)) from exc
 
     @staticmethod
     def _require_confirmation(confirmed: bool) -> None:

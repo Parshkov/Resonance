@@ -369,6 +369,39 @@ class LiveCorpusService:
                 self.rebuild_index()
             return stored_user
 
+    def anonymize_user(
+        self,
+        user_id: str,
+        *,
+        request_id: str | None = None,
+        rebuild: bool = True,
+    ) -> UserRecord:
+        """Remove display-profile data while preserving opaque relational IDs."""
+        with self._lock:
+            key = self._idempotency_key(
+                request_id,
+                "user.anonymize",
+                {"user_id": user_id},
+            )
+            replay = self._replay_user(key, heal_index=rebuild)
+            if replay is not None:
+                return replay
+            user = self.repo.get_user(user_id)
+            if user is None:
+                raise PersistenceNotFoundError(user_id)
+            anonymized = replace(
+                user,
+                display_label="Deleted user",
+                avatar_placeholder="deleted",
+                updated_at=_now(),
+            )
+            return self._store_user(
+                anonymized,
+                idempotency=key,
+                audit=self._audit_event("user.anonymize", user_id=user_id),
+                rebuild=rebuild,
+            )
+
     # ------------------------------------------------------------------
     # session mutation helpers
     # ------------------------------------------------------------------

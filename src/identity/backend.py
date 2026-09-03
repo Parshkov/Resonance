@@ -30,6 +30,9 @@ class IdentityBackend(Protocol):
     def revoke_user(self, user_id: str, *, request_id: str | None = None) -> Any:
         ...
 
+    def anonymize_user(self, user_id: str, *, request_id: str | None = None) -> Any:
+        ...
+
     def create_session(
         self,
         *,
@@ -108,7 +111,7 @@ class R11IdentityBackend:
     safe because the persistence AuditEvent import is lazy.
     """
 
-    _EVENT_PREFIX = "identity."
+    _EVENT_PREFIXES = ("identity.", "security.")
 
     def __init__(self, live_corpus: Any) -> None:
         self.live_corpus = live_corpus
@@ -122,6 +125,9 @@ class R11IdentityBackend:
 
     def revoke_user(self, user_id: str, **kwargs: Any) -> Any:
         return self.live_corpus.revoke_user(user_id, **kwargs)
+
+    def anonymize_user(self, user_id: str, **kwargs: Any) -> Any:
+        return self.live_corpus.anonymize_user(user_id, **kwargs)
 
     def create_session(self, **kwargs: Any) -> Any:
         return self.live_corpus.create_session(**kwargs)
@@ -166,7 +172,7 @@ class R11IdentityBackend:
         result: list[IdentityEvent] = []
         for raw in self.repo.list_audit():
             event_type = str(getattr(raw, "event_type", ""))
-            if not event_type.startswith(self._EVENT_PREFIX):
+            if not event_type.startswith(self._EVENT_PREFIXES):
                 continue
             result.append(
                 IdentityEvent(
