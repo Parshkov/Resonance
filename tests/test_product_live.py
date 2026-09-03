@@ -451,16 +451,37 @@ class DurableSecretTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _resolve_secret(None, {}, "live-product.sqlite3")
         self.assertIsNone(_resolve_secret(None, {}, ":memory:"))
+        strong = "e" * 32
         self.assertEqual(
-            _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": "s3"},
+            _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": strong},
                             "live-product.sqlite3"),
-            b"s3")
+            strong.encode())
         with tempfile.TemporaryDirectory() as tmp:
             secret_path = Path(tmp) / "secret"
-            secret_path.write_bytes(b"file-secret\n")
+            secret_path.write_bytes(b"f" * 40 + b"\n")
             self.assertEqual(
                 _resolve_secret(str(secret_path), {}, "live-product.sqlite3"),
-                b"file-secret")
+                b"f" * 40)
+
+    def test_empty_or_short_secret_fails_instead_of_random_fallback(self):
+        """Review B4a: empty/whitespace/short secret must fail loudly."""
+        from src.product.server import _resolve_secret, build_runtime
+        with tempfile.TemporaryDirectory() as tmp:
+            for content in (b"", b"\n", b"   \n", b"short-secret\n"):
+                secret_path = Path(tmp) / "secret"
+                secret_path.write_bytes(content)
+                with self.assertRaises(ValueError):
+                    _resolve_secret(str(secret_path), {}, "live-product.sqlite3")
+        with self.assertRaises(ValueError):
+            _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": "  \n"},
+                            "live-product.sqlite3")
+        with self.assertRaises(ValueError):
+            _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": "tiny"},
+                            "live-product.sqlite3")
+        # build_runtime itself refuses an explicit empty secret (never random).
+        with self.assertRaises(ValueError):
+            build_runtime(":memory:", allowed_origins=frozenset({ORIGIN}),
+                          confirmation_secret=b"")
 
 
 class BoundaryHygieneTests(unittest.TestCase):

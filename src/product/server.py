@@ -85,10 +85,15 @@ def build_runtime(
     identity = IdentityService(
         R11IdentityBackend(live), allowed_origins=allowed_origins
     )
-    product = LiveProductService(
-        identity,
-        confirmation_secret=confirmation_secret or secrets.token_bytes(32),
-    )
+    if confirmation_secret is None:
+        # Ephemeral runtime only; persistent DBs are gated at the CLI boundary.
+        confirmation_secret = secrets.token_bytes(32)
+    elif not confirmation_secret:
+        raise ValueError(
+            "confirmation_secret must be non-empty; an empty secret would "
+            "silently fall back to a per-process value and orphan drafts"
+        )
+    product = LiveProductService(identity, confirmation_secret=confirmation_secret)
     return ProductRuntime(live=live, identity=identity, product=product,
                           allowed_origins=allowed_origins)
 
@@ -396,6 +401,17 @@ def serve(
     return ThreadingHTTPServer((host, port), handler)
 
 
+def _require_strong(secret: bytes, source: str) -> bytes:
+    """An empty or short secret must fail loudly, never fall back to random."""
+    if len(secret) < 32:
+        raise ValueError(
+            f"{source} must hold a stable secret of at least 32 bytes "
+            f"(got {len(secret)}); an empty/short secret would silently orphan "
+            "prepared drafts on restart"
+        )
+    return secret
+
+
 def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
                     db_path: str) -> bytes | None:
     """Durable-draft HMAC secret policy (R12C seam).
@@ -406,10 +422,12 @@ def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
     Plaintext secrets on the CLI are deliberately not accepted.
     """
     if secret_file:
-        return Path(secret_file).read_bytes().strip()
-    env_secret = environ.get("RESONANCE_CONFIRMATION_SECRET", "")
+        return _require_strong(Path(secret_file).read_bytes().strip(),
+                               f"secret file {secret_file!r}")
+    env_secret = environ.get("RESONANCE_CONFIRMATION_SECRET", "").strip()
     if env_secret:
-        return env_secret.encode("utf-8")
+        return _require_strong(env_secret.encode("utf-8"),
+                               "RESONANCE_CONFIRMATION_SECRET")
     if db_path != ":memory:":
         raise ValueError(
             "a persistent --db requires a stable confirmation secret: pass "
