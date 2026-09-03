@@ -116,6 +116,28 @@ closed:
   on it (never on `owned_sessions.length`), so a tool/UI call never mints a
   guest for a registered visitor. Regression in `test_product_http`.
 
+### Third revision (re-verification findings B1a, F4)
+
+The reproduction's execution re-verification (#118) closed B2/B3/F1/F2 and found
+two more; both closed:
+
+- **B1a** (a human could not *initiate* an intro — the "Request intro" control
+  read a `querySession` global nothing set, so it never rendered) — `collab_ui.mjs`
+  now has a "Start an introduction" panel section that lists the viewer's own
+  discoverable session, runs live `rich_discover`, and renders a "Request intro"
+  button per intro-accepting candidate (independent of the R9 replay cards); it
+  also sets `document.body.dataset.querySession`. The stale R9
+  "Introductions unavailable" placeholder is hidden at runtime (the R9 file is
+  untouched). Verified live: the button renders and initiates an intro from the
+  panel.
+- **F4** (a second tab's `rotate` revoked the first tab's token and stranded its
+  writes) — `session.mjs` now shares the CSRF token across tabs via
+  `localStorage` (so a second tab reuses the token and never rotates), and any
+  `csrf_rejected` write clears the stored token and re-bootstraps once before
+  failing. Verified live across two tabs: the second reuses the token, the first
+  keeps writing, and it self-heals after a forced rotation. HTTP regression
+  `test_two_concurrent_clients_of_one_subject_selfheal`.
+
 ```
 python3 -m unittest tests.test_collaboration -v
 python3 -m unittest tests.test_product_http

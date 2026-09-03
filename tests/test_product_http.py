@@ -353,6 +353,57 @@ class ProductHttpTests(unittest.TestCase):
             "candidate": r7_dna(QUERY_DNA, "thought-reload"),
             "presentation": dict(PRES)})
         self.assertEqual(prepared["status"], "prepared_private")
+
+    def test_two_concurrent_clients_of_one_subject_selfheal(self):
+        """F4: a second client rotating must not permanently strand the first.
+
+        The committed bootstrap shares one token via localStorage and, on a
+        csrf_rejected write, re-bootstraps once. This test models the recovery
+        contract at the HTTP layer: after a rotate invalidates an old token, a
+        client that re-reads the current token can write again; the server
+        never accepts the stale token (fail-closed), which is what the
+        client-side self-heal keys off.
+        """
+        client = self.client()
+        client.guest()
+        # tab-2 rotates the shared subject
+        rot_headers = {"Content-Type": "application/json", "Origin": self.origin,
+                       "Cookie": client.cookie}
+        request = Request(self.base + "/api/product/rotate", data=b"{}",
+                          headers=rot_headers, method="POST")
+        with urlopen(request, timeout=10) as response:
+            rotated = json.loads(response.read())
+            new_cookie = SimpleCookie(response.headers.get("Set-Cookie")).get(
+                "resonance_token")
+        # tab-1 still holding the OLD token+cookie: write fails closed (401,
+        # prior auth session revoked) — never silently accepted.
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/product/prepare", {
+                "candidate": r7_dna("ses-gabe-warehouse", "thought-strand"),
+                "presentation": dict(PRES)})
+        self.assertIn(ctx.exception.code, (401, 403))
+        # self-heal: re-read the shared token+cookie, write succeeds again
+        client.cookie = f"resonance_token={new_cookie.value}"
+        client.csrf = rotated["csrf_token"]
+        status, prepared, _ = client.request("POST", "/api/product/prepare", {
+            "candidate": r7_dna("ses-gabe-warehouse", "thought-healed"),
+            "presentation": dict(PRES)})
+        self.assertEqual(prepared["status"], "prepared_private")
+
+    def test_collab_ui_has_intro_initiation_and_hides_stale_placeholder(self):
+        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+            ui = response.read().decode("utf-8")
+        # human intro initiation exists and drives the live discover+request path
+        self.assertIn("Start an introduction", ui)
+        self.assertIn("/api/product/rich_discover", ui)
+        self.assertIn("querySession", ui)
+        # the stale R9 placeholder is hidden at runtime
+        self.assertIn("intro-unavailable", ui)
+        # session bootstrap shares the token across tabs (F4) and self-heals
+        with urlopen(Request(self.base + "/session.mjs"), timeout=10) as response:
+            session = response.read().decode("utf-8")
+        self.assertIn("localStorage", session)
+        self.assertIn("csrf_rejected", session)
         with urlopen(Request(self.base + "/deeplink.mjs"), timeout=10) as response:
             script = response.read().decode("utf-8")
         self.assertIn("FRAGMENT_RE", script)
