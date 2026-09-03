@@ -80,6 +80,16 @@ class FakeR11Backend:
                 )
         return user
 
+    def anonymize_user(self, user_id, *, request_id=None):
+        user = self.users[user_id]
+        user = replace(
+            user,
+            display_label="Deleted user",
+            avatar_placeholder="deleted",
+        )
+        self.users[user_id] = user
+        return user
+
     def create_session(self, **kwargs):
         session = FakeSession(
             session_id=kwargs["session_id"],
@@ -289,7 +299,7 @@ class IdentityConsentTests(unittest.TestCase):
         self.assertEqual(str(owned.exception), str(missing.exception))
 
     def test_cookie_mutations_require_csrf_and_visible_confirmation(self):
-        ui = ManualUIAdapter(self.service)
+        ui = ManualUIAdapter(self.service, request_origin="https://resonance.local")
         with self.assertRaises(CsrfError):
             ui.create_thought_session(
                 self.alice.access_token,
@@ -473,8 +483,8 @@ class IdentityConsentTests(unittest.TestCase):
         self.assertNotIn(session.session_id, self.backend.index)
 
     def test_manual_ui_and_webmcp_have_same_authorization_and_consent_result(self):
-        ui = ManualUIAdapter(self.service)
-        webmcp = WebMCPAdapter(self.service)
+        ui = ManualUIAdapter(self.service, request_origin="https://resonance.local")
+        webmcp = WebMCPAdapter(self.service, request_origin="https://resonance.local")
         first = ui.create_thought_session(
             self.alice.access_token,
             self.alice.csrf_token,
@@ -531,6 +541,7 @@ class IdentityConsentTests(unittest.TestCase):
         )
         self.service.revoke_account(other.access_token, confirmed=True)
         self.assertNotIn(session.session_id, self.backend.index)
+        self.assertEqual(self.backend.get_user(self.alice.user_id).display_label, "Deleted user")
         with self.assertRaises(AuthenticationError):
             self.service.authenticate(other.access_token)
 
