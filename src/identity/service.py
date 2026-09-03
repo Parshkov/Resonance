@@ -380,6 +380,8 @@ class IdentityService:
         actor_type: str = "human",
         client_id: str = "resonance-product",
         protocol_session_id: str | None = None,
+        expected_version: int | None = None,
+        request_id: str | None = None,
     ) -> ConsentChoices:
         actor, current = self._require_owned(
             access_token,
@@ -399,7 +401,12 @@ class IdentityService:
         self.backend.update_consent(
             session_id,
             choices.to_corpus_consent(),
-            expected_version=int(_field(current, "version", 0)),
+            expected_version=(
+                int(_field(current, "version", 0))
+                if expected_version is None
+                else expected_version
+            ),
+            request_id=request_id,
         )
         self._append(
             CONSENT_SET,

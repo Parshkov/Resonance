@@ -111,7 +111,7 @@ class R11IdentityBackend:
     safe because the persistence AuditEvent import is lazy.
     """
 
-    _EVENT_PREFIXES = ("identity.", "security.")
+    _EVENT_PREFIXES = ("identity.", "security.", "ingestion.")
 
     def __init__(self, live_corpus: Any) -> None:
         self.live_corpus = live_corpus
