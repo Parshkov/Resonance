@@ -111,7 +111,9 @@ class TwoUserJourneyTests(unittest.TestCase):
     def _bob_query_session(self):
         session_id, _ = share_thought(
             self.product, self.bob, r7_dna(QUERY_DNA, "thought-bob-query"),
-            loc=location("R", lat=55.9, lon=37.7))
+            loc=location("R", lat=55.9, lon=37.7),
+            intent=ShareIntent(share_display_profile=True,
+                               share_coarse_location=True))
         return session_id
 
     def test_a_shares_b_discovers_when_structurally_resonant(self):
@@ -191,6 +193,59 @@ class TwoUserJourneyTests(unittest.TestCase):
         self.assertEqual(row["person_pseudonym"], "anonymous")
         self.assertNotIn("location", row["display"])
         self.assertNotIn("distance_context", row["display"])
+        # R12B projection semantics: profile-off hides profile-derived
+        # presentation metadata entirely (review B2).
+        for field in ("topic", "domain", "cluster_id"):
+            self.assertNotIn(field, row["display"])
+
+    def test_query_side_location_consent_gates_distance(self):
+        """Review B1: distance requires BOTH sides' coarse-location consent."""
+        a_session, _ = share_thought(
+            self.product, self.alice, r7_dna("ses-gabe-warehouse", "thought-alice"),
+            loc=location("R"),
+            intent=ShareIntent(share_display_profile=True,
+                               share_coarse_location=True))
+        # Bob's location is STORED (R12C persists it) but NOT consented.
+        b_session, _ = share_thought(
+            self.product, self.bob, r7_dna(QUERY_DNA, "thought-bob-query"),
+            loc=location("R", lat=55.9, lon=37.7),
+            intent=ShareIntent(share_display_profile=True,
+                               share_coarse_location=False))
+        self.assertTrue(dict(self.live.get_session(b_session).location))
+        before = self.product.discover(self.bob.access_token, b_session, k=8)
+        row = next(m for m in before["matches"] if m["session_id"] == a_session)
+        self.assertNotIn("distance_context", row["display"])
+        # Enabling the viewer's own coarse-location consent turns it on...
+        from src.identity.models import ConsentChoices
+        self.product.set_consent(
+            self.bob.access_token, b_session,
+            ConsentChoices(share_thought_dna=True, share_display_profile=True,
+                           share_coarse_location=True, allow_intro_requests=False),
+            confirmed=True, csrf_token=self.bob.csrf_token,
+            cookie_authenticated=True, origin=ORIGIN, client_id="manual-ui")
+        after = self.product.discover(self.bob.access_token, b_session, k=8)
+        row2 = next(m for m in after["matches"] if m["session_id"] == a_session)
+        self.assertIn("distance_context", row2["display"])
+        # ...with scores and order untouched (presentation-only guarantee).
+        key = lambda r: [(m["session_id"], m["mode_classification"],
+                          json.dumps(m["scores"], sort_keys=True))
+                         for m in r["matches"]]
+        self.assertEqual(key(before), key(after))
+
+    def test_block_after_discover_kills_stored_evidence_read(self):
+        """Review B3: blocks move no corpus generation, so get_match re-checks."""
+        a_session, _ = share_thought(
+            self.product, self.alice, r7_dna("ses-gabe-warehouse", "thought-alice"))
+        b_session = self._bob_query_session()
+        response = self.product.discover(self.bob.access_token, b_session)
+        rid = response["result_id"]
+        self.product.get_match(self.bob.access_token, rid, a_session)  # readable
+        generation_before = self.product.freshness()["serving_generation"]
+        self.identity.policy_source.block(self.bob.user_id, self.alice.user_id)
+        self.assertEqual(self.product.freshness()["serving_generation"],
+                         generation_before)  # blocks never touch the corpus
+        with self.assertRaises(ProductError):
+            self.product.get_match(self.bob.access_token, rid, a_session)
 
 
 class PresentationInvariantTests(unittest.TestCase):
@@ -359,6 +414,53 @@ class PilotScaleLatencyTests(unittest.TestCase):
         self.assertLess(elapsed, 20.0,
                         f"discover took {elapsed:.2f}s on 100-session corpus")
         print(f"\n[latency] discover over {count}+1 sessions: {elapsed:.2f}s")
+
+
+class DurableSecretTests(unittest.TestCase):
+    """Review B4: prepared private drafts must survive restart with the
+    operator-supplied stable secret; a persistent DB without one must refuse
+    to start at the CLI boundary."""
+
+    def test_draft_preview_survives_runtime_restart_with_stable_secret(self):
+        from src.product.server import build_runtime
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "live.db")
+            rt1 = build_runtime(db, allowed_origins=frozenset({ORIGIN}),
+                                confirmation_secret=SECRET)
+            creds = rt1.product.register("Alice")
+            prepared = rt1.product.prepare_structured(
+                creds.access_token, r7_dna(QUERY_DNA, "thought-secret"),
+                presentation=dict(PRES))
+            token1 = rt1.product.preview(
+                creds.access_token, prepared["draft_id"])["confirmation_token"]
+            rt1.live.repo.close()
+
+            rt2 = build_runtime(db, allowed_origins=frozenset({ORIGIN}),
+                                confirmation_secret=SECRET)
+            preview2 = rt2.product.preview(creds.access_token,
+                                           prepared["draft_id"])
+            self.assertEqual(preview2["confirmation_token"], token1)
+            receipt = rt2.product.share_prepared(
+                creds.access_token, prepared["draft_id"],
+                confirmation_token=token1, confirmed=True)
+            self.assertTrue(receipt["discoverable"])
+            rt2.live.repo.close()
+
+    def test_persistent_db_requires_stable_secret_at_cli(self):
+        from src.product.server import _resolve_secret
+        with self.assertRaises(ValueError):
+            _resolve_secret(None, {}, "live-product.sqlite3")
+        self.assertIsNone(_resolve_secret(None, {}, ":memory:"))
+        self.assertEqual(
+            _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": "s3"},
+                            "live-product.sqlite3"),
+            b"s3")
+        with tempfile.TemporaryDirectory() as tmp:
+            secret_path = Path(tmp) / "secret"
+            secret_path.write_bytes(b"file-secret\n")
+            self.assertEqual(
+                _resolve_secret(str(secret_path), {}, "live-product.sqlite3"),
+                b"file-secret")
 
 
 class BoundaryHygieneTests(unittest.TestCase):

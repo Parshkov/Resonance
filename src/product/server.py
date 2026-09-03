@@ -14,6 +14,7 @@ service, so the exact accepted tools operate on real authenticated state.
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import secrets
 from dataclasses import dataclass
@@ -395,6 +396,29 @@ def serve(
     return ThreadingHTTPServer((host, port), handler)
 
 
+def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
+                    db_path: str) -> bytes | None:
+    """Durable-draft HMAC secret policy (R12C seam).
+
+    A persistent DB REQUIRES a stable secret (file or env) or startup fails
+    explicitly — a per-process random secret would orphan every prepared
+    private draft on restart. Ephemeral in-memory runs may use a random one.
+    Plaintext secrets on the CLI are deliberately not accepted.
+    """
+    if secret_file:
+        return Path(secret_file).read_bytes().strip()
+    env_secret = environ.get("RESONANCE_CONFIRMATION_SECRET", "")
+    if env_secret:
+        return env_secret.encode("utf-8")
+    if db_path != ":memory:":
+        raise ValueError(
+            "a persistent --db requires a stable confirmation secret: pass "
+            "--secret-file or set RESONANCE_CONFIRMATION_SECRET, otherwise "
+            "prepared private drafts cannot survive a restart"
+        )
+    return None
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Resonance live product server")
     parser.add_argument("--host", default=DEFAULT_HOST)
@@ -402,11 +426,18 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--db", default="live-product.sqlite3")
     parser.add_argument("--origin", action="append", default=None,
                         help="allowed browser origin (repeatable)")
+    parser.add_argument("--secret-file", default=None,
+                        help="file holding the stable draft-confirmation secret")
     parser.add_argument("--no-seed", action="store_true",
                         help="start with an empty live corpus (no R7 seed baseline)")
     args = parser.parse_args(argv)
     origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
+    try:
+        secret = _resolve_secret(args.secret_file, os.environ, args.db)
+    except ValueError as exc:
+        parser.error(str(exc))
     runtime = build_runtime(args.db, allowed_origins=origins,
+                            confirmation_secret=secret,
                             seed=not args.no_seed)
     server = serve(args.host, args.port, runtime=runtime)
     print(f"live product on http://{args.host}:{args.port} "

@@ -224,7 +224,13 @@ class LiveProductService:
         graph = ThoughtGraph.from_dict(dict(session.thought_dna))
         raw = self.live.discover(graph, mode=mode, k=k)
 
-        viewer_coords = _coords(dict(getattr(session, "location", {}) or {}))
+        # Distance context requires BOTH sides' coarse-location consent. The
+        # query session may hold a privately stored location (R12C persists it
+        # before any share), so the viewer's own current consent gates it too.
+        viewer_consent = self.identity.policy_source.session_consent(session_id)
+        viewer_coords = None
+        if viewer_consent.get("share_coarse_location"):
+            viewer_coords = _coords(dict(getattr(session, "location", {}) or {}))
         matches: list[dict[str, Any]] = []
         dropped_blocked = 0
         for row in raw["matches"]:
@@ -299,6 +305,17 @@ class LiveProductService:
             )
         for row in list(record["payload"]["matches"]) + list(record["payload"]["rejected"]):
             if row.get("session_id") == session_id:
+                # Blocks and consent transitions do not move the corpus
+                # generation, so every stored evidence read re-checks the
+                # CURRENT viewer-relative authorization for this exact row.
+                source = self.identity.policy_source
+                owner = source.owner_of("session", session_id)
+                if owner and source.is_blocked(actor.user_id, owner):
+                    raise ProductError("match is no longer available")
+                consent = source.session_consent(session_id)
+                if consent and (consent.get("revoked") or consent.get("deleted")
+                                or not consent.get("share_thought_dna")):
+                    raise ProductError("match is no longer available")
                 return {
                     "contract_version": LIVE_PRODUCT_CONTRACT,
                     "source": "live",
@@ -335,7 +352,11 @@ class LiveProductService:
         projected = dict(row)
         display = dict(projected.get("display", {}) or {})
         if consent and not consent.get("share_display_profile"):
+            # Mirror R12B projection semantics: with profile sharing off, no
+            # profile-derived presentation metadata escapes either.
             projected["person_pseudonym"] = "anonymous"
+            for field in ("topic", "domain", "cluster_id"):
+                display.pop(field, None)
         if consent and not consent.get("share_coarse_location"):
             display.pop("location", None)
         candidate_coords = _coords(display.get("location"))
