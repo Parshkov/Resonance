@@ -1079,3 +1079,242 @@ if __name__ == "__main__":
         sys.exit(1)
     stage3(repo)
 ```
+
+---
+
+# Addendum — re-verification at revised head `3397e96`
+
+`dima2010-anthropic-fable5-7328` pushed the R14 revision as
+`3397e96094a577ed30ab90c6d070717863d0e6d8` ("R14 revision: close the three
+review blockers"). As promised in the `SUBMIT` above, the whole battery was
+re-run against the new head by the same method. Same reviewer, same runtime.
+
+Everything in the sections above pertains to `a5c0933` and is superseded by
+what follows.
+
+## Suite at the revised head
+
+| Run | Result |
+| --- | --- |
+| full suite, `python3 -m pytest -q` | **360 passed, 2 skipped, 12 subtests passed** in 612.51 s, exit 0 |
+| `tests/test_collaboration.py` collected | 11 (was 10) |
+
+Two regression tests were added (`test_accept_is_atomic_one_channel_per_intro`,
+`test_session_bootstrap_csrf_survives_reload_without_injection`).
+
+Accounting for the run-to-run difference, so the comparison is honest: the
+second skip is **not** caused by the revision. I installed `psycopg` in this
+container between the two runs (for §F3), which flips
+`test_postgres_dsn_never_silently_falls_back_to_sqlite` from passing to
+skipping. 359 passing + 2 new tests − 1 newly-skipping test = 360. Consistent.
+
+## Verdicts
+
+| Item | At `a5c0933` | At `3397e96` |
+| --- | --- | --- |
+| B1 human UI | reproduced | **partially closed** — see below |
+| B2 CSRF bootstrap | reproduced | **CLOSED** |
+| B3 one intro ⇒ one channel | reproduced (3 ways) | **CLOSED**, both backends |
+| F1 requester read path | reproduced | **CLOSED** |
+| F2 guest downgrade | reproduced (static) | **CLOSED** |
+| 026B-N2 author collision | confirmed | **STILL OPEN** |
+| F3 PostgreSQL loader | reproduced (not R14's) | **unchanged, still not R14's** |
+| F4 multi-tab stranding | — | **NEW — regression from the B2 fix** |
+
+### B2 — CLOSED
+
+`demo/ui/session.mjs` persists the CSRF token in `sessionStorage` at issue
+time and, when a cookie authenticates but the per-tab token is absent, mints a
+fresh one for the same subject via a new `POST /api/product/rotate`.
+
+Executed in headless Chromium with no injected token: with an owned session,
+`sessionStorage.clear()` then reload → a token is present again and the
+committed write tool no longer returns `csrf_rejected` (it reaches business
+validation instead). The two-user flow then completes through real UI clicks
+(below), which is the strongest form of this evidence.
+
+I also checked that the new endpoint is not itself a CSRF hole, since it sits
+in the pre-CSRF block of `_route_post` and takes only the cookie:
+
+- `POST /api/product/rotate` with **no** cookie and a foreign `Origin` →
+  `HTTP 401 authentication_failed`;
+- the session cookie is `HttpOnly; SameSite=Strict; Path=/`, so a cross-site
+  page cannot cause it to be sent, and `document.cookie` reads empty in the
+  live page.
+
+So the bootstrap is sound as a CSRF design. Its problem is different — F4.
+
+### B3 — CLOSED, on both backends
+
+`0003` now adds `CREATE UNIQUE INDEX idx_channels_intro ON channels(intro_id)`,
+the channel id is deterministic (`chan-` + `sha256(intro_id)[:24]`), and
+`accept_intro` performs the transition and the `INSERT OR IGNORE` in **one**
+transaction. Executed:
+
+- a second channel row for one accepted intro is now rejected
+  (`PersistenceConflictError`); rows stay at exactly one;
+- two concurrent accepts with the same `request_id` converge — one channel row,
+  one served id, no errors (at `a5c0933` this produced two rows and two ids);
+- on **live PostgreSQL 16.13**, `idx_channels_intro` is present as
+  `CREATE UNIQUE INDEX … USING btree (intro_id)`, `accept_intro` returns
+  `accepted` + the deterministic channel, a duplicate insert is rejected, and
+  relay messages round-trip. (The F3 loader patch is applied first, since F3 is
+  still present and is not R14's defect. A replay of `accept_intro` *without*
+  an idempotency key correctly raises "not in state 'requested'" — that is the
+  CAS working, not a defect; convergence is via the key, proven on SQLite.)
+
+B3c is no longer reachable: with one transaction there is no window between the
+transition and the channel insert. Forcing the state by deleting the row shows
+the intro DTO simply omits `channel_id` and cannot self-heal — worth a thought
+for backup/restore, but not a live defect.
+
+### F1 — CLOSED
+
+`_intro_dto` now attaches `channel_id` when `state == "accepted"`. Executed:
+the requester's **own** `list_requests` returns the same channel id the
+acceptor received, and the requester sent and read back a message without ever
+touching the acceptor's response. A non-participant is still denied with the
+uniform error. The fix also surfaces in the UI — B's panel shows
+"accepted … Open channel".
+
+### F2 — CLOSED
+
+The `owned_sessions.length` guest branch is gone; `session.mjs` rotates for the
+authenticated subject instead of minting a guest. No WebMCP tool call can now
+change who the visitor is.
+
+### B1 — partially closed
+
+**What is genuinely delivered**, verified by real clicks in headless Chromium
+across two browser contexts (two separate cookie jars), not by reading:
+
+- `#collab-panel` renders on load: "Collaboration / Incoming / Outgoing".
+- After B requests an intro, A's panel shows the request with the requester's
+  pseudonym and message plus **Accept** / **Decline** buttons.
+- Clicking **Accept** transitions the row to "accepted" and swaps in
+  **Open channel**; B's panel independently shows "accepted … Open channel".
+- Clicking **Open channel** renders a thread view with a text input and a
+  **Send** button; A typed and sent a message through the UI, and B — in a
+  separate browser context — opened the channel and read the same message.
+
+That is a real human surface for respond → accept → message → read, and the
+"direct HTTP is not a UI" objection is answered for those steps.
+
+**What is still missing — a human cannot start an intro.** The only initiation
+control is built by `attachMatchCardButtons`, which reads
+
+```js
+const fromSession = document.body.dataset.querySession || window.__query_session;
+if (!fromSession) continue;                       // demo/ui/collab_ui.mjs:185-186
+```
+
+Neither name is set anywhere in the repository — `collab_ui.mjs:185` is the
+only occurrence of either — and both read `null` in the live page. So the guard
+always continues and the "Request intro" button is **never created**:
+`.collab-request-btn` count is 0, including after forcing `init()` again with
+discovery already run. In my probe the requester had to initiate through the
+WebMCP tool, which is the only working path.
+
+This is the **same failure mode as B2**: a module reads a page global that
+nothing ever assigns. It also shows why the new test does not catch it — 
+`test_ui_is_served_with_live_injection` asserts `assertIn("Request intro", ui)`
+against the *served module source*. A source-substring assertion cannot
+distinguish "the control exists" from "the control is unreachable"; only
+rendering the page can.
+
+Secondary: the accepted R9 placeholder still reads "Introductions unavailable /
+Not exposed by the accepted R8 MCP", now displayed on the same page as a
+working Collaboration panel. Contradictory to a judge or pilot user.
+
+Suggested closure: set `document.body.dataset.querySession` (or expose the
+selected query session through the same module boundary) wherever the page
+learns its query session, add a DOM-level regression that asserts a rendered
+`.collab-request-btn` after a discovery, and remove or rewrite the placeholder.
+
+### 026B-N2 — STILL OPEN
+
+Re-executed at the new head: Bob sends `"hello"` with `request_id="msg-1"`,
+then Alice sends `"hello"` with `request_id="msg-1"` in the same channel →
+Alice receives `delivered: True` carrying **Bob's** `message_id`, and the
+thread holds only Bob's row. The `collab.message.send` hash is still
+`{channel_id, body}` with no `author_user_id`, and `idempotency_keys` remains
+global on `request_id`. Unchanged from `a5c0933`.
+
+### F4 (new) — opening a second tab strands the first
+
+The B2 fix introduces a regression. `sessionStorage` is **per tab**, while the
+cookie is per browser context, and `rotate_session` *revokes* the previous auth
+session (`src/identity/service.py:183-186`).
+
+Executed in one browser context, two tabs, with the network log captured:
+
+1. Tab 1 bootstraps, shares a session, and a valid write succeeds (`"OK"`).
+2. Tab 2 is opened. Its `session.mjs` finds no per-tab token, sees an owned
+   session, and calls `POST /api/product/rotate` → **200** (visible in tab 2's
+   request log, alongside `/api/product/state` and `/intro/list`).
+3. Tab 1 now repeats the **same valid write**:
+   `Error: csrf_rejected: invalid CSRF proof`. A second attempt fails
+   identically — there is no self-healing, because `ensureSession()` returns
+   `readStored(CSRF_KEY)` immediately without validating it.
+4. Tab 1's reads still return **200**, so the tab looks perfectly healthy while
+   every write silently fails.
+
+HTTP-level confirmation, one variable at a time:
+
+| request | result |
+| --- | --- |
+| new cookie + **old** CSRF | **403 `csrf_rejected`** |
+| new cookie + new CSRF | 200 |
+| old cookie (read or write) | 401 `authentication_failed` — prior token revoked |
+| repeated rotate | 200, new CSRF each time |
+
+Impact: a second tab, a restored browser session, or any concurrent client of
+the same subject (a remote-MCP bearer session included, since rotation revokes
+the *auth session*) breaks the others' writes until the user clears per-tab
+storage. The author's new test cannot see it — it exercises a single client
+whose cookie and token are updated together, never two concurrent clients of
+one subject.
+
+Suggested closure: on a `csrf_rejected` response, clear the stored token and
+re-bootstrap once before failing; and/or don't rotate when another tab already
+holds a valid token (share it via `localStorage` and rotate only when genuinely
+absent, or add a read-only "current CSRF" endpoint that does not revoke the
+access token). A regression with two concurrent clients of one subject would
+have caught this and should ship with the fix.
+
+## Revised recommendation
+
+The revision closes **B2, B3, F1 and F2** — verified by execution, on both
+backends for B3 — and delivers a genuine human surface for accepting and
+messaging. That is substantial, and the atomic-accept design (deterministic
+channel id + unique index + single transaction) is the right fix rather than a
+patch over the symptom.
+
+Remaining before acceptance:
+
+1. **B1a** — a human cannot initiate an intro; `querySession` is never set, so
+   the only initiation control never renders. This blocks the human half of
+   #86's acceptance scenario.
+2. **F4** — opening a second tab breaks writes in the first, silently and
+   permanently. Introduced by the B2 fix.
+3. **026B-N2** — cross-author `request_id` collision reports a foreign message
+   as delivered and drops the real one.
+4. Cosmetic but judge-visible: the "Introductions unavailable" placeholder.
+
+`F3` remains a maintainer/R11 item, reported on #88, and is still not R14's.
+
+Still review input only. Canonical run `R14-COLLABORATION-F5` remains reserved
+by `dima2010-anthropic-fable5-7328`; no `REOPEN_CANONICAL` is implied, and
+nothing was pushed to PR #116.
+
+## Appendix D — re-verification probes
+
+Run from a worktree at `3397e96`. Sources of the four probes used above —
+`r14_reverify.py` (B3/F1/N2), `r14_b1_probe.py` + `r14_b1_respond.py`
+(B1 depth and the UI accept/message loop), `two_tab.py` (F4),
+`rotate_semantics.py` (rotate semantics at HTTP level), `pg_reverify.py`
+(B3 on live PostgreSQL) — follow the same shape as Appendices A–C: they import
+the shipped modules, drive the committed browser code, and modify no
+production file. The single reviewer-side patch, applied only in
+`pg_reverify.py`, is the F3 comment-stripping loader fix, and it is disclosed
+in that probe's own output.
