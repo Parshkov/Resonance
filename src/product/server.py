@@ -946,7 +946,10 @@ def main(argv: list[str] | None = None) -> None:
                             seed=seed)
     startup_purge_demo(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
-    oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
+    # The startup log names the FIRST declared --origin; per-request metadata
+    # still follows the host actually addressed (see `_issuer`).
+    oauth_mount.attach_core(
+        runtime, issuer=oauth_mount.canonical_origin(args.origin, origins))
     server = serve(args.host, args.port, runtime=runtime)
     # Never echo credentials: a PostgreSQL DSN carries the password, and this
     # line lands in platform logs (privacy-safe logs are an R16 gate).

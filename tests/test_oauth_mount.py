@@ -51,6 +51,34 @@ class IssuerDerivationTests(unittest.TestCase):
         self.assertEqual(om.public_issuer(frozenset({"http://127.0.0.1:8788"}), {}),
                          "http://127.0.0.1:8788")
 
+    def test_canonical_origin_is_the_first_declared_not_the_alphabetical_one(self):
+        # A deployment that serves a custom domain alongside the platform host
+        # has two allowed origins. `allowed_origins` is a set, so it cannot say
+        # which is canonical, and public_issuer() without headers falls back to
+        # the alphabetically first https origin — here the platform host, which
+        # is exactly the wrong answer once a custom domain exists.
+        declared = ["https://resonance.parshkov.com",
+                    "https://resonance-production-cfe3.up.railway.app"]
+        allowed = frozenset(declared)
+        self.assertEqual(om.public_issuer(allowed),
+                         "https://resonance-production-cfe3.up.railway.app")
+        self.assertEqual(om.canonical_origin(declared, allowed),
+                         "https://resonance.parshkov.com")
+        # Per request each allowed host still serves its own metadata, so the
+        # legacy platform URL keeps working for clients already registered on it.
+        for host in ("resonance.parshkov.com", "resonance-production-cfe3.up.railway.app"):
+            self.assertEqual(
+                om.public_issuer(allowed, {"X-Forwarded-Host": host,
+                                           "X-Forwarded-Proto": "https"}),
+                f"https://{host}")
+        # Trailing slashes and blanks in the operator's argv are tolerated …
+        self.assertEqual(
+            om.canonical_origin(["", "  https://resonance.parshkov.com/ "], allowed),
+            "https://resonance.parshkov.com")
+        # … and with nothing declared it degrades to the old behaviour.
+        self.assertEqual(om.canonical_origin(None, allowed), om.public_issuer(allowed))
+        self.assertEqual(om.canonical_origin([], allowed), om.public_issuer(allowed))
+
     def test_challenge_points_at_protected_resource_metadata(self):
         value = om.www_authenticate("https://x.example")
         self.assertTrue(value.startswith("Bearer "))

@@ -656,7 +656,14 @@ def main(argv: list[str] | None = None) -> None:
                             seed=seed)
     startup_purge_demo(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
-    oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
+    # Per request the issuer is re-derived from the host actually addressed
+    # (`ProductHandler._issuer`), so every allowed origin serves its own
+    # metadata. This value only labels the startup log, and `public_issuer()`
+    # would pick the alphabetically first https origin — which stops being the
+    # canonical one the moment a custom domain is added alongside the platform
+    # host. The FIRST declared --origin is the canonical one, so say that.
+    oauth_mount.attach_core(
+        runtime, issuer=oauth_mount.canonical_origin(args.origin, origins))
     server = serve(args.host, args.port, runtime=runtime)
     print(f"competition product on http://{args.host}:{args.port} "
           f"(origins: {sorted(origins)}; db: {_redact_db(args.db)}; mode: LIVE+WebMCP)")

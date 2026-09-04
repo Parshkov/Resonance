@@ -14,7 +14,7 @@ Nothing here mints, validates or stores tokens.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit
 
 PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
@@ -52,6 +52,25 @@ def public_issuer(allowed_origins: frozenset[str] | set[str] | None,
     if origins:
         return origins[0]
     return candidate or "http://127.0.0.1"
+
+
+def canonical_origin(declared: Sequence[str] | None,
+                     allowed_origins: frozenset[str] | set[str] | None) -> str:
+    """The origin this deployment calls its own.
+
+    `allowed_origins` is a set, so it cannot say which of several hosts is
+    canonical — and `public_issuer()` falls back to the alphabetically first
+    https origin, which stops being the canonical one as soon as a custom
+    domain is served alongside the platform host. The order the operator
+    declared them in does say it: the first `--origin` is canonical. Used for
+    what has to name one host (the startup log, documentation); per-request
+    metadata still follows the host actually addressed.
+    """
+    for origin in declared or ():
+        cleaned = (origin or "").strip().rstrip("/")
+        if cleaned:
+            return cleaned
+    return public_issuer(allowed_origins)
 
 
 def resource_url(issuer: str) -> str:
