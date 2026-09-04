@@ -44,8 +44,22 @@ automatically when every allowed origin is `https://`.
 
 ## Option A — Railway with Railway PostgreSQL (chosen: no CLI, ~10 minutes, ~$8–12/month)
 
-`railway.json` in the repository root tells Railway to build the `Dockerfile`,
-health-check `/api/product/health`, and restart on failure.
+**Production is provisioned this way** as project `resonance-live`, origin
+`https://resonance-production-cfe3.up.railway.app` (2026-09-04). Lessons from
+that first real build, so nobody repeats them:
+
+- Railway has **deprecated config-as-code** (`railway.json` / `railway.toml`)
+  and defaults to the Railpack builder. Set **Dockerfile path**, **healthcheck
+  path** (`/api/product/health`, 60 s) and **restart policy** (on failure) in
+  the service's *Settings* — the file in the repo is documentation only.
+- Railway **rejects a Docker `VOLUME` instruction** ("use Railway Volumes"); the
+  Dockerfile no longer has one.
+- The PostgreSQL service runs the `pgvector/pgvector:pg16` image with a
+  Railway volume at `/var/lib/postgresql/data` and
+  `PGDATA=/var/lib/postgresql/data/pgdata`; `DATABASE_URL` points at the
+  private host `postgres.railway.internal:5432`.
+- Health-check success is Railway's own probe of `/api/product/health`, i.e.
+  migrations applied and the seed loaded before traffic is routed.
 
 1. **Create the project.** railway.com → **New Project** → **Deploy from GitHub
    repo** → `Parshkov/Resonance`, branch `main`. Railway detects the Dockerfile.

@@ -509,6 +509,16 @@ def _require_strong(secret: bytes, source: str) -> bytes:
     return secret
 
 
+def _redact_db(target: str) -> str:
+    """Mask the userinfo of a DSN for logging; file paths pass through."""
+    parsed = urlparse(target)
+    if parsed.scheme in {"postgres", "postgresql"} and parsed.hostname:
+        port = f":{parsed.port}" if parsed.port else ""
+        user = f"{parsed.username}@" if parsed.username else ""
+        return f"{parsed.scheme}://{user}{parsed.hostname}{port}{parsed.path}"
+    return target
+
+
 def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
                     db_path: str) -> bytes | None:
     """Durable-draft HMAC secret policy (R12C seam).
@@ -555,8 +565,10 @@ def main(argv: list[str] | None = None) -> None:
                             confirmation_secret=secret,
                             seed=not args.no_seed)
     server = serve(args.host, args.port, runtime=runtime)
+    # Never echo credentials: a PostgreSQL DSN carries the password, and this
+    # line lands in platform logs (privacy-safe logs are an R16 gate).
     print(f"live product on http://{args.host}:{args.port} "
-          f"(origins: {sorted(origins)}; db: {args.db}; mode: LIVE)")
+          f"(origins: {sorted(origins)}; db: {_redact_db(args.db)}; mode: LIVE)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
