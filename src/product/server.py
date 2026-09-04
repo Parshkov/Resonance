@@ -59,6 +59,7 @@ from src.product.mcp_bridge import (
     RemoteMCPBridge,
     bearer_token,
 )
+from src.product import oauth_mount
 
 REPO = Path(__file__).resolve().parents[2]
 UI_DIR = REPO / "demo" / "ui"
@@ -227,6 +228,9 @@ class ProductHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         try:
+            if oauth_mount.is_oauth_path(parsed.path):
+                self._handle_oauth("GET", parsed.path, parse_qs(parsed.query))
+                return
             self._route_get(parsed.path, parse_qs(parsed.query))
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
@@ -237,9 +241,47 @@ class ProductHandler(BaseHTTPRequestHandler):
             if _mcp_path_token(parsed.path) is not None:
                 self._handle_mcp(parsed.path)
                 return
+            if oauth_mount.is_oauth_path(parsed.path):
+                self._handle_oauth("POST", parsed.path, parse_qs(parsed.query))
+                return
             self._route_post(parsed.path)
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
+
+    # -- canonical OAuth mount (R15C, #136) ------------------------------------
+    def _issuer(self) -> str:
+        return oauth_mount.public_issuer(self.runtime.allowed_origins, self.headers)
+
+    def _oauth_core(self) -> Any:
+        # The protocol core is owned by src/remote (R15A); the runtime carries
+        # it when configured. Without it the paths answer 404 and nothing else
+        # in the product changes.
+        return getattr(self.runtime, "oauth_core", None)
+
+    def _handle_oauth(self, method: str, path: str, query: dict[str, list[str]]) -> None:
+        length = int(self.headers.get("Content-Length") or 0)
+        if length < 0 or length > MAX_BODY_BYTES:
+            raise IngestionError("request body exceeds product bound")
+        body = self.rfile.read(length) if (length and method == "POST") else b""
+        core = self._oauth_core()
+        if core is None:
+            self._send_error_json(HTTPStatus.NOT_FOUND, "not_found", "unknown path")
+            return
+        response = oauth_mount.dispatch(
+            core, method=method, path=path, query=query,
+            headers={k: v for k, v in self.headers.items()}, body=body, issuer=self._issuer())
+        self.send_response(response.status)
+        headers = dict(response.headers)
+        headers.setdefault("Content-Type", "application/json; charset=utf-8")
+        headers["Content-Length"] = str(len(response.body))
+        for key, value in headers.items():
+            self.send_header(key, value)
+        # Same CSP as the rest of the origin; the consent page must not need
+        # inline script/style (stated in the HANDOFF on #134).
+        self._security_headers()
+        self.end_headers()
+        if response.body:
+            self.wfile.write(response.body)
 
     def do_DELETE(self) -> None:  # noqa: N802
         # Streamable HTTP clients may terminate a session explicitly; the
@@ -255,21 +297,36 @@ class ProductHandler(BaseHTTPRequestHandler):
     def _handle_mcp(self, path: str) -> None:
         """POST /mcp[/<key>]: one JSON-RPC message (or batch) per request,
         answered with a single JSON body (no SSE stream is offered)."""
-        token = bearer_token(self.headers.get("Authorization"), _mcp_path_token(path) or None)
+        issuer = self._issuer()
+        presented = bearer_token(self.headers.get("Authorization"), _mcp_path_token(path) or None)
+        # With the canonical OAuth core mounted, the presented bearer is checked
+        # for audience/revocation there and mapped to the R12 access token; the
+        # manual key path (bearer IS the R12 token) stays as the debug fallback.
+        token = oauth_mount.resolve_bearer(self._oauth_core(), presented, issuer=issuer)
+        if token:
+            try:
+                self.runtime.identity.authenticate(token)
+            except AuthenticationError:
+                token = None
         if not token:
+            # RFC 9728: the challenge tells a hosted client where the
+            # protected-resource metadata (and from it the authorization
+            # server) lives, so connecting with only the /mcp URL can start
+            # the browser authorization flow.
             self.send_response(HTTPStatus.UNAUTHORIZED)
-            self.send_header("WWW-Authenticate", 'Bearer realm="resonance", error="invalid_token"')
+            self.send_header("WWW-Authenticate", oauth_mount.www_authenticate(
+                issuer, error="invalid_token" if presented else None))
             body = json.dumps({"error": "authentication_failed",
-                               "message": "send the account's MCP key as Authorization: Bearer "
-                                          "<key> (mint it in the Collaboration panel)"}).encode()
+                               "message": "authorize this client through "
+                                          f"{oauth_mount.resource_metadata_url(issuer)} "
+                                          "(hosted clients do this automatically), or send "
+                                          "an MCP key as Authorization: Bearer <key>"}).encode()
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self._security_headers()
             self.end_headers()
             self.wfile.write(body)
             return
-        # Authenticate up front so a bad key is a 401, not a per-tool error.
-        self.runtime.identity.authenticate(token)
         length = int(self.headers.get("Content-Length") or 0)
         if length < 0 or length > MAX_BODY_BYTES:
             raise IngestionError("request body exceeds product bound")
