@@ -54,6 +54,7 @@ from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product.service import LiveProductService, ProductError, StaleResultError
 from src.product.mcp_bridge import (
+    BridgeError,
     INVALID_REQUEST,
     PARSE_ERROR,
     RemoteMCPBridge,
@@ -138,6 +139,23 @@ def build_runtime(
     product = LiveProductService(identity, confirmation_secret=confirmation_secret)
     return ProductRuntime(live=live, identity=identity, product=product,
                           allowed_origins=allowed_origins)
+
+
+class _DiscardWriter:
+    """Sink for HEAD responses: headers are already flushed, the body is dropped.
+    Installed only between end_headers() and the end of do_HEAD(), which puts
+    the real socket writer back before socketserver finishes the request."""
+
+    closed = False
+
+    def write(self, data: bytes) -> int:
+        return len(data)
+
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
 
 
 class ProductHandler(BaseHTTPRequestHandler):
@@ -225,6 +243,24 @@ class ProductHandler(BaseHTTPRequestHandler):
         }
 
     # -- routing -----------------------------------------------------------
+    def do_HEAD(self) -> None:  # noqa: N802
+        # Link scanners, uptime checkers and browsers preflight with HEAD; the
+        # stdlib handler answered 501. Run the GET route and drop the body: the
+        # headers (status, Content-Type, Content-Length, security headers) are
+        # exactly those of the GET.
+        real_wfile = self.wfile
+        self._head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
+            self.wfile = real_wfile
+
+    def end_headers(self) -> None:
+        super().end_headers()
+        if getattr(self, "_head_only", False):
+            self.wfile = _DiscardWriter()
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         try:
@@ -379,7 +415,7 @@ class ProductHandler(BaseHTTPRequestHandler):
             ((CollaborationError,), HTTPStatus.BAD_REQUEST, "collaboration_unavailable"),
             ((WorkspaceError,), HTTPStatus.BAD_REQUEST, "workspace_unavailable"),
             ((IdentityValidationError, PersistenceValidationError, IngestionError,
-              ProductError, ValueError), HTTPStatus.BAD_REQUEST, "validation_failed"),
+              ProductError, BridgeError, ValueError), HTTPStatus.BAD_REQUEST, "validation_failed"),
             ((PersistenceStateError,), HTTPStatus.CONFLICT, "state_conflict"),
         ]
         for types, status, code in mapping:

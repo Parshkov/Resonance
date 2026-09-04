@@ -16,7 +16,9 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 | seed | default seeds the accepted R7 corpus (create-only, idempotent across restarts); `--no-seed` starts empty | |
 
 Migrations under `ops/migrations/` are applied automatically at startup on both
-backends. Health: `GET /api/product/health` → `{"ok": true, ...}`.
+backends (`0005_oauth_grants` makes OAuth codes / refresh grants / client
+registrations durable, so a redeploy no longer forces hosted MCP clients to
+re-authorize). Health: `GET /api/product/health` → `{"ok": true, ...}`.
 
 HTTPS is mandatory for the WebMCP browser surface (secure context); every
 platform below terminates TLS in front of the container.

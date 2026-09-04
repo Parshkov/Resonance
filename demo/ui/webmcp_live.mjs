@@ -131,19 +131,48 @@ const REQUEST_ID_PROPERTY = {
 const tools = [
   {
     name: "resonance_prepare_thought",
-    title: "Prepare current thought for sharing",
-    description: "Create a private durable draft from the thought currently visible in Resonance. Nothing becomes discoverable yet.",
+    title: "Prepare the person's thought for sharing",
+    description: "Create a private durable draft of the person's REAL reasoning: pass `thought` (a labelled causal graph you extracted from the conversation — preferred) or `context` (raw text, ≤ 4000 chars, for the deterministic cue extractor). Without either, the thought currently visible on the page is used. The text is never retained; nothing becomes discoverable yet.",
     inputSchema: {
       type: "object", required: ["request_id"],
       properties: {
         request_id: REQUEST_ID_PROPERTY,
         note: {type: "string", maxLength: 500, description: "Optional private preparation note."},
+        thought: {
+          type: "object", required: ["nodes", "relations"],
+          description: "Causal structure of what the person is working on. Labels are short noun phrases (no sentences, no personal data).",
+          properties: {
+            topic: {type: "string", maxLength: 120, description: "3-8 word public title."},
+            domain: {type: "string", maxLength: 60, description: "Field, e.g. 'distributed-systems'."},
+            nodes: {
+              type: "array", minItems: 2, maxItems: 24,
+              items: {type: "object", required: ["label", "role"], additionalProperties: false,
+                      properties: {id: {type: "string", maxLength: 32}, label: {type: "string", maxLength: 120},
+                                   role: {type: "string", enum: ["agent", "constraint", "evidence", "mechanism", "method", "outcome", "problem", "resource", "state"]},
+                                   negated: {type: "boolean"},
+                                   modality: {type: "string", enum: ["actual", "possible", "conditional"]}}},
+            },
+            relations: {
+              type: "array", minItems: 1, maxItems: 48,
+              items: {type: "object", required: ["source", "target", "type"], additionalProperties: false,
+                      properties: {source: {type: "string", description: "node id or label"},
+                                   target: {type: "string", description: "node id or label"},
+                                   type: {type: "string", enum: ["causes", "constrains", "contradicts", "part_of", "prevents", "requires", "supports"]},
+                                   negated: {type: "boolean"},
+                                   modality: {type: "string", enum: ["actual", "possible", "conditional"]}}},
+            },
+          }, additionalProperties: false,
+        },
+        context: {type: "string", maxLength: 4000, description: "Raw text fallback when a graph cannot be extracted."},
       }, additionalProperties: false,
     },
-    annotations: {readOnlyHint: false},
-    execute: async (input) => executeWrite("prepare", "/api/webmcp/prepare", {
-      request_id: input?.request_id || "", note: input?.note || "",
-    }),
+    annotations: {readOnlyHint: false, untrustedContentHint: true},
+    execute: async (input) => {
+      const payload = {request_id: input?.request_id || "", note: input?.note || ""};
+      if (input?.thought !== undefined) payload.thought = input.thought;
+      if (input?.context) payload.context = input.context;
+      return executeWrite("prepare", "/api/webmcp/prepare", payload);
+    },
   },
   {
     name: "resonance_get_share_preview",

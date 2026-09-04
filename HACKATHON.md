@@ -65,6 +65,8 @@ Then open `http://127.0.0.1:8765/` in a WebMCP-capable browser. For the submitte
 
 **Real chats, real content (remote MCP):** the same live origin is also a remote MCP server for the assistant a person already talks to (Claude, Cursor, any Streamable-HTTP client): `https://resonance-production-cfe3.up.railway.app/mcp` — the client is given only that URL and completes standard OAuth 2.1 onboarding (RFC 9728 / 8414 / 7591, PKCE S256, explicit consent page; a manually minted key remains a debug-only fallback). The chat's model extracts the causal structure of the person's *actual* work, Resonance previews it, shares only after explicit approval, then discovers people whose reasoning resonates and relays consent-gated introductions. Connection steps and the tool-by-tool test script are in `ops/CONNECT_MCP.md`; `tests/test_remote_mcp.py` runs two people from two chats end to end.
 
+**Real content through the browser tools:** `resonance_prepare_thought` accepts the agent's extracted `thought` (labelled causal graph) or raw `context` (never retained), exactly like the remote MCP path; without either it falls back to the thought visible on the page. After an explicit share the page's live view shows the person's own thought.
+
 Native WebMCP acceptance is a separate evidence requirement: the browser/agent must actually discover the six registered tools and invoke at least one read flow plus the write/share/retry flow. Static source inspection alone is not reported as proof of native discovery/invocation.
 
 ## Provenance for this R10 run

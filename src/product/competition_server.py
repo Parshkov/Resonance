@@ -33,6 +33,7 @@ from src.ingestion.identity import (
     INGESTION_SHARED,
 )
 from src.ingestion.service import ShareIntent
+from src.product.mcp_bridge import BridgeError, _slug, build_thought_dna
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
 from src.product.server import (
@@ -153,6 +154,20 @@ def _owned_live_session(product, token: str) -> str | None:
 
 def _has_shared(product, token: str) -> bool:
     return _owned_live_session(product, token) is not None
+
+
+MAX_CONTEXT_CHARS = 4000
+
+
+def _presentation_for(thought: Any) -> dict[str, Any]:
+    """The durable projection needs exactly {topic, domain, cluster_id}; derive
+    them from what the agent supplied (never from the raw text)."""
+    topic = (str(thought.get("topic") or "").strip() if isinstance(thought, Mapping) else "") \
+        or "Shared thought"
+    domain = (str(thought.get("domain") or "").strip() if isinstance(thought, Mapping) else "") \
+        or "general"
+    return {"topic": topic[:120], "domain": domain[:60],
+            "cluster_id": (_slug(topic) or "shared")[:48]}
 
 
 def _candidate_for(subject: str, request_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -462,18 +477,43 @@ class CompetitionHandler(ProductHandler):
         security["client_id"] = "live-browser-webmcp"
 
         if operation == "prepare":
-            candidate, source = _candidate_for(subject, request_id)
-            result = product.prepare_structured(
-                token, candidate,
-                presentation=dict(source.get("presentation") or {}),
-                coarse_location=None,
-                intent=ShareIntent(
-                    share_display_profile=True,
-                    share_coarse_location=False,
-                    receive_intro_requests=True,
-                ),
-                **security,
+            intent = ShareIntent(
+                share_display_profile=True,
+                share_coarse_location=False,
+                receive_intro_requests=True,
             )
+            thought = body.get("thought")
+            context = body.get("context")
+            if thought is not None and context:
+                raise ValueError("provide either thought or context, not both")
+            if thought is not None or context:
+                # The agent hands over the person's REAL reasoning: a labelled
+                # causal graph it extracted (preferred) or raw text for the
+                # cue extractor. Same contract as remote MCP; the text is never
+                # retained.
+                presentation = _presentation_for(thought)
+                if thought is not None:
+                    candidate = build_thought_dna(thought, human_id=subject)
+                    result = product.prepare_structured(
+                        token, candidate, presentation=presentation,
+                        coarse_location=None, intent=intent, **security)
+                else:
+                    if not isinstance(context, str) or len(context) > MAX_CONTEXT_CHARS:
+                        raise ValueError(f"context must be text of at most {MAX_CONTEXT_CHARS} characters")
+                    result = product.prepare_raw_text(
+                        token, context, presentation=presentation,
+                        coarse_location=None, intent=intent, **security)
+            else:
+                # Legacy/demo input: clone the thought currently visible on the
+                # page (clearly labelled), so the tool still works without content.
+                candidate, source = _candidate_for(subject, request_id)
+                result = product.prepare_structured(
+                    token, candidate,
+                    presentation=dict(source.get("presentation") or {}),
+                    coarse_location=None,
+                    intent=intent,
+                    **security,
+                )
             wire = {
                 "contract_version": WEBMCP_CONTRACT,
                 "draft_id": result["draft_id"],

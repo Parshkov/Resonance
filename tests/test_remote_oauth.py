@@ -313,6 +313,23 @@ class OAuthCoreTests(unittest.TestCase):
                                 {"protocolVersion": "2025-03-26"})
         self.assertEqual(istatus, 200)
 
+    def test_revoking_refresh_token_cascades_to_its_access_token(self):
+        # RFC 7009 §2.1: a client that disconnects hands back its refresh token;
+        # the access token issued with it must stop working too (found on the
+        # public origin during R17 acceptance: it kept authenticating).
+        c, tok, _, _ = self._full_connect("cid", scope="resonance offline_access")
+        access, refresh = tok["access_token"], tok["refresh_token"]
+        istatus, sid, _ = c.rpc(access, "initialize", {"protocolVersion": "2025-03-26"})
+        self.assertEqual(istatus, 200)
+        status, _, _ = c.post_form("/oauth/revoke",
+                                   {"token": refresh, "token_type_hint": "refresh_token"})
+        self.assertEqual(status, 200)
+        rstatus, _, _ = c.token({"grant_type": "refresh_token",
+                                 "refresh_token": refresh, "client_id": "cid"})
+        self.assertEqual(rstatus, 400)
+        astatus, _, _ = c.rpc(access, "tools/list", session=sid, mid=2)
+        self.assertEqual(astatus, 401)
+
     def test_no_refresh_without_offline_access(self):
         _, tok, _, _ = self._full_connect("cid", scope="resonance")
         self.assertNotIn("refresh_token", tok)
@@ -356,3 +373,69 @@ class OAuthCoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DurableGrantStoreTests(unittest.TestCase):
+    """Codes / refresh grants / client registrations survive a process restart
+    when the core is built over the product repository (migration 0005)."""
+
+    def test_refresh_grant_and_client_survive_restart(self):
+        import tempfile
+        from pathlib import Path
+        from src.remote.oauth import RepositoryGrantStore
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "grants.sqlite3")
+            runtime = build_runtime(db, allowed_origins=frozenset({"https://x"}), seed=False)
+            runtime.remote_auth = RepositoryGrantStore(runtime.live.repo)
+            httpd = build_httpd("127.0.0.1", 0, runtime=runtime)
+            base = f"http://127.0.0.1:{httpd.server_address[1]}"
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            try:
+                c = Client(base)
+                req = Request(base + "/oauth/register",
+                              data=json.dumps({"redirect_uris": [REDIRECT], "client_name": "T"}).encode(),
+                              headers={"Content-Type": "application/json"}, method="POST")
+                status, _, body = c._open(req)
+                self.assertEqual(status, 201, body)
+                client_id = json.loads(body)["client_id"]
+                verifier, challenge = _pkce(b"durable-grant-verifier-seed-000001")
+                auth = c.authorize(challenge=challenge, state="s1", client_id=client_id,
+                                   resource=base + "/mcp", scope="resonance offline_access")
+                self.assertEqual(auth["status"], 302, auth)
+                status, _, body = c.token({"grant_type": "authorization_code", "code": auth["query"]["code"],
+                                           "code_verifier": verifier, "redirect_uri": REDIRECT,
+                                           "client_id": client_id, "resource": base + "/mcp"})
+                self.assertEqual(status, 200, body)
+                tok = json.loads(body)
+                self.assertIn("refresh_token", tok)
+            finally:
+                httpd.shutdown(); httpd.server_close()
+            runtime.live.repo.close()
+
+            # "redeploy": a brand-new process over the same database
+            runtime2 = build_runtime(db, allowed_origins=frozenset({"https://x"}), seed=False)
+            runtime2.remote_auth = RepositoryGrantStore(runtime2.live.repo)
+            httpd2 = build_httpd("127.0.0.1", 0, runtime=runtime2)
+            base2 = f"http://127.0.0.1:{httpd2.server_address[1]}"
+            threading.Thread(target=httpd2.serve_forever, daemon=True).start()
+            try:
+                c2 = Client(base2)
+                status, _, body = c2.token({"grant_type": "refresh_token",
+                                            "refresh_token": tok["refresh_token"],
+                                            "client_id": client_id})
+                self.assertEqual(status, 200, body)  # grant survived the restart
+                refreshed = json.loads(body)
+                self.assertNotEqual(refreshed["refresh_token"], tok["refresh_token"])  # rotated
+                status2, _, _ = c2.token({"grant_type": "refresh_token",
+                                          "refresh_token": tok["refresh_token"],
+                                          "client_id": client_id})
+                self.assertEqual(status2, 400)  # single use, even across processes
+                # the registered client is known to the new process too
+                verifier, challenge = _pkce(b"durable-grant-verifier-seed-000002")
+                auth = c2.authorize(challenge=challenge, state="s2", client_id=client_id,
+                                    resource=base2 + "/mcp")
+                self.assertEqual(auth["status"], 302, auth)
+            finally:
+                httpd2.shutdown(); httpd2.server_close()
+                runtime2.live.repo.close()

@@ -107,6 +107,71 @@ class CompetitionWebMCPTests(unittest.TestCase):
         shared = app.index('el("span", "", "Shared with Resonance")')
         self.assertIn('window.__resonanceWebMCP?.mode !== "live-product"', app[shared - 400:shared])
 
+    def test_webmcp_prepare_accepts_the_agents_real_thought(self):
+        # Post-release product gap: the browser prepare used to clone the page's
+        # flagship thought; an agent must be able to hand over the person's REAL
+        # reasoning (structured graph or raw text), same contract as remote MCP.
+        client = Client(self.base)
+        client.guest()
+        thought = {
+            "topic": "Retry storm after a partial outage", "domain": "distributed-systems",
+            "nodes": [
+                {"id": "a0", "label": "partial upstream outage", "role": "problem"},
+                {"id": "a1", "label": "synchronized client retries", "role": "mechanism"},
+                {"id": "a2", "label": "request amplification", "role": "state"},
+                {"id": "a3", "label": "jittered exponential backoff", "role": "method"},
+            ],
+            "relations": [
+                {"source": "a0", "target": "a1", "type": "causes"},
+                {"source": "a1", "target": "a2", "type": "causes"},
+                {"source": "a3", "target": "a2", "type": "prevents"},
+            ],
+        }
+        _, prepared, _ = client.request("POST", "/api/webmcp/prepare",
+                                        {"request_id": "real-1", "thought": thought})
+        self.assertFalse(prepared["discoverable"])
+        self.assertEqual(prepared["input_kind"], "agent_structured")
+        self.assertEqual(prepared["source_retention"], "not_retained")
+        _, preview, _ = client.request("GET", "/api/webmcp/preview")
+        labels = {n["label"] for n in preview["will_become_discoverable"]["thought"]["nodes"]}
+        self.assertEqual(labels, {n["label"] for n in thought["nodes"]})
+        self.assertEqual(preview["will_become_discoverable"]["presentation"]["topic"],
+                         "Retry storm after a partial outage")
+        self.assertEqual(preview["will_become_discoverable"]["presentation"]["domain"],
+                         "distributed-systems")
+        # same request_id + same input replays; different input conflicts
+        _, again, _ = client.request("POST", "/api/webmcp/prepare",
+                                     {"request_id": "real-1", "thought": thought})
+        self.assertEqual(again["draft_id"], prepared["draft_id"])
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/webmcp/prepare", {"request_id": "real-1", "context": "x"})
+        self.assertEqual(ctx.exception.code, 409)
+
+    def test_webmcp_prepare_raw_context_and_invalid_thought(self):
+        client = Client(self.base)
+        client.guest()
+        _, prepared, _ = client.request("POST", "/api/webmcp/prepare", {
+            "request_id": "raw-1",
+            "context": "A partial outage causes synchronized client retries. The retries cause "
+                       "request amplification, which leads to cascading saturation. Jittered "
+                       "backoff prevents the amplification."})
+        self.assertFalse(prepared["discoverable"])
+        self.assertEqual(prepared["input_kind"], "raw_text_fallback")
+        self.assertEqual(prepared["source_retention"], "not_retained")
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/webmcp/prepare", {
+                "request_id": "bad-1",
+                "thought": {"nodes": [{"label": "a", "role": "vibe"}, {"label": "b", "role": "state"}],
+                            "relations": []}})
+        self.assertEqual(ctx.exception.code, 400)
+        payload = json.loads(ctx.exception.read().decode())
+        self.assertEqual(payload["error"], "validation_failed")
+        self.assertIn("role must be one of", payload["message"])
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/webmcp/prepare",
+                           {"request_id": "both-1", "context": "x", "thought": {"nodes": [], "relations": []}})
+        self.assertEqual(ctx.exception.code, 400)
+
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
         # R17 acceptance finding: the first thing a judge does on the card is a
         # read through the page tool; an unshared visitor must get a mapped
