@@ -1,0 +1,9 @@
+P0 health readiness wait
+session_start_utc=2026-09-04T16:10:34Z
+policy: begin polling >=120s after start; require 60s of continuous HTTP 200 on /api/product/health (1 req/s)
+polling_begin_utc=2026-09-04T16:10:52Z
+window_open_utc=2026-09-04T16:12:34Z
+streak_start_utc=2026-09-04T16:12:34Z
+ready_utc=2026-09-04T16:13:35Z continuous_200_seconds>=60
+RESULT=READY
+{"ok": true, "mode": "live", "freshness": {"db_generation": 252, "serving_generation": 252, "index_current": true, "engine_snapshot": "4c97f9f9a8b23964d2655b76662ac007634ad8a51c4fc4c8a04b931990a300ec"}}
