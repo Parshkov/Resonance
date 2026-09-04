@@ -415,9 +415,91 @@ function selectMatch(sessionId) {
   renderEvidence(match);
 }
 
+// Everything below is owned by a rendered discovery result. Whenever a result
+// stops being on screen — a failure, or a successful discovery in which nothing
+// cleared the resonance bar — ALL of it has to go. Clearing only the match list
+// used to leave the previous source's evidence, mapping rows, drawer contents,
+// contradiction card and response counts on screen next to the new source's
+// message, which reads as evidence for a result that was never returned.
+function clearResults() {
+  state.payload = null;
+  state.primary = [];
+  state.selectedSessionId = null;
+
+  document.getElementById("match-list")?.replaceChildren();
+  setText("shown-count", "00 shown");
+
+  setText("evidence-kicker", "Evidence");
+  setText("metric-class", "—");
+  setText("metric-structural", "—");
+  setText("metric-confidence", "—");
+  document.getElementById("mapping-list")?.replaceChildren();
+  document.getElementById("relation-chips")?.replaceChildren();
+  setText("proof-note", "No frontend matching or score calculation.");
+
+  document.getElementById("connection-layer")?.replaceChildren();
+  document.getElementById("marker-layer")?.replaceChildren();
+  const unlocated = document.getElementById("unlocated-anchor");
+  if (unlocated) unlocated.hidden = true;
+  document.getElementById("map-status")?.classList.remove("is-loading");
+
+  const card = document.getElementById("contradiction-card");
+  if (card) card.hidden = true;
+
+  setText("secondary-count", "0");
+  const trigger = document.getElementById("secondary-trigger");
+  if (trigger) trigger.disabled = true;
+  document.getElementById("drawer-matches")?.replaceChildren();
+  document.getElementById("drawer-rejected")?.replaceChildren();
+
+  setText("snapshot-short", "—");
+  const snapshot = document.getElementById("snapshot-button");
+  if (snapshot) {
+    snapshot.disabled = true;
+    snapshot.title = "";
+  }
+}
+
+// A discovery that returns candidates but none that clear the resonance bar is
+// a real, correct answer — the backend refusing to advertise a false analogy —
+// not a failure. It gets its own state and its own honest counts instead of
+// being reported through the error path.
+function renderEmpty(payload) {
+  clearResults();
+  state.payload = payload;
+  const rejected = visibleRejected(payload);
+  renderContradictions(rejected);
+  renderDrawer(visibleOtherMatches(payload, []), rejected);
+  setText("response-summary", `${payload.matches.length} returned · 0 resonances · ${payload.rejected.length} rejected`);
+  setText("evidence-kicker", "No resonance in this corpus");
+  setText("evidence-heading", "Nothing cleared the resonance bar");
+  setText("evidence-subtitle",
+    `${payload.matches.length} candidate${payload.matches.length === 1 ? "" : "s"} came back and every one was refused as a resonance. `
+    + "Open \u201cOther returned results\u201d to inspect them.");
+  setText("map-status-text", "0 resonances · every returned candidate was refused");
+
+  const snapshotValue = payload.query?.provenance?.corpus_snapshot;
+  if (snapshotValue) {
+    setText("snapshot-short", shortSnapshot(snapshotValue));
+    const button = document.getElementById("snapshot-button");
+    if (button) {
+      button.disabled = false;
+      button.title = snapshotValue;
+    }
+  }
+  setText("source-note", state.source === "live"
+    ? "LIVE · accepted discover_resonance MCP path · no match passed the threshold"
+    : "REPLAY · genuine accepted R8 fixture · no match passed the threshold");
+  setText("runtime-badge", state.source === "live" ? "Accepted MCP · local" : "Deterministic · offline");
+  document.getElementById("app-shell").dataset.state = "empty";
+}
+
 function renderDiscovery(payload) {
   const primary = selectPrimaryMatches(payload);
-  if (!primary.length) throw new Error("No eligible resonances were returned for this thought");
+  if (!primary.length) {
+    renderEmpty(payload);
+    return;
+  }
   state.payload = payload;
   state.primary = primary;
   state.selectedSessionId = primary[0].session_id;
@@ -457,11 +539,10 @@ function setSourceControls(source, loading = false) {
 
 function showError(error) {
   document.getElementById("app-shell").dataset.state = "error";
-  // Never leave the previous source's cards/evidence on screen next to an
-  // error for the current one.
-  document.getElementById("match-list")?.replaceChildren();
-  state.primary = [];
-  state.selectedSessionId = null;
+  // Never leave the previous source's cards, evidence, drawer, counts or map on
+  // screen next to an error for the current one.
+  clearResults();
+  setText("response-summary", "—");
   setText("evidence-heading", "No resonance to show");
   setText("evidence-subtitle", error.message);
   setText("map-status-text", `Discovery unavailable: ${error.message}`);
