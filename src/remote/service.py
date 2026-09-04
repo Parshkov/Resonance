@@ -70,7 +70,20 @@ class RemoteProductService:
     def prepare(self, bearer: str, *, candidate=None, context=None,
                 presentation=None, coarse_location=None, intent=None) -> dict[str, Any]:
         share_intent = ShareIntent(**intent) if isinstance(intent, dict) else None
-        common = dict(presentation=presentation or {},
+        # Integration delta (R16 review of the exact head): a real chat passing
+        # only `context` prepared fine but could never share — the durable
+        # projection requires exactly {topic, domain, cluster_id}. Fill the
+        # missing fields from whatever the caller gave so the raw-text path is
+        # usable end to end; explicit values always win.
+        given = dict(presentation or {})
+        topic = str(given.get("topic") or (str(context).strip().split("\n", 1)[0][:120]
+                                             if context else "") or "Shared thought")
+        domain = str(given.get("domain") or "general")
+        cluster = str(given.get("cluster_id") or
+                      "".join(ch if ch.isalnum() else "-" for ch in topic.lower()).strip("-")[:48]
+                      or "shared")
+        presentation = {**given, "topic": topic, "domain": domain, "cluster_id": cluster}
+        common = dict(presentation=presentation,
                       coarse_location=coarse_location, intent=share_intent, **_AGENT_CTX)
         if (candidate is None) == (context is None):
             raise IngestionError("provide exactly one of candidate or context")
