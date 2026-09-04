@@ -291,6 +291,8 @@ TOOLS: list[dict[str, Any]] = [
             "deterministic cue extractor, with no model in the loop; contact details are scrubbed. Pass "
             "`thought` (a labelled causal graph you extracted) only when the text carries no explicit "
             "connectives (because, leads to, prevents, requires, ...). Nothing becomes discoverable. "
+            "Pass `topic` (and `domain`) so other people see what the thought is about instead of "
+            "the placeholder \"Shared thought\"; both are presentation only and never affect matching. "
             "The result includes the exact preview of what WOULD be shared and a one-time "
             "confirmation_token. Show the preview to the person and ask for explicit approval "
             "before calling resonance_share_thought."),
@@ -300,6 +302,14 @@ TOOLS: list[dict[str, Any]] = [
                 "thought": THOUGHT_SCHEMA,
                 "context": {"type": "string", "maxLength": 4000,
                             "description": "The person's own words; extracted deterministically (preferred)."},
+                "topic": {"type": "string", "maxLength": 120,
+                          "description": "Short human-readable name for this thought, shown to other people in "
+                                         "discovery results (e.g. 'Retry storm overloads delivery queue'). "
+                                         "Never personal data. Defaults to thought.topic, else 'Shared thought'."},
+                "domain": {"type": "string", "maxLength": 60,
+                           "description": "Field this thought belongs to (e.g. 'distributed-systems'). "
+                                          "Presentation only: it never influences matching or scores. "
+                                          "Defaults to thought.domain, else 'general'."},
                 "receive_intro_requests": {
                     "type": "boolean", "default": True,
                     "description": "Whether other people may request an introduction (default true)."},
@@ -571,10 +581,17 @@ class RemoteMCPBridge:
             receive_intro_requests=arguments.get("receive_intro_requests", True) is not False,
         )
         # The durable projection requires exactly {topic, domain, cluster_id};
-        # derive sensible values from what the chat provided.
-        topic = (str(thought.get("topic") or "").strip() if isinstance(thought, Mapping) else "") \
+        # derive sensible values from what the chat provided. An explicit
+        # topic/domain argument wins, then the graph's own fields; only then the
+        # placeholder. Without the arguments the `context` path — the one this
+        # tool tells callers to prefer — had no way to name the thought at all,
+        # so every raw-text share was displayed as "Shared thought" in domain
+        # "general" and collapsed into one cluster.
+        topic = str(arguments.get("topic") or "").strip() \
+            or (str(thought.get("topic") or "").strip() if isinstance(thought, Mapping) else "") \
             or "Shared thought"
-        domain = (str(thought.get("domain") or "").strip() if isinstance(thought, Mapping) else "") \
+        domain = str(arguments.get("domain") or "").strip() \
+            or (str(thought.get("domain") or "").strip() if isinstance(thought, Mapping) else "") \
             or "general"
         presentation = {"topic": topic[:120], "domain": domain[:60],
                         "cluster_id": (_slug(topic) or "shared")[:48]}

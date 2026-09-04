@@ -342,6 +342,23 @@ class RemoteMCPHttpTests(unittest.TestCase):
                        "A review SLA prevents the pile-up."})
         self.assertFalse(err3, prep2)
         self.assertNotEqual(prep2["draft_id"], prep["draft_id"])
+        # the `context` path can name the thought: without topic/domain every
+        # raw-text share was displayed as the placeholder "Shared thought" in
+        # domain "general" and collapsed into a single cluster.
+        err4, named = chat.call("resonance_prepare_thought", {
+            "context": "Slow code review causes merge queue pile-up, which leads to release delays. "
+                       "A review SLA prevents the pile-up.",
+            "topic": "Merge queue pile-up from slow review",
+            "domain": "release-engineering"})
+        self.assertFalse(err4, named)
+        presentation = named["will_become_discoverable"]["presentation"]
+        self.assertEqual(presentation["topic"], "Merge queue pile-up from slow review")
+        self.assertEqual(presentation["domain"], "release-engineering")
+        self.assertEqual(presentation["cluster_id"], "merge-queue-pile-up-from-slow-review")
+        # and the placeholder is still what an unnamed raw-text share gets
+        self.assertEqual(prep["will_become_discoverable"]["presentation"],
+                         {"topic": "Shared thought", "domain": "general",
+                          "cluster_id": "shared-thought"})
         bad = chat.rpc("tools/call", {"name": "resonance_nope", "arguments": {}})
         self.assertEqual(bad["error"]["code"], -32602)
         unknown = chat.rpc("frobnicate")

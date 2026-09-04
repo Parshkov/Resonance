@@ -63,6 +63,17 @@ def main() -> int:
     ap.add_argument("origin")
     ap.add_argument("--out", required=True)
     ap.add_argument("--exe", default=os.environ.get("CHROME_EXE"))
+    # Some runners (sandboxed CI, an agent container) reach the public internet
+    # only through an HTTP proxy. Chromium does not read HTTPS_PROXY on its own,
+    # so pass it through; the origin under test is public either way.
+    ap.add_argument("--proxy", default=os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy"),
+                    help="HTTP proxy for the browser (default: $HTTPS_PROXY); pass '' to force a direct connection")
+    # Escape hatch for constrained runners. Certificate verification is never
+    # disabled here and must not be: only add flags that change transport, e.g.
+    # --browser-arg=--ssl-version-max=tls1.2 when an egress relay cannot carry
+    # a TLS 1.3 handshake.
+    ap.add_argument("--browser-arg", action="append", default=[], dest="browser_args",
+                    help="extra Chromium flag (repeatable); never use it to disable certificate checks")
     args = ap.parse_args()
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     ev = {"origin": args.origin, "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "steps": []}
@@ -74,9 +85,11 @@ def main() -> int:
         return bool(cond)
 
     with sync_playwright() as p:
-        launch = {"args": ["--enable-features=WebMCP,WebMCPTesting"]}
+        launch = {"args": ["--enable-features=WebMCP,WebMCPTesting", *args.browser_args]}
         if args.exe:
             launch["executable_path"] = args.exe
+        if args.proxy:
+            launch["proxy"] = {"server": args.proxy}
         # 1) native probe: no shim
         b = p.chromium.launch(**launch)
         pg = b.new_page(viewport={"width": 1440, "height": 900})
