@@ -340,6 +340,29 @@ class ProbeSelfTest(unittest.TestCase):
                 got = failed_ids(rep)
                 self.assertTrue(expected <= got, f"{defect}: expected {expected} in failures, got {got}")
 
+    def test_scan_log_flags_leaked_secrets_only(self):
+        import os
+        import tempfile
+        httpd, base = start_double()
+        try:
+            probe = Probe(base, timeout=10)
+            probe.run()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+        secret = probe.redact._secrets[0][0]
+        with tempfile.TemporaryDirectory() as d:
+            clean, dirty = os.path.join(d, "clean.log"), os.path.join(d, "dirty.log")
+            with open(clean, "w") as fh:
+                fh.write("GET /oauth/authorize 200\nPOST /oauth/token 200\n")
+            with open(dirty, "w") as fh:
+                fh.write(f"DEBUG issued code={secret}\n")
+            probe.scan_log(clean)
+            probe.scan_log(dirty)
+        e7 = [s for s in probe.steps if s.id == "E7"]
+        self.assertEqual([s.status for s in e7], ["PASS", "FAIL"])
+        self.assertNotIn(secret, json.dumps(probe.report()))
+
     def test_www_authenticate_parser(self):
         p = parse_www_authenticate('Bearer realm="x", resource_metadata="https://h/.well-known/oauth-protected-resource/mcp", error=invalid_token')
         self.assertEqual(p["resource_metadata"], "https://h/.well-known/oauth-protected-resource/mcp")

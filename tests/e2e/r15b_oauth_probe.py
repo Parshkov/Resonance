@@ -1006,6 +1006,18 @@ class Probe:
         self.step_no_leakage()
         return self.report()
 
+    def scan_log(self, path: str) -> None:
+        """Server-side leak check: scan a captured server log for any secret the probe handled."""
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError as exc:
+            self._skip("E7", "server log contains no secret material", f"cannot read {path}: {exc}")
+            return
+        found = self.redact.leaks(text)
+        self._rec("E7", "server log contains no secret material (codes/verifiers/tokens)", not found,
+                  f"{path}: {len(text)} bytes scanned; leaked kinds={found}" if found else f"{path}: {len(text)} bytes scanned")
+
     def report(self) -> dict[str, Any]:
         counts = {k: sum(1 for s in self.steps if s.status == k) for k in ("PASS", "FAIL", "SKIP", "INFO")}
         return {"probe": PROBE_VERSION, "target": self.base, "resource": self.resource,
@@ -1025,12 +1037,17 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scope", default="offline_access")
     ap.add_argument("--timeout", type=float, default=15.0)
     ap.add_argument("--report", default=None, help="write the JSON report here (also printed)")
+    ap.add_argument("--scan-log", default=None, metavar="PATH",
+                    help="after the run, scan this captured server log for any secret the probe handled")
     a = ap.parse_args(argv)
     overrides = dict(kv.split("=", 1) for kv in a.consent if "=" in kv)
     probe = Probe(a.base, client_id=a.client_id, redirect_uri=a.redirect_uri,
                   consent_overrides=overrides, timeout=a.timeout, scope=a.scope or None)
     try:
-        rep = probe.run()
+        probe.run()
+        if a.scan_log:
+            probe.scan_log(a.scan_log)
+        rep = probe.report()
     except URLError as exc:
         rep = probe.report()
         rep["verdict"] = "FAIL"
