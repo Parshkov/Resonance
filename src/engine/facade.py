@@ -39,6 +39,11 @@ RETRIEVAL_OVERFETCH = 4
 MIN_VERIFY_POOL = 24
 
 
+def _tie_key(hit: ResonanceHit):
+    return (round(hit.verification.components.structural, 6),
+            round(hit.candidate.channel_scores.get("primary", 0.0), 6))
+
+
 def _verified_sort_key(hit: ResonanceHit):
     v = hit.verification
     rejected = 1 if v.hard_rejection else 0
@@ -152,7 +157,17 @@ class ResonanceEngine:
             hits.append(ResonanceHit(candidate=self._flag_synced(candidate, verification),
                                      verification=verification))
         ordered = sorted(hits, key=_verified_sort_key)
-        kept = [h for h in ordered if not h.verification.hard_rejection][:k]
+        accepted = [h for h in ordered if not h.verification.hard_rejection]
+        kept = accepted[:k]
+        # Competition ties at the k boundary are not truncated by name: a
+        # candidate whose verified and retrieval scores equal the k-th one is
+        # returned too (same policy as the index's TIE_POLICY).
+        if len(accepted) > k:
+            boundary = _tie_key(kept[-1])
+            for extra in accepted[k:]:
+                if _tie_key(extra) != boundary:
+                    break
+                kept.append(extra)
         rejected = [h for h in ordered if h.verification.hard_rejection
                     and retrieval_position.get(h.candidate.candidate_id, pool + 1) <= k]
         return tuple(kept + rejected)

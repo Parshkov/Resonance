@@ -5,7 +5,7 @@ Channels, all deterministic and model-free:
 * ``structural`` -- label-free D0/D1 landmark-pair keys (same skeleton).
 * ``concept``    -- (role, abstract concept) landmark keys from the lexicon
                     (same abstract notions in the same arrangement).
-* ``content``    -- BM25-style stem overlap over labels and source text
+* ``content``    -- BM25-style stem overlap over node labels
                     (same words).
 * ``knowledge``  -- Knowledge DNA ``about``/``requires`` overlap.
 
@@ -155,7 +155,10 @@ class InvertedCandidateIndex:
         for thought_id, graph in graphs.items():
             structural.add(thought_id, fingerprints(graph, "MULTI"))
             concept.add(thought_id, concept_fingerprints(graph))
-            bag: Counter[str] = Counter(_tokens(graph.source.text, *(node.label for node in graph.nodes)))
+            # Labels only: shared user graphs never carry source text (it is
+            # removed on share), so scoring source text would favour seeded
+            # fixtures over people.
+            bag: Counter[str] = Counter(_tokens(*(node.label for node in graph.nodes)))
             content_tf[thought_id] = bag
             content_len[thought_id] = sum(bag.values())
             for term, tf in bag.items():
@@ -285,7 +288,7 @@ class InvertedCandidateIndex:
 
     def _content_query(self, graph: ThoughtGraph) -> dict[str, float]:
         """BM25 over stems, normalised by the query's self-score so values lie in [0, 1]."""
-        query_bag = Counter(_tokens(graph.source.text, *(node.label for node in graph.nodes)))
+        query_bag = Counter(_tokens(*(node.label for node in graph.nodes)))
         k1, b = 1.2, 0.75
         scores: dict[str, float] = defaultdict(float)
 
