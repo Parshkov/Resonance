@@ -90,6 +90,20 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertEqual(payload["error"], "share_required")
         self.assertIn("resonance_prepare_thought", payload["message"])
 
+    def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
+        # R17 acceptance finding: the first thing a judge does on the card is a
+        # read through the page tool; an unshared visitor must get a mapped
+        # product state (409 share_required), not "unexpected product error".
+        client = Client(self.base)
+        client.guest()
+        for source in ("replay", "live"):
+            with self.assertRaises(HTTPError) as ctx:
+                client.request("GET", f"/api/webmcp/discover?source={source}")
+            self.assertEqual(ctx.exception.code, 409, source)
+            payload = json.loads(ctx.exception.read().decode())
+            self.assertEqual(payload["error"], "share_required")
+            self.assertIn("resonance_prepare_thought", payload["message"])
+
     def test_webmcp_prepare_preview_share_live_discover_updates_same_product(self):
         client = Client(self.base)
         client.guest()

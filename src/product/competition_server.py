@@ -249,6 +249,20 @@ class CompetitionHandler(ProductHandler):
         self.bridge.remember(subject, operation, request_id, fingerprint, result)
         self._send_json(dict(result))
 
+    def _send_share_required(self) -> None:
+        # A visitor who has not shared a thought is a product state, not a
+        # server fault: the WebMCP discover tool used to raise an unmapped
+        # PermissionError here and surface as a 500 "unexpected product error"
+        # on the very first read a judge makes (release-blocker found during
+        # R17 acceptance; same mapping the R9 /api/discover view already uses).
+        self._send_json(
+            {"error": "share_required",
+             "message": "discovery needs a shared thought first: run "
+                        "resonance_prepare_thought → resonance_get_share_preview → "
+                        "resonance_share_prepared_thought (explicit confirm), then "
+                        "resonance_discover again."},
+            HTTPStatus.CONFLICT)
+
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 
@@ -369,7 +383,8 @@ class CompetitionHandler(ProductHandler):
             source = (params.get("source") or ["live"])[0]
             if source == "replay":
                 if not _has_shared(product, token):
-                    raise PermissionError("current thought is private; sharing consent is required")
+                    self._send_share_required()
+                    return
                 payload = load_replay()
                 result_id = self.bridge.remember_replay(payload)
                 self._send_json({
@@ -385,7 +400,8 @@ class CompetitionHandler(ProductHandler):
                 raise ValueError("source must be replay or live")
             session_id = _owned_live_session(product, token)
             if not session_id:
-                raise PermissionError("current thought is private; sharing consent is required")
+                self._send_share_required()
+                return
             live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K,
                                     client_id="live-browser-webmcp")
             self._send_json({
