@@ -15,7 +15,7 @@ sys.path.insert(0, str(REPO))
 from src.product import server as product_server  # noqa: E402
 from src.product.mcp_bridge import build_thought_dna  # noqa: E402
 from src.product.server import build_runtime, serve  # noqa: E402
-from src.remote.oauth import GrantStore, OAuthCore  # noqa: E402
+from src.remote.oauth import GrantStore, OAuthCore, OAuthError  # noqa: E402
 
 
 class RegistrationLimitTests(unittest.TestCase):
@@ -67,6 +67,27 @@ class AudienceBindingTests(unittest.TestCase):
                                  "client_id": "c", "expires": 9e12})
         self.assertIsNone(core.resolve_bearer(token, resource="http://127.0.0.1/mcp"))
         self.assertEqual(core.resolve_bearer(token, resource="https://other.example/mcp"), token)
+
+    def test_token_response_fails_closed_when_audience_record_cannot_persist(self):
+        class BrokenAudienceStore(GrantStore):
+            def put_access(self, token, record):
+                raise RuntimeError("storage unavailable")
+
+        runtime = build_runtime(
+            ":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False
+        )
+        core = OAuthCore(runtime.identity, BrokenAudienceStore())
+        creds = runtime.identity.register_guest(actor_type="agent")
+
+        with self.assertRaisesRegex(OAuthError, "could not bind access token"):
+            core._token_response(
+                creds.access_token,
+                "resonance",
+                "http://127.0.0.1/mcp",
+                "client-test",
+            )
+        with self.assertRaises(Exception):
+            runtime.identity.authenticate(creds.access_token)
 
 
 class DemoPersonaAndScrubTests(unittest.TestCase):

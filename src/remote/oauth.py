@@ -258,15 +258,6 @@ class RepositoryGrantStore(GrantStore):
         record = self.repository.get_grant(self.KIND_ACCESS, _hash(token))
         return dict(record) if record is not None else None
 
-    # -- access-token audience records -----------------------------------
-    def put_access(self, token: str, record: Mapping[str, Any]) -> None:
-        self.repository.put_grant(self.KIND_ACCESS, _hash(token), dict(record),
-                                  user_id=record.get("user_id"), expires_at=record.get("expires"))
-
-    def get_access(self, token: str) -> dict[str, Any] | None:
-        record = self.repository.get_grant(self.KIND_ACCESS, _hash(token))
-        return dict(record) if record is not None else None
-
     # -- clients --------------------------------------------------------
     def put_client(self, client_id: str, record: Mapping[str, Any]) -> None:
         self.repository.put_grant(self.KIND_CLIENT, client_id, dict(record))
@@ -638,8 +629,18 @@ class OAuthCore:
                     "user_id": owner.user_id, "resource": resource, "client_id": client_id,
                     "expires": self.clock() + DEFAULT_TOKEN_TTL,
                 })
-            except Exception:  # noqa: BLE001 -- audience record is best effort
-                pass
+            except Exception as exc:  # noqa: BLE001 -- transport returns an OAuth error
+                # Never return an OAuth-issued token unless its audience record
+                # was committed.  Otherwise a transient grant-store failure
+                # would silently downgrade RFC 8707 enforcement to the legacy
+                # unbound manual-key path.
+                try:
+                    self.identity.logout(access_token)
+                except Exception:  # noqa: BLE001 -- best-effort cleanup only
+                    pass
+                raise OAuthError(
+                    "server_error", "could not bind access token to the requested resource", 500
+                ) from exc
         if SCOPE_OFFLINE in scope.split():
             actor = self.identity.authenticate(access_token)
             refresh = secrets.token_urlsafe(32)
