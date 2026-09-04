@@ -59,7 +59,9 @@ git diff --check
 python3 -m demo.ui.webmcp_server --source replay
 ```
 
-Then open `http://127.0.0.1:8765/` in a WebMCP-capable browser. For the submitted hosted product, use HTTPS. Follow the judge flow in `demo/ui/README.md` to discover the tools, start private, prepare and preview a thought, explicitly share it with the returned confirmation token, repeat the share with the same `request_id` to prove idempotency, discover structural matches, pass the returned `result_id` into `resonance_get_match`, verify LIVE/REPLAY source fidelity, revoke consent, confirm old results and discovery fail closed, and exercise cancel/reconcile with a stable operation key.
+Then open `http://127.0.0.1:8765/` in a WebMCP-capable browser. For the submitted hosted product, use HTTPS.
+
+**Hosted live product:** `https://resonance-production-cfe3.up.railway.app` — the authenticated R11–R14 stack on PostgreSQL (Railway; see `ops/DEPLOY.md`). The live origin serves the WebMCP tools, the Collaboration panel (intro → accept → private relay messaging) and the product API; the R9 replay visual (`demo/ui/webmcp_server.py`) remains the fixture-backed presentation and runs from the demo server above. Follow the judge flow in `demo/ui/README.md` to discover the tools, start private, prepare and preview a thought, explicitly share it with the returned confirmation token, repeat the share with the same `request_id` to prove idempotency, discover structural matches, pass the returned `result_id` into `resonance_get_match`, verify LIVE/REPLAY source fidelity, revoke consent, confirm old results and discovery fail closed, and exercise cancel/reconcile with a stable operation key.
 
 Native WebMCP acceptance is a separate evidence requirement: the browser/agent must actually discover the six registered tools and invoke at least one read flow plus the write/share/retry flow. Static source inspection alone is not reported as proof of native discovery/invocation.
 
