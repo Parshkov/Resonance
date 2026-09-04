@@ -75,9 +75,11 @@ class RemoteProductService:
         # projection requires exactly {topic, domain, cluster_id}. Fill the
         # missing fields from whatever the caller gave so the raw-text path is
         # usable end to end; explicit values always win.
+        # Defaults never copy raw conversation text into the public
+        # presentation (the projection is discoverable; the source is not
+        # retained), so a context-only share gets neutral labels.
         given = dict(presentation or {})
-        topic = str(given.get("topic") or (str(context).strip().split("\n", 1)[0][:120]
-                                             if context else "") or "Shared thought")
+        topic = str(given.get("topic") or "Shared thought")
         domain = str(given.get("domain") or "general")
         cluster = str(given.get("cluster_id") or
                       "".join(ch if ch.isalnum() else "-" for ch in topic.lower()).strip("-")[:48]
