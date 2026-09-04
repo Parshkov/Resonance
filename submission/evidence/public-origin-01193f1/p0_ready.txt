@@ -1,0 +1,3 @@
+P0 readiness poll for https://resonance-production-cfe3.up.railway.app (start 2026-09-04T15:11:15Z, give up after 600s)
+2026-09-04T15:11:16Z health=200 head_root=200
+READY at 2026-09-04T15:11:16Z
