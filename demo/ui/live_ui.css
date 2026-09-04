@@ -83,6 +83,13 @@
 }
 .collab-input:focus-visible { outline: 1px solid var(--bright); outline-offset: 2px; }
 
+.collab-subhead { margin: 12px 0 4px; color: var(--text-3); font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.collab-code {
+  margin: 0; padding: 8px 10px; overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 10px;
+  background: var(--canvas-raised); color: var(--text-2); font-family: var(--mono); font-size: 10px; line-height: 1.45;
+  white-space: pre-wrap; word-break: break-all; user-select: all;
+}
+
 /* ---- narrow viewports (audit: horizontal overflow at 390px) ------------ */
 @media (max-width: 760px) {
   .app-shell { padding-inline: 10px; min-height: 0; }
