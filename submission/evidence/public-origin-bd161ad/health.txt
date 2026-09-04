@@ -1,0 +1,4 @@
+Fri Sep  4 06:33:52 UTC 2026
+
+{"ok": true, "mode": "live", "freshness": {"db_generation": 106, "serving_generation": 106, "index_current": true, "engine_snapshot": "f7f839d595712aa5467cc12fd91b19c44ccc944f2f0a415f466b4240f8a05892"}}
+HTTP 200
