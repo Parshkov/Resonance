@@ -1,0 +1,536 @@
+"""Competition/live browser server: accepted WebMCP UX over LiveProductService.
+
+This is a release adapter, not a second product state machine.  The authoritative
+identity, drafts, consent, discovery results, intro/channel state, and corpus all
+remain in the accepted R11-R14 services.  The bridge only translates the R10
+browser wire shape (whose tool schemas were frozen before R13 existed) onto the
+live authenticated product and keeps a tiny per-process operation receipt cache
+for AbortError reconciliation.
+
+REPLAY remains available only as an explicitly labelled presentation fixture.
+LIVE always requires an authenticated, explicitly shared durable session.
+"""
+
+from __future__ import annotations
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import re
+import threading
+from http import HTTPStatus
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+from typing import Any, Mapping
+from urllib.parse import parse_qs
+
+from demo.ui.server import _flagship_session, load_replay, load_replay_bytes, public_context
+from src.ingestion.identity import (
+    INGESTION_DISCARDED,
+    INGESTION_PREPARED,
+    INGESTION_SHARED,
+)
+from src.ingestion.service import ShareIntent
+from src.persistence.errors import PersistenceConflictError
+from src.product.server import (
+    DEFAULT_HOST,
+    DEFAULT_PORT,
+    UI_DIR,
+    ProductHandler,
+    ProductRuntime,
+    _resolve_secret,
+    build_runtime,
+)
+
+WEBMCP_CONTRACT = "resonance-webmcp/0.1"
+REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+WRITE_OPERATIONS = frozenset({"prepare", "share", "consent"})
+CANONICAL_K = 15
+CANONICAL_MODE = "analogical"
+
+
+def _fingerprint(body: Mapping[str, Any]) -> str:
+    semantic = {key: value for key, value in body.items() if key != "request_id"}
+    raw = json.dumps(semantic, sort_keys=True, separators=(",", ":"),
+                     ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _safe_replay_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "session_id": row.get("session_id"),
+        "person_pseudonym": row.get("person_pseudonym"),
+        "mode_classification": row.get("mode_classification"),
+        "hard_rejection": row.get("hard_rejection"),
+        "confidence": row.get("confidence"),
+        "scores": row.get("scores"),
+        "display": row.get("display"),
+        "evidence": row.get("evidence"),
+    }
+
+
+def _replay_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in [*payload.get("matches", []), *payload.get("rejected", [])]:
+        sid = str(row.get("session_id", ""))
+        if not sid or sid in seen:
+            continue
+        if row.get("display", {}).get("share_state") != "discoverable":
+            continue
+        seen.add(sid)
+        result.append(_safe_replay_row(row))
+    return result
+
+
+class LiveWebMCPBridge:
+    """Translation bookkeeping only; no authoritative product state lives here."""
+
+    def __init__(self) -> None:
+        self.lock = threading.RLock()
+        self.operations: dict[tuple[str, str, str], dict[str, Any]] = {}
+        self.replay_results: dict[str, dict[str, Any]] = {}
+
+    def operation(self, subject: str, operation: str,
+                  request_id: str) -> dict[str, Any] | None:
+        with self.lock:
+            return self.operations.get((subject, operation, request_id))
+
+    def remember(self, subject: str, operation: str, request_id: str,
+                 fingerprint: str, result: Mapping[str, Any]) -> None:
+        with self.lock:
+            self.operations[(subject, operation, request_id)] = {
+                "fingerprint": fingerprint,
+                "result": dict(result),
+            }
+
+    def remember_replay(self, payload: Mapping[str, Any]) -> str:
+        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                         ensure_ascii=False).encode("utf-8")
+        result_id = "result-" + hashlib.sha256(b"replay:" + raw).hexdigest()[:24]
+        with self.lock:
+            self.replay_results[result_id] = dict(payload)
+            while len(self.replay_results) > 8:
+                self.replay_results.pop(next(iter(self.replay_results)))
+        return result_id
+
+    def replay(self, result_id: str) -> dict[str, Any] | None:
+        with self.lock:
+            return self.replay_results.get(result_id)
+
+
+def _latest_prepared_draft(product, token: str) -> str | None:
+    actor = product.identity.authenticate(token)
+    states: dict[str, tuple[str, str]] = {}
+    for event in product.identity.backend.list_identity_events():
+        if event.user_id != actor.user_id:
+            continue
+        draft_id = str(event.payload.get("draft_id", ""))
+        if not draft_id:
+            continue
+        if event.event_type == INGESTION_PREPARED:
+            states[draft_id] = ("prepared", event.created_at)
+        elif event.event_type == INGESTION_SHARED:
+            states[draft_id] = ("shared", event.created_at)
+        elif event.event_type == INGESTION_DISCARDED:
+            states[draft_id] = ("discarded", event.created_at)
+    prepared = [(when, draft) for draft, (status, when) in states.items()
+                if status == "prepared"]
+    return max(prepared)[1] if prepared else None
+
+
+def _owned_live_session(product, token: str) -> str | None:
+    rows = product.owned_sessions(token)
+    discoverable = [row for row in rows if row.get("share_state") == "discoverable"]
+    if not discoverable:
+        return None
+    return str(discoverable[-1].get("session_id") or "") or None
+
+
+def _has_shared(product, token: str) -> bool:
+    return _owned_live_session(product, token) is not None
+
+
+def _candidate_for(subject: str, request_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Clone the page's clearly-labelled canonical replay thought for live share.
+
+    The R10 tool schema intentionally takes only request_id/note.  In the browser
+    its input is therefore the current thought already visible on the page.  The
+    live adapter clones that exact page thought with a subject/request-specific
+    thought_id so the live durable row cannot collide with the seeded corpus.
+    """
+    session = copy.deepcopy(_flagship_session())
+    thought = dict(session["thought_dna"])
+    suffix = hashlib.sha256(f"{subject}:{request_id}".encode()).hexdigest()[:16]
+    thought["thought_id"] = f"thought-webmcp-{suffix}"
+    return thought, session
+
+
+def _live_context(product, token: str) -> dict[str, Any] | None:
+    session_id = _owned_live_session(product, token)
+    if not session_id:
+        return None
+    session = product.identity.backend.get_session(session_id)
+    if session is None:
+        return None
+    thought = dict(getattr(session, "thought_dna", {}) or {})
+    presentation = dict(getattr(session, "presentation", {}) or {})
+    location = dict(getattr(session, "location", {}) or {})
+    consent = product.identity.policy_source.session_consent(session_id)
+    context: dict[str, Any] = {
+        "contract_version": "resonance-ui-context/0.1",
+        "active_thought": {
+            "thought_id": thought.get("thought_id", ""),
+            "source": thought.get("source", {"text": "", "sha256": ""}),
+            "nodes": [
+                {"id": n.get("id"), "label": n.get("label"), "role": n.get("role")}
+                for n in thought.get("nodes", [])
+            ],
+            "relations": [
+                {"id": r.get("id"), "source": r.get("source"),
+                 "target": r.get("target"), "type": r.get("type")}
+                for r in thought.get("relations", [])
+            ],
+        },
+        "consent": {"shared_with_resonance": True},
+        "pinned_request": {"mode": CANONICAL_MODE, "k": CANONICAL_K},
+    }
+    if consent.get("share_display_profile"):
+        context["presentation"] = {
+            "topic": presentation.get("topic", "Shared thought"),
+            "domain": presentation.get("domain", ""),
+        }
+    if consent.get("share_coarse_location") and location:
+        context["location"] = location
+    return context
+
+
+def _legacy_discovery(live: Mapping[str, Any]) -> dict[str, Any]:
+    """R8 presentation shape; rank/score/evidence are not recomputed."""
+    return {
+        "contract_version": live.get("discovery_contract") or "resonance-discovery/0.1",
+        "query": live.get("query", {}),
+        "matches": list(live.get("matches", [])),
+        "rejected": list(live.get("rejected", [])),
+    }
+
+
+class CompetitionHandler(ProductHandler):
+    bridge: LiveWebMCPBridge
+
+    def _subject(self, token: str) -> str:
+        return self.runtime.product.identity.authenticate(token).user_id
+
+    def _request_id(self, body: Mapping[str, Any]) -> str:
+        request_id = body.get("request_id")
+        if not isinstance(request_id, str) or not REQUEST_ID_RE.fullmatch(request_id):
+            raise ValueError("request_id must be 1-128 characters from A-Z a-z 0-9 _ . : -")
+        return request_id
+
+    def _operation_start(self, token: str, operation: str,
+                         body: Mapping[str, Any]):
+        request_id = self._request_id(body)
+        subject = self._subject(token)
+        fingerprint = _fingerprint(body)
+        existing = self.bridge.operation(subject, operation, request_id)
+        if existing is not None:
+            if existing["fingerprint"] != fingerprint:
+                raise PersistenceConflictError(
+                    "request_id was already used with different input")
+            return subject, request_id, fingerprint, dict(existing["result"])
+        return subject, request_id, fingerprint, None
+
+    def _operation_finish(self, subject: str, operation: str, request_id: str,
+                          fingerprint: str, result: Mapping[str, Any]) -> None:
+        self.bridge.remember(subject, operation, request_id, fingerprint, result)
+        self._send_json(dict(result))
+
+    def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
+        product = self.runtime.product
+
+        # The accepted R9 app remains unchanged. These three routes translate
+        # its presentation contract to the live product without any shadow DB.
+        if path == "/api/config":
+            self._send_json({"default_source": "replay", "live_product": True})
+            return
+        if path == "/api/context":
+            try:
+                token = self._token()
+                context = _live_context(product, token)
+            except Exception:
+                context = None
+            self._send_json(context or public_context())
+            return
+        if path == "/api/discover":
+            source = (params.get("source") or ["replay"])[0]
+            if source == "replay":
+                self._send_bytes(load_replay_bytes(), "application/json; charset=utf-8")
+                return
+            if source != "live":
+                raise ValueError("source must be replay or live")
+            token = self._token()
+            session_id = _owned_live_session(product, token)
+            if not session_id:
+                raise PermissionError("share the current thought before LIVE discovery")
+            live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K)
+            self._send_json(_legacy_discovery(live))
+            return
+
+        # Serve a live implementation of the *same* accepted R10 tool names.
+        # Legacy demo server still serves demo/ui/webmcp.mjs unchanged.
+        if path == "/webmcp.mjs":
+            self._send_bytes((UI_DIR / "webmcp_live.mjs").read_bytes(),
+                             "text/javascript; charset=utf-8")
+            return
+
+        if path == "/api/webmcp/state":
+            try:
+                token = self._token()
+                product.identity.authenticate(token)
+            except Exception:
+                self._send_json({
+                    "contract_version": WEBMCP_CONTRACT,
+                    "draft_ready": False, "draft_id": None, "shared": False,
+                    "authenticated": False,
+                })
+                return
+            draft_id = _latest_prepared_draft(product, token)
+            self._send_json({
+                "contract_version": WEBMCP_CONTRACT,
+                "draft_ready": draft_id is not None,
+                "draft_id": draft_id,
+                "shared": _has_shared(product, token),
+                "authenticated": True,
+                "freshness": product.freshness(),
+            })
+            return
+
+        if path == "/api/webmcp/operation":
+            token = self._token()
+            subject = self._subject(token)
+            operation = (params.get("operation") or [""])[0]
+            request_id = (params.get("request_id") or [""])[0]
+            if operation not in WRITE_OPERATIONS or not REQUEST_ID_RE.fullmatch(request_id):
+                raise ValueError("valid operation and request_id are required")
+            record = self.bridge.operation(subject, operation, request_id)
+            if record is None:
+                self._send_json({
+                    "error": "operation_not_committed",
+                    "message": "no committed result exists for this operation key",
+                    "retryable": True,
+                }, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json({
+                "contract_version": WEBMCP_CONTRACT,
+                "operation": operation,
+                "request_id": request_id,
+                "committed": True,
+                "result": record["result"],
+            })
+            return
+
+        if path == "/api/webmcp/preview":
+            token = self._token()
+            draft_id = _latest_prepared_draft(product, token)
+            if not draft_id:
+                raise PersistenceConflictError("no prepared private draft exists")
+            preview = product.preview(token, draft_id, client_id="live-browser-webmcp")
+            self._send_json({
+                "contract_version": WEBMCP_CONTRACT,
+                "draft_id": draft_id,
+                "confirmation_token": preview["confirmation_token"],
+                "will_become_discoverable": {
+                    "thought": preview.get("thought_dna"),
+                    "presentation": preview.get("presentation"),
+                    "location": preview.get("coarse_location"),
+                },
+                "currently_shared": _has_shared(product, token),
+                "requires_explicit_confirmation": True,
+                "source_retention": preview.get("source_retention", "not_retained"),
+            })
+            return
+
+        if path == "/api/webmcp/discover":
+            token = self._token()
+            source = (params.get("source") or ["live"])[0]
+            if source == "replay":
+                if not _has_shared(product, token):
+                    raise PermissionError("current thought is private; sharing consent is required")
+                payload = load_replay()
+                result_id = self.bridge.remember_replay(payload)
+                self._send_json({
+                    "contract_version": WEBMCP_CONTRACT,
+                    "result_id": result_id,
+                    "source": "replay",
+                    "discovery_contract": payload.get("contract_version"),
+                    "query": payload.get("query", {}),
+                    "matches_in_backend_order": _replay_rows(payload),
+                })
+                return
+            if source != "live":
+                raise ValueError("source must be replay or live")
+            session_id = _owned_live_session(product, token)
+            if not session_id:
+                raise PermissionError("current thought is private; sharing consent is required")
+            live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K,
+                                    client_id="live-browser-webmcp")
+            self._send_json({
+                "contract_version": WEBMCP_CONTRACT,
+                "result_id": live["result_id"],
+                "source": "live",
+                "discovery_contract": live.get("discovery_contract"),
+                "query": live.get("query", {}),
+                "matches_in_backend_order": list(live.get("matches", [])),
+                "aggregation": live.get("aggregation", {}),
+                "freshness": live.get("freshness", {}),
+                "location_note": live.get("location_note", ""),
+            })
+            return
+
+        if path == "/api/webmcp/match":
+            result_id = (params.get("result_id") or [""])[0]
+            session_id = (params.get("session_id") or [""])[0]
+            replay = self.bridge.replay(result_id)
+            if replay is not None:
+                row = next((row for row in _replay_rows(replay)
+                            if row.get("session_id") == session_id), None)
+                if row is None:
+                    self._send_json({"error": "not_found",
+                                     "message": "match not present in replay result"},
+                                    HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"contract_version": WEBMCP_CONTRACT,
+                                 "result_id": result_id, "source": "replay",
+                                 "match": row})
+                return
+            token = self._token()
+            result = product.get_match(token, result_id, session_id)
+            self._send_json({"contract_version": WEBMCP_CONTRACT,
+                             "result_id": result_id, "source": "live",
+                             "freshness": result.get("freshness"),
+                             "match": result["match"]})
+            return
+
+        super()._route_get(path, params)
+
+    def _route_post(self, path: str) -> None:
+        if path not in {"/api/webmcp/prepare", "/api/webmcp/share",
+                        "/api/webmcp/consent"}:
+            super()._route_post(path)
+            return
+
+        product = self.runtime.product
+        token = self._token()
+        body = self._body()
+        operation = path.rsplit("/", 1)[-1]
+        subject, request_id, fingerprint, replay = self._operation_start(
+            token, operation, body)
+        if replay is not None:
+            self._send_json(replay)
+            return
+        security = self._security_kwargs()
+        security["client_id"] = "live-browser-webmcp"
+
+        if operation == "prepare":
+            candidate, source = _candidate_for(subject, request_id)
+            result = product.prepare_structured(
+                token, candidate,
+                presentation=dict(source.get("presentation") or {}),
+                coarse_location=None,
+                intent=ShareIntent(
+                    share_display_profile=True,
+                    share_coarse_location=False,
+                    receive_intro_requests=True,
+                ),
+                **security,
+            )
+            wire = {
+                "contract_version": WEBMCP_CONTRACT,
+                "draft_id": result["draft_id"],
+                "session_id": result.get("session_id"),
+                "discoverable": False,
+                "source_retention": result.get("source_retention", "not_retained"),
+                "input_kind": result.get("input_kind"),
+                "next_step": "Preview exactly what will be shared, then confirm.",
+            }
+            self._operation_finish(subject, operation, request_id, fingerprint, wire)
+            return
+
+        if operation == "share":
+            if body.get("confirm") is not True:
+                raise ValueError("confirm=true is required after preview")
+            draft_id = _latest_prepared_draft(product, token)
+            if not draft_id:
+                raise PersistenceConflictError("no prepared private draft exists")
+            result = product.share_prepared(
+                token, draft_id,
+                confirmation_token=str(body.get("confirmation_token", "")),
+                confirmed=True, **security,
+            )
+            wire = {
+                "contract_version": WEBMCP_CONTRACT,
+                "draft_id": draft_id,
+                "session_id": result.get("session_id"),
+                "shared": True,
+                "discoverable": True,
+            }
+            self._operation_finish(subject, operation, request_id, fingerprint, wire)
+            return
+
+        # R10 consent tool is intentionally revoke-only unless already shared.
+        shared = body.get("shared") is True
+        session_id = _owned_live_session(product, token)
+        if shared:
+            if not session_id:
+                raise PersistenceConflictError(
+                    "restoring sharing requires prepare, preview, and explicit share")
+            wire = {"contract_version": WEBMCP_CONTRACT,
+                    "session_id": session_id, "shared": True,
+                    "revoked": False, "discoverable": True}
+        else:
+            if session_id:
+                product.revoke_session(token, session_id, confirmed=True, **security)
+            wire = {"contract_version": WEBMCP_CONTRACT,
+                    "session_id": session_id, "shared": False,
+                    "revoked": True, "discoverable": False}
+        self._operation_finish(subject, operation, request_id, fingerprint, wire)
+
+
+def serve(host: str, port: int, *, runtime: ProductRuntime) -> ThreadingHTTPServer:
+    bridge = LiveWebMCPBridge()
+    handler = type("BoundCompetitionHandler", (CompetitionHandler,),
+                   {"runtime": runtime, "bridge": bridge})
+    return ThreadingHTTPServer((host, port), handler)
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Resonance competition server: live product + browser WebMCP")
+    parser.add_argument("--host", default=DEFAULT_HOST)
+    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument("--db", default="live-product.sqlite3")
+    parser.add_argument("--origin", action="append", default=None)
+    parser.add_argument("--secret-file", default=None)
+    parser.add_argument("--no-seed", action="store_true")
+    args = parser.parse_args(argv)
+    origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
+    try:
+        secret = _resolve_secret(args.secret_file, os.environ, args.db)
+    except ValueError as exc:
+        parser.error(str(exc))
+    runtime = build_runtime(args.db, allowed_origins=origins,
+                            confirmation_secret=secret,
+                            seed=not args.no_seed)
+    server = serve(args.host, args.port, runtime=runtime)
+    print(f"competition product on http://{args.host}:{args.port} "
+          f"(origins: {sorted(origins)}; db: {args.db}; mode: LIVE+WebMCP)")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.shutdown()
+
+
+if __name__ == "__main__":
+    main()
