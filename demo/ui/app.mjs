@@ -129,8 +129,13 @@ function renderContext(context) {
   setText("user-message", `I keep seeing ${nodes[0]?.label} trigger ${mechanism}, until ${outcome || "the system destabilizes"}. Could ${method || "a control loop"} interrupt it?`);
   setText("agent-message", "Shared with Resonance. I’ll compare only the consented structural trace and coarse synthetic location.");
 
-  const consent = document.getElementById("header-consent");
-  consent.replaceChildren(el("span", "status-light"), el("span", "", "Shared with Resonance"));
+  // On the live product the header pill reflects the visitor's real consent
+  // state (owned by webmcp_live.mjs); the replay narrative must not label a
+  // fresh, never-shared guest as "Shared with Resonance".
+  if (window.__resonanceWebMCP?.mode !== "live-product") {
+    const consent = document.getElementById("header-consent");
+    consent.replaceChildren(el("span", "status-light"), el("span", "", "Shared with Resonance"));
+  }
 
   const chain = document.getElementById("dna-chain");
   chain.replaceChildren();
