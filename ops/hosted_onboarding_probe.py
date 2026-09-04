@@ -4,7 +4,7 @@
 Simulates exactly what a hosted MCP client (ChatGPT custom app, Claude custom
 connector) does when a tester supplies **only** the canonical resource URL:
 
-    https://resonance-production-cfe3.up.railway.app/mcp
+    https://resonance.parshkov.com/mcp
 
 and nothing else — no key, no bearer, no capability URL, no custom header.
 

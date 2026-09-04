@@ -717,13 +717,13 @@ and remote MCP transports. See [`HACKATHON.md`](HACKATHON.md) for the build
 record and [`demo/ui/README.md`](demo/ui/README.md) for the complete judge flow.
 
 **Hosted judge path (the submitted product):** open
-`https://resonance-production-cfe3.up.railway.app` in a WebMCP-capable Chrome
+`https://resonance.parshkov.com` in a WebMCP-capable Chrome
 (a guest account is created for you; no sign-up), then follow **Card A** in
 [`submission/HUMAN_TEST_CARDS.md`](submission/HUMAN_TEST_CARDS.md):
 prepare → preview → explicit share → discover → evidence → revoke, each step a
 `document.modelContext` tool call with a visible page update. The same origin
 is also a remote MCP server for the chat you already use — hand your client
-only `https://resonance-production-cfe3.up.railway.app/mcp` and it completes
+only `https://resonance.parshkov.com/mcp` and it completes
 standard OAuth onboarding (Cards B/C). Exact release SHA, deployment and
 executed evidence: [`submission/RELEASE_MANIFEST.md`](submission/RELEASE_MANIFEST.md).
 
@@ -743,7 +743,7 @@ inspect and invoke the tools through `document.modelContext`.
 Resonance has a working, LLM-free matching engine (engine 0.2) and a deployed product around it. The honest state is kept in [`docs/STATUS.md`](docs/STATUS.md); the decision that produced engine 0.2 is [ADR-0004](docs/decisions/ADR-0004-concept-aligned-analogy-and-benchmark-v0.2.md).
 
 The current release freeze is **engine 0.2 on `0aea577`** (2026-09-04), live at
-<https://resonance-production-cfe3.up.railway.app> with the canonical MCP endpoint at `/mcp`.
+<https://resonance.parshkov.com> with the canonical MCP endpoint at `/mcp`.
 On that commit 463 tests pass, both v0.2 benchmark gates pass with gold unedited, and the full
 acceptance set was executed directly against the public origin: OAuth onboarding 9/9 required
 steps, OAuth smoke 27/27, a real three-person structural test over `/mcp` 36/36, a browser run

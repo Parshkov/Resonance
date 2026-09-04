@@ -18,7 +18,7 @@ Starts from NOTHING but the resource URL a normal user receives
 
 Prints PASS/FAIL per step and never prints tokens, codes or secrets. stdlib only.
 
-    python3 ops/oauth_smoke.py https://resonance-production-cfe3.up.railway.app/mcp
+    python3 ops/oauth_smoke.py https://resonance.parshkov.com/mcp
     python3 ops/oauth_smoke.py http://127.0.0.1:8788/mcp --auto-consent
 """
 from __future__ import annotations

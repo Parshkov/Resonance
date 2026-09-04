@@ -1,0 +1,247 @@
+{
+  "origin": "https://resonance.parshkov.com",
+  "started_at": "2026-09-04T23:45:58Z",
+  "steps": [],
+  "browser": {
+    "version": "152.0.7977.83",
+    "native_document_modelContext": "object",
+    "native_navigator_modelContext": "undefined"
+  },
+  "native_status_pill": "WebMCP \u00b7 private",
+  "native_contract": {
+    "contract": "resonance-webmcp/0.1",
+    "toolNames": [
+      "resonance_prepare_thought",
+      "resonance_get_share_preview",
+      "resonance_share_prepared_thought",
+      "resonance_discover",
+      "resonance_get_match",
+      "resonance_update_consent"
+    ],
+    "mode": "live-product"
+  },
+  "console_native": [
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()"
+  ],
+  "mode": "NATIVE",
+  "native_tool_shape": {
+    "name": "resonance_discover",
+    "keys": [
+      "annotations",
+      "description",
+      "inputSchema",
+      "name",
+      "origin",
+      "title",
+      "window"
+    ],
+    "hasInputSchema": true,
+    "origin": "https://resonance.parshkov.com",
+    "description": "Run DB-backed structural discovery for the currently shared live session. Replay"
+  },
+  "harness_tools": [
+    "resonance_add_workspace_note",
+    "resonance_add_workspace_task",
+    "resonance_create_workspace",
+    "resonance_discover",
+    "resonance_get_match",
+    "resonance_get_share_preview",
+    "resonance_get_workspace",
+    "resonance_list_requests",
+    "resonance_list_workspaces",
+    "resonance_prepare_thought",
+    "resonance_read_messages",
+    "resonance_request_intro",
+    "resonance_respond_intro",
+    "resonance_respond_workspace_invite",
+    "resonance_send_message",
+    "resonance_share_prepared_thought",
+    "resonance_update_consent"
+  ],
+  "header_before": "Private \u00b7 not discoverable",
+  "pre_share_discover": {
+    "status": 409,
+    "body": "{\"error\": \"share_required\", \"message\": \"discovery needs a shared thought first: run resonance_prepare_thought \u2192 resonance_get_share_preview \u2192 resonance_share_prepared_thought (explicit confirm), then resonance_discover again.\"}"
+  },
+  "header_after_prepare": "Private \u00b7 not discoverable",
+  "pill_after_prepare": "WebMCP \u00b7 private draft ready",
+  "header_after_share": "Shared with Resonance",
+  "pill_after_share": "WebMCP \u00b7 LIVE shared",
+  "rendered_discovery": {
+    "status": 200,
+    "matches": 2,
+    "eligible": 0,
+    "expected_cards": 0,
+    "cards": 0,
+    "app_state": "empty",
+    "shown_count": "00 shown",
+    "classifications": [
+      "negative"
+    ]
+  },
+  "pill_after_discover": "WebMCP \u00b7 LIVE DB discovery",
+  "response_summary": "2 returned \u00b7 0 resonances \u00b7 0 rejected",
+  "header_after_revoke": "Private \u00b7 not discoverable",
+  "pill_after_revoke": "WebMCP \u00b7 private",
+  "console_harness": [
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: WebMCP tool execution failed: Uncaught Error: discovery needs a shared thought first: run resonance_prepare_thought \u2192 resonance_get_share_preview \u2192 resonance_share_prepared_thought (explicit confirm), then resonance_discover again.",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: WebMCP tool execution failed: Uncaught Error: discovery needs a shared thought first: run resonance_prepare_thought \u2192 resonance_get_share_preview \u2192 resonance_share_prepared_thought (explicit confirm), then resonance_discover again.",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: WebMCP tool execution failed: Uncaught Error: durable corpus changed after this discovery; run discovery again"
+  ],
+  "checks": [
+    {
+      "step": "page loads (title + app shell)",
+      "ok": true,
+      "advisory": false,
+      "detail": "title='Resonance \u2014 Visual Discovery'"
+    },
+    {
+      "step": "NATIVE document.modelContext present",
+      "ok": true,
+      "advisory": true,
+      "detail": "typeof document.modelContext=object; navigator.modelContext=undefined in 152.0.7977.83. A fact about the RUNNER, not the product: absent in a stock browser, present in Google Chrome 152+ launched with --enable-features=WebMCP (the harness passes that flag). Advisory: excluded from the exit code."
+    },
+    {
+      "step": "the capability pill agrees with the browser (says 'unavailable' exactly when document.modelContext is absent)",
+      "ok": true,
+      "advisory": false,
+      "detail": "pill='WebMCP \u00b7 private'; typeof document.modelContext=object"
+    },
+    {
+      "step": "page exposes WebMCP contract + six tool names",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"contract\": \"resonance-webmcp/0.1\", \"toolNames\": [\"resonance_prepare_thought\", \"resonance_get_share_preview\", \"resonance_share_prepared_thought\", \"resonance_discover\", \"resonance_get_match\", \"resonance_update_consent\"], \"mode\": \"live-product\"}"
+    },
+    {
+      "step": "NATIVE: page registered its tools via document.modelContext.registerTool (six R10 tools + collaboration/workspace tools)",
+      "ok": true,
+      "advisory": false,
+      "detail": "17 tools: resonance_add_workspace_note, resonance_add_workspace_task, resonance_create_workspace, resonance_discover, resonance_get_match, resonance_get_share_preview, resonance_get_workspace, resonance_list_requests, resonance_list_workspaces, resonance_prepare_thought, resonance_read_messages, resonance_request_intro, resonance_respond_intro, resonance_respond_workspace_invite, resonance_send_message, resonance_share_prepared_thought, resonance_update_consent"
+    },
+    {
+      "step": "NATIVE: the browser's own getTools() exposes the tool with its input schema",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"name\": \"resonance_discover\", \"keys\": [\"annotations\", \"description\", \"inputSchema\", \"name\", \"origin\", \"title\", \"window\"], \"hasInputSchema\": true, \"origin\": \"https://resonance.parshkov.com\", \"description\": \"Run DB-backed structural discovery for the currently shared live session. Replay\"}"
+    },
+    {
+      "step": "NATIVE: status pill reports registration",
+      "ok": true,
+      "advisory": false,
+      "detail": "WebMCP \u00b7 private"
+    },
+    {
+      "step": "NATIVE: the capability pill does not report 'unavailable' in a WebMCP browser",
+      "ok": true,
+      "advisory": false,
+      "detail": "WebMCP \u00b7 private"
+    },
+    {
+      "step": "nothing discoverable before share: discover(replay) fails closed with 409 share_required",
+      "ok": true,
+      "advisory": false,
+      "detail": "status=409 body={\"error\": \"share_required\", \"message\": \"discovery needs a shared thought first: run resonance_prepar"
+    },
+    {
+      "step": "WRITE 1: resonance_prepare_thought -> private (discoverable=false)",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"discoverable\": false, \"draft_ready\": null, \"session_id\": \"ses-5bd0718a6d290bb3\", \"state\": null}"
+    },
+    {
+      "step": "READ: resonance_get_share_preview returns confirmation_token + Thought DNA",
+      "ok": true,
+      "advisory": false,
+      "detail": "nodes=10 relations=10"
+    },
+    {
+      "step": "nothing discoverable before confirm: LIVE discover refuses (no shared thought)",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"isError\": true, \"error\": \"UnknownError\", \"status\": null, \"message\": \"Tool was executed but the invocation failed. For example, the script function threw an er"
+    },
+    {
+      "step": "WRITE 2: explicit share -> discoverable=true",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"discoverable\": true, \"shared\": true, \"session_id\": \"ses-5bd0718a6d290bb3\"}"
+    },
+    {
+      "step": "visible UI update after share (header/pill changed)",
+      "ok": true,
+      "advisory": false,
+      "detail": "header: 'Private \u00b7 not discoverable' -> 'Shared with Resonance'; pill: 'WebMCP \u00b7 LIVE shared'"
+    },
+    {
+      "step": "idempotent retry (same request_id) returns committed result",
+      "ok": true,
+      "advisory": false,
+      "detail": "ses-5bd0718a6d290bb3 == ses-5bd0718a6d290bb3"
+    },
+    {
+      "step": "READ: LIVE discover after share returns live matches",
+      "ok": true,
+      "advisory": false,
+      "detail": "result_id=result-e13fc2b4cfa9d4fc6d287605 n=2"
+    },
+    {
+      "step": "visible match cards equal the payload's eligible matches (cards == min(eligible, 4))",
+      "ok": true,
+      "advisory": false,
+      "detail": "cards=0 expected=0 from 2 returned (0 eligible; classifications=['negative'])"
+    },
+    {
+      "step": "the shell state agrees with the payload (ready iff a resonance is shown)",
+      "ok": true,
+      "advisory": false,
+      "detail": "data-state='empty' expected_cards=0"
+    },
+    {
+      "step": "the visible count agrees with the cards actually rendered",
+      "ok": true,
+      "advisory": false,
+      "detail": "shown-count='00 shown' cards=0"
+    },
+    {
+      "step": "an empty rail reports zero resonances rather than a bare match count",
+      "ok": true,
+      "advisory": false,
+      "detail": "response-summary='2 returned \u00b7 0 resonances \u00b7 0 rejected'"
+    },
+    {
+      "step": "READ: resonance_get_match returns evidence for a live match",
+      "ok": true,
+      "advisory": false,
+      "detail": "keys=['contract_version', 'freshness', 'match', 'result_id', 'source']"
+    },
+    {
+      "step": "WRITE 3: revoke consent (shared=false)",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"contract_version\": \"resonance-webmcp/0.1\", \"session_id\": \"ses-5bd0718a6d290bb3\", \"shared\": false, \"revoked\": true, \"discoverable\": false}"
+    },
+    {
+      "step": "after revoke: LIVE discover fails closed / thought not discoverable",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"isError\": true, \"error\": \"UnknownError\", \"status\": null, \"message\": \"Tool was executed but the invocation failed. For example, the script function threw an er"
+    },
+    {
+      "step": "after revoke: old result_id evidence fails closed",
+      "ok": true,
+      "advisory": false,
+      "detail": "{\"isError\": true, \"error\": \"UnknownError\", \"status\": null, \"message\": \"Tool was executed but the invocation failed. For example, the script function threw an er"
+    }
+  ],
+  "summary": "24/24 checks passed"
+}
