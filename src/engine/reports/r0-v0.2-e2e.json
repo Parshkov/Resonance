@@ -1,6 +1,6 @@
 {
  "benchmark_version": "r0-v0.2",
- "build_seconds": 0.2053,
+ "build_seconds": 0.2077,
  "calibration": {
   "analogy_over_coincidence": 1.0,
   "analogy_over_generic_motif": 1.0,
@@ -404,7 +404,7 @@
   }
  },
  "overall_status": "pass",
- "query_latency_mean_seconds": 0.7808,
+ "query_latency_mean_seconds": 0.7771,
  "rows": [
   {
    "case_id": "S1-C01",

@@ -5,162 +5,52 @@
    {
     "bucket_id": "California",
     "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "Central Europe",
     "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "East Africa",
     "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "Kansai",
     "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "Kanto",
     "count": 1,
-    "intensity": 0.0833
-   },
-   {
-    "bucket_id": "Malay Peninsula",
-    "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "North Atlantic",
     "count": 1,
-    "intensity": 0.0833
-   },
-   {
-    "bucket_id": "Oaxaca",
-    "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "Pacific Northwest",
     "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "Texas",
     "count": 1,
-    "intensity": 0.0833
-   },
-   {
-    "bucket_id": "Vienna Basin",
-    "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    },
    {
     "bucket_id": "Île-de-France",
     "count": 1,
-    "intensity": 0.0833
+    "intensity": 0.1111
    }
   ]
  },
  "contract_version": "resonance-discovery/0.1",
  "matches": [
-  {
-   "actions": [
-    "compare",
-    "explain",
-    "request_intro"
-   ],
-   "confidence": "high",
-   "display": {
-    "cluster_id": "complementary-bridge",
-    "domain": "thermal-engineering",
-    "location": {
-     "city": "Reykjavik",
-     "kind": "synthetic_coarse",
-     "lat": 64.1,
-     "lon": -21.9,
-     "precision": "city",
-     "region": "North Atlantic"
-    },
-    "share_state": "discoverable",
-    "topic": "closed-loop chiller design"
-   },
-   "evidence": {
-    "contradiction_count": 0,
-    "mapped_node_count": 10,
-    "preserved_relation_count": 10,
-    "preserved_relations": [
-     {
-      "candidate_relation": "r0",
-      "query_relation": "r0"
-     },
-     {
-      "candidate_relation": "r1",
-      "query_relation": "r1"
-     },
-     {
-      "candidate_relation": "r2",
-      "query_relation": "r2"
-     },
-     {
-      "candidate_relation": "r3",
-      "query_relation": "r3"
-     },
-     {
-      "candidate_relation": "r4",
-      "query_relation": "r4"
-     }
-    ],
-    "top_correspondences": [
-     {
-      "candidate_label": "thermal-budget gap",
-      "candidate_node": "n0",
-      "query_label": "plasma lens heat",
-      "query_node": "n0"
-     },
-     {
-      "candidate_label": "heat-path analysis",
-      "candidate_node": "n1",
-      "query_label": "ionization cascade",
-      "query_node": "n1"
-     },
-     {
-      "candidate_label": "hot-spot map",
-      "candidate_node": "n2",
-      "query_label": "beam wander",
-      "query_node": "n2"
-     },
-     {
-      "candidate_label": "lab time limit",
-      "candidate_node": "n3",
-      "query_label": "aperture budget",
-      "query_node": "n3"
-     },
-     {
-      "candidate_label": "closed-loop chiller design",
-      "candidate_node": "n4",
-      "query_label": "adaptive cooling",
-      "query_node": "n4"
-     }
-    ]
-   },
-   "hard_rejection": null,
-   "match_id": "befbcc9430fc41c12628dafb",
-   "mode_classification": "complementary",
-   "person_pseudonym": "Diego R.",
-   "scores": {
-    "contradiction": 0.0,
-    "coverage_containment": 1.0,
-    "h_sign_conflict": false,
-    "r_direct": 1.0,
-    "semantic": 0.35276298701298703,
-    "structural": 1.0,
-    "y_systematicity": 1.0
-   },
-   "session_id": "ses-diego-chiller"
-  },
   {
    "actions": [
     "compare",
@@ -264,18 +154,18 @@
    ],
    "confidence": "high",
    "display": {
-    "cluster_id": "accumulating-intermediary-failure",
-    "domain": "organizations",
+    "cluster_id": "complementary-bridge",
+    "domain": "thermal-engineering",
     "location": {
-     "city": "Berlin",
+     "city": "Reykjavik",
      "kind": "synthetic_coarse",
-     "lat": 52.5,
-     "lon": 13.4,
+     "lat": 64.1,
+     "lon": -21.9,
      "precision": "city",
-     "region": "Central Europe"
+     "region": "North Atlantic"
     },
     "share_state": "discoverable",
-    "topic": "inbox overload cascade"
+    "topic": "closed-loop chiller design"
    },
    "evidence": {
     "contradiction_count": 0,
@@ -305,31 +195,31 @@
     ],
     "top_correspondences": [
      {
-      "candidate_label": "inbox overload",
+      "candidate_label": "thermal-budget gap",
       "candidate_node": "n0",
       "query_label": "plasma lens heat",
       "query_node": "n0"
      },
      {
-      "candidate_label": "meeting cascade",
+      "candidate_label": "heat-path analysis",
       "candidate_node": "n1",
       "query_label": "ionization cascade",
       "query_node": "n1"
      },
      {
-      "candidate_label": "coordination lag",
+      "candidate_label": "hot-spot map",
       "candidate_node": "n2",
       "query_label": "beam wander",
       "query_node": "n2"
      },
      {
-      "candidate_label": "headcount freeze",
+      "candidate_label": "lab time limit",
       "candidate_node": "n3",
       "query_label": "aperture budget",
       "query_node": "n3"
      },
      {
-      "candidate_label": "delegation protocol",
+      "candidate_label": "closed-loop chiller design",
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
@@ -337,19 +227,19 @@
     ]
    },
    "hard_rejection": null,
-   "match_id": "9685396119e554c5aa649077",
-   "mode_classification": "analogical",
-   "person_pseudonym": "Noah R.",
+   "match_id": "befbcc9430fc41c12628dafb",
+   "mode_classification": "complementary",
+   "person_pseudonym": "Diego R.",
    "scores": {
     "contradiction": 0.0,
     "coverage_containment": 1.0,
     "h_sign_conflict": false,
     "r_direct": 1.0,
-    "semantic": 0.42115948032594186,
+    "semantic": 0.35276298701298703,
     "structural": 1.0,
     "y_systematicity": 1.0
    },
-   "session_id": "ses-noah-org-overload"
+   "session_id": "ses-diego-chiller"
   },
   {
    "actions": [
@@ -445,6 +335,101 @@
     "y_systematicity": 1.0
    },
    "session_id": "ses-kwame-traffic"
+  },
+  {
+   "actions": [
+    "compare",
+    "explain",
+    "request_intro"
+   ],
+   "confidence": "high",
+   "display": {
+    "cluster_id": "accumulating-intermediary-failure",
+    "domain": "organizations",
+    "location": {
+     "city": "Berlin",
+     "kind": "synthetic_coarse",
+     "lat": 52.5,
+     "lon": 13.4,
+     "precision": "city",
+     "region": "Central Europe"
+    },
+    "share_state": "discoverable",
+    "topic": "inbox overload cascade"
+   },
+   "evidence": {
+    "contradiction_count": 0,
+    "mapped_node_count": 10,
+    "preserved_relation_count": 10,
+    "preserved_relations": [
+     {
+      "candidate_relation": "r0",
+      "query_relation": "r0"
+     },
+     {
+      "candidate_relation": "r1",
+      "query_relation": "r1"
+     },
+     {
+      "candidate_relation": "r2",
+      "query_relation": "r2"
+     },
+     {
+      "candidate_relation": "r3",
+      "query_relation": "r3"
+     },
+     {
+      "candidate_relation": "r4",
+      "query_relation": "r4"
+     }
+    ],
+    "top_correspondences": [
+     {
+      "candidate_label": "inbox overload",
+      "candidate_node": "n0",
+      "query_label": "plasma lens heat",
+      "query_node": "n0"
+     },
+     {
+      "candidate_label": "meeting cascade",
+      "candidate_node": "n1",
+      "query_label": "ionization cascade",
+      "query_node": "n1"
+     },
+     {
+      "candidate_label": "coordination lag",
+      "candidate_node": "n2",
+      "query_label": "beam wander",
+      "query_node": "n2"
+     },
+     {
+      "candidate_label": "headcount freeze",
+      "candidate_node": "n3",
+      "query_label": "aperture budget",
+      "query_node": "n3"
+     },
+     {
+      "candidate_label": "delegation protocol",
+      "candidate_node": "n4",
+      "query_label": "adaptive cooling",
+      "query_node": "n4"
+     }
+    ]
+   },
+   "hard_rejection": null,
+   "match_id": "9685396119e554c5aa649077",
+   "mode_classification": "analogical",
+   "person_pseudonym": "Noah R.",
+   "scores": {
+    "contradiction": 0.0,
+    "coverage_containment": 1.0,
+    "h_sign_conflict": false,
+    "r_direct": 1.0,
+    "semantic": 0.42115948032594186,
+    "structural": 1.0,
+    "y_systematicity": 1.0
+   },
+   "session_id": "ses-noah-org-overload"
   },
   {
    "actions": [
@@ -991,243 +976,6 @@
     "y_systematicity": 0.5
    },
    "session_id": "ses-camille-portrait"
-  },
-  {
-   "actions": [
-    "compare",
-    "explain",
-    "request_intro"
-   ],
-   "confidence": "low",
-   "display": {
-    "cluster_id": "unrelated-distractor",
-    "domain": "music-theory",
-    "location": {
-     "city": "Vienna",
-     "kind": "synthetic_coarse",
-     "lat": 48.2,
-     "lon": 16.4,
-     "precision": "city",
-     "region": "Vienna Basin"
-    },
-    "share_state": "discoverable",
-    "topic": "species counterpoint"
-   },
-   "evidence": {
-    "contradiction_count": 2,
-    "mapped_node_count": 8,
-    "preserved_relation_count": 1,
-    "preserved_relations": [
-     {
-      "candidate_relation": "r2",
-      "query_relation": "r8"
-     }
-    ],
-    "top_correspondences": [
-     {
-      "candidate_label": "parallel fifths",
-      "candidate_node": "n1",
-      "query_label": "plasma lens heat",
-      "query_node": "n0"
-     },
-     {
-      "candidate_label": "voice crossing",
-      "candidate_node": "n2",
-      "query_label": "ionization cascade",
-      "query_node": "n1"
-     },
-     {
-      "candidate_label": "dissonance stress",
-      "candidate_node": "n3",
-      "query_label": "beam wander",
-      "query_node": "n2"
-     },
-     {
-      "candidate_label": "species drill",
-      "candidate_node": "n4",
-      "query_label": "adaptive cooling",
-      "query_node": "n4"
-     },
-     {
-      "candidate_label": "exercise book",
-      "candidate_node": "n7",
-      "query_label": "interferometry",
-      "query_node": "n6"
-     }
-    ]
-   },
-   "hard_rejection": null,
-   "match_id": "f4b2bc6ef58063404006aa60",
-   "mode_classification": "negative",
-   "person_pseudonym": "Franz W.",
-   "scores": {
-    "contradiction": 0.15,
-    "coverage_containment": 1.0,
-    "h_sign_conflict": false,
-    "r_direct": 0.1,
-    "semantic": 0.01441369935551418,
-    "structural": 0.12364456104386465,
-    "y_systematicity": 0.5
-   },
-   "session_id": "ses-franz-counterpoint"
-  },
-  {
-   "actions": [
-    "compare",
-    "explain",
-    "request_intro"
-   ],
-   "confidence": "low",
-   "display": {
-    "cluster_id": "unrelated-distractor",
-    "domain": "horticulture",
-    "location": {
-     "city": "Oaxaca",
-     "kind": "synthetic_coarse",
-     "lat": 17.1,
-     "lon": -96.7,
-     "precision": "city",
-     "region": "Oaxaca"
-    },
-    "share_state": "discoverable",
-    "topic": "tomato blight watch"
-   },
-   "evidence": {
-    "contradiction_count": 2,
-    "mapped_node_count": 8,
-    "preserved_relation_count": 1,
-    "preserved_relations": [
-     {
-      "candidate_relation": "r2",
-      "query_relation": "r8"
-     }
-    ],
-    "top_correspondences": [
-     {
-      "candidate_label": "leaf spotting",
-      "candidate_node": "n1",
-      "query_label": "plasma lens heat",
-      "query_node": "n0"
-     },
-     {
-      "candidate_label": "humid nights",
-      "candidate_node": "n2",
-      "query_label": "ionization cascade",
-      "query_node": "n1"
-     },
-     {
-      "candidate_label": "wilting state",
-      "candidate_node": "n3",
-      "query_label": "beam wander",
-      "query_node": "n2"
-     },
-     {
-      "candidate_label": "spacing and prune",
-      "candidate_node": "n4",
-      "query_label": "adaptive cooling",
-      "query_node": "n4"
-     },
-     {
-      "candidate_label": "field note",
-      "candidate_node": "n7",
-      "query_label": "interferometry",
-      "query_node": "n6"
-     }
-    ]
-   },
-   "hard_rejection": null,
-   "match_id": "1524d50008b5b3ab04822c3b",
-   "mode_classification": "negative",
-   "person_pseudonym": "Luz H.",
-   "scores": {
-    "contradiction": 0.15,
-    "coverage_containment": 1.0,
-    "h_sign_conflict": false,
-    "r_direct": 0.1,
-    "semantic": 0.04270031433961152,
-    "structural": 0.12364456104386465,
-    "y_systematicity": 0.5
-   },
-   "session_id": "ses-luz-tomato"
-  },
-  {
-   "actions": [
-    "compare",
-    "explain",
-    "request_intro"
-   ],
-   "confidence": "low",
-   "display": {
-    "cluster_id": "unrelated-distractor",
-    "domain": "tax-administration",
-    "location": {
-     "city": "Singapore",
-     "kind": "synthetic_coarse",
-     "lat": 1.4,
-     "lon": 103.8,
-     "precision": "city",
-     "region": "Malay Peninsula"
-    },
-    "share_state": "discoverable",
-    "topic": "year-end filing pack"
-   },
-   "evidence": {
-    "contradiction_count": 2,
-    "mapped_node_count": 8,
-    "preserved_relation_count": 1,
-    "preserved_relations": [
-     {
-      "candidate_relation": "r2",
-      "query_relation": "r8"
-     }
-    ],
-    "top_correspondences": [
-     {
-      "candidate_label": "missing receipt",
-      "candidate_node": "n1",
-      "query_label": "plasma lens heat",
-      "query_node": "n0"
-     },
-     {
-      "candidate_label": "basis mismatch",
-      "candidate_node": "n2",
-      "query_label": "ionization cascade",
-      "query_node": "n1"
-     },
-     {
-      "candidate_label": "deadline pressure",
-      "candidate_node": "n3",
-      "query_label": "beam wander",
-      "query_node": "n2"
-     },
-     {
-      "candidate_label": "checklist pass",
-      "candidate_node": "n4",
-      "query_label": "adaptive cooling",
-      "query_node": "n4"
-     },
-     {
-      "candidate_label": "prior-year return",
-      "candidate_node": "n7",
-      "query_label": "interferometry",
-      "query_node": "n6"
-     }
-    ]
-   },
-   "hard_rejection": null,
-   "match_id": "f5797d5fd35d18fb440f9aea",
-   "mode_classification": "negative",
-   "person_pseudonym": "Dev K.",
-   "scores": {
-    "contradiction": 0.15,
-    "coverage_containment": 1.0,
-    "h_sign_conflict": false,
-    "r_direct": 0.1,
-    "semantic": 0.00472455591261534,
-    "structural": 0.12364456104386465,
-    "y_systematicity": 0.5
-   },
-   "session_id": "ses-dev-tax"
   }
  ],
  "metadata": {

@@ -40,8 +40,11 @@ MIN_VERIFY_POOL = 24
 
 
 def _tie_key(hit: ResonanceHit):
-    return (round(hit.verification.components.structural, 6),
-            round(hit.candidate.channel_scores.get("primary", 0.0), 6))
+    """Boundary ties are decided on the verified score alone: candidates whose
+    structural score equals the k-th one are all returned (retrieval score is
+    only a stable order inside the tie, never a truncation key)."""
+    return (hit.verification.classification == "negative",
+            round(hit.verification.components.structural, 6))
 
 
 def _verified_sort_key(hit: ResonanceHit):
@@ -159,9 +162,9 @@ class ResonanceEngine:
         ordered = sorted(hits, key=_verified_sort_key)
         accepted = [h for h in ordered if not h.verification.hard_rejection]
         kept = accepted[:k]
-        # Competition ties at the k boundary are not truncated by name: a
-        # candidate whose verified and retrieval scores equal the k-th one is
-        # returned too (same policy as the index's TIE_POLICY).
+        # Competition ties at the k boundary are not truncated by name or by
+        # retrieval score: every candidate whose verified score equals the
+        # k-th one is returned too (same policy as the index's TIE_POLICY).
         if len(accepted) > k:
             boundary = _tie_key(kept[-1])
             for extra in accepted[k:]:

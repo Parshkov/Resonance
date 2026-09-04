@@ -34,8 +34,8 @@ from demo.ui.server import (  # noqa: E402
 
 # Verified order (engine 0.2): retrieval proposes, verification ranks.
 EXPECTED_PRIMARY = [
-    "ses-noah-org-overload",
     "ses-kwame-traffic",
+    "ses-noah-org-overload",
     "ses-mei-battery-heat",
     "ses-gabe-warehouse",
 ]
@@ -144,10 +144,7 @@ class ProjectionTests(unittest.TestCase):
         self.assertTrue(contradiction["hard_rejection"])
 
     def test_other_returned_rows_remain_counted(self):
-        # engine 0.2 returns the best CANONICAL_K verified rows (over-fetch +
-        # verified ranking), so more non-primary rows remain than under the
-        # tie-truncated engine 0.1 capture.
-        self.assertEqual(remaining_match_count(self.payload), 9)
+        self.assertEqual(remaining_match_count(self.payload), 6)
 
 
 class SourceAndBoundaryTests(unittest.TestCase):
