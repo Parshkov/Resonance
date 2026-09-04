@@ -1,0 +1,558 @@
+{
+  "resource": "https://resonance-production-cfe3.up.railway.app/mcp",
+  "started_at": "2026-09-04T20:54:04Z",
+  "steps": [],
+  "identities": {
+    "A": {
+      "user_id": "person-dd8e6f1f22e0f36e"
+    },
+    "B": {
+      "user_id": "person-d090187dc9003c23"
+    },
+    "C": {
+      "user_id": "person-6ab39075fc0a33b9"
+    }
+  },
+  "shared": {
+    "A": {
+      "draft_id": "draft-6a4cf1243818c6d6e59e1d9c",
+      "session_id": "ses-ce045745835bc1db",
+      "preview_nodes": 6,
+      "preview_relations": 6,
+      "revoked": true
+    },
+    "B": {
+      "draft_id": "draft-ab1b0e4f3af5f5d01daa7098",
+      "session_id": "ses-4b4d411da2c48003",
+      "preview_nodes": 6,
+      "preview_relations": 6
+    },
+    "C": {
+      "draft_id": "draft-d4e97b54d400323465d2d5ff",
+      "session_id": "ses-b09f6f31fec1a226",
+      "preview_nodes": 5,
+      "preview_relations": 3
+    }
+  },
+  "discover_B": {
+    "result_id": "result-9a6971dc29c66239e1237eb9",
+    "source": "live",
+    "matches": [
+      {
+        "rank": 0,
+        "session_id": "ses-bb2d935993bb38c5",
+        "mode": null,
+        "score": 1.0,
+        "scores": {
+          "structural": 1.0,
+          "semantic": 1.0,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 1,
+        "session_id": "ses-9583f257ab7acd0c",
+        "mode": null,
+        "score": 1.0,
+        "scores": {
+          "structural": 1.0,
+          "semantic": 1.0,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 2,
+        "session_id": "ses-c041572ff069dafd",
+        "mode": null,
+        "score": 1.0,
+        "scores": {
+          "structural": 1.0,
+          "semantic": 1.0,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 3,
+        "session_id": "ses-ef6d5093f53a09d5",
+        "mode": null,
+        "score": 1.0,
+        "scores": {
+          "structural": 1.0,
+          "semantic": 1.0,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 4,
+        "session_id": "ses-ce045745835bc1db",
+        "mode": null,
+        "score": 1.0,
+        "scores": {
+          "structural": 1.0,
+          "semantic": 0.2885670248850574,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": true,
+        "is_C": false
+      },
+      {
+        "rank": 5,
+        "session_id": "ses-099c77441b96db62",
+        "mode": null,
+        "score": 0.6726272798700864,
+        "scores": {
+          "structural": 0.6726272798700864,
+          "semantic": 0.11451491247608618,
+          "r_direct": 0.5,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 6,
+        "session_id": "ses-a95528cc2a90ef11",
+        "mode": null,
+        "score": 0.6226272798700864,
+        "scores": {
+          "structural": 0.6226272798700864,
+          "semantic": 0.11150878743766092,
+          "r_direct": 0.5,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.16666666666666666,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 7,
+        "session_id": "ses-f141cc4c7a1e1fdb",
+        "mode": null,
+        "score": 0.17709548119224364,
+        "scores": {
+          "structural": 0.17709548119224364,
+          "semantic": 0.12413051833140902,
+          "r_direct": 0.16666666666666666,
+          "y_systematicity": 0.5,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 8,
+        "session_id": "ses-e1771799a599ed59",
+        "mode": null,
+        "score": 0.17709548119224364,
+        "scores": {
+          "structural": 0.17709548119224364,
+          "semantic": 0.12413051833140902,
+          "r_direct": 0.16666666666666666,
+          "y_systematicity": 0.5,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 9,
+        "session_id": "ses-9ef6e59df883a8da",
+        "mode": null,
+        "score": 0.17709548119224364,
+        "scores": {
+          "structural": 0.17709548119224364,
+          "semantic": 0.12413051833140902,
+          "r_direct": 0.16666666666666666,
+          "y_systematicity": 0.5,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 10,
+        "session_id": "ses-1e48f4558db17120",
+        "mode": null,
+        "score": 0.17709548119224364,
+        "scores": {
+          "structural": 0.17709548119224364,
+          "semantic": 0.12413051833140902,
+          "r_direct": 0.16666666666666666,
+          "y_systematicity": 0.5,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 11,
+        "session_id": "ses-b09f6f31fec1a226",
+        "mode": null,
+        "score": 0.17709548119224364,
+        "scores": {
+          "structural": 0.17709548119224364,
+          "semantic": 0.12413051833140902,
+          "r_direct": 0.16666666666666666,
+          "y_systematicity": 0.5,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": true
+      }
+    ],
+    "rejected_count": 0
+  },
+  "explain_A": {
+    "source": "live",
+    "result_id": "result-9a6971dc29c66239e1237eb9",
+    "match": {
+      "match_id": "35bb8f578b4b4f9f772b41a7",
+      "person_pseudonym": "guest-b35252",
+      "session_id": "ses-ce045745835bc1db",
+      "mode_classification": "analogical",
+      "hard_rejection": null,
+      "scores": {
+        "structural": 1.0,
+        "semantic": 0.2885670248850574,
+        "r_direct": 1.0,
+        "y_systematicity": 1.0,
+        "coverage_containment": 1.0,
+        "contradiction": 0.0,
+        "h_sign_conflict": false
+      },
+      "confidence": "high",
+      "evidence": {
+        "mapped_node_count": 6,
+        "preserved_relation_count": 6,
+        "contradiction_count": 0,
+        "top_correspondences": [
+          {
+            "query_node": "b0",
+            "candidate_node": "a0",
+            "query_label": "supply shortage rumour",
+            "candidate_label": "partial upstream outage"
+          },
+          {
+            "query_node": "b1",
+            "candidate_node": "a1",
+            "query_label": "synchronized bulk purchases",
+            "candidate_label": "synchronized client retries"
+          },
+          {
+            "query_node": "b2",
+            "candidate_node": "a2",
+            "query_label": "demand amplification",
+            "candidate_label": "request amplification"
+          },
+          {
+            "query_node": "b3",
+            "candidate_node": "a3",
+            "query_label": "empty shelves",
+            "candidate_label": "cascading saturation"
+          },
+          {
+            "query_node": "b4",
+            "candidate_node": "a4",
+            "query_label": "per-customer purchase cap",
+            "candidate_label": "fixed retry budget"
+          }
+        ],
+        "preserved_relations": [
+          {
+            "query_relation": "r0",
+            "candidate_relation": "r0"
+          },
+          {
+            "query_relation": "r1",
+            "candidate_relation": "r1"
+          },
+          {
+            "query_relation": "r2",
+            "candidate_relation": "r2"
+          },
+          {
+            "query_relation": "r3",
+            "candidate_relation": "r3"
+          },
+          {
+            "query_relation": "r4",
+            "candidate_relation": "r4"
+          }
+        ]
+      },
+      "display": {
+        "share_state": "discoverable",
+        "cluster_id": "retry-storm-after-a-partial-outage",
+        "topic": "Retry storm after a partial outage",
+        "domain": "distributed-systems",
+        "demo_persona": false
+      },
+      "actions": [
+        "compare",
+        "explain",
+        "request_intro"
+      ]
+    }
+  },
+  "intro": {
+    "intro_id": "intro-0e82ded13fee7b72af4ffbc7",
+    "channel_id": "chan-07c24fe14710c2c86ee65476",
+    "accepted": true,
+    "messages": 1
+  },
+  "revoke": {
+    "A_session": "ses-ce045745835bc1db",
+    "second_result_id": "result-db6df863edd9aee3da91b80c",
+    "A_absent": true
+  },
+  "cleanup": {
+    "revoked": [
+      {
+        "identity": "A",
+        "session_id": "ses-ce045745835bc1db",
+        "revoked": true,
+        "already": true
+      },
+      {
+        "identity": "B",
+        "session_id": "ses-4b4d411da2c48003",
+        "revoked": true,
+        "discoverable": false
+      },
+      {
+        "identity": "C",
+        "session_id": "ses-b09f6f31fec1a226",
+        "revoked": true,
+        "discoverable": false
+      }
+    ],
+    "still_discoverable": []
+  },
+  "checks": [
+    {
+      "step": "A onboarded via OAuth (guest) + MCP initialize + whoami",
+      "ok": true,
+      "detail": "user=person-dd8e6f1f22e0f36e transport=stateless (no Mcp-Session-Id; spec-permitted)"
+    },
+    {
+      "step": "B onboarded via OAuth (guest) + MCP initialize + whoami",
+      "ok": true,
+      "detail": "user=person-d090187dc9003c23 transport=stateless (no Mcp-Session-Id; spec-permitted)"
+    },
+    {
+      "step": "C onboarded via OAuth (guest) + MCP initialize + whoami",
+      "ok": true,
+      "detail": "user=person-6ab39075fc0a33b9 transport=stateless (no Mcp-Session-Id; spec-permitted)"
+    },
+    {
+      "step": "three independent identities",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "A prepare -> private draft (discoverable=false)",
+      "ok": true,
+      "detail": "draft=draft-6a4cf1243818c6d6e59e1d9c input_kind=agent_structured retention=not_retained"
+    },
+    {
+      "step": "A nothing discoverable before explicit confirm",
+      "ok": true,
+      "detail": "shared_before=0"
+    },
+    {
+      "step": "A share with confirm=false rejected",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "A explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "session=ses-ce045745835bc1db"
+    },
+    {
+      "step": "B prepare -> private draft (discoverable=false)",
+      "ok": true,
+      "detail": "draft=draft-ab1b0e4f3af5f5d01daa7098 input_kind=agent_structured retention=not_retained"
+    },
+    {
+      "step": "B nothing discoverable before explicit confirm",
+      "ok": true,
+      "detail": "shared_before=0"
+    },
+    {
+      "step": "B share with confirm=false rejected",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "B explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "session=ses-4b4d411da2c48003"
+    },
+    {
+      "step": "C prepare -> private draft (discoverable=false)",
+      "ok": true,
+      "detail": "draft=draft-d4e97b54d400323465d2d5ff input_kind=agent_structured retention=not_retained"
+    },
+    {
+      "step": "C nothing discoverable before explicit confirm",
+      "ok": true,
+      "detail": "shared_before=0"
+    },
+    {
+      "step": "C share with confirm=false rejected",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "C explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "session=ses-b09f6f31fec1a226"
+    },
+    {
+      "step": "B discover returns result_id from live source",
+      "ok": true,
+      "detail": "result_id=result-9a6971dc29c66239e1237eb9 source=live matches=12"
+    },
+    {
+      "step": "A (retry storm) found by B (panic buying)",
+      "ok": true,
+      "detail": "rank=4 score=1.0 mode=None"
+    },
+    {
+      "step": "A ranks above C (structure beats shared vocabulary)",
+      "ok": true,
+      "detail": "rank_A=4 rank_C=11 score_C=0.17709548119224364"
+    },
+    {
+      "step": "B explain_match(A) returns structural evidence",
+      "ok": true,
+      "detail": "keys=['contract_version', 'freshness', 'match', 'result_id', 'source']"
+    },
+    {
+      "step": "C cannot read B's discovery result (result_id subject-bound)",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "B requests intro to A",
+      "ok": true,
+      "detail": "intro=intro-0e82ded13fee7b72af4ffbc7 state=requested"
+    },
+    {
+      "step": "intro retry with same request_id is idempotent",
+      "ok": true,
+      "detail": "intro-0e82ded13fee7b72af4ffbc7 == intro-0e82ded13fee7b72af4ffbc7"
+    },
+    {
+      "step": "A sees the incoming intro",
+      "ok": true,
+      "detail": "incoming=1"
+    },
+    {
+      "step": "A accepts -> channel opened",
+      "ok": true,
+      "detail": "channel=chan-07c24fe14710c2c86ee65476 state=accepted"
+    },
+    {
+      "step": "A sends a relay message",
+      "ok": true,
+      "detail": "message=msg-425a1f3624d163e6b505b224"
+    },
+    {
+      "step": "B reads A's message",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "step": "C cannot read the A<->B channel",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "A stop_sharing -> revoked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "fresh discovery: revoked A is absent immediately",
+      "ok": true,
+      "detail": "result_id=result-db6df863edd9aee3da91b80c matches=11"
+    },
+    {
+      "step": "old result_id no longer serves revoked A's evidence",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "stateless transport: a stale Mcp-Session-Id is ignored, bearer still authoritative (restart-safe)",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "step": "reconnect: fresh initialize with the same bearer maps to the same account",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "access_token in query string does NOT authenticate",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "step": "cleanup: this run leaves no discoverable guest session behind",
+      "ok": true,
+      "detail": "revoked=['ses-ce045745835bc1db', 'ses-4b4d411da2c48003', 'ses-b09f6f31fec1a226'] still_discoverable=[]"
+    },
+    {
+      "step": "revoked access token stops working on /mcp",
+      "ok": true,
+      "detail": "revoke=200 then /mcp=401"
+    }
+  ],
+  "finished_at": "2026-09-04T20:54:28Z",
+  "summary": "36/36 checks passed"
+}
