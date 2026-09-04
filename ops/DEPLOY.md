@@ -62,6 +62,28 @@ that first real build, so nobody repeats them:
   private host `postgres.railway.internal:5432`.
 - Health-check success is Railway's own probe of `/api/product/health`, i.e.
   migrations applied and the seed loaded before traffic is routed.
+- **Push auto-deploy is OFF and cannot be toggled** (checked 2026-09-04 via
+  Railway's API: `enabled: false, canEnable: false, reason: NO_INSTALLATION`).
+  The service is linked to `Parshkov/Resonance` by name only; the **Railway
+  GitHub App is not installed on the repository**, so Railway receives no push
+  webhooks. Every production deployment so far carries `meta.reason: deploy`,
+  i.e. was started by hand (`connect-service-source` from the Railway plugin,
+  or **Deploy** in the dashboard). To make merges to `main` deploy themselves:
+  1. as the repository owner, install the Railway GitHub App on
+     `Parshkov/Resonance` (Railway dashboard → **Account settings** →
+     **Integrations** → **GitHub**, or from the service's **Settings → Source**
+     link "Configure GitHub App"), granting access to this repository;
+  2. in the service **Settings → Source**, refresh the repository list, confirm
+     branch `main`, and switch **Auto Deploy** on (optionally require passing
+     check suites).
+  Until then, deploy after every merge with the Railway plugin
+  (`connect-service-source` repo `Parshkov/Resonance`, branch `main`) and
+  record the deployment id in `submission/RELEASE_MANIFEST.md` §0.
+- **Volume backups are not visible through the API.** Open the Postgres
+  service → volume `postgres-data` → **Backups** and enable the daily schedule
+  (plus weekly/monthly if the plan allows). Nothing in the repo can do this;
+  the 2026-09-04 diagnosis could not confirm any schedule exists, so treat the
+  database as **unbacked-up until someone has seen a completed backup there**.
 - **Entrypoint is `src.product.competition_server`** (the image default, and
   set explicitly as the Railway start command): the live product handler plus
   the R9/R10 presentation routes and the live WebMCP module, so the public

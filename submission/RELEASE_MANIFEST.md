@@ -17,6 +17,7 @@
 | suites | 440 OK on `01193f1`; 443 OK on `3c7dc80`; 446 OK on `9b51262` (2 skipped each) |
 | public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (deployment `86aebe9b`: HEAD + consent.css OK, OAuth smoke 27/27, hosted probe 9/9 required + 6/6 optional, A/B/C 35/35, remote-MCP empty-draft refusal 7/7, browser path 11/11 incl. `/api/context?source=live` = own thought and implicit-prose 400 + no draft left, Playwright: own thought rendered on Live MCP with 3 resonance cards for 15 backend rows, consent page named + styled); `public-origin-9b51262/` (deployment `6ec0959e`: OAuth 27/27, A/B/C 35/35, re-prepare regression 12/12) |
 | still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome; a real ChatGPT / Claude connector session (Cards A–C) |
+| ops gaps needing the repository/Railway owner | push auto-deploy is off and **cannot be enabled**: Railway reports `NO_INSTALLATION` — the Railway GitHub App is not installed on `Parshkov/Resonance` (merge `981d1be` of #154 at 16:17 UTC produced no deployment; every deployment has `meta.reason: deploy`, i.e. manual). Postgres volume `postgres-data` backup schedule is not exposed by the API and has **not been confirmed** — enable it in the dashboard (`ops/DEPLOY.md`, Option A notes). |
 
 # WebMCP Challenge release manifest (frozen competition record)
 
