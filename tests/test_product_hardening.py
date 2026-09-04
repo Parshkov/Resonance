@@ -148,3 +148,32 @@ class DemoSeedPolicyTests(unittest.TestCase):
     def test_in_memory_runtime_is_seeded_for_local_development(self):
         rt = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
         self.assertEqual(rt.live.health().sessions, 25)
+
+
+class ReadinessTests(unittest.TestCase):
+    def test_health_reports_engine_identity_and_demo_presence(self):
+        from src.engine import ENGINE_VERSION
+        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        httpd = serve("127.0.0.1", 0, runtime=runtime)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            with urlopen(f"http://127.0.0.1:{httpd.server_address[1]}/api/product/health") as r:
+                health = json.loads(r.read())
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+        self.assertEqual(health["engine"]["engine_version"], ENGINE_VERSION)
+        self.assertEqual(health["engine"]["verifier_config_hash"], runtime.live.engine.verifier.config_hash)
+        self.assertTrue(health["corpus"]["demo_personas_present"])
+        self.assertEqual(health["corpus"]["demo_sessions"], 25)
+        self.assertEqual(health["corpus"]["volunteer_sessions"], 0)
+
+    def test_startup_purge_is_gated_by_the_environment_variable(self):
+        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        self.assertIsNone(product_server.startup_purge_demo(runtime, {}))
+        self.assertEqual(product_server.corpus_summary(runtime)["demo_sessions"], 25)
+        result = product_server.startup_purge_demo(runtime, {"RESONANCE_PURGE_DEMO": "1"})
+        self.assertEqual(result["sessions_deleted"], 25)
+        self.assertFalse(product_server.corpus_summary(runtime)["demo_personas_present"])
+        self.assertEqual(product_server.startup_purge_demo(runtime, {"RESONANCE_PURGE_DEMO": "1"}),
+                         {"sessions_deleted": 0, "users_revoked": 0})
