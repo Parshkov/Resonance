@@ -716,6 +716,19 @@ The challenge build exposes six **browser-native WebMCP** tools through
 and remote MCP transports. See [`HACKATHON.md`](HACKATHON.md) for the build
 record and [`demo/ui/README.md`](demo/ui/README.md) for the complete judge flow.
 
+**Hosted judge path (the submitted product):** open
+`https://resonance-production-cfe3.up.railway.app` in a WebMCP-capable Chrome
+(a guest account is created for you; no sign-up), then follow **Card A** in
+[`submission/HUMAN_TEST_CARDS.md`](submission/HUMAN_TEST_CARDS.md):
+prepare → preview → explicit share → discover → evidence → revoke, each step a
+`document.modelContext` tool call with a visible page update. The same origin
+is also a remote MCP server for the chat you already use — hand your client
+only `https://resonance-production-cfe3.up.railway.app/mcp` and it completes
+standard OAuth onboarding (Cards B/C). Exact release SHA, deployment and
+executed evidence: [`submission/RELEASE_MANIFEST.md`](submission/RELEASE_MANIFEST.md).
+
+Local replay-only reproduction of the R10 surface (fixture-backed, no accounts):
+
 ```bash
 python3 -m demo.ui.webmcp_server --source replay
 ```
