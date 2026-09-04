@@ -211,6 +211,15 @@ Nothing below is claimed as done. Each item names who has to do it.
 - Decide **ADR-0005** (`approximate` vs `analogical` for same-vocabulary cross-domain pairs). It is deliberately open and needs human-authored gold; it must not be settled by moving a threshold.
 - Create the release tag if one is wanted.
 
+**Confirmed after the freeze commit merged**
+
+- The freeze commit `960fb47` (documentation only) auto-deployed as Railway deployment
+  `184aad76-206e-41ab-be27-3f58251a72fb`, SUCCESS 21:11:47 UTC, startup log
+  `oauth: core attached; … grants durable` then `competition product … mode: LIVE+WebMCP`, no
+  `purge-demo` line. `GET /api/product/health` is unchanged on every `engine.*` field and still
+  reports `demo_personas_present: false`; `ops/oauth_smoke.py` re-run against the origin: 27/27.
+  The deployed runtime is the same as `0aea577`.
+
 **Engineering, not blocking this freeze**
 
 - R9 presentation: when every live match is `negative` the page shows a match count with an empty primary rail and keeps stale REPLAY evidence. It needs an explicit empty state and a summary consistent with what is rendered.
