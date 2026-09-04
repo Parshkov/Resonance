@@ -139,6 +139,49 @@ class ProductRuntime:
     allowed_origins: frozenset[str]
 
 
+def engine_identity(runtime: "ProductRuntime") -> dict[str, str]:
+    """Versions a tester needs to know which engine answered (no secrets)."""
+    from src import scoring as _scoring
+    from src.engine import ENGINE_VERSION
+    from src.extraction import EXTRACTOR_VERSION
+    from src.fingerprint.keys import FEATURE_VERSION
+    from src.index import INDEX_VERSION
+    from src.semantics import SEMANTICS_VERSION
+    engine = runtime.live.engine
+    return {
+        "engine_version": ENGINE_VERSION,
+        "scoring_version": _scoring.SCORE_MODEL_VERSION,
+        "classify_policy": _scoring.CLASSIFY_POLICY,
+        "index_version": INDEX_VERSION,
+        "feature_version": FEATURE_VERSION,
+        "semantics_version": SEMANTICS_VERSION,
+        "extractor_version": EXTRACTOR_VERSION,
+        "verifier_config_hash": engine.verifier.config_hash,
+    }
+
+
+def corpus_summary(runtime: "ProductRuntime") -> dict[str, Any]:
+    """How much of the live corpus is real people vs seeded demo personas."""
+    kinds = runtime.live.session_kinds()
+    demo = sum(n for kind, n in kinds.items() if kind != "volunteer")
+    return {"sessions_by_kind": kinds, "volunteer_sessions": kinds.get("volunteer", 0),
+            "demo_sessions": demo, "demo_personas_present": demo > 0}
+
+
+def startup_purge_demo(runtime: "ProductRuntime", environ: Mapping[str, str] | None = None) -> dict[str, int] | None:
+    """One-shot operator action: ``RESONANCE_PURGE_DEMO=1`` tombstones every seeded
+    demo session and revokes the demo persona accounts at process start
+    (idempotent; real participants are never touched). Prints counts only."""
+    environ = os.environ if environ is None else environ
+    if environ.get("RESONANCE_PURGE_DEMO", "").strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    from src.persistence.seed import purge_demo
+    result = purge_demo(runtime.live)
+    print(f"purge-demo: sessions_deleted={result['sessions_deleted']} "
+          f"users_revoked={result['users_revoked']} (RESONANCE_PURGE_DEMO set; unset it after this deploy)")
+    return result
+
+
 def build_runtime(
     db_path: str = ":memory:",
     *,
@@ -492,7 +535,9 @@ class ProductHandler(BaseHTTPRequestHandler):
         if path == "/api/product/health":
             health = self.runtime.live.health()
             self._send_json({"ok": health.ok, "mode": "live",
-                             "freshness": product.freshness()})
+                             "freshness": product.freshness(),
+                             "engine": engine_identity(self.runtime),
+                             "corpus": corpus_summary(self.runtime)})
             return
         if path in {"/api/product/state", "/api/webmcp/state"}:
             token = None
@@ -899,6 +944,7 @@ def main(argv: list[str] | None = None) -> None:
     runtime = build_runtime(args.db, allowed_origins=origins,
                             confirmation_secret=secret,
                             seed=seed)
+    startup_purge_demo(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
     server = serve(args.host, args.port, runtime=runtime)

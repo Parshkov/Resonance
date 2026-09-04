@@ -48,6 +48,7 @@ from src.product.server import (
     _redact_db,
     _resolve_secret,
     build_runtime,
+    startup_purge_demo,
 )
 
 WEBMCP_CONTRACT = "resonance-webmcp/0.1"
@@ -621,6 +622,7 @@ def main(argv: list[str] | None = None) -> None:
     runtime = build_runtime(args.db, allowed_origins=origins,
                             confirmation_secret=secret,
                             seed=seed)
+    startup_purge_demo(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
     server = serve(args.host, args.port, runtime=runtime)

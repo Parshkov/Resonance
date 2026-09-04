@@ -864,6 +864,16 @@ class LiveCorpusService:
             self._require_fresh_index()
             return self.registry.get(thought_id)
 
+    def session_kinds(self) -> dict[str, int]:
+        """Live (not deleted) sessions by record_kind; ``volunteer`` are real people,
+        everything else is seeded demo state."""
+        counts: dict[str, int] = {}
+        for session in self.repo.list_sessions():
+            if session.deleted_at is not None:
+                continue
+            counts[session.record_kind or ""] = counts.get(session.record_kind or "", 0) + 1
+        return counts
+
     def audit_log(self) -> list[dict[str, Any]]:
         """Public audit view. The durable audit table is also the identity-event
         backing store; verifier hashes and auth-session identifiers are internal
