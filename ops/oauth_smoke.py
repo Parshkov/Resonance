@@ -181,25 +181,11 @@ class Smoke:
             self.ok("4 registration endpoint advertised", False,
                     "none advertised — hosted clients need RFC 7591 or a public client_id policy")
 
-        # 5. authorize
+        # 5. authorize (the real code, exchanged first: a conformant server burns
+        #    a code on ANY failed exchange attempt, so negatives get their own codes)
         code = self._authorize()
         if not code:
             return self.finish()
-
-        # 6/8. token + negatives
-        verifier, challenge = self._pkce_pair()
-        # (the verifier used for the real code is kept in self._verifier)
-        status, _, tok = self._token({"grant_type": "authorization_code", "code": code,
-                                      "code_verifier": "wrong-" + self._verifier,
-                                      "redirect_uri": REDIRECT_URI, "client_id": self.client_id,
-                                      "resource": self.resource})
-        self.ok("8 wrong verifier rejected", status == 400 and tok.get("error") in ("invalid_grant", "invalid_request"),
-                f"status={status} error={tok.get('error')}")
-        status, _, tok = self._token({"grant_type": "authorization_code", "code": code,
-                                      "code_verifier": self._verifier,
-                                      "redirect_uri": "http://evil.example/cb", "client_id": self.client_id,
-                                      "resource": self.resource})
-        self.ok("8 wrong redirect_uri rejected", status == 400, f"status={status} error={tok.get('error')}")
         status, _, tok = self._token({"grant_type": "authorization_code", "code": code,
                                       "code_verifier": self._verifier, "redirect_uri": REDIRECT_URI,
                                       "client_id": self.client_id, "resource": self.resource})
@@ -213,6 +199,22 @@ class Smoke:
                                        "code_verifier": self._verifier, "redirect_uri": REDIRECT_URI,
                                        "client_id": self.client_id, "resource": self.resource})
         self.ok("8 replayed code rejected", status == 400, f"status={status} error={tok2.get('error')}")
+        # fresh codes for the remaining negatives (each failed attempt burns its code)
+        bad = self._authorize(quiet=True)
+        if bad:
+            status, _, tok3 = self._token({"grant_type": "authorization_code", "code": bad,
+                                           "code_verifier": "wrong-" + self._verifier,
+                                           "redirect_uri": REDIRECT_URI, "client_id": self.client_id,
+                                           "resource": self.resource})
+            self.ok("8 wrong verifier rejected", status == 400 and tok3.get("error") in ("invalid_grant", "invalid_request"),
+                    f"status={status} error={tok3.get('error')}")
+        bad = self._authorize(quiet=True)
+        if bad:
+            status, _, tok4 = self._token({"grant_type": "authorization_code", "code": bad,
+                                           "code_verifier": self._verifier,
+                                           "redirect_uri": "http://evil.example/cb", "client_id": self.client_id,
+                                           "resource": self.resource})
+            self.ok("8 wrong redirect_uri rejected", status == 400, f"status={status} error={tok4.get('error')}")
 
         # 7. MCP with the bearer
         status, headers, init = self._rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
@@ -255,7 +257,10 @@ class Smoke:
                           headers={"Content-Type": "application/x-www-form-urlencoded"},
                           data=urlencode(form).encode())
 
-    def _authorize(self) -> str | None:
+    def _authorize(self, quiet: bool = False) -> str | None:
+        """Run one authorize round-trip and return the code. `quiet` (used for the
+        negative cases that need their own fresh code) records nothing."""
+        ok = (lambda *a, **k: bool(a[1])) if quiet else self.ok
         self._verifier, challenge = self._pkce_pair()
         state = secrets.token_urlsafe(16)
         scope = "offline_access" if "offline_access" in (self.meta.get("scopes_supported") or []) else ""
@@ -266,7 +271,7 @@ class Smoke:
             params["scope"] = scope
         url = self.meta["authorization_endpoint"] + "?" + urlencode(params)
         status, headers, body = self._req(url)
-        self.ok("5 GET authorize renders a page (200)", status == 200, f"status={status}")
+        ok("5 GET authorize renders a page (200)", status == 200, f"status={status}")
         if status != 200:
             return None
         if not self.auto_consent:
@@ -277,7 +282,7 @@ class Smoke:
         else:
             parser = _FormParser()
             parser.feed(body.decode("utf-8", "replace"))
-            if not self.ok("5 consent form present", parser.action is not None):
+            if not ok("5 consent form present", parser.action is not None):
                 return None
             fields = dict(parser.fields)
             # pick an approve/guest-style submit if the form offers choices
@@ -290,12 +295,13 @@ class Smoke:
                                               headers={"Content-Type": "application/x-www-form-urlencoded",
                                                        "Origin": self.origin, "Referer": url})
             loc = headers.get("Location", "")
-            self.ok("5 consent POST redirects (302/303)", status in (302, 303), f"status={status}")
-            self.ok("5 redirect goes to the exact redirect_uri", loc.startswith(REDIRECT_URI + "?"), loc[:120])
+            redacted = re.sub(r"code=[^&]+", "code=<redacted>", loc)
+            ok("5 consent POST redirects (302/303)", status in (302, 303), f"status={status}")
+            ok("5 redirect goes to the exact redirect_uri", loc.startswith(REDIRECT_URI + "?"), redacted[:120])
             q = parse_qs(urlsplit(loc).query)
         code = (q.get("code") or [None])[0]
-        self.ok("5 code returned", bool(code))
-        self.ok("5 exact state round-trip", (q.get("state") or [None])[0] == state)
+        ok("5 code returned", bool(code))
+        ok("5 exact state round-trip", (q.get("state") or [None])[0] == state)
         return code
 
     def finish(self) -> int:
