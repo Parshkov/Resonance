@@ -87,8 +87,11 @@ def dispatch(core: Any, *, method: str, path: str, query: Mapping[str, list[str]
     if core is None or not hasattr(core, "handle"):
         return MountResponse(404, {"Content-Type": "application/json; charset=utf-8"},
                              b'{"error":"not_found","message":"OAuth core is not mounted"}')
-    status, out_headers, out_body = core.handle(
-        method, path, dict(query), dict(headers), body, issuer=issuer)
+    result = core.handle(method, path, dict(query), dict(headers), body, issuer=issuer)
+    if isinstance(result, tuple):
+        status, out_headers, out_body = result
+    else:  # src.remote.oauth.OAuthResult (status / headers / body attributes)
+        status, out_headers, out_body = result.status, result.headers, result.body
     if isinstance(out_body, str):
         out_body = out_body.encode("utf-8")
     return MountResponse(status, out_headers, out_body or b"")
@@ -116,12 +119,16 @@ def attach_core(runtime: Any, *, issuer: str) -> Any | None:
     token, never a secret.
     """
     try:
-        from src.remote.oauth_core import build_oauth_core  # R15A-owned (#134)
+        from src.remote.oauth import GrantStore, OAuthCore  # R15A-owned (#134)
     except ImportError as exc:
         print(f"oauth: core not attached ({exc.__class__.__name__}: {exc}); "
               f"/mcp keeps bearer-only access")
         return None
-    core = build_oauth_core(runtime, issuer=issuer)
+    # The core's bearer IS the R12 access token (durable in the identity event
+    # log); codes / refresh grants / client registrations live in the in-memory
+    # GrantStore of this one production replica and are re-created by the
+    # client's normal re-authorization after a redeploy.
+    core = OAuthCore(runtime.identity, GrantStore())
     runtime.oauth_core = core
     print(f"oauth: core attached; issuer {issuer}; resource {resource_url(issuer)}")
     return core
