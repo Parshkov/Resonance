@@ -9,10 +9,10 @@
 | --- | --- |
 | public product URL | `https://resonance-production-cfe3.up.railway.app` |
 | canonical remote MCP URL | `https://resonance-production-cfe3.up.railway.app/mcp` |
-| release `main` SHA | `RELEASE_SHA_PENDING` |
+| release `main` SHA | `bd161ad12d196cf095c4fc71d1f625ad4b86fba5` (PR #142 merge; includes #130 docs squash `13896b5` and R15A/R15C `4ab28a3`) |
 | previous production candidate | `4ab28a30f986478562a88e1e1e6a83c81ef7bda9` = Railway deployment `b3bd196b-64a4-46e3-8ceb-db0352ec9ae4` (SUCCESS 06:00:36 UTC) |
 | Railway project / service / env | `resonance-live` (`670bcce5-0908-4eeb-81a6-decbdaba7e4c`) / `resonance` (`172aa183-cb11-47f5-a38a-a33482f93cf8`) / `production` (`da338ecd-9e65-477a-917e-59ff96dd7253`) |
-| release Railway deployment id | `DEPLOYMENT_PENDING` |
+| release Railway deployment id | `f48d930e-1190-4ba8-bc84-50108ac9da0c` — SUCCESS 06:32:02 UTC, `commitHash bd161ad…`, healthcheck passed before routing; startup log `oauth: core attached; issuer https://resonance-production-cfe3.up.railway.app; resource …/mcp` then `competition product on http://0.0.0.0:8080 (origins: ['https://resonance-production-cfe3.up.railway.app']; db: postgresql://postgres@postgres.railway.internal:5432/railway; mode: LIVE+WebMCP)`; previous deployment `b3bd196b` retired (REMOVED) |
 | entrypoint | `python3 -m src.product.competition_server --host 0.0.0.0 --port $PORT --db $RESONANCE_DB --origin $PUBLIC_ORIGIN` (Dockerfile, `python:3.12-slim`, only dependency `psycopg[binary]==3.3.5`) |
 | runtime | one origin, one process, one PostgreSQL (`pgvector/pgvector:pg16`, private host `postgres.railway.internal`); startup log `oauth: core attached; issuer https://resonance-production-cfe3.up.railway.app; resource …/mcp` then `competition product … mode: LIVE+WebMCP` (DSN redacted) |
 | secrets | `RESONANCE_CONFIRMATION_SECRET`, `RESONANCE_DB`, `PUBLIC_ORIGIN`, `PORT` supplied by Railway variables only; none in the repo |
@@ -35,10 +35,13 @@
 | check | where | result |
 | --- | --- | --- |
 | full repository suite on `4ab28a3` | this sandbox, Python 3.11.15 | **433 tests OK, 2 skipped** (537 s) |
-| full suite on the release tree (`4ab28a3` + #142 fix) | this sandbox | `SUITE_PENDING` |
+| full suite on the release tree (`bd161ad` content) | this sandbox | **434 tests OK, 2 skipped** (542 s) |
 | public origin raw HTTP (health, 401 challenge, RFC 9728/8414 metadata, 405 GET, 400 bare authorize) | sibling session with egress, `submission/evidence/public-origin/phase1_http.md` | PASS (06:14 UTC) |
 | public origin OAuth onboarding smoke `ops/oauth_smoke.py … --auto-consent` | sibling session, `submission/evidence/public-origin/phase2_oauth_smoke.txt` | **27/27** (06:15 UTC) |
-| public origin A/B/C three-identity structural test over `/mcp` | sibling session, `submission/evidence/public-origin/phase3_*` | `ABC_PUBLIC_PENDING` |
+| public origin A/B/C three-identity structural test over `/mcp` (deployment `b3bd196b`) | sibling session, `submission/evidence/public-origin/phase3_*` | **41/41** (06:20–06:21 UTC): B → A `analogical`, structural 0.8875, semantic 0.097, 7 mapped nodes, 5 preserved relations, `result-21330ad10b4fd06cf06984be` live; C absent; subject isolation, idempotent intro, accept/message/read, channel isolation, revoke → immediate disappearance + `stale_result` |
+| public origin OAuth/MCP negatives | `submission/evidence/public-origin/phase4_negatives.md` | 18/20: all token/PKCE/redirect/resource/refresh/revoke/query-token/bogus-bearer negatives hold; two expectations did not (refresh-token revoke does not cascade to the sibling access token — RFC 7009 SHOULD; stateless bridge ignores `Mcp-Session-Id` — spec-permitted) |
+| public origin browser run (Playwright Chromium 141, deployment `b3bd196b`) | `submission/evidence/public-origin/phase5_browser.md` | native `document.modelContext` absent (honest); shim-registered page tools: prepare → preview → share (pill → `Shared with Resonance`, `WebMCP · LIVE shared`) → LIVE discover `result-e2b27a3688f3da003de857a0`, **11 matches** → revoke; `discover(replay)` before share was the 500 fixed by #142 |
+| public origin re-verification on the release deployment `f48d930e` | `submission/evidence/public-origin-bd161ad/` | `REVERIFY_PENDING` |
 | same A/B/C on the identical tree, local PostgreSQL 16 through `competition_server` | `submission/evidence/local-postgres/abc_local_postgres.json` | **35/35**: A "retry storm" ↔ B "panic buying" `analogical`, structural 0.8875, semantic 0.089, 6/6 relations preserved; C (shared vocabulary, no loop) absent; result_id subject-bound; intro idempotent → accept → message → read; C excluded from channel; stop_sharing → immediate disappearance, old result_id fails closed; stateless session + reconnect; query-string token 401; RFC 7009 revoke → 401 |
 | local OAuth smoke through `competition_server` on PostgreSQL | this sandbox | 27/27 |
 | browser page + tool registration + prepare/preview/share/discover/get_match/revoke with visible UI state | `submission/evidence/local-postgres/browser_harness.json` + screenshots | 17/18 — the one FAIL is the honest probe "native `document.modelContext` present" (absent in Chromium 141); tools were registered through the page's own `registerTool` call via a labelled shim |
