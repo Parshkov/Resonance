@@ -1,0 +1,28 @@
+{
+    "ok": true,
+    "mode": "live",
+    "freshness": {
+        "db_generation": 426,
+        "serving_generation": 426,
+        "index_current": true,
+        "engine_snapshot": "c1ab5abc43b87b5e17ba6ef3e1494d289b41242fcd756fb5391eb01a1e465b99"
+    },
+    "engine": {
+        "engine_version": "resonance-engine/0.2",
+        "scoring_version": "resonance-score/0.2",
+        "classify_policy": "scoring-v0.2-concept-aligned-analogy/0.2",
+        "index_version": "resonance-index/0.2.0",
+        "feature_version": "resonance-fingerprint/0.2.0-multi+concept;resonance-semantics/0.2.0+resonance-lexicon/0.2.6",
+        "semantics_version": "resonance-semantics/0.2.0+resonance-lexicon/0.2.6",
+        "extractor_version": "0.2.0",
+        "verifier_config_hash": "12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77"
+    },
+    "corpus": {
+        "sessions_by_kind": {
+            "volunteer": 62
+        },
+        "volunteer_sessions": 62,
+        "demo_sessions": 0,
+        "demo_personas_present": false
+    }
+}
