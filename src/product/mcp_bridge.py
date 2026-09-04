@@ -581,7 +581,11 @@ class RemoteMCPBridge:
             candidate = build_thought_dna(thought, human_id=actor.user_id)
             prepared = self.product.prepare_structured(token, candidate, **common)
         else:
-            prepared = self.product.prepare_raw_text(token, str(context), **common)
+            # A per-prepare namespace keeps the extracted Thought DNA id unique
+            # per person and attempt: the same sentences prepared again (or by
+            # another person) must not collide with a reserved/revoked id.
+            prepared = self.product.prepare_raw_text(
+                token, str(context), source_id=f"{actor.user_id}:{secrets.token_hex(8)}", **common)
         draft_id = str(prepared["draft_id"])
         preview = self.product.preview(token, draft_id, client_id=CLIENT_ID)
         structure = _structure_summary(preview.get("thought_dna"))
