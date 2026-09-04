@@ -182,6 +182,62 @@ def startup_purge_demo(runtime: "ProductRuntime", environ: Mapping[str, str] | N
     return result
 
 
+def startup_purge_sessions(runtime: "ProductRuntime",
+                           environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: ``RESONANCE_PURGE_SESSIONS=<id>[,<id>…]``
+    tombstones exactly the sessions the operator named, at process start.
+
+    This exists because `purge-demo` deliberately cannot help here. It selects
+    rows by `record_kind != "volunteer"`, and the rows an owner actually needs
+    to remove — duplicate guest sessions left by acceptance runs before they
+    learned to revoke themselves — are real `volunteer` records. The product's
+    own `delete_session` needs the *owner's* access token, and those guests'
+    tokens are long gone.
+
+    So this deletes by explicit id and nothing else. It never selects rows on
+    its own, never matches a pattern, and never touches a session the operator
+    did not type. Every id is reported with what happened to it, including ids
+    that do not exist and ids that were already deleted, so a run that quietly
+    did less than the operator intended is visible in the log. Idempotent: a
+    second run reports `already_deleted` for everything and changes nothing.
+
+    Prints ids and counts only — never a topic, a label or any thought content.
+    """
+    environ = os.environ if environ is None else environ
+    raw = (environ.get("RESONANCE_PURGE_SESSIONS") or "").strip()
+    if not raw:
+        return None
+    wanted: list[str] = []
+    for chunk in raw.replace(",", " ").split():
+        token = chunk.strip()
+        if token and token not in wanted:
+            wanted.append(token)
+    outcome: dict[str, str] = {}
+    deleted = 0
+    for session_id in wanted:
+        session = runtime.live.get_session(session_id)
+        if session is None:
+            outcome[session_id] = "missing"
+            continue
+        if session.deleted_at is not None:
+            outcome[session_id] = "already_deleted"
+            continue
+        runtime.live.delete_session(session_id, rebuild=False)
+        outcome[session_id] = "deleted"
+        deleted += 1
+    if deleted:
+        runtime.live.rebuild_index()
+    result = {"requested": len(wanted), "deleted": deleted,
+              "already_deleted": sum(1 for v in outcome.values() if v == "already_deleted"),
+              "missing": sum(1 for v in outcome.values() if v == "missing"),
+              "outcome": outcome}
+    print(f"purge-sessions: requested={result['requested']} deleted={result['deleted']} "
+          f"already_deleted={result['already_deleted']} missing={result['missing']} "
+          f"({', '.join(f'{k}={v}' for k, v in outcome.items())}) "
+          f"(RESONANCE_PURGE_SESSIONS set; unset it after this deploy)")
+    return result
+
+
 def build_runtime(
     db_path: str = ":memory:",
     *,
@@ -945,6 +1001,7 @@ def main(argv: list[str] | None = None) -> None:
                             confirmation_secret=secret,
                             seed=seed)
     startup_purge_demo(runtime)
+    startup_purge_sessions(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     # The startup log names the FIRST declared --origin; per-request metadata
     # still follows the host actually addressed (see `_issuer`).

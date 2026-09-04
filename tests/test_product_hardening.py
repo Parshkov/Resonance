@@ -177,3 +177,50 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(product_server.corpus_summary(runtime)["demo_personas_present"])
         self.assertEqual(product_server.startup_purge_demo(runtime, {"RESONANCE_PURGE_DEMO": "1"}),
                          {"sessions_deleted": 0, "users_revoked": 0})
+
+    def test_purge_sessions_deletes_only_the_ids_the_operator_named(self):
+        # `purge-demo` selects by record_kind and so cannot touch the rows an
+        # owner actually needs to remove: duplicate `volunteer` guest sessions
+        # left by acceptance runs before they revoked themselves. Those guests'
+        # access tokens are gone, so the product's own delete_session is out of
+        # reach too. This deletes by explicit id and nothing else.
+        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        live = runtime.live
+        ids = [s.session_id for s in live.repo.list_sessions()]
+        self.assertGreaterEqual(len(ids), 4)
+        target, other = ids[0], ids[1]
+
+        # unset / blank: nothing happens at all
+        self.assertIsNone(product_server.startup_purge_sessions(runtime, {}))
+        self.assertIsNone(product_server.startup_purge_sessions(
+            runtime, {"RESONANCE_PURGE_SESSIONS": "   "}))
+        self.assertIsNone(live.get_session(target).deleted_at)
+
+        # only the named id is tombstoned; an unknown id is reported, not fatal
+        result = product_server.startup_purge_sessions(
+            runtime, {"RESONANCE_PURGE_SESSIONS": f"{target}, ses-does-not-exist"})
+        self.assertEqual(result["deleted"], 1)
+        self.assertEqual(result["missing"], 1)
+        self.assertEqual(result["outcome"][target], "deleted")
+        self.assertEqual(result["outcome"]["ses-does-not-exist"], "missing")
+        self.assertIsNotNone(live.get_session(target).deleted_at)
+        # a session that was NOT named is untouched
+        self.assertIsNone(live.get_session(other).deleted_at)
+
+        # idempotent: a second run changes nothing and says so
+        again = product_server.startup_purge_sessions(
+            runtime, {"RESONANCE_PURGE_SESSIONS": target})
+        self.assertEqual((again["deleted"], again["already_deleted"]), (0, 1))
+        self.assertEqual(again["outcome"][target], "already_deleted")
+
+        # whitespace/comma separated, duplicates collapsed
+        third = ids[2]
+        many = product_server.startup_purge_sessions(
+            runtime, {"RESONANCE_PURGE_SESSIONS": f" {third},{third}  {target} "})
+        self.assertEqual(many["requested"], 2)
+        self.assertEqual(many["deleted"], 1)
+        self.assertIsNotNone(live.get_session(third).deleted_at)
+
+        # a tombstoned session leaves the served index
+        self.assertNotIn(target, [s.session_id for s in live.repo.list_sessions()
+                                  if s.deleted_at is None])
