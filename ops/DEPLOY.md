@@ -42,7 +42,52 @@ DSN passed via `--db` was treated as a file name and the live product could not
 run on PostgreSQL regardless of the migration fix. Cookies are marked `Secure`
 automatically when every allowed origin is `https://`.
 
-## Option A — Fly.io with Fly Postgres (recommended: one CLI, ~10 minutes)
+## Option A — Railway with Railway PostgreSQL (chosen: no CLI, ~10 minutes, ~$8–12/month)
+
+`railway.json` in the repository root tells Railway to build the `Dockerfile`,
+health-check `/api/product/health`, and restart on failure.
+
+1. **Create the project.** railway.com → **New Project** → **Deploy from GitHub
+   repo** → `Parshkov/Resonance`, branch `main`. Railway detects the Dockerfile.
+   The first deploy will fail on purpose (no secret yet) — that is expected.
+2. **Add PostgreSQL.** In the project canvas: **+ Create** → **Database** →
+   **Add PostgreSQL**. Wait until it shows a green status. It exposes
+   `DATABASE_URL` (and an internal `postgres.railway.internal` URL) to the
+   project.
+   - pgvector (optional, for later): the standard Railway PostgreSQL image
+     ships the extension — once the DB is up, open its **Data** tab (or
+     **Connect** → `psql`) and run `CREATE EXTENSION IF NOT EXISTS vector;`.
+     If the image lacks it, deploy the **pgvector** template from the Railway
+     catalog instead and point `RESONANCE_DB` at that service.
+   - Backups: open the PostgreSQL service → **Backups** and confirm daily
+     volume backups are enabled on your plan; if not, add a `pg_dump` cron
+     service later.
+3. **Generate the public URL first.** Click the app service → **Settings** →
+   **Networking** → **Generate Domain**. Copy the `https://….up.railway.app`
+   URL — it is needed for the origin allowlist in the next step.
+4. **Variables.** App service → **Variables** → **+ New Variable** (or **Raw
+   Editor**):
+
+   | variable | value |
+   | --- | --- |
+   | `RESONANCE_DB` | `${{Postgres.DATABASE_URL}}` (reference the DB service; use the private URL variant if offered — no egress cost) |
+   | `RESONANCE_CONFIRMATION_SECRET` | 64 random hex characters, e.g. from `openssl rand -hex 32` or any password generator; must be ≥ 32 bytes and **never change afterwards** |
+   | `PUBLIC_ORIGIN` | the exact `https://….up.railway.app` from step 3, no trailing slash |
+
+   `PORT` is injected by Railway automatically; the image reads it.
+5. **Deploy.** Saving variables triggers a redeploy. Watch **Deployments →
+   View logs** for `live product on http://0.0.0.0:<port> (... mode: LIVE)`.
+   The health check must go green before traffic is routed.
+6. **Smoke test** (below). Then open the URL in Chrome and run the judge flow
+   from `HACKATHON.md`.
+
+Custom domain later: **Settings → Networking → Custom Domain**, add the CNAME
+Railway shows, then set `PUBLIC_ORIGIN=https://your.domain` and
+`EXTRA_ORIGINS="--origin https://….up.railway.app"` so both hosts pass the
+origin check. Never leave a host out of the allowlist: browsers on it will be
+CSRF-rejected on every write.
+
+## Option B — Fly.io with Fly Postgres (CLI, ~10 minutes, ~$5–8/month; unmanaged Postgres)
 
 ```bash
 fly auth login
@@ -60,19 +105,6 @@ curl -s https://resonance-live.fly.dev/api/product/health
 Custom domain: `fly certs add your.domain`, then set
 `PUBLIC_ORIGIN=https://your.domain` and `EXTRA_ORIGINS="--origin https://resonance-live.fly.dev"`
 so both hosts pass the origin check.
-
-## Option B — Railway (GUI, no CLI; built-in Postgres)
-
-1. New Project → **Deploy from GitHub repo** → pick this repository. Railway
-   detects the `Dockerfile`.
-2. **+ New → Database → PostgreSQL.** Railway exposes `DATABASE_URL` to the
-   service.
-3. Service → **Variables**:
-   - `RESONANCE_DB` = `${{Postgres.DATABASE_URL}}`
-   - `RESONANCE_CONFIRMATION_SECRET` = a 64-hex random string
-   - `PUBLIC_ORIGIN` = the `https://…up.railway.app` URL from **Settings →
-     Networking → Generate Domain** (do that first)
-4. Deploy. Check `https://<domain>/api/product/health`.
 
 ## Option C — Render (managed Postgres, `render.yaml` not included)
 
@@ -114,7 +146,11 @@ Then open `$ORIGIN/` in Chrome and run the judge flow from `HACKATHON.md`.
 ## Known limits at the time of writing
 
 - The R9 visual discovery view (map, match cards) does not initialise on the
-  live origin — see #88. The collaboration panel and every product API work.
+  live origin — its `/api/config` + `/api/context` routes exist only on the R9
+  demo server (#88). `demo/ui/live_shell.mjs` moves the page to an explicit
+  "Live product" state instead of loading placeholders and puts the
+  Collaboration panel first; the panel and every product API work. Wiring the
+  visual view to live per-user data is the remaining R13 follow-up.
 - One process, one machine: fine for the ≥100-user pilot on the accepted
   structural engine; scale-out would need sticky sessions or a shared
   idempotency store, neither of which the pilot requires.
