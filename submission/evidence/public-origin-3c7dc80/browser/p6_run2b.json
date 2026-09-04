@@ -1,0 +1,117 @@
+{
+ "started_at": "2026-09-04T15:48:15Z",
+ "checks": [
+  {
+   "step": "page loaded with shim; tools registered",
+   "ok": true,
+   "detail": "title='Resonance \u2014 Visual Discovery' heading_before='plasma lens thermal bloom \u2192 ionization cascade'"
+  },
+  {
+   "step": "resonance_prepare_thought WITH structured thought -> private draft",
+   "ok": true,
+   "detail": "{\"discoverable\": false, \"input_kind\": \"agent_structured\", \"source_retention\": \"not_retained\", \"session_id\": \"ses-b1426a6b2172a48d\"}"
+  },
+  {
+   "step": "resonance_get_share_preview shows own 5 labels + confirmation_token",
+   "ok": true,
+   "detail": "nodes=5 relations=5 topic='Panic buying after a shortage rumour'"
+  },
+  {
+   "step": "resonance_share_prepared_thought (confirm+token) -> shared",
+   "ok": true,
+   "detail": "{\"shared\": true, \"discoverable\": true, \"session_id\": \"ses-b1426a6b2172a48d\"}"
+  },
+  {
+   "step": "resonance_discover {source:live} -> live matches",
+   "ok": true,
+   "detail": "result_id=set n=15"
+  },
+  {
+   "step": "#thought-heading starts with 'Panic buying after a shortage rumour'",
+   "ok": true,
+   "detail": "heading='Panic buying after a shortage rumour \u2192 synchronized bulk purchases'"
+  },
+  {
+   "step": "#map-status-text captured",
+   "ok": true,
+   "detail": "map_status_text='3 resonances \u00b7 backend order intact'"
+  },
+  {
+   "step": ".match-card count == 4",
+   "ok": false,
+   "detail": "count=3 classes=['match-card is-selected', 'match-card', 'match-card'] labels=[None, None, None]"
+  },
+  {
+   "step": "after clicking #source-live: #thought-heading starts with 'Panic buying after a shortage rumour'",
+   "ok": true,
+   "detail": "heading='Panic buying after a shortage rumour \u2192 synchronized bulk purchases' map_status_text='3 resonances \u00b7 backend order intact'"
+  },
+  {
+   "step": "after clicking #source-live: .match-card count == 4",
+   "ok": false,
+   "detail": "count=3 classes=['match-card is-selected', 'match-card', 'match-card'] texts=['01 | guest-911d11 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r', '02 | guest-85ccf9 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r', '03 | guest-d0c40c | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r']"
+  },
+  {
+   "step": "resonance_update_consent {shared:false} -> revoked",
+   "ok": true,
+   "detail": "{\"shared\": false, \"revoked\": true, \"discoverable\": false}"
+  },
+  {
+   "step": "consent page 200 and shows client name 'Claude (custom connector)'",
+   "ok": true,
+   "detail": "status=200 title='Authorize Resonance access'"
+  },
+  {
+   "step": "consent stylesheet applied: main.consent borderRadius == '22px'",
+   "ok": true,
+   "detail": "borderRadius='22px' stylesheets=['https://resonance-production-cfe3.up.railway.app/oauth/consent.css']"
+  }
+ ],
+ "thought_heading": "Panic buying after a shortage rumour \u2192 synchronized bulk purchases",
+ "map_status_text": "3 resonances \u00b7 backend order intact",
+ "match_card_count": 3,
+ "match_card_classes": [
+  "match-card is-selected",
+  "match-card",
+  "match-card"
+ ],
+ "match_card_labels": [
+  null,
+  null,
+  null
+ ],
+ "header_consent": "Shared with Resonance",
+ "webmcp_status": "WebMCP \u00b7 LIVE DB discovery",
+ "match_card_texts_before_click": [
+  "01 | guest-911d11 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r",
+  "02 | guest-85ccf9 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r",
+  "03 | guest-d0c40c | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r"
+ ],
+ "after_click_thought_heading": "Panic buying after a shortage rumour \u2192 synchronized bulk purchases",
+ "after_click_map_status_text": "3 resonances \u00b7 backend order intact",
+ "after_click_match_card_count": 3,
+ "after_click_match_card_classes": [
+  "match-card is-selected",
+  "match-card",
+  "match-card"
+ ],
+ "after_click_match_card_texts": [
+  "01 | guest-911d11 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r",
+  "02 | guest-85ccf9 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r",
+  "03 | guest-d0c40c | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r"
+ ],
+ "console": [
+  "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'."
+ ],
+ "consent_client_registered": true,
+ "consent": {
+  "status": 200,
+  "client_name_shown": true,
+  "main_consent_border_radius": "22px",
+  "stylesheets": [
+   "https://resonance-production-cfe3.up.railway.app/oauth/consent.css"
+  ],
+  "title": "Authorize Resonance access"
+ },
+ "finished_at": "2026-09-04T15:48:43Z"
+}

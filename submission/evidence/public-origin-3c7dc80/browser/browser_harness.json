@@ -1,0 +1,160 @@
+{
+  "origin": "https://resonance-production-cfe3.up.railway.app",
+  "started_at": "2026-09-04T15:47:14Z",
+  "steps": [],
+  "browser": {
+    "version": "141.0.7390.37",
+    "native_document_modelContext": "undefined",
+    "native_navigator_modelContext": "undefined"
+  },
+  "native_status_pill": "WebMCP \u00b7 private",
+  "native_contract": {
+    "contract": "resonance-webmcp/0.1",
+    "toolNames": [
+      "resonance_prepare_thought",
+      "resonance_get_share_preview",
+      "resonance_share_prepared_thought",
+      "resonance_discover",
+      "resonance_get_match",
+      "resonance_update_consent"
+    ],
+    "mode": "live-product"
+  },
+  "console_native": [
+    "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'."
+  ],
+  "harness_tools": [
+    "resonance_request_intro",
+    "resonance_list_requests",
+    "resonance_respond_intro",
+    "resonance_send_message",
+    "resonance_read_messages",
+    "resonance_create_workspace",
+    "resonance_list_workspaces",
+    "resonance_get_workspace",
+    "resonance_respond_workspace_invite",
+    "resonance_add_workspace_note",
+    "resonance_add_workspace_task",
+    "resonance_prepare_thought",
+    "resonance_get_share_preview",
+    "resonance_share_prepared_thought",
+    "resonance_discover",
+    "resonance_get_match",
+    "resonance_update_consent"
+  ],
+  "header_before": "Private \u00b7 not discoverable",
+  "pre_share_discover": {
+    "status": 409,
+    "body": "{\"error\": \"share_required\", \"message\": \"discovery needs a shared thought first: run resonance_prepare_thought \u2192 resonance_get_share_preview \u2192 resonance_share_prepared_thought (explicit confirm), then resonance_discover again.\"}"
+  },
+  "header_after_prepare": "Private \u00b7 not discoverable",
+  "pill_after_prepare": "WebMCP \u00b7 private draft ready",
+  "header_after_share": "Shared with Resonance",
+  "pill_after_share": "WebMCP \u00b7 LIVE shared",
+  "pill_after_discover": "WebMCP \u00b7 LIVE DB discovery",
+  "response_summary": "10 matches \u00b7 3 rejected",
+  "header_after_revoke": "Private \u00b7 not discoverable",
+  "pill_after_revoke": "WebMCP \u00b7 private",
+  "console_harness": [
+    "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'.",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "harness: click #source-live failed: Page.click: Timeout 3000ms exceeded.\nCall log:\n  - waiting for locator(\"#source-live\")\n    - locator resolved to <button disabled type=\"button\" id=\"source-live\" data-source=\"live\" aria-pressed=\"true\" class=\"source-option is-active is-loading\">\u2026</button>\n  - attempting click action\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n      - waiting 100ms\n    4 \u00d7 waiting for element to be visible, enabled and stable\n      - element is not enabled\n    - retrying click action\n      - waiting 500ms\n",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 409 ()",
+    "error: Failed to load resource: the server responded with a status of 400 ()"
+  ],
+  "checks": [
+    {
+      "step": "page loads (title + app shell)",
+      "ok": true,
+      "detail": "title='Resonance \u2014 Visual Discovery'"
+    },
+    {
+      "step": "NATIVE document.modelContext present",
+      "ok": false,
+      "detail": "typeof document.modelContext=undefined; navigator.modelContext=undefined in Chromium 141.0.7390.37 (absent = expected in stock Chromium; native evidence needs a WebMCP-enabled Chrome)"
+    },
+    {
+      "step": "page exposes WebMCP contract + six tool names",
+      "ok": true,
+      "detail": "{\"contract\": \"resonance-webmcp/0.1\", \"toolNames\": [\"resonance_prepare_thought\", \"resonance_get_share_preview\", \"resonance_share_prepared_thought\", \"resonance_discover\", \"resonance_get_match\", \"resonance_update_consent\"], \"mode\": \"live-product\"}"
+    },
+    {
+      "step": "HARNESS: page registered its tools via document.modelContext.registerTool (six R10 tools + collaboration/workspace tools)",
+      "ok": true,
+      "detail": "17 tools: resonance_request_intro, resonance_list_requests, resonance_respond_intro, resonance_send_message, resonance_read_messages, resonance_create_workspace, resonance_list_workspaces, resonance_get_workspace, resonance_respond_workspace_invite, resonance_add_workspace_note, resonance_add_workspace_task, resonance_prepare_thought, resonance_get_share_preview, resonance_share_prepared_thought, resonance_discover, resonance_get_match, resonance_update_consent"
+    },
+    {
+      "step": "HARNESS: status pill reports registration",
+      "ok": true,
+      "detail": "WebMCP \u00b7 private"
+    },
+    {
+      "step": "nothing discoverable before share: discover(replay) fails closed with 409 share_required",
+      "ok": true,
+      "detail": "status=409 body={\"error\": \"share_required\", \"message\": \"discovery needs a shared thought first: run resonance_prepar"
+    },
+    {
+      "step": "WRITE 1: resonance_prepare_thought -> private (discoverable=false)",
+      "ok": true,
+      "detail": "{\"discoverable\": false, \"draft_ready\": null, \"session_id\": \"ses-6e2ba5d1919cd80f\", \"state\": null}"
+    },
+    {
+      "step": "READ: resonance_get_share_preview returns confirmation_token + Thought DNA",
+      "ok": true,
+      "detail": "nodes=10 relations=10"
+    },
+    {
+      "step": "nothing discoverable before confirm: LIVE discover refuses (no shared thought)",
+      "ok": true,
+      "detail": "{\"isError\": true, \"error\": \"share_required\", \"status\": 409, \"message\": \"discovery needs a shared thought first: run resonance_prepare_thought \\u2192 resonance_g"
+    },
+    {
+      "step": "WRITE 2: explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "{\"discoverable\": true, \"shared\": true, \"session_id\": \"ses-6e2ba5d1919cd80f\"}"
+    },
+    {
+      "step": "visible UI update after share (header/pill changed)",
+      "ok": true,
+      "detail": "header: 'Private \u00b7 not discoverable' -> 'Shared with Resonance'; pill: 'WebMCP \u00b7 LIVE shared'"
+    },
+    {
+      "step": "idempotent retry (same request_id) returns committed result",
+      "ok": true,
+      "detail": "ses-6e2ba5d1919cd80f == ses-6e2ba5d1919cd80f"
+    },
+    {
+      "step": "READ: LIVE discover after share returns live matches",
+      "ok": true,
+      "detail": "result_id=result-9cd7c8f67d5f3cfec3269d32 n=15"
+    },
+    {
+      "step": "visible match cards/results after discover",
+      "ok": true,
+      "detail": "cards=4"
+    },
+    {
+      "step": "READ: resonance_get_match returns evidence for a live match",
+      "ok": false,
+      "detail": "keys=['error', 'isError', 'message', 'status']"
+    },
+    {
+      "step": "WRITE 3: revoke consent (shared=false)",
+      "ok": true,
+      "detail": "{\"contract_version\": \"resonance-webmcp/0.1\", \"session_id\": \"ses-6e2ba5d1919cd80f\", \"shared\": false, \"revoked\": true, \"discoverable\": false}"
+    },
+    {
+      "step": "after revoke: LIVE discover fails closed / thought not discoverable",
+      "ok": true,
+      "detail": "{\"isError\": true, \"error\": \"share_required\", \"status\": 409, \"message\": \"discovery needs a shared thought first: run resonance_prepare_thought \\u2192 resonance_g"
+    },
+    {
+      "step": "after revoke: old result_id evidence fails closed",
+      "ok": true,
+      "detail": "{\"isError\": true, \"error\": \"validation_failed\", \"status\": 400, \"message\": \"discovery result is unknown, expired, or not yours; run discovery again\"}"
+    }
+  ],
+  "summary": "16/18 checks passed"
+}

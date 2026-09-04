@@ -1,0 +1,21 @@
+[PASS] page loads (title + app shell) — title='Resonance — Visual Discovery'
+[FAIL] NATIVE document.modelContext present — typeof document.modelContext=undefined; navigator.modelContext=undefined in Chromium 141.0.7390.37 (absent = expected in stock Chromium; native evidence needs a WebMCP-enabled Chrome)
+[PASS] page exposes WebMCP contract + six tool names — {"contract": "resonance-webmcp/0.1", "toolNames": ["resonance_prepare_thought", "resonance_get_share_preview", "resonance_share_prepared_thought", "resonance_discover", "resonance_get_match", "resonance_update_consent"], "mode": "live-product"}
+[PASS] HARNESS: page registered its tools via document.modelContext.registerTool (six R10 tools + collaboration/workspace tools) — 17 tools: resonance_request_intro, resonance_list_requests, resonance_respond_intro, resonance_send_message, resonance_read_messages, resonance_create_workspace, resonance_list_workspaces, resonance_get_workspace, resonance_respond_workspace_invite, resonance_add_workspace_note, resonance_add_workspace_task, resonance_prepare_thought, resonance_get_share_preview, resonance_share_prepared_thought, resonance_discover, resonance_get_match, resonance_update_consent
+[PASS] HARNESS: status pill reports registration — WebMCP · private
+[PASS] nothing discoverable before share: discover(replay) fails closed with 409 share_required — status=409 body={"error": "share_required", "message": "discovery needs a shared thought first: run resonance_prepar
+[PASS] WRITE 1: resonance_prepare_thought -> private (discoverable=false) — {"discoverable": false, "draft_ready": null, "session_id": "ses-c57ce130290dec95", "state": null}
+[PASS] READ: resonance_get_share_preview returns confirmation_token + Thought DNA — nodes=10 relations=10
+[PASS] nothing discoverable before confirm: LIVE discover refuses (no shared thought) — {"isError": true, "error": "share_required", "status": 409, "message": "discovery needs a shared thought first: run resonance_prepare_thought \u2192 resonance_g
+[PASS] WRITE 2: explicit share -> discoverable=true — {"discoverable": true, "shared": true, "session_id": "ses-c57ce130290dec95"}
+[PASS] visible UI update after share (header/pill changed) — header: 'Private · not discoverable' -> 'Shared with Resonance'; pill: 'WebMCP · LIVE shared'
+[PASS] idempotent retry (same request_id) returns committed result — ses-c57ce130290dec95 == ses-c57ce130290dec95
+[PASS] READ: LIVE discover after share returns live matches — result_id=result-da1ce7f42d7dcb44f62abb84 n=15
+[PASS] visible match cards/results after discover — cards=4
+[PASS] READ: resonance_get_match returns evidence for a live match — keys=['contract_version', 'freshness', 'match', 'result_id', 'source']
+[PASS] WRITE 3: revoke consent (shared=false) — {"contract_version": "resonance-webmcp/0.1", "session_id": "ses-c57ce130290dec95", "shared": false, "revoked": true, "discoverable": false}
+[PASS] after revoke: LIVE discover fails closed / thought not discoverable — {"isError": true, "error": "share_required", "status": 409, "message": "discovery needs a shared thought first: run resonance_prepare_thought \u2192 resonance_g
+[PASS] after revoke: old result_id evidence fails closed — {"isError": true, "error": "stale_result", "status": 409, "message": "durable corpus changed after this discovery; run discovery again"}
+
+17/18 checks passed
+exit=0
