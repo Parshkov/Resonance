@@ -1,4 +1,24 @@
-# Resonance — WebMCP Challenge release manifest (freeze record)
+# Resonance — release manifest
+
+> **Status update (2026-09-04, post-competition):** the sponsor confirmed the
+> competition entry was not registered, so the judging freeze below is
+> historical. Production has moved on; see **§0 Current production** first.
+> Sections 1–5 are the frozen competition record as of 07:37 UTC and are kept
+> unchanged for provenance.
+
+## 0. Current production (working-product track)
+
+| field | value |
+| --- | --- |
+| `main` / production SHA | `3c7dc80272702ce32c0e1946da57ba63189a14d6` (PR #149 on top of #147 `01193f1` and #139 `f3ace6c`) |
+| Railway deployment | `86aebe9b-f196-44f0-99b2-9870a1619bde` — SUCCESS 15:39:23 UTC; startup log `oauth: core attached; … grants durable` then `competition product … mode: LIVE+WebMCP` |
+| DB migrations | `0001_init` … `0004_workspaces`, **`0005_oauth_grants`** (durable OAuth codes / refresh grants / client registrations) |
+| since the frozen record | durable OAuth grants (no re-authorization after redeploy); RFC 7009 refresh→access revoke cascade; HEAD support; browser `resonance_prepare_thought` accepts the agent's real `thought`/`context`; empty raw-text drafts refused with guidance; live view shows the person's own thought and renders direct/approximate resonances; styled OAuth consent page naming the client; R15D hosted-client probe tooling merged |
+| suites | 440 OK on `01193f1`; 443 OK on the #149 tree (2 skipped each) |
+| public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (pending the pass-2 verification session) |
+| still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome; a real ChatGPT / Claude connector session (Cards A–C) |
+
+# WebMCP Challenge release manifest (frozen competition record)
 
 > Filled only from executed evidence. Fields marked `PENDING` are filled at
 > freeze by the R17 acceptance owner; nothing here is inferred.
