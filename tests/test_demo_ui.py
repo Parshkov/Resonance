@@ -51,6 +51,34 @@ class ProjectionTests(unittest.TestCase):
                             for row in selected))
         self.assertTrue(all(row["hard_rejection"] is None for row in selected))
 
+    def test_primary_falls_back_to_other_resonances_when_no_analogues(self):
+        # A live person's own thought may resonate directly/approximately
+        # (same domain) rather than analogically; the page must still show
+        # those in backend order, never negatives or hard rejections.
+        mutated = copy.deepcopy(self.payload)
+        for row in mutated["matches"]:
+            if row["mode_classification"] == "analogical":
+                row["mode_classification"] = "approximate"
+        selected = primary_matches(mutated)
+        self.assertEqual(len(selected), 4)
+        self.assertTrue(all(row["mode_classification"] in {"approximate", "complementary"}
+                            for row in selected))
+        self.assertTrue(all(row["hard_rejection"] is None for row in selected))
+        order = [row["session_id"] for row in mutated["matches"]]
+        self.assertEqual([row["session_id"] for row in selected],
+                         sorted((row["session_id"] for row in selected), key=order.index))
+        # analogues still win the slots when they exist, others only fill up
+        two = copy.deepcopy(self.payload)
+        kept = 0
+        for row in two["matches"]:
+            if row["mode_classification"] == "analogical":
+                kept += 1
+                if kept > 2:
+                    row["mode_classification"] = "approximate"
+        selected = primary_matches(two)
+        self.assertEqual([row["mode_classification"] for row in selected][:2], ["analogical", "analogical"])
+        self.assertEqual(len(selected), 4)
+
     def test_backend_order_is_preserved_without_score_or_metadata_ranking(self):
         mutated = copy.deepcopy(self.payload)
         by_id = {row["session_id"]: row for row in mutated["matches"]}

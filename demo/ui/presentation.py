@@ -15,6 +15,7 @@ CANONICAL_MODE = "analogical"
 CANONICAL_K = 15
 PRIMARY_MATCH_LIMIT = 4
 PRIMARY_CLASSIFICATION = "analogical"
+NEGATIVE_CLASSIFICATION = "negative"
 
 
 def _is_discoverable(row: Mapping[str, Any]) -> bool:
@@ -38,9 +39,16 @@ def validate_discovery(payload: Mapping[str, Any]) -> None:
 def primary_matches(
     payload: Mapping[str, Any], limit: int = PRIMARY_MATCH_LIMIT
 ) -> tuple[Mapping[str, Any], ...]:
-    """Return the first flagship analogues without sorting or rescoring."""
+    """Return the first flagship analogues without sorting or rescoring.
+
+    Analogical resonances come first (the R9 presentation rule). A live
+    person's thought may resonate only directly or approximately (same
+    domain); those are resonances too, so when fewer than `limit` analogues
+    exist the remaining slots take the next eligible non-negative matches in
+    backend order rather than rendering nothing.
+    """
     validate_discovery(payload)
-    selected: list[Mapping[str, Any]] = []
+    eligible: list[Mapping[str, Any]] = []
     for match in payload["matches"]:
         if not isinstance(match, Mapping):
             raise ValueError("matches[] entries must be objects")
@@ -48,11 +56,15 @@ def primary_matches(
             continue
         if match.get("hard_rejection") is not None:
             continue
-        if match.get("mode_classification") != PRIMARY_CLASSIFICATION:
+        if match.get("mode_classification") == NEGATIVE_CLASSIFICATION:
             continue
-        selected.append(match)
-        if len(selected) == limit:
+        eligible.append(match)
+    selected = [m for m in eligible if m.get("mode_classification") == PRIMARY_CLASSIFICATION][:limit]
+    for match in eligible:
+        if len(selected) >= limit:
             break
+        if match not in selected:
+            selected.append(match)
     return tuple(selected)
 
 
