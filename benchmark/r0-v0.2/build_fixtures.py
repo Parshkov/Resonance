@@ -83,6 +83,11 @@ def causes_index(sk: dict) -> int:
     raise AssertionError(sk["id"] + " has no causes edge")
 
 
+def continuation_slot(sk: dict) -> int:
+    """Slot whose downstream continuation the branch_continuation family supplies."""
+    return sk["roles"].index("outcome") if "outcome" in sk["roles"] else len(sk["roles"]) - 1
+
+
 def bridge_slot(sk: dict) -> int:
     """Slot carrying the method-input knowledge bridge: method, else mechanism, else constraint."""
     for role in ("method", "mechanism", "constraint"):
@@ -97,7 +102,7 @@ def base_nodes(sk: dict, labels: list[str]) -> list[dict]:
         knowledge = None
         if i == bridge_slot(sk):
             knowledge = {"about": [], "requires": [{"id": f"local:{sk['id']}:method-input", "conf": 1.0, "via": "benchmark"}]}
-        if role == "outcome" and i == first_slot(sk, "outcome"):
+        if i == continuation_slot(sk):
             knowledge = {"about": [], "requires": [{"id": f"local:{sk['id']}:continuation", "conf": 1.0, "via": "benchmark"}]}
         out.append(node(i, label, role, knowledge=knowledge))
     return out
@@ -244,7 +249,7 @@ def build_skeleton(sk: dict) -> tuple[list[dict], list[dict]]:
             node_pairs, e_pairs = [], []
             manifest["source_skeleton"] = other["id"]
         elif family == "branch_continuation":
-            out_slot = first_slot(sk, "outcome") if "outcome" in sk["roles"] else n - 1
+            out_slot = continuation_slot(sk)
             keep = {out_slot}
             base = [nd for nd in nodes if int(nd["id"][1:]) in keep]
             base[0].pop("knowledge", None)

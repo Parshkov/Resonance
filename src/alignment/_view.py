@@ -11,6 +11,7 @@ from collections import defaultdict
 from typing import Mapping
 
 from src.graph import ThoughtGraph
+from src.semantics import compare as _compare
 
 # Deterministic ordering of the closed relation vocabulary (thought-dna/0.1).
 RELATION_TYPES: tuple[str, ...] = (
@@ -24,6 +25,31 @@ SIGN_OPPOSITES = {("causes", "prevents"), ("prevents", "causes")}
 
 def _tokens(label: str) -> frozenset[str]:
     return frozenset(t for t in "".join(c.lower() if c.isalnum() else " " for c in label).split() if t)
+
+
+# Soft role compatibility (v0.2). Extraction assigns roles with noise; a
+# state/mechanism or problem/state confusion must not zero the affinity.
+ROLE_COMPAT: dict[frozenset[str], float] = {
+    frozenset(("state", "mechanism")): 0.6,
+    frozenset(("problem", "state")): 0.5,
+    frozenset(("outcome", "state")): 0.5,
+    frozenset(("mechanism", "method")): 0.4,
+    frozenset(("constraint", "problem")): 0.3,
+    frozenset(("evidence", "state")): 0.3,
+    frozenset(("resource", "state")): 0.3,
+    frozenset(("problem", "outcome")): 0.3,
+}
+
+
+def role_compatibility(a: str, b: str) -> float:
+    if a == b:
+        return 1.0
+    return ROLE_COMPAT.get(frozenset((a, b)), 0.0)
+
+
+def label_affinity(a: str, b: str) -> float:
+    """Deterministic label similarity in [0, 1] (lexicon + stems + trigrams)."""
+    return _compare(a, b).fused
 
 
 class GraphView:
@@ -65,26 +91,22 @@ class GraphView:
 
 
 def node_affinity(a: GraphView, b: GraphView, weights: Mapping[str, float]) -> list[list[float]]:
-    """DNA-native deterministic node affinity in [0,1]; no embeddings, no LLM.
+    """DNA-native deterministic node affinity in [0,1]; no LLM.
 
-    Role compatibility carries cross-domain analogy; label/knowledge overlap
-    carries same-domain support. Structure dominates via alpha anyway.
+    Soft role compatibility carries cross-domain analogy; label similarity from
+    the deterministic lexicon (concept classes, stems, trigrams) carries both
+    same-domain support and abstract-concept correspondence; knowledge refs
+    add independent evidence. Structure dominates via alpha anyway.
     """
     w_role, w_label, w_know = weights["role"], weights["label"], weights["knowledge"]
     out = [[0.0] * b.n for _ in range(a.n)]
     for i in range(a.n):
         na = a.nodes[i]
-        ta = a._token_cache[i]
         ka = a._about[i] | a._requires[i]
         for j in range(b.n):
             nb = b.nodes[j]
-            role = 1.0 if na.role == nb.role else 0.0
-            if ta or b._token_cache[j]:
-                inter = len(ta & b._token_cache[j])
-                union = len(ta | b._token_cache[j])
-                label = inter / union if union else 0.0
-            else:
-                label = 0.0
+            role = role_compatibility(na.role, nb.role)
+            label = label_affinity(na.label, nb.label)
             kb = b._about[j] | b._requires[j]
             if ka or kb:
                 know = len(ka & kb) / len(ka | kb) if (ka | kb) else 0.0

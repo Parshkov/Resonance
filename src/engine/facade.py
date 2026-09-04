@@ -26,7 +26,18 @@ from src import scoring as _scoring
 from src.alignment.verifier import COMPONENT_VERSION as VERIFIER_VERSION, _config_hash
 from src.interfaces import INTERFACE_VERSION
 
-ENGINE_VERSION = "resonance-engine/0.1"
+ENGINE_VERSION = "resonance-engine/0.2"
+
+
+CLASS_RANK = {"direct": 0, "approximate": 1, "analogical": 2, "complementary": 3, "negative": 4}
+
+
+def _verified_sort_key(hit: ResonanceHit):
+    v = hit.verification
+    rejected = 1 if v.hard_rejection else 0
+    negative = 1 if v.classification == "negative" else 0
+    primary = hit.candidate.channel_scores.get("primary", 0.0)
+    return (rejected, negative, -round(v.components.structural, 6), -round(primary, 6), hit.candidate.candidate_id)
 
 
 class EngineIntegrityError(RuntimeError):
@@ -118,6 +129,7 @@ class ResonanceEngine:
         require_mode(mode)
         self._require_bound()
         hits: list[ResonanceHit] = []
+        rarity = self.candidate_index.motif_rarity(graph)
         for candidate in self.candidate_index.query(graph, mode=mode, k=k):
             target = self.store.get(candidate.candidate_id)
             if target is None:
@@ -125,11 +137,13 @@ class ResonanceEngine:
                     f"index returned {candidate.candidate_id!r} which is absent "
                     "from the thought store; store/index snapshots have diverged")
             verification = self.verifier.verify(
-                graph, target, seeds=candidate.seed_correspondences)
+                graph, target, seeds=candidate.seed_correspondences, rarity=rarity)
             self._explanations[(graph.thought_id, candidate.candidate_id)] = verification
             hits.append(ResonanceHit(candidate=self._flag_synced(candidate, verification),
                                      verification=verification))
-        return tuple(hits)
+        # Verified order (ADR-0004): retrieval proposes, verification ranks.
+        # Hard-rejected candidates sink to the end in their retrieval order.
+        return tuple(sorted(hits, key=_verified_sort_key))
 
     def compare(self, a: ThoughtGraph, b: ThoughtGraph, *, mode: str) -> VerifierResult:
         require_mode(mode)

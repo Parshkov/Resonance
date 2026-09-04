@@ -20,7 +20,7 @@ import math
 from dataclasses import dataclass
 from functools import lru_cache
 
-from .lexicon import LEXICON_VERSION, LONGEST_PHRASE, PHRASE_INDEX, ROLE_HINTS, is_domain_concept, relatedness
+from .lexicon import LEXICON_VERSION, LONGEST_PHRASE, PHRASE_INDEX, ROLE_HINTS, class_weight, is_domain_concept, relatedness
 from .stem import stem
 
 SEMANTICS_VERSION = "resonance-semantics/0.2.0+" + LEXICON_VERSION
@@ -127,11 +127,16 @@ def soft_overlap(a: frozenset[str], b: frozenset[str]) -> float:
     if not a or not b:
         return 0.0
     total = 0.0
+    weight_sum = 0.0
     for x in a:
-        total += max(relatedness(x, y) for y in b)
+        w = class_weight(x)
+        total += w * max(relatedness(x, y) for y in b)
+        weight_sum += w
     for y in b:
-        total += max(relatedness(x, y) for x in a)
-    return total / (len(a) + len(b))
+        w = class_weight(y)
+        total += w * max(relatedness(x, y) for x in a)
+        weight_sum += w
+    return total / weight_sum if weight_sum else 0.0
 
 
 def _jaccard(a: frozenset | set, b: frozenset | set) -> float:

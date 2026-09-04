@@ -34,13 +34,13 @@ from .fgw import solve_fgw
 from .paths import guarded_path_matches
 from src import scoring
 
-COMPONENT_VERSION = "resonance-verifier/0.1"
+COMPONENT_VERSION = "resonance-verifier/0.2"
 
 DEFAULT_CONFIG = {
     "solver": "multirel_fgw_cg",          # or "qap_rrwm"
     "alpha": 0.7,
     "max_iters": 60,
-    "affinity_weights": {"role": 0.6, "label": 0.25, "knowledge": 0.15},
+    "affinity_weights": {"role": 0.5, "label": 0.35, "knowledge": 0.15},
     "unmatched_affinity_floor": 0.05,     # pairs below this affinity may stay unmatched
     "path_matching": "guarded",           # or "off"
     "local_moves": 200,
@@ -65,11 +65,17 @@ class MultiRelFGWVerifier:
             self.config.update(config)
         self.config_hash = _config_hash(self.config)
         self.last_latency_seconds = 0.0
+        self._rarity: float | None = None
 
     # -- StructuralVerifier protocol ---------------------------------------
     def verify(self, query: ThoughtGraph, candidate: ThoughtGraph, *,
-               seeds: Sequence[SeedCorrespondence] = ()) -> VerifierResult:
+               seeds: Sequence[SeedCorrespondence] = (),
+               rarity: float | None = None) -> VerifierResult:
+        """``rarity`` is the corpus-relative rarity of the query skeleton
+        (index.motif_rarity); None when no corpus context exists (pairwise
+        compare), in which case structure alone may still argue analogy."""
         t0 = time.perf_counter()
+        self._rarity = rarity
         va, vb = GraphView(query), GraphView(candidate)
         aff = node_affinity(va, vb, self.config["affinity_weights"])
         seed_triples = tuple(
@@ -82,16 +88,26 @@ class MultiRelFGWVerifier:
         for pi in couplings:
             mapping = self._round(pi, va, vb, aff)
             mapping = self._local_improve(mapping, va, vb)
-            adj = self._adjudicate(mapping, va, vb)
-            if adj.hard_conflicts:
-                alt = self._conflict_free_alternative(mapping, adj, va, vb)
-                if alt is not None:
-                    adj = alt
-            key = (adj.components["_support_quality"],
-                   -adj.components["contradiction"],
-                   adj.components["r_direct"])
-            if best is None or key > best[0]:
-                best = (key, adj)
+            candidates = [mapping]
+            corrected = self._twin_corrected(mapping, va, vb)
+            if corrected is not None:
+                candidates.append(corrected)
+            for cand_mapping in candidates:
+                adj = self._adjudicate(cand_mapping, va, vb)
+                if adj.hard_conflicts:
+                    alt = self._conflict_free_alternative(cand_mapping, adj, va, vb)
+                    if alt is not None:
+                        adj = alt
+                # Selection stays blind to *structural* contradictions
+                # (ADR-0003 #8) but not to label-identity ones: a mapping that
+                # aligns structure against unmistakable label twins is worse
+                # evidence, not hidden evidence (ADR-0004).
+                key = (adj.components["_support_quality"]
+                       - adj.components["_label_contradiction"],
+                       -adj.components["contradiction"],
+                       adj.components["r_direct"])
+                if best is None or key > best[0]:
+                    best = (key, adj)
         adj = best[1]
         result = self._assemble(adj, va, vb)
         self.last_latency_seconds = time.perf_counter() - t0
@@ -146,8 +162,50 @@ class MultiRelFGWVerifier:
                 used_c.add(best_j)
         return sorted(out)
 
+    def _twin_corrected(self, mapping, va, vb):
+        """Re-pair nodes with unmistakable label twins (surface >= T_TWIN).
+
+        Additive/swap only: a query node whose twin is free takes it; when the
+        twin is held by another query node with a weak label match, the two
+        swap partners. Returns None when nothing changes.
+        """
+        from src.semantics import compare as _compare
+        pairs = dict(mapping)
+        inverse = {j: i for i, j in pairs.items()}
+        changed = False
+        for i in range(va.n):
+            best = None
+            for j in range(vb.n):
+                sim = _compare(va.nodes[i].label, vb.nodes[j].label).surface
+                if sim >= scoring.T_TWIN and (best is None or sim > best[1]):
+                    best = (j, sim)
+            if best is None:
+                continue
+            j = best[0]
+            if pairs.get(i) == j:
+                continue
+            holder = inverse.get(j)
+            if holder is not None and \
+               _compare(va.nodes[holder].label, vb.nodes[j].label).fused >= scoring.T_TWIN_CHOSEN:
+                continue                       # the twin is legitimately taken
+            old_j = pairs.get(i)
+            pairs[i] = j
+            inverse[j] = i
+            if holder is not None:
+                if old_j is not None:
+                    pairs[holder] = old_j
+                    inverse[old_j] = holder
+                else:
+                    del pairs[holder]
+            elif old_j is not None:
+                inverse.pop(old_j, None)
+            changed = True
+        if not changed:
+            return None
+        return sorted(pairs.items())
+
     def _structural_key(self, mapping, va, vb):
-        adj = scoring.adjudicate(va, vb, mapping)
+        adj = scoring.adjudicate(va, vb, mapping, rarity=self._rarity)
         return adj.components["structural"], adj
 
     def _local_improve(self, mapping, va, vb):
@@ -175,6 +233,10 @@ class MultiRelFGWVerifier:
             # deleting the witness hides the conflict instead of adjudicating
             # it (the same local-yes-global-no dodge, second entrance).
             for con in adj.contradictions:
+                if con.kind == "label_identity":      # node-level witness (v0.2)
+                    evidenced_q.add(va.index[con.query_item])
+                    evidenced_c.add(vb.index[con.candidate_item])
+                    continue
                 qr = va.rel_by_id[con.query_item]
                 cr = vb.rel_by_id[con.candidate_item]
                 evidenced_q.add(va.index[qr.source]); evidenced_q.add(va.index[qr.target])
@@ -195,11 +257,11 @@ class MultiRelFGWVerifier:
         return mapping
 
     def _adjudicate(self, mapping, va, vb):
-        preserved_ids = {q for (q, _, _) in scoring.adjudicate(va, vb, mapping).preserved}
+        preserved_ids = {q for (q, _, _) in scoring.adjudicate(va, vb, mapping, rarity=self._rarity).preserved}
         paths = ()
         if self.config["path_matching"] == "guarded":
             paths = tuple(guarded_path_matches(va, vb, list(mapping), preserved_ids))
-        return scoring.adjudicate(va, vb, mapping, paths)
+        return scoring.adjudicate(va, vb, mapping, paths, rarity=self._rarity)
 
     def _conflict_free_alternative(self, mapping, adj, va, vb):
         """ADR-0003: on a hard sign conflict, search for a DIFFERENT mapping
@@ -286,13 +348,17 @@ class MultiRelFGWVerifier:
         matched_q_rels = {m.query_relation for m in matched} | {p.query_relation for p in edge_paths}
         matched_c_rels = {m.candidate_relation for m in matched} | {
             rid for p in edge_paths for rid in p.candidate_relations}
+        def item_spans(view, item_id):
+            if item_id in view.rel_by_id:
+                return view.rel_by_id[item_id].spans
+            return view.nodes[view.index[item_id]].spans
+
         contradictions = tuple(
             Contradiction(
                 kind=c.kind, query_item=c.query_item, candidate_item=c.candidate_item,
                 contribution=c.contribution, rule_version=COMPONENT_VERSION,
-                query_provenance=prov(va, c.query_item, va.rel_by_id[c.query_item].spans),
-                candidate_provenance=prov(vb, c.candidate_item,
-                                          vb.rel_by_id[c.candidate_item].spans))
+                query_provenance=prov(va, c.query_item, item_spans(va, c.query_item)),
+                candidate_provenance=prov(vb, c.candidate_item, item_spans(vb, c.candidate_item)))
             for c in adj.contradictions)
         comp = adj.components
         vector = ScoreVector(
@@ -310,13 +376,18 @@ class MultiRelFGWVerifier:
             h_sign_conflict=comp["h_sign_conflict"], e_nodes=comp["e_nodes"],
             e_relations=comp["e_relations"],
             knowledge_evidence_present=comp["knowledge_evidence_present"],
-            rarity_weighting=comp["rarity_weighting"])
+            rarity_weighting=comp["rarity_weighting"],
+            extras={"surface_semantic": comp["surface_semantic"],
+                    "concept_alignment": comp["concept_alignment"],
+                    "domain_overlap": comp["domain_overlap"],
+                    "rarity": comp["rarity"],
+                    "n_role_exact": comp["n_role_exact"]})
         hard_rejection = None
         if comp["h_sign_conflict"]:
             worst = max(adj.hard_conflicts, key=lambda c: c.contribution)
             hard_rejection = f"{worst.kind}:{worst.query_item}->{worst.candidate_item}"
         classification = scoring.classify(comp)
-        confidence = "provisional"
+        confidence = scoring.confidence(comp, classification)
         solver_config = ConfigRef(
             component="r4-verifier/" + self.config["solver"],
             component_version=COMPONENT_VERSION,

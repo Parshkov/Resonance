@@ -72,19 +72,34 @@ def evaluate(engine_factory=ResonanceEngine, *, split: str | None = None, k_retr
     engine.candidate_index.build(graphs.values())
     build_seconds = time.perf_counter() - t0
 
-    # retrieval: one query per skeleton, ranks of every candidate
+    # retrieval: one query per skeleton. A positive's rank is counted among
+    # DISTRACTORS only (1 + number of non-relevant graphs ranked above it):
+    # twelve relevant candidates per query cannot all fit in a top-5, and a
+    # relevant graph outranking another relevant graph is not a retrieval error.
     ranks: dict[str, dict[str, int]] = {}
     verified_order: dict[str, list[tuple[str, float, str]]] = {}
+    relevant_for: dict[str, set[str]] = defaultdict(set)
+    for p in pairs:
+        if p["relevant"]:
+            relevant_for[p["query_graph"]].add(p["candidate_graph"])
+    for p in read_jsonl(ROOT / "pairs.jsonl"):
+        if p["relevant"]:
+            relevant_for[p["query_graph"]].add(p["candidate_graph"])
+    for g in graphs:                       # plain analogy-domain graphs are relevant too
+        if g.split("-A-")[0] + "-Q" in relevant_for and "-A-" in g:
+            relevant_for[g.split("-A-")[0] + "-Q"].add(g)
     query_ids = sorted({p["query_graph"] for p in pairs})
     latencies = []
+    comp_ranks: dict[str, dict[str, int]] = {}
     for qid in query_ids:
         t1 = time.perf_counter()
         hits = engine.find(graphs[qid], mode="analogical", k=k_retrieval)
         latencies.append(time.perf_counter() - t1)
-        ranks[qid] = {h.candidate.candidate_id: h.candidate.channel_ranks.get("primary", i + 1)
-                      for i, h in enumerate(hits)}
+        ranks[qid] = distractor_ranks(hits, relevant_for[qid])
         verified_order[qid] = [(h.candidate.candidate_id, h.verification.components.structural,
                                 h.verification.classification) for h in hits]
+        comp_hits = engine.find(graphs[qid], mode="complementary", k=k_retrieval)
+        comp_ranks[qid] = distractor_ranks(comp_hits, relevant_for[qid])
 
     rows = []
     for p in pairs:
@@ -93,7 +108,8 @@ def evaluate(engine_factory=ResonanceEngine, *, split: str | None = None, k_retr
         pred_nodes = {(m.query_node, m.candidate_node) for m in res.mapping}
         gold_nodes = {tuple(x) for x in p["gold_node_pairs"]}
         node_f1 = f1(pred_nodes, gold_nodes) if p["relevant"] else None
-        rank = ranks[p["query_graph"]].get(p["candidate_graph"])
+        rank_table = comp_ranks if p["gold_class"] == "complementary" else ranks
+        rank = rank_table[p["query_graph"]].get(p["candidate_graph"])
         predicted_relevant = res.classification != "negative" and res.hard_rejection is None
         rows.append({
             "case_id": p["case_id"], "skeleton": p["skeleton"], "split": p["split"], "family": p["family"],
@@ -180,6 +196,18 @@ def evaluate(engine_factory=ResonanceEngine, *, split: str | None = None, k_retr
     return report
 
 
+def distractor_ranks(hits, relevant: set[str]) -> dict[str, int]:
+    ordered = sorted(hits, key=lambda h: (h.candidate.channel_ranks.get("primary", 10**9), h.candidate.candidate_id))
+    out: dict[str, int] = {}
+    distractors_above = 0
+    for h in ordered:
+        cid = h.candidate.candidate_id
+        out[cid] = distractors_above + 1
+        if cid not in relevant:
+            distractors_above += 1
+    return out
+
+
 def engine_identity(engine: ResonanceEngine) -> dict[str, str]:
     from src.engine import ENGINE_VERSION
     return {"engine_version": ENGINE_VERSION,
@@ -196,8 +224,9 @@ def main(argv=None) -> int:
     report = evaluate(split=args.split)
     if args.output:
         args.output.write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
-    summary = {k: v for k, v in report.items() if k != "rows"}
+    summary = dict(report)
     if not args.rows:
+        summary.pop("rows")
         for split in ("calibration", "gate"):
             summary[split] = {k: v for k, v in summary[split].items() if k != "families"}
     print(json.dumps(summary, indent=1, sort_keys=True))

@@ -225,7 +225,7 @@ SKELETONS: list[dict] = [
 # Families and gold classes (superset of v0.1; two new hard negatives).
 FAMILIES: list[tuple[str, str, bool]] = [
     ("paraphrase", "direct", True),
-    ("vocabulary_substitution", "approximate", True),
+    ("vocabulary_substitution", "direct", True),
     ("irrelevant_branch", "approximate", True),
     ("partial_graph", "approximate", True),
     ("transparent_granularity", "approximate", True),

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from .stem import stem
 
-LEXICON_VERSION = "resonance-lexicon/0.2.1"
+LEXICON_VERSION = "resonance-lexicon/0.2.5"
 
 # concept -> (role_hint | None, terms)
 # role_hint feeds extraction and soft role compatibility; None = no hint.
@@ -55,10 +55,10 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                                   "back pressure", "contention", "serialization point")),
     "BLOCKAGE": ("state", ("block", "blockage", "blocked", "obstruct", "obstruction", "jam", "stall",
                            "stalled", "stuck", "deadlock", "gridlock", "halt", "freeze", "frozen",
-                           "clot", "impasse", "standstill")),
+                           "clot", "impasse", "standstill", "gridlock", "traffic jam", "tailback", "spillback", "lock", "locked", "lock-in", "lock in", "lockout", "treatment lock", "hold", "on hold")),
     "DELAY": ("state", ("delay", "latency", "lag", "slow", "slowness", "wait", "waiting", "postpone",
                         "postponement", "late", "lateness", "overdue", "response time", "turnaround",
-                        "sluggish", "backlog of requests", "time to", "slower", "slowing", "slows", "slowed", "sluggish thinking", "slow progress")),
+                        "sluggish", "backlog of requests", "time to", "slower", "slowing", "slows", "slowed", "sluggish thinking", "slow progress", "cycle time", "lead time", "turnaround time", "time to recover")),
     "ACCELERATION": ("mechanism", ("accelerate", "acceleration", "speed up", "faster", "hasten", "expedite",
                                    "quicken", "rush", "fast track", "fast-track")),
     # ---- feedback / propagation -------------------------------------------
@@ -101,9 +101,9 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                               "quota", "allowance", "carrying capacity", "seat", "seats",
                               "slots", "supply of", "availability")),
     "LIMIT": ("constraint", ("limit", "limitation", "cap", "bound", "boundary", "threshold", "maximum",
-                             "minimum", "constraint", "restriction", "restrict",
+                             "minimum", "restriction", "restrict",
                              "hard limit", "rate limit", "budget cap", "cutoff", "cut-off", "tolerance",
-                             "envelope", "upper bound", "lower bound", "capacity limit", "spillway")),
+                             "envelope", "upper bound", "lower bound", "capacity limit", "spillway", "hiring freeze", "headcount freeze", "spending freeze", "freeze on")),
     "BUDGET": ("constraint", ("budget", "allocation", "allowance", "funding", "funds", "money", "cost",
                               "expense", "spending", "price", "pricing", "fee", "cash", "capital",
                               "financial", "afford", "affordability", "runway")),
@@ -149,10 +149,10 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
     "SIGNAL": ("evidence", ("signal", "indicator", "symptom", "marker", "cue", "sign", "warning",
                             "warning sign", "early warning", "alarm", "alert", "telemetry", "metric",
                             "reading", "measurement", "measure", "sensor", "gauge", "detect", "detection",
-                            "observation", "observe", "monitor", "monitoring", "records", "statistics", "dashboard", "burn rate", "valuation", "mark to market", "appraisal", "readings", "report", "reports")),
+                            "observation", "observe", "monitor", "monitoring", "records", "statistics", "dashboard", "burn rate", "valuation", "mark to market", "appraisal", "readings", "report", "reports", "chart", "graph", "plot", "log", "logs", "counts", "interferometry", "spectroscopy", "imaging", "scan", "scanner", "trace", "traces", "probe readings")),
     "UNCERTAINTY": ("state", ("uncertain", "uncertainty", "ambiguous", "ambiguity", "unknown", "unclear",
                               "vague", "fuzzy", "unpredictable", "unpredictability", "variance",
-                              "randomness", "random", "stochastic", "guess", "guessing", "doubt")),
+                              "randomness", "random", "stochastic", "guess", "guessing", "doubt", "undiagnosed", "unexplained", "unknown cause", "blind", "invisible", "hidden cause", "unknown origin", "disputed", "unresolved", "mystery", "puzzling", "blind spots")),
     "ERROR": ("problem", ("error", "mistake", "bug", "defect", "fault", "faulty", "flaw", "flawed",
                           "glitch", "malfunction", "incorrect", "wrong", "inaccurate", "inaccuracy",
                           "miscalculation", "misread", "typo", "corruption", "corrupt", "invalid", "bad loan", "bad debt", "nonperforming loan", "non performing loan")),
@@ -171,7 +171,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                                  "fine tune", "correction", "correct", "compensate", "compensation")),
     "MEMORY": ("resource", ("memory", "remember", "recall", "retention", "retain", "record", "history",
                             "log", "archive", "cache", "store", "storage", "persist", "persistence",
-                            "state", "snapshot", "checkpoint", "journal", "ledger")),
+                            "snapshot", "checkpoint", "journal", "ledger", "biobank", "repository", "warehouse of", "span store", "trace store", "case file", "dossier")),
     "FORGETTING": ("state", ("forget", "forgetting", "amnesia", "lose track", "lost", "loss of context",
                              "context loss", "evict", "eviction", "expire", "stale", "staleness",
                              "outdated", "obsolete", "decay of memory", "fade", "fading")),
@@ -206,7 +206,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                             "lose", "ruin", "wreck", "meltdown", "blackout", "downtime", "shutdown",
                             "shut down", "bankrupt", "bankruptcy", "insolvency", "insolvent", "default",
                             "catastrophe", "catastrophic", "disaster", "abort", "aborted", "dropout",
-                            "drop out", "give up", "quit", "extinction", "demise", "unavailable", "closure", "wipeout", "wipe out", "crisis", "damage", "damaged", "harm", "injury", "fall behind", "falling behind", "lose ground", "losing ground")),
+                            "drop out", "give up", "quit", "extinction", "demise", "unavailable", "closure", "wipeout", "wipe out", "crisis", "damage", "damaged", "harm", "injury", "fall behind", "falling behind", "lose ground", "losing ground", "missed sla", "sla breach")),
     "SUCCESS": ("outcome", ("succeed", "success", "successful", "win", "winning", "achieve", "achievement",
                             "accomplish", "goal met", "complete",
                             "completion", "finish", "thrive", "thriving", "flourish", "prosper",
@@ -214,7 +214,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
     "RECOVERY": ("outcome", ("recover", "recovery", "restore", "restoration", "heal", "healing", "repair",
                              "rebuild", "rebound", "bounce back", "resume", "resumption", "revive",
                              "revival", "rehabilitate", "remediate", "remediation", "fix", "fixed",
-                             "roll back", "rollback", "reset", "restart", "reboot")),
+                             "roll back", "rollback", "reset", "restart", "reboot", "mttr", "time to recover", "faster recovery", "bounce-back")),
     "RESILIENCE": ("state", ("resilient", "resilience", "robust", "robustness", "durable", "durability",
                              "hardy", "tolerant", "tolerance", "fault tolerant", "fault-tolerant",
                              "graceful degradation", "withstand", "endure", "endurance", "survivable",
@@ -229,26 +229,26 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                                     "overhead", "rework", "duplication", "duplicate effort", "churn",
                                     "thrash", "thrashing", "idle", "idling", "underutilized", "redundant tests", "redundant work", "double work", "duplicated effort", "duplicate work", "repeated work", "wasted rework", "wasted demolition")),
     # ---- epistemic / methods ---------------------------------------------
-    "EVIDENCE": ("evidence", ("evidence", "data", "dataset", "proof", "prove", "finding", "findings",
+    "EVIDENCE": ("evidence", ("data", "dataset", "proof", "prove", "finding", "findings",
                               "result", "results", "observation", "observed", "experiment", "experimental",
                               "measurement", "measured", "study", "survey", "sample", "statistic",
                               "statistics", "record", "log entry", "report", "trace", "audit trail",
-                              "benchmark", "test result")),
+                              "benchmark", "test result", "slide", "specimen", "sherd", "witness statement", "statement", "testimony", "satellite", "station record", "bank record", "call record", "field data", "survey data", "readout", "sample data")),
     "HYPOTHESIS": ("problem", ("hypothesis", "hypothesize", "conjecture", "assumption", "assume",
                                "theory", "premise", "claim", "proposition", "guess", "expectation",
                                "expect", "prediction", "predict", "belief", "believe", "suspect")),
     "MODEL": ("method", ("model", "modeling", "modelling", "simulation", "simulate", "representation",
                          "abstraction", "schema", "framework", "mapping", "diagram", "formula",
-                         "equation", "algorithm", "estimator", "estimate", "approximation")),
-    "METHOD": ("method", ("method", "methodology", "technique", "approach", "strategy", "tactic",
+                         "equation", "algorithm", "estimator", "estimate", "approximation", "bayesian", "statistical model", "estimation", "ensemble", "chronology", "timeline", "attribution ensemble")),
+    "METHOD": ("method", ("methodology", "technique", "approach", "strategy", "tactic",
                           "procedure", "protocol", "process", "practice", "routine", "recipe", "playbook",
-                          "policy", "rule", "heuristic", "workflow", "pipeline", "mechanism", "scheme",
+                          "policy", "rule", "heuristic", "workflow", "pipeline", "scheme",
                           "plan", "planning", "design", "architecture", "solution", "intervention",
                           "treatment", "therapy", "regimen", "remedy", "countermeasure", "safeguard")),
     "TOOL": ("resource", ("tool", "tooling", "instrument", "device", "equipment", "machine", "machinery",
                           "apparatus", "software", "library", "platform", "infrastructure", "system",
                           "service", "utility", "facility", "hardware")),
-    "RESOURCE": ("resource", ("resource", "resources", "supply", "supplies", "inventory", "stock",
+    "RESOURCE": ("resource", ("supply", "supplies", "inventory", "stock",
                               "asset", "assets", "material", "materials", "input", "inputs", "raw material",
                               "fuel", "energy", "power", "water", "food", "staff", "personnel", "labor",
                               "labour", "manpower", "headcount", "compute", "storage space", "roster", "pool", "credit line", "line of credit", "credit facility", "vessel time", "ship time", "cluster time", "compute time", "lab time", "machine time", "beam time", "zone", "reserve zone", "protected area", "sanctuary", "set aside", "land set aside")),
@@ -267,7 +267,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                             "loop back", "keep trying", "try again", "polling", "poll", "repeatedly", "again and again", "re present", "re send", "re try", "re submit", "come back", "coming back", "return visit", "return visits")),
     "TIMEOUT": ("state", ("timeout", "time out", "timed out", "expire", "expired", "expiry", "deadline miss",
                           "missed deadline", "give up waiting", "abandon", "abandonment", "drop",
-                          "dropped", "cancel", "cancellation", "walk away", "churn")),
+                          "dropped", "cancel", "cancellation", "walk away", "churn", "missed sla", "sla breach", "sla miss", "missed target", "missed slot")),
     "THRESHOLD_EVENT": ("state", ("trigger", "triggered", "trip", "tripped", "breach", "breached", "cross",
                                   "crossing", "exceed", "exceeded", "violate", "violation", "overrun",
                                   "overstep", "hit the limit", "reach the limit", "critical", "spill point", "passing the", "past the", "beyond the", "over the line", "breaching")),
@@ -289,7 +289,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                            "checking", "inspect", "inspection", "review", "audit", "assess", "assessment",
                            "evaluate", "evaluation", "diagnose", "diagnosis", "diagnostic", "probe",
                            "screen", "examine", "examination", "trial", "pilot", "canary", "rehearsal",
-                           "dry run", "drill", "experiment", "experimental", "benchmark", "benchmark run", "a b", "a/b", "culture test", "blood test", "lab test", "field trial", "survey pilot", "survey")),
+                           "dry run", "drill", "experiment", "experimental", "benchmark", "benchmark run", "a b", "a/b", "culture test", "blood test", "lab test", "field trial", "survey pilot", "survey", "sequencing", "assay", "panel", "tracing", "trace analysis", "profiling", "reanalysis", "attribution", "reconstruction", "dating", "typology", "interview", "cross-examination", "cross examination", "discovery process")),
     # ---- agents / social ----------------------------------------------------
     "AGENT": ("agent", ("person", "people", "team", "teams", "individual", "employee", "employees",
                         "worker", "workers", "manager", "managers", "leader", "leadership", "engineer",
@@ -298,7 +298,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                         "firm", "department", "group", "community", "population", "society", "government",
                         "agency", "committee", "board", "founder", "founders", "student", "students",
                         "teacher", "family", "household", "actor", "actors", "participant", "participants",
-                        "stakeholder", "stakeholders", "member", "members", "agent", "agents", "bank",
+                        "stakeholder", "stakeholders", "member", "members", "bank",
                         "banks", "investor", "investors", "trader", "traders", "market participant", "fleet", "clinic", "clinics", "desk", "application", "applications", "vendor", "vendors", "supplier", "suppliers", "trawler", "subcontractor", "subcontractors")),
     "INCENTIVE_MISMATCH": ("problem", ("moral hazard", "perverse incentive", "misaligned incentive",
                                        "free rider", "free-rider", "tragedy of the commons", "gaming",
@@ -310,11 +310,11 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                                       "blind spot", "unaware", "ignorance", "ignorant", "out of the loop",
                                       "information asymmetry", "asymmetry", "notes missing", "information lost", "missing handoff", "not passed along", "not passed on", "not communicated", "never told", "no one told", "unshared", "not shared", "uninformed", "hidden changes", "hidden change", "nothing passed on")),
     # ---- generic problem / goal words (weak, role-carrying) ----------------
-    "PROBLEM": ("problem", ("problem", "issue", "trouble", "difficulty", "difficult", "challenge",
+    "PROBLEM": ("problem", ("issue", "trouble", "difficulty", "difficult", "challenge",
                             "obstacle", "pain", "pain point", "friction point", "concern", "worry",
                             "complaint", "symptom", "incident", "crisis", "emergency", "bottleneck", "disease", "blight", "infection", "outbreak", "bad loan", "bad debt", "nonperforming", "non performing")),
     "GOAL": ("outcome", ("goal", "objective", "target", "aim", "purpose", "intent", "intention", "mission",
-                         "outcome", "result", "desired", "want", "wanted", "need to", "should", "must",
+                         "result", "desired", "want", "wanted", "need to", "should", "must",
                          "milestone", "deliverable", "kpi", "okr", "metric of success")),
     # ---- domain anchors: same-domain support only, no analogical weight ----
     "DOMAIN_ELECTROCHEMISTRY": (None, ("battery", "batteries", "cell", "cells", "electrolyte", "anode",
@@ -360,6 +360,9 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                                     "inventory", "supplier", "suppliers", "lead time", "batch", "batches",
                                     "shift", "shifts", "maintenance", "downtime", "conveyor", "robot",
                                     "welding", "casting", "quality control")),
+    "DOMAIN_SCIENCE": (None, ("research", "researcher", "laboratory", "lab", "scientist", "coral", "reef",
+                              "tank", "tanks", "vessel", "field study", "paper", "publication", "journal",
+                              "peer review", "sample", "samples", "specimen", "trial", "study", "experiment")),
     "DOMAIN_COOKING": (None, ("dough", "sourdough", "bread", "oven", "bake", "baking", "yeast", "starter",
                               "flour", "ferment", "fermentation", "proof", "proofing", "kitchen", "recipe",
                               "ingredient", "ingredients", "sauce", "boil", "simmer", "knead", "rise of dough")),
@@ -402,7 +405,13 @@ for _a, _b, _w in (
     ("METHOD", "CONTROL", 0.4), ("METHOD", "ADAPTATION", 0.4), ("ADAPTATION", "SELECTION", 0.5),
     ("ADAPTATION", "RECOVERY", 0.4), ("RECOVERY", "RESILIENCE", 0.6), ("RESILIENCE", "STABILITY", 0.6),
     ("RESILIENCE", "REDUNDANCY", 0.5), ("STABILITY", "OSCILLATION", 0.3), ("OSCILLATION", "FEEDBACK", 0.4),
-    ("FAILURE", "TIMEOUT", 0.4), ("FAILURE", "RISK", 0.4), ("RISK", "UNCERTAINTY", 0.4),
+    ("FAILURE", "TIMEOUT", 0.4), ("FAILURE", "RISK", 0.4), ("FAILURE", "BLOCKAGE", 0.5),
+    ("SATURATION", "HEAT", 0.4), ("LOAD", "BUDGET", 0.2), ("DRIFT", "DELAY", 0.3),
+    ("BLOCKAGE", "LIMIT", 0.4), ("ADAPTATION", "CONTROL", 0.5), ("COORDINATION", "METHOD", 0.3),
+    ("COOLING", "CONTROL", 0.5), ("GROWTH", "SATURATION", 0.5), ("DEGRADATION", "AMPLIFICATION", 0.3),
+    ("FRICTION", "SATURATION", 0.3), ("AGENT", "CONTROL", 0.3), ("PROBLEM", "UNCERTAINTY", 0.4),
+    ("EVIDENCE", "MEMORY", 0.4), ("HYPOTHESIS", "UNCERTAINTY", 0.5), ("TESTING", "MODEL", 0.4),
+    ("DEPENDENCY", "SCARCITY", 0.3), ("LOAD", "PROBLEM", 0.3), ("DEPLETION", "DECLINE", 0.5), ("RISK", "UNCERTAINTY", 0.4),
     ("RISK", "DEBT", 0.4), ("DEBT", "INVESTMENT", 0.3), ("SUCCESS", "GOAL", 0.5), ("SUCCESS", "QUALITY", 0.4),
     ("PROBLEM", "ERROR", 0.4), ("PROBLEM", "RISK", 0.3), ("FLOW", "REQUEST", 0.4), ("FLOW", "INFORMATION", 0.3),
     ("REQUEST", "LOAD", 0.5), ("RETRY", "FEEDBACK", 0.4), ("RETRY", "AMPLIFICATION", 0.4),
@@ -414,6 +423,24 @@ for _a, _b, _w in (
     ("VARIATION", "NOISE", 0.4), ("DRIFT", "MISALIGNMENT", 0.4), ("AGENT", "COORDINATION", 0.2),
 ):
     _rel(_a, _b, _w)
+
+
+# The nine role names themselves (problem, mechanism, state, outcome,
+# constraint, method, evidence, resource, agent) are deliberately absent from
+# every term list: a label that only restates its role carries no content.
+
+# Classes that mostly restate a node's *role* (problem, method, agent, ...)
+# carry little content: two labels that share only such a class have not
+# been shown to be about the same notion. They count at reduced weight.
+GENERIC_CLASSES: dict[str, float] = {
+    "PROBLEM": 0.3, "GOAL": 0.3, "METHOD": 0.3, "AGENT": 0.3, "RESOURCE": 0.3, "TOOL": 0.3,
+    "INFORMATION": 0.3, "REQUEST": 0.3, "MEMORY": 0.4, "MODEL": 0.4, "EVIDENCE": 0.5, "SIGNAL": 0.5,
+    "TESTING": 0.6,
+}
+
+
+def class_weight(concept: str) -> float:
+    return GENERIC_CLASSES.get(concept, 1.0)
 
 
 def relatedness(a: str, b: str) -> float:
