@@ -1,3 +1,12 @@
+/* An element the code hides must actually disappear. Every `display:` rule in
+   this sheet beats the browser's default `[hidden] { display: none }`, so a
+   class that is hidden in JS but styled with an explicit display stays on
+   screen. `.contradiction-card` did exactly that: `clearResults()` set
+   `hidden = true`, the property read back true, and the card kept showing
+   "Loading rejected results…" over the empty, error and unshared states.
+   State the override once instead of remembering it per class. */
+[hidden] { display: none !important; }
+
 :root {
   color-scheme: dark;
   --canvas: #0a0a0a;

@@ -74,7 +74,11 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertNotIn("STATE =", source)
         with urlopen(self.base + "/api/config", timeout=10) as response:
             config = json.loads(response.read())
-        self.assertEqual(config["default_source"], "replay")
+        # The public origin must open on the visitor's own state. Defaulting to
+        # "replay" made every first load render the four fixture personas from
+        # src/discovery/fixtures/example_response.json as if they were people in
+        # the live corpus.
+        self.assertEqual(config["default_source"], "live")
         self.assertTrue(config["live_product"])
 
     def test_live_source_without_shared_thought_is_409_not_500(self):
@@ -106,6 +110,62 @@ class CompetitionWebMCPTests(unittest.TestCase):
             app = response.read().decode()
         shared = app.index('el("span", "", "Shared with Resonance")')
         self.assertIn('window.__resonanceWebMCP?.mode !== "live-product"', app[shared - 400:shared])
+
+    def test_webmcp_pill_reports_the_browser_not_the_consent_state(self):
+        # Regression for the fix above. Making the header consent pill truthful
+        # also routed applyAuthoritativeState() through the WebMCP *capability*
+        # pill, so a browser with no document.modelContext showed
+        # "WebMCP · private" — byte-identical to a browser where registration
+        # succeeded. Observed on the public origin in Chrome 152 (stock).
+        # Card A step 1 asks a tester to stop when the pill says "unavailable",
+        # so this pill has to keep saying it.
+        with urlopen(self.base + "/webmcp.mjs", timeout=10) as response:
+            live = response.read().decode()
+        unavailable = live.index('setStatus("WebMCP · unavailable")')
+        # the capability is recorded before the status is written …
+        self.assertIn("agentSurface = false", live[unavailable - 200:unavailable])
+        # … and the consent updater must not write the capability pill then.
+        apply_at = live.index("function applyAuthoritativeState")
+        body = live[apply_at:apply_at + 900]
+        self.assertIn("if (agentSurface === false) return;", body)
+        self.assertLess(body.index("if (agentSurface === false) return;"),
+                        body.index('setStatus("WebMCP · LIVE shared")'))
+        # setConsentVisible still runs first: the header keeps telling the truth.
+        self.assertLess(body.index("setConsentVisible(state.shared === true)"),
+                        body.index("if (agentSurface === false) return;"))
+
+    def test_landing_page_of_a_fresh_visitor_has_no_fixture_personas(self):
+        # The product opens on the visitor's own state. Nothing a first-time
+        # visitor is served may carry the fixture personas from
+        # src/discovery/fixtures/example_response.json.
+        client = Client(self.base)
+        client.guest()
+        with urlopen(self.base + "/", timeout=10) as response:
+            html = response.read().decode()
+        with urlopen(self.base + "/app.mjs", timeout=10) as response:
+            app = response.read().decode()
+        personas = ["Kwame A.", "Noah R.", "Mei L.", "Gabe S.", "Camille B.",
+                    "Diego R.", "Sam D.", "Sora N.", "Theo M.", "Yuki T."]
+        for name in personas:
+            self.assertNotIn(name, html)
+            self.assertNotIn(name, app)
+        self.assertNotIn("aria-plasma-lens", html)
+        # Both data routes the default view touches fail closed for this visitor.
+        for path in ("/api/context", "/api/discover?source=live"):
+            with self.assertRaises(HTTPError) as ctx:
+                client.request("GET", path)
+            self.assertEqual(ctx.exception.code, 409, path)
+            self.assertEqual(
+                json.loads(ctx.exception.read().decode())["error"], "share_required", path)
+        # The page renders that as its own state, never through the error path.
+        self.assertIn('dataset.state = "unshared"', app)
+        self.assertIn("function renderUnshared()", app)
+        self.assertIn("clearActiveThought()", app)
+        # Replay stays reachable and stays labelled as example data.
+        _, replay_context, _ = client.request("GET", "/api/context?source=replay")
+        self.assertEqual(replay_context["active_thought"]["thought_id"],
+                         "thought-aria-plasma-lens")
+        self.assertIn("example personas, not real participants", app)
 
     def test_webmcp_prepare_accepts_the_agents_real_thought(self):
         # Post-release product gap: the browser prepare used to clone the page's
@@ -153,8 +213,16 @@ class CompetitionWebMCPTests(unittest.TestCase):
         # source and app.mjs re-renders it on every source switch.
         client = Client(self.base)
         client.guest()
-        _, public, _ = client.request("GET", "/api/context?source=live")
-        self.assertEqual(public["active_thought"]["thought_id"], "thought-aria-plasma-lens")
+        # Before sharing, the visitor has no active thought. This used to hand
+        # back the fixture thought (`thought-aria-plasma-lens`) as if it were
+        # theirs; it now fails closed the same way discovery does.
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/context?source=live")
+        self.assertEqual(ctx.exception.code, 409)
+        self.assertEqual(json.loads(ctx.exception.read().decode())["error"], "share_required")
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/context")
+        self.assertEqual(ctx.exception.code, 409)
         thought = {"topic": "Panic buying after a shortage rumour", "domain": "consumer-economics",
                    "nodes": [{"id": "b0", "label": "supply shortage rumour", "role": "problem"},
                              {"id": "b1", "label": "synchronized bulk purchases", "role": "mechanism"},

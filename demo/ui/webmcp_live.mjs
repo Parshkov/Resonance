@@ -66,8 +66,19 @@ function setConsentVisible(shared) {
   host.dataset.shared = String(shared);
 }
 
+// Whether THIS browser exposes an agent surface. `null` until registerWebMCP()
+// has looked; it is a browser capability, not a consent state.
+let agentSurface = null;
+
 function applyAuthoritativeState(state) {
   setConsentVisible(state.shared === true);
+  // Two different pills carry two different facts: `#header-consent` says what
+  // is discoverable, `#webmcp-status` says whether this browser has WebMCP at
+  // all. Writing a consent word into the capability pill made a browser with
+  // no document.modelContext read "WebMCP · private" — identical to a browser
+  // where registration succeeded, and the opposite of what Card A step 1 tells
+  // a tester to look for.
+  if (agentSurface === false) return;
   if (state.shared) setStatus("WebMCP · LIVE shared");
   else if (state.draft_ready) setStatus("WebMCP · private draft ready");
   else setStatus("WebMCP · private");
@@ -262,6 +273,7 @@ const tools = [
 async function registerWebMCP() {
   const modelContext = document.modelContext || navigator.modelContext;
   if (!modelContext?.registerTool) {
+    agentSurface = false;
     setStatus("WebMCP · unavailable");
     // No agent surface in this browser, but the header must still tell the
     // truth about the visitor's own consent state (private by default).
@@ -278,10 +290,12 @@ async function registerWebMCP() {
     for (const tool of tools) {
       await modelContext.registerTool(tool, {signal: registrationController.signal});
     }
+    agentSurface = true;
     applyAuthoritativeState(await readAuthoritativeState());
     return true;
   } catch (error) {
     registrationController.abort();
+    agentSurface = false;
     setStatus("WebMCP · registration failed");
     console.error("Resonance LIVE WebMCP registration failed", error);
     return false;

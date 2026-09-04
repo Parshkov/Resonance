@@ -37,6 +37,7 @@ from src.product.mcp_bridge import (
     BridgeError, _has_usable_structure, _insufficient_structure_message, _slug,
     _structure_summary, build_thought_dna,
 )
+from src.identity.models import AuthenticationError
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
 from src.product.server import (
@@ -282,29 +283,60 @@ class CompetitionHandler(ProductHandler):
                         "resonance_discover again."},
             HTTPStatus.CONFLICT)
 
+    def _visitor_token(self) -> str | None:
+        """The visitor's bearer, or None when this browser has no session yet.
+
+        A first load has no session cookie: `webmcp_live.mjs` creates the guest
+        session, and the page's own boot fetches race it. "No session" and "no
+        shared thought" are the same fact to a reader — nothing of theirs is
+        discoverable — so the read routes answer with the same product state
+        instead of an authentication fault. Any other identity error still
+        propagates.
+        """
+        try:
+            return self._token()
+        except AuthenticationError:
+            return None
+
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 
         # The accepted R9 app remains unchanged. These three routes translate
         # its presentation contract to the live product without any shadow DB.
         if path == "/api/config":
-            self._send_json({"default_source": "replay", "live_product": True})
+            # The public product opens on the visitor's OWN state, never on the
+            # replay fixture. The fixture is four invented personas
+            # (`src/discovery/fixtures/example_response.json`); serving it as
+            # the default made every first load of the production origin show
+            # fabricated people, which contradicts `demo_personas_present:
+            # false` in /api/product/health. Replay stays reachable, labelled,
+            # on ?source=replay and the "Replay fixture" control.
+            self._send_json({"default_source": "live", "live_product": True})
             return
         if path == "/api/context":
             # ?source=replay -> the labelled public replay thought; ?source=live
-            # (or no source) -> the visitor's own shared thought when they have
-            # one, so the page's active-thought panel follows the live view.
+            # (or no source) -> the visitor's own shared thought.
             source = (params.get("source") or ["auto"])[0]
             if source not in {"auto", "replay", "live"}:
                 raise ValueError("source must be replay or live")
+            if source == "replay":
+                self._send_json(public_context())
+                return
             context = None
-            if source != "replay":
+            token = self._visitor_token()
+            if token is not None:
                 try:
-                    token = self._token()
                     context = _live_context(product, token)
                 except Exception:
                     context = None
-            self._send_json(context or public_context())
+            if context is None:
+                # A visitor who has shared nothing has no active thought. This
+                # used to fall back to `public_context()`, i.e. the fixture
+                # thought was presented as if it were theirs. Fail closed with
+                # the same product state the discovery routes use.
+                self._send_share_required()
+                return
+            self._send_json(context)
             return
         if path == "/api/discover":
             source = (params.get("source") or ["replay"])[0]
@@ -313,8 +345,8 @@ class CompetitionHandler(ProductHandler):
                 return
             if source != "live":
                 raise ValueError("source must be replay or live")
-            token = self._token()
-            session_id = _owned_live_session(product, token)
+            token = self._visitor_token()
+            session_id = _owned_live_session(product, token) if token else None
             if not session_id:
                 # Not an error in the product: the visitor simply has not shared
                 # a thought yet. PermissionError was unmapped and surfaced as a
