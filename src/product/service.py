@@ -380,6 +380,55 @@ class LiveProductService:
         )
 
     # ------------------------------------------------------------------
+    # workspaces (R14B)
+    # ------------------------------------------------------------------
+    @property
+    def workspaces(self):
+        from src.workspaces import WorkspaceService
+        if not hasattr(self, "_workspaces"):
+            self._workspaces = WorkspaceService(self.identity)
+        return self._workspaces
+
+    def create_workspace(self, access_token, intro_id, **kwargs):
+        return self.workspaces.create_from_intro(access_token, intro_id, **kwargs)
+
+    def workspace_invite(self, access_token, workspace_id, invitee_user_id, **kwargs):
+        return self.workspaces.invite(access_token, workspace_id, invitee_user_id, **kwargs)
+
+    def workspace_respond_invite(self, access_token, workspace_id, **kwargs):
+        return self.workspaces.respond_invite(access_token, workspace_id, **kwargs)
+
+    def workspace_remove_member(self, access_token, workspace_id, target_user_id, **kwargs):
+        return self.workspaces.remove_member(access_token, workspace_id, target_user_id, **kwargs)
+
+    def workspace_leave(self, access_token, workspace_id, **kwargs):
+        return self.workspaces.leave(access_token, workspace_id, **kwargs)
+
+    def workspace_add_note(self, access_token, workspace_id, body, **kwargs):
+        return self.workspaces.add_note(access_token, workspace_id, body, **kwargs)
+
+    def workspace_add_task(self, access_token, workspace_id, title, **kwargs):
+        return self.workspaces.add_task(access_token, workspace_id, title, **kwargs)
+
+    def workspace_set_task_state(self, access_token, workspace_id, task_id, state, **kwargs):
+        return self.workspaces.set_task_state(access_token, workspace_id, task_id, state, **kwargs)
+
+    def workspace_link_match(self, access_token, workspace_id, session_id, why, **kwargs):
+        return self.workspaces.link_match(access_token, workspace_id, session_id, why, **kwargs)
+
+    def workspace_add_artifact(self, access_token, workspace_id, **kwargs):
+        return self.workspaces.add_artifact(access_token, workspace_id, **kwargs)
+
+    def workspace_update_brief(self, access_token, workspace_id, brief, **kwargs):
+        return self.workspaces.update_brief(access_token, workspace_id, brief, **kwargs)
+
+    def list_my_workspaces(self, access_token):
+        return self.workspaces.list_my_workspaces(access_token)
+
+    def get_workspace(self, access_token, workspace_id):
+        return self.workspaces.get_workspace(access_token, workspace_id)
+
+    # ------------------------------------------------------------------
     # collaboration (R14) — one boundary, accepted semantics underneath
     # ------------------------------------------------------------------
     @property

@@ -739,3 +739,156 @@ class SQLiteRepository:
                 "SELECT * FROM messages WHERE channel_id = ? "
                 "ORDER BY created_at, message_id", (channel_id,)).fetchall()
             return tuple(row_message(r) for r in rows)
+
+    # -- workspaces (R14B) ----------------------------------------------
+    # No workspace write bumps the corpus generation.
+    def create_workspace(self, workspace, members, *, audit=None):
+        with self._lock:
+            self._begin()
+            try:
+                self._conn.execute(
+                    "INSERT INTO workspaces(workspace_id, title, brief, "
+                    "owner_user_id, origin_intro_id, created_at, updated_at, "
+                    "version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (workspace.workspace_id, workspace.title, workspace.brief,
+                     workspace.owner_user_id, workspace.origin_intro_id,
+                     workspace.created_at, workspace.updated_at, workspace.version))
+                for m in members:
+                    self._conn.execute(
+                        "INSERT INTO workspace_members(workspace_id, user_id, "
+                        "role, state, invited_by, invited_at, joined_at) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (m.workspace_id, m.user_id, m.role, m.state,
+                         m.invited_by, m.invited_at, m.joined_at))
+                self._insert_audit(audit)
+                self._conn.commit()
+                return workspace
+            except sqlite3.IntegrityError as exc:
+                self._conn.rollback()
+                raise PersistenceConflictError(
+                    "workspace or member conflicts with durable state") from exc
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def get_workspace(self, workspace_id):
+        from .models import WorkspaceRecord
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM workspaces WHERE workspace_id = ?", (workspace_id,)).fetchone()
+            if row is None:
+                return None
+            return WorkspaceRecord(row["workspace_id"], row["title"], row["brief"],
+                                   row["owner_user_id"], row["origin_intro_id"],
+                                   row["created_at"], row["updated_at"], int(row["version"]))
+
+    def get_member(self, workspace_id, user_id):
+        from .models import MemberRecord
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT * FROM workspace_members WHERE workspace_id = ? AND user_id = ?",
+                (workspace_id, user_id)).fetchone()
+            if row is None:
+                return None
+            return MemberRecord(row["workspace_id"], row["user_id"], row["role"],
+                                row["state"], row["invited_by"], row["invited_at"],
+                                row["joined_at"])
+
+    def list_members(self, workspace_id):
+        from .models import MemberRecord
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT * FROM workspace_members WHERE workspace_id = ? ORDER BY invited_at, user_id",
+                (workspace_id,)).fetchall()
+            return tuple(MemberRecord(r["workspace_id"], r["user_id"], r["role"],
+                                      r["state"], r["invited_by"], r["invited_at"],
+                                      r["joined_at"]) for r in rows)
+
+    def list_workspaces_for_user(self, user_id):
+        from .models import WorkspaceRecord
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT w.* FROM workspaces w JOIN workspace_members m "
+                "ON w.workspace_id = m.workspace_id WHERE m.user_id = ? "
+                "AND m.state IN ('invited','active') ORDER BY w.created_at",
+                (user_id,)).fetchall()
+            return tuple(WorkspaceRecord(r["workspace_id"], r["title"], r["brief"],
+                                         r["owner_user_id"], r["origin_intro_id"],
+                                         r["created_at"], r["updated_at"], int(r["version"]))
+                         for r in rows)
+
+    def upsert_member(self, member, *, audit=None):
+        with self._lock:
+            self._begin()
+            try:
+                self._conn.execute(
+                    "INSERT INTO workspace_members(workspace_id, user_id, role, "
+                    "state, invited_by, invited_at, joined_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT(workspace_id, user_id) DO UPDATE SET "
+                    "role=excluded.role, state=excluded.state, joined_at=excluded.joined_at",
+                    (member.workspace_id, member.user_id, member.role, member.state,
+                     member.invited_by, member.invited_at, member.joined_at))
+                self._insert_audit(audit)
+                self._conn.commit()
+                return member
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def add_workspace_row(self, table, columns, values, *, audit=None):
+        """Generic single-row insert for notes/tasks/artifacts/links/activity."""
+        with self._lock:
+            self._begin()
+            try:
+                placeholders = ", ".join("?" for _ in columns)
+                self._conn.execute(
+                    f"INSERT INTO {table}({', '.join(columns)}) VALUES ({placeholders})",
+                    values)
+                self._insert_audit(audit)
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def update_task_state(self, task_id, state, now):
+        with self._lock:
+            self._begin()
+            try:
+                cur = self._conn.execute(
+                    "UPDATE workspace_tasks SET state = ?, updated_at = ? WHERE task_id = ?",
+                    (state, now, task_id))
+                if cur.rowcount != 1:
+                    raise PersistenceConflictError(f"task {task_id!r} not found")
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def list_workspace_rows(self, table, workspace_id, order="created_at"):
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT * FROM {table} WHERE workspace_id = ? ORDER BY {order}",
+                (workspace_id,)).fetchall()
+            return [dict(r) for r in rows]
+
+    def bump_workspace(self, workspace_id, *, expected_version, brief=None, now=None):
+        with self._lock:
+            self._begin()
+            try:
+                if brief is not None:
+                    cur = self._conn.execute(
+                        "UPDATE workspaces SET brief = ?, updated_at = ?, version = version + 1 "
+                        "WHERE workspace_id = ? AND version = ?",
+                        (brief, now, workspace_id, expected_version))
+                else:
+                    cur = self._conn.execute(
+                        "UPDATE workspaces SET updated_at = ?, version = version + 1 "
+                        "WHERE workspace_id = ? AND version = ?",
+                        (now, workspace_id, expected_version))
+                if cur.rowcount != 1:
+                    raise PersistenceConflictError(
+                        f"workspace {workspace_id!r} stale or missing at version {expected_version}")
+                self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
