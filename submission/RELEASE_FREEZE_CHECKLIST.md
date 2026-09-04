@@ -1,5 +1,13 @@
 # R17 WebMCP Release / Submission Freeze Checklist
 
+> **Reset for engine 0.2 (2026-09-04, PR #158):** the R17 freeze was taken on
+> engine 0.1. Re-run this checklist from scratch on the engine 0.2 deployment.
+> Additional gates for that freeze: `python3 benchmark/r0-v0.2/runner.py` and
+> `python3 benchmark/extraction-v0.2/runner.py` exit 0; production demo
+> personas purged (`purge-demo`) or `RESONANCE_SEED_DEMO=1` recorded as a
+> deliberate choice; remote MCP identity is the product server only
+> (`src/remote/README.md`).
+
 > This is a **release gate**, not evidence that a checkbox has passed. Fill it only from the exact frozen release candidate.
 
 ## 1. Exact release identity

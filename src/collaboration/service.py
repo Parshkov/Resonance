@@ -146,6 +146,12 @@ class CollaborationService:
             raise CollaborationError("intro message exceeds the product bound")
         # Requester must own the source session (enumeration-resistant seam).
         self.identity.consent_for(access_token, from_session_id, client_id=client_id)
+        target = self.backend.get_session(target_session_id)
+        target_kind = str(getattr(target, "record_kind", "") or "")
+        if target_kind and target_kind != "volunteer":
+            raise CollaborationError(
+                "target is a seeded demo persona (record_kind "
+                f"{target_kind!r}); introductions are relayed only between real participants")
         # Accepted R12B rule: candidate opt-in + symmetric blocks + explicit
         # confirmation, with a durable decision record. Every denial branch is
         # normalized outward to one uniform error (leak-free negative space).

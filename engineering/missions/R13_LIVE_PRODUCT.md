@@ -26,7 +26,7 @@ viewer-relative blocks forbid — order and scores are never touched.
 
 The server boots on the accepted R7 seed corpus as the ambient platform
 baseline (`record_kind=synthetic`, honestly labeled); live user sessions are
-`record_kind=volunteer`. `--no-seed` starts empty. Responses carry
+`record_kind=volunteer`. Since 2026-09-04 (engine 0.2) persistent databases are not seeded unless `--seed-demo` / `RESONANCE_SEED_DEMO=1` is given, and seeded rows carry `display.demo_persona: true`. Responses carry
 `source: "live"` and `mode: "live"`; the deterministic replay demo remains the
 separate, clearly labeled judging mode from R9/R10.
 

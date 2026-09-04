@@ -68,6 +68,34 @@ def seed_r7(service: LiveCorpusService, sessions: list[Mapping[str, Any]] | None
     return len(records)
 
 
+def purge_demo(service: LiveCorpusService, sessions: list[Mapping[str, Any]] | None = None) -> dict[str, int]:
+    """Remove seeded demo state from a live corpus.
+
+    Every session whose ``record_kind`` is not ``volunteer`` (R7 fixtures are
+    ``synthetic`` / ``manually_curated``, pilot-scale seeds are ``synthetic``)
+    is tombstoned, and every demo persona account from the R7 corpus is
+    revoked. Real participants (``volunteer``) are never touched. Idempotent:
+    a second run reports zeros.
+    """
+    records = list(sessions) if sessions is not None else load_sessions()
+    persona_ids = {session["person"]["person_id"] for session in records}
+    deleted = 0
+    for session in service.repo.list_sessions():
+        if session.record_kind == "volunteer" or session.deleted_at is not None:
+            continue
+        service.delete_session(session.session_id, rebuild=False)
+        deleted += 1
+    revoked = 0
+    for user_id in sorted(persona_ids):
+        user = service.get_user(user_id)
+        if user is None or user.hidden:
+            continue
+        service.revoke_user(user_id, rebuild=False)
+        revoked += 1
+    service.rebuild_index()
+    return {"sessions_deleted": deleted, "users_revoked": revoked}
+
+
 def minimal_thought(thought_id: str, label: str = "heat") -> dict[str, Any]:
     """Valid synthetic manual Thought DNA used only for persistence smoke tests."""
     text = f"{label} accumulation causes failure"

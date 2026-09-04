@@ -329,8 +329,8 @@ class RemoteMCPHttpTests(unittest.TestCase):
         # implicit prose: the extractor abstains, the bridge refuses to leave an
         # empty shareable draft and tells the model to pass `thought` instead
         err2, weak = chat.call("resonance_prepare_thought", {
-            "context": "Whenever the upstream degrades, thousands of clients notice timeouts "
-                       "at once and retry, and the whole tier ends up saturated."})
+            "context": "The upstream was slow all week. Thousands of clients noticed timeouts. "
+                       "The whole tier ended up saturated by Friday."})
         self.assertTrue(err2, weak)
         self.assertIn("call again with `thought`", json.dumps(weak))
         _, mine = chat.call("resonance_my_thoughts", {})

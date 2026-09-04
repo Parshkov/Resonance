@@ -43,9 +43,9 @@ Results must carry the accepted identity:
 
 ```
 adapter_version:        resonance-mcp/0.1
-engine_version:         resonance-engine/0.1
+engine_version:         resonance-engine/0.2
 interface_version:      resonance-interfaces/0.1
-verifier_config_hash:   3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f893dbb1b1d
+verifier_config_hash:   12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77
 ```
 
 This is the first working Resonance MCP milestone. It is not a corpus-scale or

@@ -5,7 +5,6 @@ import json
 import unittest
 
 from src.security import (
-    AuthorizationCodeBroker,
     AuthorizationDenied,
     ConfirmationRequired,
     CsrfGuard,
@@ -22,7 +21,6 @@ from src.security import (
     SecurityPolicy,
     SecurityService,
     SessionBindingError,
-    pkce_s256,
     safe_log_metadata,
     suppress_small_buckets,
     validate_coarse_location,
@@ -303,80 +301,6 @@ class GuardTests(unittest.TestCase):
             "access_token": "secret",
         })
         self.assertEqual(sanitized, {"correlation_id": "c1", "decision": "deny"})
-
-
-class OAuthSecurityTests(unittest.TestCase):
-    def test_codes_are_bound_to_authenticated_subject_client_redirect_resource_and_pkce(self) -> None:
-        clock = Clock()
-        broker = AuthorizationCodeBroker(ttl_seconds=60, clock=clock)
-        ctx = RequestContext("user-a", "client-a", "auth-a")
-        verifier = "v" * 50
-        code = broker.issue_code(
-            ctx,
-            client_id="client-a",
-            redirect_uri="https://client.example/cb",
-            code_challenge=pkce_s256(verifier),
-            code_challenge_method="S256",
-            resource="https://resonance.example/mcp",
-            audience="resonance-mcp",
-        )
-        subject = broker.exchange_code(
-            code,
-            client_id="client-a",
-            redirect_uri="https://client.example/cb",
-            code_verifier=verifier,
-            resource="https://resonance.example/mcp",
-            audience="resonance-mcp",
-        )
-        self.assertEqual(subject, "user-a")
-        with self.assertRaises(OAuthGrantError):
-            broker.exchange_code(
-                code,
-                client_id="client-a",
-                redirect_uri="https://client.example/cb",
-                code_verifier=verifier,
-                resource="https://resonance.example/mcp",
-                audience="resonance-mcp",
-            )
-
-    def test_public_issue_code_api_has_no_caller_supplied_user_parameter(self) -> None:
-        signature = inspect.signature(AuthorizationCodeBroker.issue_code)
-        self.assertNotIn("user", signature.parameters)
-        self.assertNotIn("username", signature.parameters)
-        broker = AuthorizationCodeBroker()
-        with self.assertRaises(OAuthGrantError):
-            broker.issue_code(
-                RequestContext("", "client-a", "auth-a"),
-                client_id="client-a",
-                redirect_uri="https://client.example/cb",
-                code_challenge="challenge",
-                code_challenge_method="S256",
-                resource="https://resonance.example/mcp",
-                audience="resonance-mcp",
-            )
-
-    def test_code_cannot_be_redeemed_by_another_client_or_resource(self) -> None:
-        broker = AuthorizationCodeBroker()
-        ctx = RequestContext("user-a", "client-a", "auth-a")
-        verifier = "x" * 50
-        code = broker.issue_code(
-            ctx,
-            client_id="client-a",
-            redirect_uri="https://client.example/cb",
-            code_challenge=pkce_s256(verifier),
-            code_challenge_method="S256",
-            resource="https://resonance.example/mcp",
-            audience="resonance-mcp",
-        )
-        with self.assertRaises(OAuthGrantError):
-            broker.exchange_code(
-                code,
-                client_id="client-b",
-                redirect_uri="https://client.example/cb",
-                code_verifier=verifier,
-                resource="https://resonance.example/mcp",
-                audience="resonance-mcp",
-            )
 
 
 if __name__ == "__main__":

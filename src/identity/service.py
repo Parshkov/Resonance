@@ -83,6 +83,10 @@ def _mapping(value: Any) -> dict[str, Any]:
     raise IdentityValidationError(f"cannot project {type(value).__name__} as mapping")
 
 
+_LOCATION_KEYS = frozenset({"kind", "region", "city", "lat", "lon", "precision"})
+_LOCATION_KINDS = frozenset({"synthetic_coarse", "consented_coarse"})
+
+
 class IdentityService:
     """Single authorization/policy service for UI, WebMCP, API, and remote MCP.
 
@@ -896,39 +900,45 @@ class IdentityService:
 
     @staticmethod
     def _normalize_location(location: Mapping[str, Any]) -> dict[str, Any]:
-        # R7's current corpus shape represents city-level coarse location with
-        # a synthetic centroid.  Reject accidental exact-address/GPS fields;
-        # schema validation itself remains R11's responsibility.
-        forbidden = {"address", "street", "postal_code", "gps", "exact_lat", "exact_lon"}
-        overlap = forbidden.intersection(location)
-        if overlap:
-            raise IdentityValidationError(f"exact location fields are not allowed: {sorted(overlap)}")
-        precision = location.get("precision")
-        if precision is not None and precision != "city":
+        """Exact-allowlist city-level coarse location (R12 review hardening).
+
+        An empty object means no location was supplied. Otherwise the key set
+        must be exactly {kind, region, city, lat, lon, precision}: an arbitrary
+        extra field could smuggle precise data or create a durable row that
+        later breaks the R11 presentation projection. Coordinates are bounded,
+        finite and rounded to one decimal.
+        """
+        if not isinstance(location, Mapping):
+            raise IdentityValidationError("location must be an object")
+        if not location:
+            return {}
+        keys = set(location)
+        missing = sorted(_LOCATION_KEYS - keys)
+        unknown = sorted(keys - _LOCATION_KEYS)
+        if missing:
+            raise IdentityValidationError(f"location missing required fields: {missing}")
+        if unknown:
+            raise IdentityValidationError(f"location contains unknown fields: {unknown}")
+        if location.get("kind") not in _LOCATION_KINDS:
+            raise IdentityValidationError(f"location.kind must be one of {sorted(_LOCATION_KINDS)}")
+        if location.get("precision") != "city":
             raise IdentityValidationError("location precision must be city-level")
-        coarse = dict(location)
-        has_lat = "lat" in coarse
-        has_lon = "lon" in coarse
-        if has_lat != has_lon:
-            raise IdentityValidationError("coarse location requires both lat and lon")
-        if has_lat:
-            lat = coarse["lat"]
-            lon = coarse["lon"]
-            if (
-                isinstance(lat, bool)
-                or isinstance(lon, bool)
-                or not isinstance(lat, (int, float))
-                or not isinstance(lon, (int, float))
-                or not math.isfinite(float(lat))
-                or not math.isfinite(float(lon))
-                or not -90 <= float(lat) <= 90
-                or not -180 <= float(lon) <= 180
-            ):
-                raise IdentityValidationError("coarse location coordinates are invalid")
-            coarse["lat"] = round(float(lat), 1)
-            coarse["lon"] = round(float(lon), 1)
-            coarse["precision"] = "city"
-        return coarse
+        for field in ("region", "city"):
+            value = location.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise IdentityValidationError(f"location.{field} must be a non-empty string")
+        lat, lon = location["lat"], location["lon"]
+        if (
+            isinstance(lat, bool) or isinstance(lon, bool)
+            or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float))
+            or not math.isfinite(float(lat)) or not math.isfinite(float(lon))
+            or not -90 <= float(lat) <= 90 or not -180 <= float(lon) <= 180
+        ):
+            raise IdentityValidationError("coarse location coordinates are invalid")
+        return {
+            "kind": location["kind"], "region": location["region"], "city": location["city"],
+            "lat": round(float(lat), 1), "lon": round(float(lon), 1), "precision": "city",
+        }
 
     def _append_intro_consent(
         self,

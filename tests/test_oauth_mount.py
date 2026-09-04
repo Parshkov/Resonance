@@ -28,12 +28,23 @@ class IssuerDerivationTests(unittest.TestCase):
                          "https://resonance-production-cfe3.up.railway.app"
                          "/.well-known/oauth-protected-resource")
 
-    def test_forwarded_headers_then_host_when_no_https_origin(self):
+    def test_headers_are_trusted_only_when_they_name_an_allowed_origin(self):
+        # A caller-controlled Host/X-Forwarded-Host must never become the
+        # issuer (metadata poisoning); it is used only if it is allowed itself.
         self.assertEqual(
             om.public_issuer(frozenset({"http://127.0.0.1:8788"}),
                              {"Host": "0.0.0.0:8080", "X-Forwarded-Proto": "https",
                               "X-Forwarded-Host": "app.example"}),
-            "https://app.example")
+            "http://127.0.0.1:8788")
+        self.assertEqual(
+            om.public_issuer(frozenset({"https://a.example", "https://b.example"}),
+                             {"Host": "b.example", "X-Forwarded-Proto": "https"}),
+            "https://b.example")
+        self.assertEqual(
+            om.public_issuer(frozenset({"https://a.example", "https://b.example"}),
+                             {"Host": "evil.example", "X-Forwarded-Proto": "https"}),
+            "https://a.example")
+        # no allowlist at all (local development): Host is all there is
         self.assertEqual(om.public_issuer(frozenset(), {"Host": "127.0.0.1:9"}),
                          "http://127.0.0.1:9")
         # local http origin and no headers at all -> the allowed origin itself

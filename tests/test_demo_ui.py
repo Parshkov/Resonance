@@ -32,11 +32,12 @@ from demo.ui.server import (  # noqa: E402
     verify_sources,
 )
 
+# Verified order (engine 0.2): retrieval proposes, verification ranks.
 EXPECTED_PRIMARY = [
-    "ses-gabe-warehouse",
     "ses-kwame-traffic",
-    "ses-mei-battery-heat",
     "ses-noah-org-overload",
+    "ses-mei-battery-heat",
+    "ses-gabe-warehouse",
 ]
 
 

@@ -140,6 +140,7 @@ class GrantStore:
     codes: dict[str, dict[str, Any]] = field(default_factory=dict)
     refresh: dict[str, dict[str, Any]] = field(default_factory=dict)
     clients: dict[str, dict[str, Any]] = field(default_factory=dict)
+    access: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # -- authorization codes --------------------------------------------
     def put_code(self, code: str, record: Mapping[str, Any]) -> None:
@@ -180,6 +181,15 @@ class GrantStore:
             self.refresh.pop(h, None)
         return len(gone)
 
+    # -- access-token audience records -----------------------------------
+    def put_access(self, token: str, record: Mapping[str, Any]) -> None:
+        """Remember which resource an access token was issued for (RFC 8707)."""
+        self.access[_hash(token)] = dict(record)
+
+    def get_access(self, token: str) -> dict[str, Any] | None:
+        record = self.access.get(_hash(token))
+        return dict(record) if record is not None else None
+
     # -- clients --------------------------------------------------------
     def put_client(self, client_id: str, record: Mapping[str, Any]) -> None:
         self.clients[client_id] = dict(record)
@@ -200,6 +210,7 @@ class RepositoryGrantStore(GrantStore):
     KIND_CODE = "code"
     KIND_REFRESH = "refresh"
     KIND_CLIENT = "client"
+    KIND_ACCESS = "access"
 
     def __init__(self, repository: Any, *, clock: Any = time.time) -> None:
         super().__init__(clock=clock)
@@ -236,6 +247,16 @@ class RepositoryGrantStore(GrantStore):
 
     def revoke_refresh_for_subject(self, user_id: str) -> int:
         return int(self.repository.delete_grants_for_user(self.KIND_REFRESH, user_id))
+
+    # -- access-token audience records -----------------------------------
+    def put_access(self, token: str, record: Mapping[str, Any]) -> None:
+        """Remember which resource an access token was issued for (RFC 8707)."""
+        self.repository.put_grant(self.KIND_ACCESS, _hash(token), dict(record),
+                                  user_id=record.get("user_id"), expires_at=record.get("expires"))
+
+    def get_access(self, token: str) -> dict[str, Any] | None:
+        record = self.repository.get_grant(self.KIND_ACCESS, _hash(token))
+        return dict(record) if record is not None else None
 
     # -- clients --------------------------------------------------------
     def put_client(self, client_id: str, record: Mapping[str, Any]) -> None:
@@ -307,6 +328,9 @@ class OAuthCore:
             self.identity.authenticate(token)
         except Exception:  # noqa: BLE001 -- any auth failure is "no subject"
             return None
+        record = self.store.get_access(token) if hasattr(self.store, "get_access") else None
+        if record is not None and record.get("resource", "").rstrip("/") != resource.rstrip("/"):
+            return None                      # token bound to another audience
         return token
 
     # -- routing --------------------------------------------------------
@@ -598,6 +622,25 @@ class OAuthCore:
             "expires_in": DEFAULT_TOKEN_TTL,
             "scope": scope,
         }
+        if hasattr(self.store, "put_access"):
+            try:
+                owner = self.identity.authenticate(access_token)
+                self.store.put_access(access_token, {
+                    "user_id": owner.user_id, "resource": resource, "client_id": client_id,
+                    "expires": self.clock() + DEFAULT_TOKEN_TTL,
+                })
+            except Exception as exc:  # noqa: BLE001 -- transport returns an OAuth error
+                # Never return an OAuth-issued token unless its audience record
+                # was committed.  Otherwise a transient grant-store failure
+                # would silently downgrade RFC 8707 enforcement to the legacy
+                # unbound manual-key path.
+                try:
+                    self.identity.logout(access_token)
+                except Exception:  # noqa: BLE001 -- best-effort cleanup only
+                    pass
+                raise OAuthError(
+                    "server_error", "could not bind access token to the requested resource", 500
+                ) from exc
         if SCOPE_OFFLINE in scope.split():
             actor = self.identity.authenticate(access_token)
             refresh = secrets.token_urlsafe(32)

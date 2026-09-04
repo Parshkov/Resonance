@@ -99,7 +99,7 @@ class Client:
 class OAuthCoreTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"https://x"}))
+        cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
         cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
         cls.issuer = cls.base
@@ -156,12 +156,13 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertIn("refresh_token", doc["grant_types_supported"])
         self.assertTrue(doc["resource_indicators_supported"])
 
-    def test_issuer_follows_forwarded_headers(self):
-        # Behind a proxy the discovery URLs must be the public https origin.
+    def test_issuer_is_never_taken_from_an_unlisted_forwarded_host(self):
+        # A caller-controlled forwarded host must not become the issuer of the
+        # discovery documents (metadata poisoning); the allowlist decides.
         _, _, body = self.c().get("/.well-known/oauth-authorization-server",
                                   {"X-Forwarded-Proto": "https",
                                    "X-Forwarded-Host": "resonance.example"})
-        self.assertEqual(json.loads(body)["issuer"], "https://resonance.example")
+        self.assertNotEqual(json.loads(body)["issuer"], "https://resonance.example")
 
     # -- 4-10 happy path ------------------------------------------------
     def _full_connect(self, client_id, *, scope="resonance"):
@@ -285,8 +286,8 @@ class OAuthCoreTests(unittest.TestCase):
     def test_revoke_then_reuse_fails(self):
         c, tok, _, _ = self._full_connect("cid")
         access = tok["access_token"]
-        _, sid, _ = c.rpc(access, "initialize", {"protocolVersion": "2025-03-26"})
-        self.assertIsNotNone(sid)
+        istatus, sid, _ = c.rpc(access, "initialize", {"protocolVersion": "2025-03-26"})
+        self.assertEqual(istatus, 200)
         status, _, _ = c.post_form("/oauth/revoke",
                                    {"token": access, "token_type_hint": "access_token"})
         self.assertEqual(status, 200)
@@ -402,7 +403,7 @@ class DurableGrantStoreTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             db = str(Path(tmp) / "grants.sqlite3")
-            runtime = build_runtime(db, allowed_origins=frozenset({"https://x"}), seed=False)
+            runtime = build_runtime(db, allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
             runtime.remote_auth = RepositoryGrantStore(runtime.live.repo)
             httpd = build_httpd("127.0.0.1", 0, runtime=runtime)
             base = f"http://127.0.0.1:{httpd.server_address[1]}"

@@ -346,6 +346,21 @@ class SQLiteRepository:
         idempotency: IdempotencyKey | None = None,
         audit: AuditEvent | None = None,
     ) -> SessionRecord:
+        try:
+            return self._put_session(session, expected_version=expected_version,
+                                     idempotency=idempotency, audit=audit)
+        except sqlite3.IntegrityError as exc:
+            raise PersistenceConflictError(
+                "session identifier or thought_id conflicts with durable state") from exc
+
+    def _put_session(
+        self,
+        session: SessionRecord,
+        *,
+        expected_version: int | None = None,
+        idempotency: IdempotencyKey | None = None,
+        audit: AuditEvent | None = None,
+    ) -> SessionRecord:
         with self._lock:
             self._begin()
             try:

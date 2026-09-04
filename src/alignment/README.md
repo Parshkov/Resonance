@@ -28,3 +28,12 @@ measured and reported, with `"off"` as the audit-clean configuration.
 
 Seeds are hints: at least one unseeded restart always runs and selection can
 override seeded results (C3's measured seeds caveat, ADR-0003).
+
+## v0.2 (ADR-0004)
+
+Node affinity = soft role compatibility (state/mechanism 0.6, problem/state 0.5,
+...) + deterministic lexicon similarity + knowledge overlap. Beside the FGW
+mappings, a *twin-corrected* mapping (nodes re-paired to unmistakable label
+twins) is adjudicated too, and mapping selection subtracts the `label_identity`
+contradiction mass, so structure is never aligned against the words silently.
+`verify(..., rarity=...)` takes the corpus rarity from the index.

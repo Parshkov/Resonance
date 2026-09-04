@@ -522,6 +522,12 @@ class LiveProductService:
                 return None
         projected = dict(row)
         display = dict(projected.get("display", {}) or {})
+        # Seeded demo personas (record_kind synthetic / manually_curated) are
+        # labelled so a real participant never mistakes them for people who
+        # can accept an introduction.
+        record = self.backend.get_session(candidate_session)
+        record_kind = str(getattr(record, "record_kind", "") or "")
+        display["demo_persona"] = bool(record_kind) and record_kind != "volunteer"
         if consent and not consent.get("share_display_profile"):
             # Mirror R12B projection semantics: with profile sharing off, no
             # profile-derived presentation metadata escapes either.

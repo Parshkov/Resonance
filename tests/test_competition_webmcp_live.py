@@ -210,8 +210,8 @@ class CompetitionWebMCPTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as ctx:
             client.request("POST", "/api/webmcp/prepare", {
                 "request_id": "implicit-1",
-                "context": "Whenever the upstream degrades, thousands of clients notice timeouts "
-                           "at once and retry, and the whole tier ends up saturated."})
+                "context": "The upstream was slow all week. Thousands of clients noticed timeouts. "
+                           "The whole tier ended up saturated by Friday."})
         self.assertEqual(ctx.exception.code, 400)
         payload = json.loads(ctx.exception.read().decode())
         self.assertEqual(payload["error"], "validation_failed")

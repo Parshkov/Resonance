@@ -13,3 +13,13 @@ control and is not a shippable default.
 - equal-length paths are canonicalized by the lexicographically smallest
   `(direction, type, assertion)` token sequence, independent of relation IDs
 - no semantic/label bits in structural keys
+
+## v0.2 (ADR-0004)
+
+Two key families now exist. `fingerprints()` is unchanged in spirit: label-free
+D0/D1 landmark pairs joined by the canonical typed path (<= 3). `concept_fingerprints()`
+adds keys over `(role, abstract concept class)` from `src/semantics` with typed
+paths <= 2 plus single-landmark keys, so an analogy in another domain shares
+keys while a template coincidence with concept-free labels does not. Query-side
+class expansion (`expand=True`) reaches strongly related classes. Adjacency is
+computed once per graph. `FEATURE_VERSION` carries the lexicon version.

@@ -740,48 +740,33 @@ inspect and invoke the tools through `document.modelContext`.
 
 ## Where the project is now
 
-Resonance is being built now.
+Resonance has a working, LLM-free matching engine (engine 0.2) and a deployed product around it. The honest state is kept in [`docs/STATUS.md`](docs/STATUS.md); the decision that produced engine 0.2 is [ADR-0004](docs/decisions/ADR-0004-concept-aligned-analogy-and-benchmark-v0.2.md).
 
-The current phase is selecting the mathematical machinery required before freezing Thought DNA and the production matching pipeline.
+What is validated today, on Benchmark v0.2 (eight distinct reasoning skeletons, four domains each, eighteen case families, gate split never used for tuning):
 
-We are **not** trying to determine whether structured signals can be compared in principle. They can.
+- same words, different structure → rejected;
+- different words, same abstract structure → `analogical`;
+- same skeleton with concept-free labels (a template coincidence) → `negative`;
+- partial, paraphrased, permuted, granular and extraction-noisy variants → retrieved and classified correctly;
+- prose with explicit connectives → a grounded Thought Graph without any LLM.
 
-The engineering question is harder and more useful:
+What is **not** validated: real user thoughts at scale, corpus sizes beyond a few hundred graphs, implicit causation in prose, and native WebMCP discovery on a hosted client. Benchmark gold is agent-authored and awaits independent human review.
 
-> What representation and family of algorithms preserve enough of human thought structure to make the resulting matches robust, scalable, explainable, and genuinely useful?
-
-Current work includes independent investigation of:
-
-1. cognitive analogy and Structure Mapping,
-2. Shazam-style relational fingerprinting,
-3. approximate graph alignment,
-4. multiscale / granularity invariance,
-5. Knowledge DNA,
-6. context-to-Thought-Graph extraction,
-7. falsification benchmarks,
-8. adversarial review of the entire architecture.
-
-Those results feed directly into:
+The pipeline in code:
 
 ```text
-Research
-   ↓
-Decision Matrix
-   ↓
-Invariance Specification
-   ↓
-Algorithm ADRs
-   ↓
+prose or agent-supplied graph
+   ↓  src/extraction (cue extractor v0.2) / manual ingest
 Thought DNA v0.1
-   ↓
-Benchmark
-   ↓
-Prototype
-   ↓
-MCP
+   ↓  src/fingerprint (structural + concept keys)
+inverted index with IDF (src/index)
+   ↓  over-fetched candidates
+FGW alignment + scoring policy v0.2 (src/alignment, src/scoring)
+   ↓  verified ranking
+explanation: mapping, preserved relations, contradictions, confidence
 ```
 
-Research is therefore a **state of the project**, not the definition of the project.
+Semantics come from a deterministic, inspectable lexicon of abstract relational concepts (`src/semantics`), not from a model.
 
 ---
 

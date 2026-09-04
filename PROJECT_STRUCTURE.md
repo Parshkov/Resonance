@@ -37,8 +37,7 @@ Resonance/
 │   ├── missions/             R0 model-independent research tasks
 │   ├── submissions/          raw human/agent research results
 │   ├── reviews/              comparative/adversarial synthesis
-│   ├── logbook/              chronological research/engineering record
-│   └── results/              legacy initial scaffold; do not use for new runs
+│   └── logbook/              chronological research/engineering record
 │
 ├── engineering/
 │   ├── README.md             R1–R6 implementation chain

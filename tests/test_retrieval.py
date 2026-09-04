@@ -156,7 +156,7 @@ class RetrievalTests(unittest.TestCase):
             [("q0", "n1", "n0", "requires"), ("q1", "n0", "n3", "causes")],
             knowledge={"n1": {"requires": ["local:thermo:heat"]}},
         )
-        self.index = InvertedCandidateIndex(max_df_frac=1.0, min_df_cutoff=100)
+        self.index = InvertedCandidateIndex(stop_df_frac=1.0, min_corpus_for_stop=100)
         self.index.build((self.query, self.analogue, self.flip, self.chain, self.knowledge_hit))
 
     def test_index_satisfies_protocol(self):
@@ -253,14 +253,14 @@ class RetrievalTests(unittest.TestCase):
         )
 
     def test_persistence_restores_policy_and_rejects_tampered_versions(self):
-        custom = InvertedCandidateIndex(max_df_frac=1.0, min_df_cutoff=100)
+        custom = InvertedCandidateIndex(stop_df_frac=1.0, min_corpus_for_stop=100)
         custom.build((self.query, self.analogue))
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "index.json"
             custom.dump(path)
             restored = InvertedCandidateIndex.load(path)
-            self.assertEqual(restored.max_df_frac, 1.0)
-            self.assertEqual(restored.min_df_cutoff, 100)
+            self.assertEqual(restored.stop_df_frac, 1.0)
+            self.assertEqual(restored.min_corpus_for_stop, 100)
             self.assertEqual(restored.corpus_snapshot, custom.corpus_snapshot)
             payload = json.loads(path.read_text(encoding="utf-8"))
             payload["index_version"] = "tampered-version"
@@ -271,7 +271,7 @@ class RetrievalTests(unittest.TestCase):
 
     def test_tied_best_share_min_rank_and_are_not_truncated_by_name(self):
         twin = battery("z-org", "city")
-        index = InvertedCandidateIndex(max_df_frac=1.0, min_df_cutoff=100)
+        index = InvertedCandidateIndex(stop_df_frac=1.0, min_corpus_for_stop=100)
         index.build((self.query, self.analogue, twin, self.chain))
         hits = index.query(self.query, mode="structural", k=1)
         ids = {hit.candidate_id for hit in hits}

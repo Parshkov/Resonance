@@ -34,6 +34,7 @@ import json
 import secrets
 from typing import Any, Callable, Mapping
 
+from src.semantics import scrub as _scrub
 from src.collaboration import CollaborationError
 from src.graph.validation import NODE_ROLES, RELATION_TYPES
 from src.graph.versioning import SCHEMA_VERSION
@@ -170,7 +171,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
     for index, item in enumerate(raw_nodes):
         if not isinstance(item, Mapping):
             raise BridgeError("validation_failed", f"nodes[{index}] must be an object")
-        label = str(item.get("label", "")).strip()
+        label = _scrub(str(item.get("label", "")).strip())
         role = str(item.get("role", "")).strip()
         if not label or len(label) > 120:
             raise BridgeError("validation_failed", f"nodes[{index}].label must be 1..120 characters")
@@ -285,9 +286,11 @@ TOOLS: list[dict[str, Any]] = [
         "name": "resonance_prepare_thought",
         "title": "Prepare the person's current thought for sharing",
         "description": (
-            "Step 1 of 2. Build a private draft from the REAL reasoning in this conversation: pass "
-            "`thought` (labelled causal graph you extracted) or, as a fallback, `context` (raw text, "
-            "≤ 4000 chars; the deterministic cue extractor will try). Nothing becomes discoverable. "
+            "Step 1 of 2. Build a private draft from the REAL reasoning in this conversation. Prefer "
+            "`context`: the person's own words (≤ 4000 chars) are turned into a Thought Graph by the "
+            "deterministic cue extractor, with no model in the loop; contact details are scrubbed. Pass "
+            "`thought` (a labelled causal graph you extracted) only when the text carries no explicit "
+            "connectives (because, leads to, prevents, requires, ...). Nothing becomes discoverable. "
             "The result includes the exact preview of what WOULD be shared and a one-time "
             "confirmation_token. Show the preview to the person and ask for explicit approval "
             "before calling resonance_share_thought."),
@@ -296,7 +299,7 @@ TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "thought": THOUGHT_SCHEMA,
                 "context": {"type": "string", "maxLength": 4000,
-                            "description": "Raw text fallback when a graph cannot be extracted."},
+                            "description": "The person's own words; extracted deterministically (preferred)."},
                 "receive_intro_requests": {
                     "type": "boolean", "default": True,
                     "description": "Whether other people may request an introduction (default true)."},
@@ -466,8 +469,9 @@ class RemoteMCPBridge:
                 "serverInfo": {"name": self.server_name, "version": self.server_version},
                 "instructions": (
                     "Resonance finds people whose *structure of reasoning* resonates with the "
-                    "person you are talking to. Flow: extract the causal structure of what they "
-                    "are working on -> resonance_prepare_thought -> show the preview and ask for "
+                    "person you are talking to. Flow: resonance_prepare_thought with the person's own "
+                    "words as `context` (deterministic extraction; pass a `thought` graph only for "
+                    "text without explicit connectives) -> show the preview and ask for "
                     "explicit approval -> resonance_share_thought(confirm=true) -> "
                     "resonance_discover -> resonance_explain_match -> resonance_request_intro "
                     "(only with approval). Never invent content; never pass contact details."),
