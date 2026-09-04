@@ -1,5 +1,25 @@
 # Resonance — release manifest
 
+> **Update (2026-09-04, workstation run on `8670568`).** Three things in §0 below
+> are now out of date and are corrected here rather than silently edited:
+> **(1) Card A is no longer unclaimed.** Google Chrome **152.0.7977.83 stable**
+> exposes `document.modelContext` when launched with `--enable-features=WebMCP`
+> — Canary was never required — and Card A steps 1–9 ran natively against the
+> public origin: **24/24, `mode: NATIVE`**.
+> **(2) §4's claim that stock Chrome shows `WebMCP · unavailable` "by design"
+> was false as deployed**: the consent fix in #144 overwrote that pill with the
+> consent state, so a browser with no WebMCP showed `WebMCP · private`. Fixed
+> in #169.
+> **(3) The production front page served the R8 fixture.** `default_source` was
+> `replay`, so a first-time visitor saw four invented people before doing
+> anything, while `/api/product/health` reported `demo_personas_present: false`
+> — true of the database, not of the page. Fixed in #169; the landing state is
+> now the visitor's own.
+> Evidence: `submission/evidence/public-origin-8670568/`. Current production
+> SHA is **`8670568e174f63567d489c901817e3c575f5b5c2`**, Railway deployment
+> **`d05c733f-283c-4016-8cf8-ce951270a99b`**. Sections 1–5 remain the historical
+> competition record.
+
 > **Engine 0.2 freeze taken (2026-09-04).** The engine 0.2 re-freeze that the
 > previous banner demanded is done: the public-origin evidence was re-run on the
 > engine 0.2 deployment, `purge-demo` ran on production (it found nothing to
@@ -29,10 +49,10 @@
 | suites | **463 OK, 1 skipped** on `0aea577` (the skip needs a local PostgreSQL); 461 OK on `3267ea5` before this run's two new test classes |
 | repository gates | `python3 benchmark/r0-v0.2/runner.py` → `overall_status: pass`, exit 0; `python3 benchmark/extraction-v0.2/runner.py` → `overall_status: pass`, exit 0. r0-v0.2 gate values: classification accuracy 1.0, polarity rejection 1.0, negative FPR 0.0, positive node F1 0.8469, Recall@5 1.0, Recall@20 1.0. **Gold was not edited and is still awaiting human review (ADR-0004).** |
 | public-origin evidence | **`submission/evidence/public-origin-0aea577/`** — the first full acceptance set run *directly* against the public origin (health, `hosted_onboarding_probe` 9/9 required, `oauth_smoke` 27/27, `abc_mcp_test` 36/36, Card A in a real Chromium 16/18 with screenshots, Card B through the real Claude custom connector). Earlier: `public-origin-c66951b/` (purge + hosted-connector discover on engine 0.2), `public-origin-01193f1/`, `public-origin-3c7dc80/`, `public-origin-9b51262/` (all engine 0.1). |
-| Card A (browser WebMCP) | executed on `0aea577` against the live origin in Chromium 141: 16/18. Native `document.modelContext` is **absent** in stock Chromium and remains **unclaimed**; the `cards=0` check is correct fail-closed behaviour (`primary_matches()` drops every `negative` match and every live match currently is `negative`) around two open R9 presentation defects. A human run in a WebMCP-enabled Chrome is still outstanding. |
+| Card A (browser WebMCP) | **superseded — now native.** On `8670568` the whole card ran against the live origin in **Google Chrome 152.0.7977.83 with `--enable-features=WebMCP`**: **24/24, `mode: NATIVE`**. Tools discovered through the browser's own `document.modelContext.getTools({})` (17, with `inputSchema` and `origin`) and invoked with `executeTool(tool, argsJson, {})`; prepare → preview → share → live discover → get_match → revoke, all fail-closed states holding. The old `cards=0` red is gone because the assertion is now the renderer's exact rule (#171), and it passes for the right reason: 6 matches returned, all `negative`, 0 eligible, `data-state='empty'`. Evidence: `submission/evidence/public-origin-8670568/card-a-browser/`. Historical: 16/18 on `0aea577` in Chromium 141, which has no WebMCP at all. **Honest limitation:** through the native surface Chrome wraps a failing tool as `UnknownError`, so an agent does not receive the product's `share_required` code the way remote MCP delivers it. |
 | Card B (hosted Claude client) | executed on `0aea577` by an agent through the real Claude custom connector: `whoami` → `prepare_thought` → preview → `share_thought(confirm: true)` → `discover` → `explain_match` → `stop_sharing` (`revoked: true`), guest session revoked afterwards. **A human still has to run it once end to end.** |
-| still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome (Card A step 1–2); ChatGPT developer-mode app (Card C); two real people in one recorded run (Card D); corpus scale replay 10^4–10^5; human review of the Benchmark v0.2 and extraction-v0.2 gold |
-| known open items | ten pre-existing duplicate guest sessions in the live corpus (ids in the evidence summary) need an owner-side deletion; ADR-0005 (`approximate` vs `analogical` for same-vocabulary cross-domain pairs) is **open** and needs human-authored gold; the R9 page shows a match count with an empty primary rail and a stale evidence panel when every live match is `negative` |
+| still untested / must not claim | Card B by a **human** in claude.ai (an agent has run steps 4–8 through the real connector); ChatGPT developer-mode app (Card C, needs a Business/Enterprise/Edu workspace); Grok custom connector (Card E — Grok *does* support remote MCP connectors, so this is available and simply not run); two real people in one recorded run (Card D); corpus scale replay 10^4–10^5; human review of the Benchmark v0.2 and extraction-v0.2 gold; **the custom domain `resonance.parshkov.com`** — attached, DNS propagated, certificate still validating, so it does not serve yet and nothing may call it canonical until `oauth_smoke` and `abc_mcp_test` have run against it |
+| known open items | ten pre-existing duplicate guest sessions in the live corpus (ids in the `0aea577` evidence summary) still need deletion — the tool now exists (`RESONANCE_PURGE_SESSIONS`, #172) but has **not** been run on production; their cost is measured, not assumed: on `8670568` the genuine cross-domain analogy is still at **rank 4** behind three exact copies at structural 1.0. ADR-0005 (`approximate` vs `analogical` for same-vocabulary cross-domain pairs) remains **open** and needs human-authored gold — it must not be settled by moving a threshold. ~~the R9 page shows a match count with an empty primary rail and a stale evidence panel when every live match is `negative`~~ fixed in #167/#169, verified 18/18. |
 | post-freeze deploy check | the freeze commit itself (`960fb47`, PR #165, documentation only) auto-deployed as **`184aad76-206e-41ab-be27-3f58251a72fb`**, SUCCESS 21:11:47 UTC, with the same startup log (`oauth: core attached; … grants durable`, `mode: LIVE+WebMCP`) and **no** `purge-demo` line. `GET /api/product/health` afterwards is byte-identical on every `engine.*` field and still reports `demo_personas_present: false`; `ops/oauth_smoke.py` re-run against the origin: **27/27**. The runtime is unchanged from `0aea577`, as intended. |
 | secrets | `RESONANCE_DB`, `RESONANCE_CONFIRMATION_SECRET`, `PUBLIC_ORIGIN`, `PORT` supplied by Railway variables only; none in the repo. `RESONANCE_DB` and `RESONANCE_CONFIRMATION_SECRET` were not read or modified during this freeze. |
 
@@ -92,7 +112,7 @@
 ## 4. Known limitations (non-blocking, stated honestly)
 
 - OAuth codes / refresh grants / client registrations are in process memory on the single replica: a redeploy makes hosted clients re-authorize once (R12 access tokens are durable).
-- Native WebMCP requires a browser exposing `document.modelContext`; stock Chrome/Chromium 141 shows `WebMCP · unavailable` by design.
+- Native WebMCP requires a browser exposing `document.modelContext`. **Correction (2026-09-04):** as written this line was true of the intent and false of the deployed build — the consent fix in #144 overwrote the capability pill with the consent state, so a browser without WebMCP showed `WebMCP · private`, not `WebMCP · unavailable`. Fixed in #169; the pill is now checked in both directions by `browser_harness.py`. Also: Chromium 141 has no WebMCP at all, but **Chrome 152 stable does**, behind `--enable-features=WebMCP`.
 - The browser `resonance_prepare_thought` builds from the labelled page thought; real-conversation ingestion is the remote MCP path (`context=` / structured `thought`).
 - The raw-text cue extractor is the honest floor for `context=` input; structured graphs from the chat's model give the strongest matches.
 - Railway push auto-deploy does not fire; deployments are triggered through the Railway plugin and recorded here.

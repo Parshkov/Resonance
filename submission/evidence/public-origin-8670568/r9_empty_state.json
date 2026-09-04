@@ -1,0 +1,96 @@
+{
+  "base": "http://127.0.0.1:8901",
+  "checks": [
+    {
+      "step": "baseline REPLAY renders match cards",
+      "ok": true,
+      "detail": "cards=4"
+    },
+    {
+      "step": "baseline populates evidence and drawer",
+      "ok": true,
+      "detail": "summary='10 matches \u00b7 5 rejected' kicker='WHY KWAME A. RESONATES'"
+    },
+    {
+      "step": "an empty result is its own state, not an error",
+      "ok": true,
+      "detail": "data-state='empty'"
+    },
+    {
+      "step": "no match cards are shown",
+      "ok": true,
+      "detail": "cards=0"
+    },
+    {
+      "step": "the summary no longer claims matches that are not shown",
+      "ok": true,
+      "detail": "summary='10 returned \u00b7 0 resonances \u00b7 5 rejected' (was '10 matches \u00b7 5 rejected')"
+    },
+    {
+      "step": "the evidence panel drops the previous source's identity",
+      "ok": true,
+      "detail": "kicker='NO RESONANCE IN THIS CORPUS' (was 'WHY KWAME A. RESONATES')"
+    },
+    {
+      "step": "stale mapping rows are gone",
+      "ok": true,
+      "detail": "mapping_rows=0"
+    },
+    {
+      "step": "stale relation chips are gone",
+      "ok": true,
+      "detail": "chips=0"
+    },
+    {
+      "step": "the returned-but-refused candidates stay inspectable",
+      "ok": true,
+      "detail": "drawer_rows=15"
+    },
+    {
+      "step": "the map reports zero resonances",
+      "ok": true,
+      "detail": "map_status='0 resonances \u00b7 every returned candidate was refused'"
+    },
+    {
+      "step": "the heading says why nothing is shown",
+      "ok": true,
+      "detail": "heading='Nothing cleared the resonance bar'"
+    },
+    {
+      "step": "the contradiction card is never hidden-but-still-rendered in the empty state",
+      "ok": true,
+      "detail": "{\"hidden\": false, \"display\": \"grid\", \"visibleText\": \"\\u00d7\\n\\nCONTRADICTION EVIDENCE\\n\\ncausal inversion of heat cascade\\n\\nLea V.\\nrelation_type:r0->r0\\n5 REJECTED\"}"
+    },
+    {
+      "step": "replay renders again after the empty state",
+      "ok": true,
+      "detail": "cards=4"
+    },
+    {
+      "step": "a failure is reported as an error",
+      "ok": true,
+      "detail": "data-state='error'"
+    },
+    {
+      "step": "the error state leaves no result data from the previous source",
+      "ok": true,
+      "detail": "{\"cards\": 0, \"mappings\": 0, \"chips\": 0, \"drawer\": 0, \"markers\": 0, \"connections\": 0, \"summary\": \"\\u2014\", \"kicker\": \"Evidence\", \"contradictionHidden\": true, \"contradictionDisplay\": \"none\", \"contradictionVisibleText\": \"\"}"
+    },
+    {
+      "step": "a hidden contradiction card is actually off screen, not just flagged hidden",
+      "ok": true,
+      "detail": "computed display='none'; visible text=''"
+    },
+    {
+      "step": "no uncaught JavaScript exceptions",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "no unexpected console errors",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "summary": "18/18 checks passed"
+}

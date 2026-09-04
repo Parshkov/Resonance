@@ -12,10 +12,38 @@ you for one, that is a FAIL to report.
 
 ## Card A — native browser WebMCP (competition evidence; Chrome with WebMCP enabled)
 
-Prerequisite: a Chrome build that exposes `document.modelContext` (Chrome
-Canary/Dev with the WebMCP flag, or the ChatGPT in-app browser when it
-supports WebMCP). Stock Chrome/Chromium 141 does **not** expose it — the page
-then shows the pill `WebMCP · unavailable`; that is the browser, not the site.
+Prerequisite: a Chrome build that exposes `document.modelContext`. **Canary is
+not needed.** Google Chrome **152 stable** ships WebMCP behind a flag; launch it
+with the feature enabled and quit any running Chrome first, or the flag is
+ignored:
+
+```
+open -a "Google Chrome" --args --enable-features=WebMCP
+```
+
+Verified on Chrome `152.0.7977.83`: `typeof document.modelContext` is
+`"undefined"` without the flag and `"object"` with it. `navigator.modelContext`
+does not exist either way. Older builds (Chromium 141) have no WebMCP at all.
+
+If the pill reads `WebMCP · unavailable`, this browser has no
+`document.modelContext` — stop and report the browser version. That pill states
+the **browser's capability**, not your consent; your consent is the header pill
+(`Private · not discoverable` / `Shared with Resonance`). Before #169 the
+capability pill was overwritten with the consent state, so a browser without
+WebMCP showed `WebMCP · private` and this step could not be trusted.
+
+The whole card is also automated:
+
+```
+python3 submission/evidence/browser_harness.py https://<origin> \
+    --exe "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --out submission/evidence/<dir>
+```
+
+It passes `--enable-features=WebMCP` itself, reports `mode: NATIVE` when the
+browser really has the surface, and revokes its own share at the end. Executed
+run on `8670568`: 24/24, `mode: NATIVE` —
+`submission/evidence/public-origin-8670568/card-a-browser/`.
 
 1. Open the origin. Expect: the R9 page renders 4 replay cards; header pill
    `Private · not discoverable`; WebMCP pill `WebMCP · private` (registration
@@ -102,3 +130,19 @@ introduction; the other accepts in their chat (`resonance_respond_intro`,
 `confirm: true`) and replies (`resonance_send_message`). Report the two
 pseudonymous ids, the session ids, the structural score and the preserved
 relation count — nothing else.
+
+## Card E — hosted MCP client, canonical URL only (Grok custom connector)
+
+Grok supports custom **remote** MCP connectors, so this is a third independent
+hosted client and not a "not supported" result. It cannot reach a local server;
+the canonical public URL is exactly what it needs.
+
+1. grok.com → **Connectors** → **New Connector** → **Custom**.
+2. MCP server URL = `https://resonance-production-cfe3.up.railway.app/mcp`;
+   complete the authentication the server asks for (OAuth is discovered).
+3. The Resonance authorization page opens → **Continue as guest** → **Approve**.
+4. New chat with the connector enabled: "Call resonance_whoami." → `person-…`.
+5. Steps 5–8 of Card B.
+
+On a Grok Business/Enterprise workspace a team admin has to provision the
+connector first. **Not executed on any engine version.**

@@ -1,0 +1,64 @@
+{
+ "extractor": {
+  "id": "resonance-cue-extractor",
+  "version": "0.2.0"
+ },
+ "gates": {
+  "assertion_accuracy": {
+   "observed": 1.0,
+   "required": 0.9,
+   "status": "pass"
+  },
+  "determinism": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "edge_f1": {
+   "observed": 0.9359,
+   "required": 0.6,
+   "status": "pass"
+  },
+  "modality_accuracy": {
+   "observed": 0.9726,
+   "required": 0.8,
+   "status": "pass"
+  },
+  "node_f1": {
+   "observed": 0.9333,
+   "required": 0.7,
+   "status": "pass"
+  },
+  "nonempty_rate": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "pii_leaks": {
+   "observed": 0,
+   "required": 0,
+   "status": "pass"
+  },
+  "role_accuracy": {
+   "observed": 0.6218,
+   "required": 0.6,
+   "status": "pass"
+  }
+ },
+ "metrics": {
+  "assertion_accuracy": 1.0,
+  "cases": 22,
+  "determinism": 1.0,
+  "edge_f1": 0.9359,
+  "edge_precision": 0.9359,
+  "edge_recall": 0.9359,
+  "modality_accuracy": 0.9726,
+  "node_f1": 0.9333,
+  "node_precision": 0.9297,
+  "node_recall": 0.937,
+  "nonempty_rate": 1.0,
+  "pii_leaks": 0,
+  "role_accuracy": 0.6218
+ },
+ "overall_status": "pass"
+}
