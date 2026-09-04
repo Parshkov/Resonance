@@ -140,3 +140,34 @@ def export_document(
         "audit": [e.to_public_dict() for e in audit],
         "idempotency": [r.to_dict() for r in idempotency],
     }
+
+
+def row_intro(row: Mapping[str, Any]) -> "IntroRecord":
+    from .models import IntroRecord
+    return IntroRecord(
+        intro_id=row["intro_id"],
+        from_user_id=row["from_user_id"],
+        to_user_id=row["to_user_id"],
+        from_session_id=row["from_session_id"] or "",
+        to_session_id=row["to_session_id"] or "",
+        state=row["state"],
+        message=row["message"] or "",
+        created_at=row["created_at"],
+        updated_at=row["updated_at"] or row["created_at"],
+        accepted_at=row["accepted_at"],
+        declined_at=row["declined_at"],
+        cancelled_at=row["cancelled_at"],
+    )
+
+
+def row_channel(row: Mapping[str, Any]) -> "ChannelRecord":
+    from .models import ChannelRecord
+    return ChannelRecord(channel_id=row["channel_id"], intro_id=row["intro_id"] or "",
+                         created_at=row["created_at"], closed_at=row["closed_at"])
+
+
+def row_message(row: Mapping[str, Any]) -> "MessageRecord":
+    from .models import MessageRecord
+    return MessageRecord(message_id=row["message_id"], channel_id=row["channel_id"] or "",
+                         author_user_id=row["author_user_id"] or "",
+                         body=row["body"] or "", created_at=row["created_at"])

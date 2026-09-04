@@ -48,6 +48,8 @@ from src.persistence.errors import (
     PersistenceValidationError,
 )
 from src.persistence.seed import seed_r7
+from src.collaboration import CollaborationError
+from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product.service import LiveProductService, ProductError, StaleResultError
 
 REPO = Path(__file__).resolve().parents[2]
@@ -62,6 +64,9 @@ STATIC = {
     "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
     "/webmcp.mjs": ("webmcp.mjs", "text/javascript; charset=utf-8"),
     "/deeplink.mjs": ("deeplink.mjs", "text/javascript; charset=utf-8"),
+    "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
+    "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
+    "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
 }
 
 
@@ -197,11 +202,12 @@ class ProductHandler(BaseHTTPRequestHandler):
             ((AuthorizationError, DraftNotFound), HTTPStatus.FORBIDDEN,
              "authorization_failed"),
             ((CsrfError,), HTTPStatus.FORBIDDEN, "csrf_rejected"),
-            ((ConfirmationRequiredError, ConfirmationError), HTTPStatus.CONFLICT,
+            ((ConfirmationRequiredError, ConfirmationError, PolicyConfirmationRequired), HTTPStatus.CONFLICT,
              "confirmation_required"),
             ((StaleResultError, PersistenceStaleIndexError), HTTPStatus.CONFLICT,
              "stale_result"),
             ((PersistenceConflictError,), HTTPStatus.CONFLICT, "conflict"),
+            ((CollaborationError,), HTTPStatus.BAD_REQUEST, "collaboration_unavailable"),
             ((IdentityValidationError, PersistenceValidationError, IngestionError,
               ProductError, ValueError), HTTPStatus.BAD_REQUEST, "validation_failed"),
             ((PersistenceStateError,), HTTPStatus.CONFLICT, "state_conflict"),
@@ -222,7 +228,10 @@ class ProductHandler(BaseHTTPRequestHandler):
                 "</body>",
                 '  <script>window.RESONANCE_MODE = "live";</script>\n'
                 '  <script type="module" src="/webmcp.mjs"></script>\n'
-                '  <script type="module" src="/deeplink.mjs"></script>\n</body>',
+                '  <script type="module" src="/deeplink.mjs"></script>\n'
+                '  <script type="module" src="/session.mjs"></script>\n'
+                '  <script type="module" src="/collab.mjs"></script>\n'
+                '  <script type="module" src="/collab_ui.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
@@ -245,6 +254,13 @@ class ProductHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/product/sessions":
             self._send_json({"sessions": product.owned_sessions(self._token())})
+            return
+        if path == "/api/product/intro/list":
+            self._send_json(product.list_requests(self._token()))
+            return
+        if path == "/api/product/channel/messages":
+            channel_id = (params.get("channel_id") or [""])[0]
+            self._send_json(product.read_messages(self._token(), channel_id))
             return
         if path in {"/api/product/preview", "/api/webmcp/preview"}:
             draft_id = (params.get("draft_id") or [""])[0]
@@ -331,6 +347,13 @@ class ProductHandler(BaseHTTPRequestHandler):
             self._send_json({"logged_out": True},
                             cookie=f"{COOKIE_NAME}=; Max-Age=0; Path=/")
             return
+        if path == "/api/product/rotate":
+            creds = product.rotate_session(self._token())
+            self._send_json(
+                {"user_id": creds.user_id, "csrf_token": creds.csrf_token,
+                 "expires_at": creds.expires_at},
+                cookie=self._cookie_for(creds.access_token))
+            return
 
         token = self._token()
         body = self._body()
@@ -397,6 +420,35 @@ class ProductHandler(BaseHTTPRequestHandler):
             self._send_json({"session_id": str(body.get("session_id", "")),
                              "revoked": True,
                              "discoverable": False})
+            return
+        if path == "/api/product/intro/request":
+            self._send_json(product.request_intro(
+                token,
+                from_session_id=str(body.get("from_session_id", "")),
+                target_session_id=str(body.get("target_session_id", "")),
+                message=str(body.get("message", "")),
+                request_id=body.get("request_id"),
+                confirmed=bool(body.get("confirmed", False)), **security))
+            return
+        if path == "/api/product/intro/respond":
+            self._send_json(product.respond_intro(
+                token, str(body.get("intro_id", "")),
+                accept=bool(body.get("accept", False)),
+                request_id=body.get("request_id"),
+                confirmed=bool(body.get("confirmed", False)), **security))
+            return
+        if path == "/api/product/intro/cancel":
+            self._send_json(product.cancel_intro(
+                token, str(body.get("intro_id", "")),
+                request_id=body.get("request_id"),
+                confirmed=bool(body.get("confirmed", False)), **security))
+            return
+        if path == "/api/product/channel/send":
+            self._send_json(product.send_message(
+                token, str(body.get("channel_id", "")),
+                str(body.get("body", "")),
+                request_id=body.get("request_id"),
+                confirmed=bool(body.get("confirmed", False)), **security))
             return
         if path == "/api/product/delete":
             product.delete_session(

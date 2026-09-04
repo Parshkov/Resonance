@@ -117,17 +117,25 @@ class IdentityPolicySource:
         return None
 
     def peer_action_allowed(self, subject: str, peer_id: str, action: str) -> bool:
-        if action != "intro:request":
-            return False
-        # Candidate opt-in is the only R12 peer capability. The policy also
-        # checks consent on the exact target session before reaching this seam.
-        return any(
-            _field(session, "user_id") == peer_id
-            and self.session_consent(str(_field(session, "session_id"))).get(
-                "allow_intro_requests", False
+        if action == "intro:request":
+            # Candidate opt-in is the R12 peer capability. The policy also
+            # checks consent on the exact target session before this seam.
+            return any(
+                _field(session, "user_id") == peer_id
+                and self.session_consent(str(_field(session, "session_id"))).get(
+                    "allow_intro_requests", False
+                )
+                for session in self.backend.list_sessions()
             )
-            for session in self.backend.list_sessions()
-        )
+        if action == "message:send":
+            # R14 extends the deferral point this method reserved: relay
+            # messaging is allowed exactly between mutually ACCEPTED
+            # connections, read from the durable intro records per call.
+            repo = getattr(self.backend, "repo", None)
+            if repo is None or not hasattr(repo, "accepted_user_pairs"):
+                return False
+            return frozenset((subject, peer_id)) in repo.accepted_user_pairs()
+        return False
 
     def is_blocked(self, subject: str, peer_id: str) -> bool:
         blocked = False

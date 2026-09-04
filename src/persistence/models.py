@@ -206,3 +206,73 @@ class IdempotencyRecord:
             "response": dict(self.response),
             "created_at": self.created_at,
         }
+
+
+INTRO_STATES = ("requested", "accepted", "declined", "cancelled")
+
+
+@dataclass(frozen=True, slots=True)
+class IntroRecord:
+    """Durable pairwise connection request (R14). Never corpus content."""
+
+    intro_id: str
+    from_user_id: str
+    to_user_id: str
+    from_session_id: str
+    to_session_id: str
+    state: str
+    message: str
+    created_at: str
+    updated_at: str
+    accepted_at: str | None = None
+    declined_at: str | None = None
+    cancelled_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "intro_id": self.intro_id,
+            "from_user_id": self.from_user_id,
+            "to_user_id": self.to_user_id,
+            "from_session_id": self.from_session_id,
+            "to_session_id": self.to_session_id,
+            "state": self.state,
+            "message": self.message,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "accepted_at": self.accepted_at,
+            "declined_at": self.declined_at,
+            "cancelled_at": self.cancelled_at,
+        }
+
+    @classmethod
+    def from_mapping(cls, raw: Mapping[str, Any]) -> "IntroRecord":
+        return cls(**{key: raw.get(key) for key in (
+            "intro_id", "from_user_id", "to_user_id", "from_session_id",
+            "to_session_id", "state", "message", "created_at", "updated_at",
+            "accepted_at", "declined_at", "cancelled_at")})
+
+
+@dataclass(frozen=True, slots=True)
+class ChannelRecord:
+    channel_id: str
+    intro_id: str
+    created_at: str
+    closed_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"channel_id": self.channel_id, "intro_id": self.intro_id,
+                "created_at": self.created_at, "closed_at": self.closed_at}
+
+
+@dataclass(frozen=True, slots=True)
+class MessageRecord:
+    message_id: str
+    channel_id: str
+    author_user_id: str
+    body: str
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"message_id": self.message_id, "channel_id": self.channel_id,
+                "author_user_id": self.author_user_id, "body": self.body,
+                "created_at": self.created_at}

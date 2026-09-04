@@ -62,20 +62,31 @@ RICH_RESULT_SCHEMA: dict[str, Any] = {
 }
 
 
-def _intro_state(policy_source: Any, candidate_session: str) -> str:
+def _intro_state(policy_source: Any, candidate_session: str,
+                 viewer_id: str | None = None) -> str:
     """Connection state from the R12B-authoritative consent source.
 
     Blocked pairs never reach a rich result (rows are dropped upstream), and
-    contact details do not exist anywhere in the pipeline; `requested` /
-    `accepted` become derivable once R14 lands its durable intro records.
+    contact details do not exist anywhere in the pipeline. With R14's durable
+    intro records present, a live `requested`/`accepted` state between the
+    viewer and the candidate's owner takes precedence over consent-derived
+    availability — one derivation function, no second source of truth.
     """
+    if viewer_id:
+        owner = policy_source.owner_of("session", candidate_session)
+        repo = getattr(getattr(policy_source, "backend", None), "repo", None)
+        if owner and repo is not None and hasattr(repo, "latest_intro_between"):
+            latest = repo.latest_intro_between(viewer_id, owner)
+            if latest is not None and latest.state in {"requested", "accepted"}:
+                return latest.state
     consent = policy_source.session_consent(candidate_session)
     if consent and consent.get("allow_intro_requests"):
         return "available"
     return "unavailable"
 
 
-def build_rich_result(payload: Mapping[str, Any], *, policy_source: Any) -> dict[str, Any]:
+def build_rich_result(payload: Mapping[str, Any], *, policy_source: Any,
+                      viewer_id: str | None = None) -> dict[str, Any]:
     """Wrap an authorized R13 discover payload into the versioned rich shape.
 
     Rows pass through with order and scores untouched; the wrapper only adds
@@ -87,7 +98,7 @@ def build_rich_result(payload: Mapping[str, Any], *, policy_source: Any) -> dict
     def enrich(row: Mapping[str, Any]) -> dict[str, Any]:
         session_id = str(row.get("session_id", ""))
         out = dict(row)
-        out["intro_state"] = _intro_state(policy_source, session_id)
+        out["intro_state"] = _intro_state(policy_source, session_id, viewer_id)
         out["ui_ref"] = f"/#match={result_id}:{session_id}"
         return out
 

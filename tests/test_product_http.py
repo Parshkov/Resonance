@@ -244,6 +244,62 @@ class ProductHttpTests(unittest.TestCase):
             structure = response.read().decode("utf-8")
         self.assertIn("preserved relations", structure)
 
+    def test_collaboration_two_account_flow_over_http(self):
+        alice = self.client(); alice.guest()
+        a_session = self._shared_session(alice, "ses-gabe-warehouse",
+                                         "thought-collab-alice")
+        # opt into intro requests
+        alice.request("POST", "/api/product/consent", {
+            "session_id": a_session,
+            "choices": {"share_thought_dna": True, "share_display_profile": True,
+                        "share_coarse_location": False, "allow_intro_requests": True},
+            "confirmed": True})
+        bob = self.client(); bob.guest()
+        b_session = self._shared_session(bob, QUERY_DNA, "thought-collab-bob")
+        status, disc, _ = bob.request(
+            "GET", f"/api/product/discover?session_id={b_session}&k=20")
+        self.assertIn(a_session, [m["session_id"] for m in disc["matches"]])
+
+        status, intro, _ = bob.request("POST", "/api/product/intro/request", {
+            "from_session_id": b_session, "target_session_id": a_session,
+            "message": "compare mitigations?", "request_id": "http-req",
+            "confirmed": True})
+        self.assertEqual(intro["state"], "requested")
+        # confirmation is required
+        with self.assertRaises(HTTPError) as ctx:
+            bob.request("POST", "/api/product/intro/request", {
+                "from_session_id": b_session, "target_session_id": a_session,
+                "message": "again", "request_id": "http-req-2", "confirmed": False})
+        self.assertEqual(ctx.exception.code, 409)
+
+        status, incoming, _ = alice.request("GET", "/api/product/intro/list")
+        self.assertEqual(len(incoming["incoming"]), 1)
+        status, accepted, _ = alice.request("POST", "/api/product/intro/respond", {
+            "intro_id": incoming["incoming"][0]["intro_id"], "accept": True,
+            "request_id": "http-acc", "confirmed": True})
+        channel = accepted["channel_id"]
+        bob.request("POST", "/api/product/channel/send", {
+            "channel_id": channel, "body": "throttle input power",
+            "request_id": "http-m1", "confirmed": True})
+        alice.request("POST", "/api/product/channel/send", {
+            "channel_id": channel, "body": "stage inbound docks",
+            "request_id": "http-m2", "confirmed": True})
+        status, thread, _ = bob.request(
+            "GET", f"/api/product/channel/messages?channel_id={channel}")
+        self.assertEqual([m["body"] for m in thread["messages"]],
+                         ["throttle input power", "stage inbound docks"])
+        self.assertTrue(all(m["untrusted"] for m in thread["messages"]))
+        # a third party cannot read the channel
+        carol = self.client(); carol.guest()
+        with self.assertRaises(HTTPError) as ctx:
+            carol.request("GET", f"/api/product/channel/messages?channel_id={channel}")
+        self.assertEqual(ctx.exception.code, 400)
+        # rich intro_state is now accepted for Bob's view
+        status, rich, _ = bob.request(
+            "GET", f"/api/product/rich_discover?session_id={b_session}&k=20")
+        row = next(m for m in rich["matches"] if m["session_id"] == a_session)
+        self.assertEqual(row["intro_state"], "accepted")
+
     def test_ui_is_served_with_live_injection(self):
         request = Request(self.base + "/", headers={"Origin": self.origin})
         with urlopen(request, timeout=10) as response:
@@ -251,6 +307,103 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('window.RESONANCE_MODE = "live"', html)
         self.assertIn('src="/webmcp.mjs"', html)
         self.assertIn('src="/deeplink.mjs"', html)
+        self.assertIn('src="/session.mjs"', html)
+        self.assertIn('src="/collab.mjs"', html)
+        self.assertIn('src="/collab_ui.mjs"', html)
+        # the human-UI collaboration module is committed and served
+        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+            ui = response.read().decode("utf-8")
+        self.assertIn("Request intro", ui)
+        self.assertIn("/api/product/intro/request", ui)
+        self.assertIn("textContent", ui)  # UGC displayed, never assigned to innerHTML
+        self.assertNotIn(".innerHTML =", ui)
+        self.assertNotIn(".innerHTML=", ui)
+
+    def test_session_bootstrap_csrf_survives_reload_without_injection(self):
+        # A committed page flow: establish a session, then a "reload" that only
+        # carries the cookie must still be able to mint a usable CSRF via
+        # /api/product/rotate — no harness secret injection.
+        client = self.client()
+        first = client.guest()
+        original_csrf = first["csrf_token"]
+        # F2: an authenticated visitor reports authenticated=true; an anon one
+        # false — so the bootstrap never mints a guest for an authenticated user.
+        status, state, _ = client.request("GET", "/api/product/state")
+        self.assertTrue(state["authenticated"])
+        anon = self.client()
+        status, anon_state, _ = anon.request("GET", "/api/product/state",
+                                             origin=False, csrf=False)
+        self.assertFalse(anon_state["authenticated"])
+        # simulate reload: same cookie, CSRF value no longer in hand
+        rotated_headers = {"Content-Type": "application/json",
+                           "Origin": self.origin, "Cookie": client.cookie}
+        request = Request(self.base + "/api/product/rotate", data=b"{}",
+                          headers=rotated_headers, method="POST")
+        with urlopen(request, timeout=10) as response:
+            rotated = json.loads(response.read())
+            set_cookie = response.headers.get("Set-Cookie")
+        self.assertEqual(rotated["user_id"], first["user_id"])
+        self.assertTrue(rotated["csrf_token"])
+        self.assertNotEqual(rotated["csrf_token"], original_csrf)
+        # the rotated csrf actually authorizes a write on the same identity
+        new_cookie = SimpleCookie(set_cookie).get("resonance_token")
+        client.cookie = f"resonance_token={new_cookie.value}"
+        client.csrf = rotated["csrf_token"]
+        status, prepared, _ = client.request("POST", "/api/product/prepare", {
+            "candidate": r7_dna(QUERY_DNA, "thought-reload"),
+            "presentation": dict(PRES)})
+        self.assertEqual(prepared["status"], "prepared_private")
+
+    def test_two_concurrent_clients_of_one_subject_selfheal(self):
+        """F4: a second client rotating must not permanently strand the first.
+
+        The committed bootstrap shares one token via localStorage and, on a
+        csrf_rejected write, re-bootstraps once. This test models the recovery
+        contract at the HTTP layer: after a rotate invalidates an old token, a
+        client that re-reads the current token can write again; the server
+        never accepts the stale token (fail-closed), which is what the
+        client-side self-heal keys off.
+        """
+        client = self.client()
+        client.guest()
+        # tab-2 rotates the shared subject
+        rot_headers = {"Content-Type": "application/json", "Origin": self.origin,
+                       "Cookie": client.cookie}
+        request = Request(self.base + "/api/product/rotate", data=b"{}",
+                          headers=rot_headers, method="POST")
+        with urlopen(request, timeout=10) as response:
+            rotated = json.loads(response.read())
+            new_cookie = SimpleCookie(response.headers.get("Set-Cookie")).get(
+                "resonance_token")
+        # tab-1 still holding the OLD token+cookie: write fails closed (401,
+        # prior auth session revoked) — never silently accepted.
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/product/prepare", {
+                "candidate": r7_dna("ses-gabe-warehouse", "thought-strand"),
+                "presentation": dict(PRES)})
+        self.assertIn(ctx.exception.code, (401, 403))
+        # self-heal: re-read the shared token+cookie, write succeeds again
+        client.cookie = f"resonance_token={new_cookie.value}"
+        client.csrf = rotated["csrf_token"]
+        status, prepared, _ = client.request("POST", "/api/product/prepare", {
+            "candidate": r7_dna("ses-gabe-warehouse", "thought-healed"),
+            "presentation": dict(PRES)})
+        self.assertEqual(prepared["status"], "prepared_private")
+
+    def test_collab_ui_has_intro_initiation_and_hides_stale_placeholder(self):
+        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+            ui = response.read().decode("utf-8")
+        # human intro initiation exists and drives the live discover+request path
+        self.assertIn("Start an introduction", ui)
+        self.assertIn("/api/product/rich_discover", ui)
+        self.assertIn("querySession", ui)
+        # the stale R9 placeholder is hidden at runtime
+        self.assertIn("intro-unavailable", ui)
+        # session bootstrap shares the token across tabs (F4) and self-heals
+        with urlopen(Request(self.base + "/session.mjs"), timeout=10) as response:
+            session = response.read().decode("utf-8")
+        self.assertIn("localStorage", session)
+        self.assertIn("csrf_rejected", session)
         with urlopen(Request(self.base + "/deeplink.mjs"), timeout=10) as response:
             script = response.read().decode("utf-8")
         self.assertIn("FRAGMENT_RE", script)
