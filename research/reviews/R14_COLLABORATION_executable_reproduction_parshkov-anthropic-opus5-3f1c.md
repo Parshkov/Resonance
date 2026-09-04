@@ -1590,3 +1590,101 @@ Observed on accepted `main` @ `d2f0d24`:
 
 The `main` run is the attribution evidence: identical failure with no R14 code
 present.
+
+---
+
+# Addendum 3 — post-acceptance verification, and two corrections to Addendum 2
+
+R14 was ACCEPTED and merged while this run was in flight: PR #116 at exact head
+`2d4387e`, landing on `main` as `47b6d58`. Addendum 2 was written against
+`3397e96` and two of its claims do not survive the merged head. Recording the
+corrections here rather than leaving the artifact's earlier text to stand.
+
+## Correction 1 — B1a is closed, and by a better fix than I proposed
+
+Addendum 2 said the "Request intro" control "cannot render anywhere, on any
+head, with or without my patch", because it attached to `.match-card` elements
+that the live origin never renders. That was accurate for `3397e96`. It is
+**wrong for the merged head**.
+
+The author did not patch the guard. They added a **`Start an introduction`
+panel section** that runs its own `/api/product/rich_discover` and renders a
+button per intro-accepting candidate, independent of the R9 replay cards, and
+sets `document.body.dataset.querySession`. That sidesteps the dead R9 page
+entirely — a better fix than my candidate patch, which only bypassed the guard
+on cards that were never going to exist.
+
+Verified on `47b6d58` by real clicks in headless Chromium, two browser contexts
+(two cookie jars), the whole of #86's scenario through the **human UI**:
+
+| step | observed |
+| --- | --- |
+| B's initiation surface | `Start an introduction / guest-9be30b / Request intro` — 1 button (was 0) |
+| B clicks **Request intro** | Outgoing → `requested: <message>` + **Cancel** |
+| A reloads | Incoming → `guest-2276af / requested: <message>` + **Accept** / **Decline** |
+| A clicks **Accept** | buttons become **Open channel** |
+| A opens channel, types, clicks **Send** | sent |
+| B reloads, opens channel | `guest-9be30b: throttle input power at the bloom edge` |
+| contact data in the panel | none — pseudonyms only |
+
+## Correction 2 — the CSP finding was overstated
+
+Addendum 2 and my first #88 comment presented the CSP refusal of the injected
+`window.RESONANCE_MODE` script as part of a release blocker. It is real, but
+**functionally harmless**: that flag is written by the inline script and **read
+nowhere** in the repository — no `.mjs`, `.html` or `.py` consumes it. Worth
+cleaning up (a strict-CSP page should not ship a script the browser always
+refuses) but not a blocker, and I should not have listed it beside the real
+cause. Only the unrouted endpoints matter.
+
+## The R13 live-page defect, scoped properly
+
+Still open on `47b6d58`. The live server routes none of `/api/config`,
+`/api/context`, `/api/discover?source=…`, all three of which `app.mjs` needs;
+`boot()` throws on the first two, so the R9 visual view never initializes and
+the page sits on its loading placeholders.
+
+It is **not** a routing shim, which is why Addendum 2's promise of a patch is
+not fulfilled here. The page hard-asserts a fixture-shaped contract —
+`resonance-ui-context/0.1` with `pinned_request.mode === "analogical"` and
+`k === 15`, and `public_context()` builds its active thought from the **R7
+flagship fixture session**. Serving those routes from the live server means
+either handing a judge a fixture-backed map, contradicting the canonical data
+rule this milestone exists to establish, or building a live per-viewer context
+and discovery mapping that still satisfies the pinned assertions. The second is
+genuine R13 integration work and not something to drop into a release path
+unverified hours before a freeze. Three options with a recommendation are on
+#88; I offered to implement and browser-verify whichever the maintainer picks,
+and will not touch accepted surfaces without that go-ahead.
+
+What does work on the live origin, verified: every product API, and R14's
+collaboration panel end to end — precisely because it builds its own surface
+from `rich_discover` instead of depending on the R9 page. What is dark is
+specifically the R9 map / match cards / evidence drawer.
+
+## The other two items at the merged head
+
+- **026B-N2 — closed, stronger than I proposed.** I suggested binding the author
+  into the request *hash*, which only converts the collision into a visible
+  conflict. The author namespaced the `request_id` itself per subject, so Alice
+  reusing Bob's `msg-1` stores a **distinct** message: `got_bobs_id: false`,
+  thread `[('counterpart','hello'), ('me','hello')]`, both persisted, and
+  same-author replay still idempotent. That solves the global-keyspace problem I
+  had written off as R11-level.
+- **F4 — closed.** The token is shared across tabs via `localStorage`, so a
+  second tab reuses it instead of rotating, and a rejected proof re-bootstraps
+  once. Second tab's token no longer differs; tab 1's write after tab 2 opens
+  returns `OK` where it previously failed `csrf_rejected` twice.
+
+## Standing of this run
+
+Every finding this run produced — F1 (independently matching 026B's N1), F2, F4,
+B1a, and the executed confirmations of B1/B2/B3 — was accepted by the canonical
+author and closed with a regression. Two were closed by better fixes than the
+patches I offered, which is the right outcome: the reviewer's job was to prove
+the defect and hand over something runnable, and the author's job was to choose
+the design. F3 (PostgreSQL migration loader) and the R13 page defect remain open
+on #88 as `main`-level items, neither charged to R14.
+
+Corrections above supersede Addendum 2 where they conflict. The `3397e96`
+evidence stands as a record of that head, not of the merged product.
