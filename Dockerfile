@@ -32,7 +32,9 @@ WORKDIR /app
 COPY --chown=resonance:resonance . /app
 
 USER resonance
-VOLUME ["/data"]
+# No Docker VOLUME instruction: Railway rejects it ("use Railway Volumes"), and
+# with PostgreSQL the app container holds no state. For a SQLite deployment,
+# attach a platform volume at /data instead.
 
 # Platform sets PORT (Fly/Railway/Render all do); PUBLIC_ORIGIN must be the
 # exact https origin browsers will use — it is the CSRF/Origin allowlist.
