@@ -1,0 +1,37 @@
+[PASS] A onboarded via OAuth (guest) + MCP initialize + whoami — user=person-0bdbee31efc02a66 transport=stateless (no Mcp-Session-Id; spec-permitted)
+[PASS] B onboarded via OAuth (guest) + MCP initialize + whoami — user=person-113294e0a901f7cc transport=stateless (no Mcp-Session-Id; spec-permitted)
+[PASS] C onboarded via OAuth (guest) + MCP initialize + whoami — user=person-52efda1823804b10 transport=stateless (no Mcp-Session-Id; spec-permitted)
+[PASS] three independent identities
+[PASS] A prepare -> private draft (discoverable=false) — draft=draft-8147c2603608cd3ed6c28eca input_kind=agent_structured retention=not_retained
+[PASS] A nothing discoverable before explicit confirm — shared_before=0
+[PASS] A share with confirm=false rejected — tool isError
+[PASS] A explicit share -> discoverable=true — session=ses-27e18573b82f185d
+[PASS] B prepare -> private draft (discoverable=false) — draft=draft-d42ba68fb61c6e3660b40db9 input_kind=agent_structured retention=not_retained
+[PASS] B nothing discoverable before explicit confirm — shared_before=0
+[PASS] B share with confirm=false rejected — tool isError
+[PASS] B explicit share -> discoverable=true — session=ses-ef6d5093f53a09d5
+[PASS] C prepare -> private draft (discoverable=false) — draft=draft-587c138ff69de3a25154addd input_kind=agent_structured retention=not_retained
+[PASS] C nothing discoverable before explicit confirm — shared_before=0
+[PASS] C share with confirm=false rejected — tool isError
+[PASS] C explicit share -> discoverable=true — session=ses-9ef6e59df883a8da
+[PASS] B discover returns result_id from live source — result_id=result-9845e0f6521b59846726b44f source=live matches=11
+[PASS] A (retry storm) found by B (panic buying) — rank=0 score=0.8875000000000001 mode=None
+[PASS] A ranks above C (structure beats shared vocabulary) — rank_A=0 rank_C=absent score_C=None
+[PASS] B explain_match(A) returns structural evidence — keys=['contract_version', 'freshness', 'match', 'result_id', 'source']
+[PASS] C cannot read B's discovery result (result_id subject-bound) — tool isError
+[PASS] B requests intro to A — intro=intro-c087e1e0f8824ba5117dad06 state=requested
+[PASS] intro retry with same request_id is idempotent — intro-c087e1e0f8824ba5117dad06 == intro-c087e1e0f8824ba5117dad06
+[PASS] A sees the incoming intro — incoming=1
+[PASS] A accepts -> channel opened — channel=chan-a1eb3d358d5818a88c9eb73c state=accepted
+[PASS] A sends a relay message — message=msg-01cbec419afa607dc963bfce
+[PASS] B reads A's message — count=1
+[PASS] C cannot read the A<->B channel — tool isError
+[PASS] A stop_sharing -> revoked
+[PASS] fresh discovery: revoked A is absent immediately — result_id=result-ab6f1e028765f18bb3985b0a matches=10
+[PASS] old result_id no longer serves revoked A's evidence — tool isError
+[PASS] stateless transport: a stale Mcp-Session-Id is ignored, bearer still authoritative (restart-safe) — status=200
+[PASS] reconnect: fresh initialize with the same bearer maps to the same account
+[PASS] access_token in query string does NOT authenticate — status=401
+[PASS] revoked access token stops working on /mcp — revoke=200 then /mcp=401
+
+35/35 checks passed
