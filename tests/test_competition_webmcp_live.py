@@ -84,7 +84,7 @@ class CompetitionWebMCPTests(unittest.TestCase):
             "request_id": "competition-prepare-1", "note": "judge flow",
         })
         self.assertFalse(prepared["discoverable"])
-        self.assertTrue(prepared["session_id"].startswith("session-"))
+        self.assertTrue(prepared["session_id"].startswith("ses-"))
 
         _, state, _ = client.request("GET", "/api/webmcp/state")
         self.assertTrue(state["draft_ready"])
