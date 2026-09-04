@@ -1,5 +1,5 @@
 -- resonance-persistence/0.1
--- Derived from superseded R11 PR #95 (Grok 4.6); preserved verbatim in shape
+-- Derived from superseded R11 PR #95 (Grok 4.6), preserved verbatim in shape
 -- so databases created by that foundation upgrade through 0002 safely.
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
