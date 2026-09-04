@@ -10,12 +10,12 @@
 
 | field | value |
 | --- | --- |
-| `main` / production SHA | `3c7dc80272702ce32c0e1946da57ba63189a14d6` (PR #149 on top of #147 `01193f1` and #139 `f3ace6c`) |
-| Railway deployment | `86aebe9b-f196-44f0-99b2-9870a1619bde` — SUCCESS 15:39:23 UTC; startup log `oauth: core attached; … grants durable` then `competition product … mode: LIVE+WebMCP` |
+| `main` / production SHA | `9b51262ca595122a6df78ecb92443e5438a182fe` (PR #152; earlier #149 `3c7dc80`, #147 `01193f1`, #139 `f3ace6c`) |
+| Railway deployment | `6ec0959e-6de5-43ae-9ad8-23742bb62d26` — SUCCESS 16:10:29 UTC; startup log `oauth: core attached; … grants durable` then `competition product … mode: LIVE+WebMCP` (earlier `86aebe9b`, `28ff8d4a`) |
 | DB migrations | `0001_init` … `0004_workspaces`, **`0005_oauth_grants`** (durable OAuth codes / refresh grants / client registrations) |
-| since the frozen record | durable OAuth grants (no re-authorization after redeploy); RFC 7009 refresh→access revoke cascade; HEAD support; browser `resonance_prepare_thought` accepts the agent's real `thought`/`context`; empty raw-text drafts refused with guidance; live view shows the person's own thought and renders direct/approximate resonances; styled OAuth consent page naming the client; R15D hosted-client probe tooling merged |
-| suites | 440 OK on `01193f1`; 443 OK on the #149 tree (2 skipped each) |
-| public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (deployment `86aebe9b`: HEAD + consent.css OK, OAuth smoke 27/27, hosted probe 9/9 required + 6/6 optional, A/B/C 35/35, remote-MCP empty-draft refusal 7/7, browser path 11/11 incl. `/api/context?source=live` = own thought and implicit-prose 400 + no draft left, Playwright: own thought rendered on Live MCP with 3 resonance cards for 15 backend rows, consent page named + styled) |
+| since the frozen record | durable OAuth grants (no re-authorization after redeploy); RFC 7009 refresh→access revoke cascade; HEAD support; browser `resonance_prepare_thought` accepts the agent's real `thought`/`context`; empty raw-text drafts refused with guidance; live view shows the person's own thought and renders direct/approximate resonances; styled OAuth consent page naming the client; R15D hosted-client probe tooling merged; raw-text Thought DNA ids namespaced per person/attempt (same sentences can be prepared again / by another person) |
+| suites | 440 OK on `01193f1`; 443 OK on `3c7dc80`; 446 OK on `9b51262` (2 skipped each) |
+| public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (deployment `86aebe9b`: HEAD + consent.css OK, OAuth smoke 27/27, hosted probe 9/9 required + 6/6 optional, A/B/C 35/35, remote-MCP empty-draft refusal 7/7, browser path 11/11 incl. `/api/context?source=live` = own thought and implicit-prose 400 + no draft left, Playwright: own thought rendered on Live MCP with 3 resonance cards for 15 backend rows, consent page named + styled); `public-origin-9b51262/` (deployment `6ec0959e`: OAuth 27/27, A/B/C 35/35, re-prepare regression 12/12) |
 | still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome; a real ChatGPT / Claude connector session (Cards A–C) |
 
 # WebMCP Challenge release manifest (frozen competition record)
