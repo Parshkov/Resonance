@@ -6,6 +6,7 @@ import json
 import threading
 import unittest
 from http.cookies import SimpleCookie
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from src.product.competition_server import serve
@@ -75,6 +76,19 @@ class CompetitionWebMCPTests(unittest.TestCase):
             config = json.loads(response.read())
         self.assertEqual(config["default_source"], "replay")
         self.assertTrue(config["live_product"])
+
+    def test_live_source_without_shared_thought_is_409_not_500(self):
+        # R16 Chrome audit: a fresh visitor clicking "Live MCP" used to get a
+        # 500 ("unexpected product error") because the unshared case raised an
+        # unmapped PermissionError. It is a product state, not a server fault.
+        client = Client(self.base)
+        client.guest()
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/discover?source=live")
+        self.assertEqual(ctx.exception.code, 409)
+        payload = json.loads(ctx.exception.read().decode())
+        self.assertEqual(payload["error"], "share_required")
+        self.assertIn("resonance_prepare_thought", payload["message"])
 
     def test_webmcp_prepare_preview_share_live_discover_updates_same_product(self):
         client = Client(self.base)

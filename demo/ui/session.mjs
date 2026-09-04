@@ -110,6 +110,12 @@ async function apiFetch(method, path, body, { _retried = false } = {}) {
     }
     throw new Error(`${payload.error || response.status}: ${payload.message || "request failed"}`);
   }
+  if (method === "POST" && typeof document !== "undefined") {
+    // Let on-page surfaces (collaboration panel, status pills) re-read the
+    // authorized record after any successful write, whichever client made it
+    // (WebMCP tool, workspace tool, or the panel itself).
+    document.dispatchEvent(new CustomEvent("resonance:write", {detail: {path}}));
+  }
   return payload;
 }
 

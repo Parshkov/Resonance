@@ -14,8 +14,8 @@
  */
 
 const LIVE_HINT =
-  "Live product. Share a thought from your agent (WebMCP tools) or use the " +
-  "Collaboration panel below to discover people and start an introduction.";
+  "Live product. Share a thought from your agent (WebMCP tools) or open the " +
+  "Collaboration panel (top bar) to discover people and start an introduction.";
 
 function setText(id, text) {
   const node = document.getElementById(id);
@@ -47,12 +47,9 @@ function markLiveShell() {
     button.setAttribute("aria-disabled", "true");
     button.title = "Source switching is a demo-server feature; this origin is always live.";
   }
-  // Bring the working surface into view once the collaboration panel exists.
-  const panel = document.getElementById("collab-panel");
-  const workspace = document.getElementById("main-workspace");
-  if (panel && workspace && panel.parentElement === workspace) {
-    workspace.prepend(panel);
-  }
+  // With no demo context the R9 surfaces stay empty, so the working surface
+  // (the collaboration drawer owned by collab_ui.mjs) is opened for the visitor.
+  document.dispatchEvent(new CustomEvent("resonance:collab-open"));
 }
 
 async function detectAndApply() {
