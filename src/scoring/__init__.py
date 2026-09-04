@@ -124,9 +124,17 @@ def adjudicate(
         sign = [r for r in fwd if (rel.type, r.type) in SIGN_OPPOSITES]
         flipped = [r for r in fwd if r.type == rel.type and r.assertion != rel.assertion]
         reversed_ = [r for r in rev if r.type == rel.type and r.assertion == rel.assertion]
+        # A candidate relation already consumed by an exact match has been fully
+        # explained; re-using it here would let one candidate edge both preserve
+        # one query relation and contradict another between the same node pair.
+        # With nothing unconsumed left on the candidate side, the remaining query
+        # relation is unobserved evidence, not a contradiction (contract). Sign,
+        # assertion and direction conflicts stay unfiltered: a directly opposite
+        # assertion conflicts with the query whether or not it also matched.
         modal = [r for r in fwd if r.type == rel.type and r.assertion == rel.assertion
-                 and r.modality != rel.modality]
-        typed = [r for r in fwd if r.type != rel.type and (rel.type, r.type) not in SIGN_OPPOSITES]
+                 and r.modality != rel.modality and r.id not in matched_c_rels]
+        typed = [r for r in fwd if r.type != rel.type and (rel.type, r.type) not in SIGN_OPPOSITES
+                 and r.id not in matched_c_rels]
         if sign:
             rec = ContradictionRec("relation_type", rel.id, sign[0].id,
                                    min(conf, sign[0].extract_conf))
