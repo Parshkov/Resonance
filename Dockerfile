@@ -49,6 +49,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
       r=urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/api/product/health', timeout=4); \
       sys.exit(0 if r.status==200 else 1)"
 
-# `--origin` may be repeated; ops/DEPLOY.md shows how to add a second origin
-# (e.g. the platform's default *.fly.dev host alongside a custom domain).
-CMD ["sh", "-c", "exec python3 -m src.product.server --host 0.0.0.0 --port \"$PORT\" --db \"$RESONANCE_DB\" --origin \"$PUBLIC_ORIGIN\" $EXTRA_ORIGINS"]
+# The competition server is the live product handler plus the accepted R9/R10
+# browser presentation routes (/api/config, /api/context, /api/discover) and
+# the live WebMCP module, so a judge gets the visual discovery view AND the
+# six registered tools on real authenticated state. `--origin` may be
+# repeated; ops/DEPLOY.md shows how to add a second origin (a platform default
+# host alongside a custom domain). RESONANCE_ENTRYPOINT=src.product.server
+# selects the API-only live server instead.
+CMD ["sh", "-c", "exec python3 -m ${RESONANCE_ENTRYPOINT:-src.product.competition_server} --host 0.0.0.0 --port \"$PORT\" --db \"$RESONANCE_DB\" --origin \"$PUBLIC_ORIGIN\" $EXTRA_ORIGINS"]

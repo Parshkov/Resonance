@@ -122,7 +122,7 @@ Long-term question:
 
 ## Links — fill from frozen candidate
 
-- Live application: `TBD`
+- Live application: `https://resonance-production-cfe3.up.railway.app` (Railway, PostgreSQL-backed; judge path in `HACKATHON.md`)
 - Public repository: `https://github.com/Parshkov/Resonance`
 - Demo video (<3:00, public YouTube): `TBD`
 - Frozen release/tag: `TBD`

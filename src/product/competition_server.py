@@ -40,6 +40,7 @@ from src.product.server import (
     UI_DIR,
     ProductHandler,
     ProductRuntime,
+    _redact_db,
     _resolve_secret,
     build_runtime,
 )
@@ -525,7 +526,7 @@ def main(argv: list[str] | None = None) -> None:
                             seed=not args.no_seed)
     server = serve(args.host, args.port, runtime=runtime)
     print(f"competition product on http://{args.host}:{args.port} "
-          f"(origins: {sorted(origins)}; db: {args.db}; mode: LIVE+WebMCP)")
+          f"(origins: {sorted(origins)}; db: {_redact_db(args.db)}; mode: LIVE+WebMCP)")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
