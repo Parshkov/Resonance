@@ -115,11 +115,15 @@ class OnboardingProbe:
                                      headers=headers or {})
         opener = (urllib.request.build_opener()
                   if follow_redirects else urllib.request.build_opener(_NoRedirect))
+        # HTTP/2 origins (e.g. Railway) lowercase every header name; normalize
+        # to lowercase keys so lookups are case-insensitive across servers.
+        def _norm(hdrs):
+            return {k.lower(): v for k, v in hdrs.items()}
         try:
             with opener.open(req, timeout=self.timeout) as r:
-                return r.status, dict(r.headers), r.read()
+                return r.status, _norm(r.headers), r.read()
         except urllib.error.HTTPError as e:
-            return e.code, dict(e.headers), e.read()
+            return e.code, _norm(e.headers), e.read()
 
     def _record(self, step: Step) -> Step:
         self.steps.append(step)
@@ -147,7 +151,7 @@ class OnboardingProbe:
         status, headers, _ = self._http("POST", self.mcp_url,
                                         headers={"Content-Type": "application/json"},
                                         body=body)
-        www = headers.get("WWW-Authenticate", "") or headers.get("Www-Authenticate", "")
+        www = headers.get("www-authenticate", "")
         meta_url = None
         for part in www.split(","):
             part = part.strip()
@@ -234,7 +238,7 @@ class OnboardingProbe:
             params["resource"] = self.resource
         # (a) GET the consent page a human would see
         status, headers, raw = self._http("GET", authz + "?" + urlencode(params))
-        is_html = "text/html" in (headers.get("Content-Type", "").lower())
+        is_html = "text/html" in (headers.get("content-type", "").lower())
         self._record(Step("authorize consent page (GET)", status == 200 and is_html, True,
                           "human consent screen rendered", status))
         # (b) approve — guest continuation unless a real account was supplied
@@ -245,7 +249,7 @@ class OnboardingProbe:
         status, headers, _ = self._http("POST", authz,
                                         headers={"Content-Type": "application/x-www-form-urlencoded"},
                                         body=urlencode(form).encode(), follow_redirects=False)
-        loc = headers.get("Location", "")
+        loc = headers.get("location", "")
         q = parse_qs(urlparse(loc).query)
         code = (q.get("code") or [None])[0]
         got_state = (q.get("state") or [None])[0]
@@ -290,7 +294,7 @@ class OnboardingProbe:
             payload["params"] = params
         status, resp_headers, raw = self._http("POST", self.mcp_url,
                                                headers=headers, body=json.dumps(payload).encode())
-        sid = resp_headers.get("Mcp-Session-Id")
+        sid = resp_headers.get("mcp-session-id")
         if sid:
             self.session_id = sid
         try:
