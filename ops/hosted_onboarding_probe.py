@@ -41,6 +41,7 @@ import argparse
 import base64
 import hashlib
 import json
+import re
 import secrets
 import sys
 import urllib.error
@@ -152,12 +153,12 @@ class OnboardingProbe:
                                         headers={"Content-Type": "application/json"},
                                         body=body)
         www = headers.get("www-authenticate", "")
-        meta_url = None
-        for part in www.split(","):
-            part = part.strip()
-            if part.lower().startswith("bearer") and "resource_metadata=" in part:
-                meta_url = part.split("resource_metadata=", 1)[1].strip().strip('"')
-        ok = status == 401 and bool(meta_url)
+        # RFC 6750/9728: "Bearer" is the scheme; realm/error/resource_metadata are
+        # comma-separated auth-params after it in any order. Extract the param from
+        # the whole value — never assume which comma-segment carries it.
+        m = re.search(r'resource_metadata\s*=\s*"?([^",\s]+)"?', www)
+        meta_url = m.group(1) if m else None
+        ok = status == 401 and www.strip().lower().startswith("bearer") and bool(meta_url)
         detail = ("401 with resource_metadata pointer" if ok
                   else f"expected 401 + WWW-Authenticate resource_metadata; got {status} / {www!r}")
         return self._record(Step("unauthenticated /mcp challenge", ok, True, detail,
@@ -395,26 +396,28 @@ class OnboardingProbe:
                                  f"reuse returned {status2}", status2))
 
     def revoke_then_reuse(self) -> Step:
-        # /oauth/revoke is not always in metadata; derive from AS base if absent.
-        revoke = self.endpoints.get("revocation_endpoint")
-        if not revoke:
-            servers = (self.steps and None)
-            revoke = self.origin + "/oauth/revoke"
+        # RFC 7009: the token to revoke is sent in the request body (token +
+        # token_type_hint), not inferred from a bearer. Revoke the current
+        # refresh token, then prove it can no longer mint an access token.
+        revoke = self.endpoints.get("revocation_endpoint") or (self.origin + "/oauth/revoke")
+        target = self.refresh_token
+        if not target:
+            return self._record(Step("revoke then reuse", False, False,
+                                     "no refresh token to revoke"))
         status, _, _ = self._http("POST", revoke,
-                                  headers={"Authorization": f"Bearer {self.access_token}"},
-                                  body=b"")
-        self._record(Step("revoke (disconnect)", status == 200, False,
-                          "subject grants revoked", status))
-        # after revoke, the refresh token must no longer mint access
-        if self.refresh_token:
-            status2, _, _ = self._http("POST", self.endpoints["token_endpoint"],
-                                       headers={"Content-Type": "application/x-www-form-urlencoded"},
-                                       body=urlencode({"grant_type": "refresh_token",
-                                                       "refresh_token": self.refresh_token,
-                                                       "client_id": self.client_id}).encode())
-            return self._record(Step("refresh after revoke rejected", status2 >= 400, False,
-                                     f"returned {status2}", status2))
-        return self.steps[-1]
+                                  headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                  body=urlencode({"token": target,
+                                                  "token_type_hint": "refresh_token",
+                                                  "client_id": self.client_id}).encode())
+        self._record(Step("revoke refresh token (RFC 7009)", status == 200, False,
+                          "revocation endpoint accepted", status))
+        status2, _, _ = self._http("POST", self.endpoints["token_endpoint"],
+                                   headers={"Content-Type": "application/x-www-form-urlencoded"},
+                                   body=urlencode({"grant_type": "refresh_token",
+                                                   "refresh_token": target,
+                                                   "client_id": self.client_id}).encode())
+        return self._record(Step("refresh after revoke rejected", status2 >= 400, False,
+                                 f"reuse of revoked token returned {status2}", status2))
 
     # -- orchestration ----------------------------------------------------
     def run(self, *, smoke: bool = False, refresh: bool = False,
