@@ -90,6 +90,23 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertEqual(payload["error"], "share_required")
         self.assertIn("resonance_prepare_thought", payload["message"])
 
+    def test_header_consent_pill_is_truthful_without_native_webmcp(self):
+        # R17 acceptance finding (public-origin browser run): in a browser
+        # without document.modelContext the R9 replay narrative labelled a
+        # fresh, never-shared guest "Shared with Resonance". The live module
+        # must apply the visitor's authoritative consent state even when no
+        # agent surface exists, and the replay narrative must yield on the
+        # live product.
+        with urlopen(self.base + "/webmcp.mjs", timeout=10) as response:
+            live = response.read().decode()
+        unavailable = live.index('setStatus("WebMCP · unavailable")')
+        self.assertIn("applyAuthoritativeState(await readAuthoritativeState())",
+                      live[unavailable:unavailable + 600])
+        with urlopen(self.base + "/app.mjs", timeout=10) as response:
+            app = response.read().decode()
+        shared = app.index('el("span", "", "Shared with Resonance")')
+        self.assertIn('window.__resonanceWebMCP?.mode !== "live-product"', app[shared - 400:shared])
+
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
         # R17 acceptance finding: the first thing a judge does on the card is a
         # read through the page tool; an unshared visitor must get a mapped

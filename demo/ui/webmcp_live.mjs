@@ -234,6 +234,14 @@ async function registerWebMCP() {
   const modelContext = document.modelContext || navigator.modelContext;
   if (!modelContext?.registerTool) {
     setStatus("WebMCP · unavailable");
+    // No agent surface in this browser, but the header must still tell the
+    // truth about the visitor's own consent state (private by default).
+    try {
+      await ensureSession();
+      applyAuthoritativeState(await readAuthoritativeState());
+    } catch (error) {
+      console.warn("Resonance consent state unavailable", error);
+    }
     return false;
   }
   try {
