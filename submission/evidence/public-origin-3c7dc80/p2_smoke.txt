@@ -1,0 +1,30 @@
+[PASS] 1 unauthenticated /mcp is 401 — status=401
+[PASS] 1 challenge carries resource_metadata — Bearer realm="resonance", resource_metadata="https://resonance-production-cfe3.up.railway.app/.well-known/oauth-protected-resource"
+[PASS] 2 protected-resource metadata 200 — status=200
+[PASS] 2 resource matches /mcp URL — resource='https://resonance-production-cfe3.up.railway.app/mcp' expected 'https://resonance-production-cfe3.up.railway.app/mcp'
+[PASS] 2 authorization_servers present — {"resource": "https://resonance-production-cfe3.up.railway.app/mcp", "authorization_servers": ["https://resonance-production-cfe3.up.railway.app"], "scopes_supported": ["resonance", "offline_access"],
+[PASS] 3 authorization-server metadata discoverable — https://resonance-production-cfe3.up.railway.app
+[PASS] 3 issuer matches — issuer='https://resonance-production-cfe3.up.railway.app'
+[PASS] 3 S256 advertised — ['S256']
+[PASS] 3 absolute https endpoints — authorize=https://resonance-production-cfe3.up.railway.app/oauth/authorize token=https://resonance-production-cfe3.up.railway.app/oauth/token
+[PASS] 4 dynamic registration 201/200 — status=201
+[PASS] 4 client_id issued
+[PASS] 5 GET authorize renders a page (200) — status=200
+[PASS] 5 consent form present
+[PASS] 5 consent POST redirects (302/303) — status=302
+[PASS] 5 redirect goes to the exact redirect_uri — http://127.0.0.1:8765/callback?code=<redacted>&state=H_dsB6LcghHXSdXHwYPE9Q
+[PASS] 5 code returned
+[PASS] 5 exact state round-trip
+[PASS] 6 token exchange 200 — status=200 error=None 
+[PASS] 6 token_type Bearer
+[PASS] 8 replayed code rejected — status=400 error=invalid_grant
+[PASS] 8 wrong verifier rejected — status=400 error=invalid_grant
+[PASS] 8 wrong redirect_uri rejected — status=400 error=invalid_grant
+[PASS] 7 initialize 200 — status=200 {"jsonrpc": "2.0", "id": 2, "result": {"protocolVersion": "2025-06-18", "capabilities": {"tools": {}}, "serverInfo": {"n
+[PASS] 7 tools/list includes resonance_whoami — resonance_whoami, resonance_prepare_thought, resonance_share_thought, resonance_my_thoughts, resonance_discover, resonance_explain_match, resonance_request_intro, resonance_list_intros, resonance_resp
+[PASS] 7 resonance_whoami returns an account — user_id=person-… label=guest-09530e
+[PASS] 9 refresh_token grant 200 — status=200 error=None
+[PASS] 9 refreshed token maps to the same account
+
+27/27 checks passed
+smoke exit=0

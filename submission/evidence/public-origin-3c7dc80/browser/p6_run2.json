@@ -1,0 +1,91 @@
+{
+ "started_at": "2026-09-04T15:47:14Z",
+ "checks": [
+  {
+   "step": "page loaded with shim; tools registered",
+   "ok": true,
+   "detail": "title='Resonance \u2014 Visual Discovery' heading_before='plasma lens thermal bloom \u2192 ionization cascade'"
+  },
+  {
+   "step": "resonance_prepare_thought WITH structured thought -> private draft",
+   "ok": true,
+   "detail": "{\"discoverable\": false, \"input_kind\": \"agent_structured\", \"source_retention\": \"not_retained\", \"session_id\": \"ses-63816917ae7ca4e4\"}"
+  },
+  {
+   "step": "resonance_get_share_preview shows own 5 labels + confirmation_token",
+   "ok": true,
+   "detail": "nodes=5 relations=5 topic='Panic buying after a shortage rumour'"
+  },
+  {
+   "step": "resonance_share_prepared_thought (confirm+token) -> shared",
+   "ok": true,
+   "detail": "{\"shared\": true, \"discoverable\": true, \"session_id\": \"ses-63816917ae7ca4e4\"}"
+  },
+  {
+   "step": "resonance_discover {source:live} -> live matches",
+   "ok": true,
+   "detail": "result_id=set n=15"
+  },
+  {
+   "step": "#thought-heading starts with 'Panic buying after a shortage rumour'",
+   "ok": false,
+   "detail": "heading='plasma lens thermal bloom \u2192 ionization cascade'"
+  },
+  {
+   "step": "#map-status-text captured",
+   "ok": true,
+   "detail": "map_status_text='Calling accepted discovery MCP\u2026'"
+  },
+  {
+   "step": ".match-card count == 4",
+   "ok": true,
+   "detail": "count=4 classes=['match-card is-selected', 'match-card', 'match-card', 'match-card'] labels=[None, None, None, None]"
+  },
+  {
+   "step": "resonance_update_consent {shared:false} -> revoked",
+   "ok": true,
+   "detail": "{\"shared\": false, \"revoked\": true, \"discoverable\": false}"
+  },
+  {
+   "step": "consent page 200 and shows client name 'Claude (custom connector)'",
+   "ok": true,
+   "detail": "status=200 title='Authorize Resonance access'"
+  },
+  {
+   "step": "consent stylesheet applied: main.consent borderRadius == '22px'",
+   "ok": true,
+   "detail": "borderRadius='22px' stylesheets=['https://resonance-production-cfe3.up.railway.app/oauth/consent.css']"
+  }
+ ],
+ "thought_heading": "plasma lens thermal bloom \u2192 ionization cascade",
+ "map_status_text": "Calling accepted discovery MCP\u2026",
+ "match_card_count": 4,
+ "match_card_classes": [
+  "match-card is-selected",
+  "match-card",
+  "match-card",
+  "match-card"
+ ],
+ "match_card_labels": [
+  null,
+  null,
+  null,
+  null
+ ],
+ "header_consent": "Shared with Resonance",
+ "webmcp_status": "WebMCP \u00b7 LIVE DB discovery",
+ "console": [
+  "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'."
+ ],
+ "consent_client_registered": true,
+ "consent": {
+  "status": 200,
+  "client_name_shown": true,
+  "main_consent_border_radius": "22px",
+  "stylesheets": [
+   "https://resonance-production-cfe3.up.railway.app/oauth/consent.css"
+  ],
+  "title": "Authorize Resonance access"
+ },
+ "finished_at": "2026-09-04T15:47:50Z"
+}

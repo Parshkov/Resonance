@@ -220,6 +220,24 @@ class CompetitionWebMCPTests(unittest.TestCase):
             client.request("GET", "/api/webmcp/preview")
         self.assertEqual(ctx.exception.code, 409)  # no private draft left behind
 
+    def test_same_raw_text_can_be_prepared_again_and_by_another_person(self):
+        # The extracted Thought DNA id is namespaced per person and attempt, so
+        # re-preparing the same sentences (after stop-sharing) or another
+        # visitor preparing them does not hit "thought_id is already reserved".
+        text = ("A partial outage causes synchronized client retries. The retries cause "
+                "request amplification, which leads to cascading saturation.")
+        first = Client(self.base); first.guest()
+        _, one, _ = first.request("POST", "/api/webmcp/prepare", {"request_id": "same-1", "context": text})
+        _, preview, _ = first.request("GET", "/api/webmcp/preview")
+        first.request("POST", "/api/webmcp/share", {"request_id": "same-2", "confirm": True,
+                                                    "confirmation_token": preview["confirmation_token"]})
+        first.request("POST", "/api/webmcp/consent", {"request_id": "same-3", "shared": False})
+        _, again, _ = first.request("POST", "/api/webmcp/prepare", {"request_id": "same-4", "context": text})
+        self.assertNotEqual(again["draft_id"], one["draft_id"])
+        second = Client(self.base); second.guest()
+        _, other, _ = second.request("POST", "/api/webmcp/prepare", {"request_id": "same-1", "context": text})
+        self.assertFalse(other["discoverable"])
+
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
         # R17 acceptance finding: the first thing a judge does on the card is a
         # read through the page tool; an unshared visitor must get a mapped

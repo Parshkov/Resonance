@@ -511,9 +511,12 @@ class CompetitionHandler(ProductHandler):
                 else:
                     if not isinstance(context, str) or len(context) > MAX_CONTEXT_CHARS:
                         raise ValueError(f"context must be text of at most {MAX_CONTEXT_CHARS} characters")
+                    # Per-prepare namespace: the extracted id must not collide
+                    # with a reserved/revoked id for the same sentences.
                     result = product.prepare_raw_text(
-                        token, context, presentation=presentation,
-                        coarse_location=None, intent=intent, **security)
+                        token, context, source_id=f"{subject}:{request_id}",
+                        presentation=presentation, coarse_location=None,
+                        intent=intent, **security)
                     preview = product.preview(token, str(result["draft_id"]),
                                               client_id="live-browser-webmcp")
                     structure = _structure_summary(preview.get("thought_dna"))

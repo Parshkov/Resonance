@@ -335,6 +335,13 @@ class RemoteMCPHttpTests(unittest.TestCase):
         self.assertIn("call again with `thought`", json.dumps(weak))
         _, mine = chat.call("resonance_my_thoughts", {})
         self.assertFalse([s for s in mine["sessions"] if s.get("discoverable")])
+        # the same sentences prepared again get a fresh Thought DNA id (per
+        # person and attempt), never "thought_id is already reserved"
+        err3, prep2 = chat.call("resonance_prepare_thought", {
+            "context": "Slow code review causes merge queue pile-up, which leads to release delays. "
+                       "A review SLA prevents the pile-up."})
+        self.assertFalse(err3, prep2)
+        self.assertNotEqual(prep2["draft_id"], prep["draft_id"])
         bad = chat.rpc("tools/call", {"name": "resonance_nope", "arguments": {}})
         self.assertEqual(bad["error"]["code"], -32602)
         unknown = chat.rpc("frobnicate")
