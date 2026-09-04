@@ -88,7 +88,7 @@ class MigrationAndHealthTests(unittest.TestCase):
         health = repo.health()
         self.assertTrue(health["ok"])
         self.assertEqual(health["backend"], "sqlite")
-        self.assertEqual(health["migrations"], ["0001_init", "0002_recovery_generation", "0003_collaboration"])
+        self.assertEqual(health["migrations"], ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces"])
         self.assertEqual(health["corpus_generation"], 0)
         service = LiveCorpusService(repo)
         self.assertTrue(service.health().ok)
@@ -110,7 +110,7 @@ class MigrationAndHealthTests(unittest.TestCase):
             repo = SQLiteRepository(path)
             self.assertEqual(
                 repo.health()["migrations"],
-                ["0001_init", "0002_recovery_generation", "0003_collaboration"],
+                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces"],
             )
             columns = {
                 row[1] for row in repo._conn.execute("PRAGMA table_info(sessions)").fetchall()
@@ -162,7 +162,7 @@ class MigrationAndHealthTests(unittest.TestCase):
             )
             self.assertEqual(
                 recovered.health()["migrations"],
-                ["0001_init", "0002_recovery_generation", "0003_collaboration"],
+                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces"],
             )
             recovered.close()
 

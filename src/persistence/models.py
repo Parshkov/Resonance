@@ -276,3 +276,44 @@ class MessageRecord:
         return {"message_id": self.message_id, "channel_id": self.channel_id,
                 "author_user_id": self.author_user_id, "body": self.body,
                 "created_at": self.created_at}
+
+
+WORKSPACE_ROLES = ("owner", "member", "viewer")
+MEMBER_STATES = ("invited", "active", "removed", "left")
+TASK_STATES = ("todo", "doing", "done")
+
+
+@dataclass(frozen=True, slots=True)
+class WorkspaceRecord:
+    workspace_id: str
+    title: str
+    brief: str
+    owner_user_id: str
+    origin_intro_id: str | None
+    created_at: str
+    updated_at: str
+    version: int = 1
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"workspace_id": self.workspace_id, "title": self.title,
+                "brief": self.brief, "owner_user_id": self.owner_user_id,
+                "origin_intro_id": self.origin_intro_id,
+                "created_at": self.created_at, "updated_at": self.updated_at,
+                "version": self.version}
+
+
+@dataclass(frozen=True, slots=True)
+class MemberRecord:
+    workspace_id: str
+    user_id: str
+    role: str
+    state: str
+    invited_by: str | None
+    invited_at: str
+    joined_at: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"workspace_id": self.workspace_id, "user_id": self.user_id,
+                "role": self.role, "state": self.state,
+                "invited_by": self.invited_by, "invited_at": self.invited_at,
+                "joined_at": self.joined_at}

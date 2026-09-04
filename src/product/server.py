@@ -50,6 +50,7 @@ from src.persistence.errors import (
 )
 from src.persistence.seed import seed_r7
 from src.collaboration import CollaborationError
+from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product.service import LiveProductService, ProductError, StaleResultError
 
@@ -68,6 +69,7 @@ STATIC = {
     "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
+    "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
     "/live_shell.mjs": ("live_shell.mjs", "text/javascript; charset=utf-8"),
 }
 
@@ -221,6 +223,7 @@ class ProductHandler(BaseHTTPRequestHandler):
              "stale_result"),
             ((PersistenceConflictError,), HTTPStatus.CONFLICT, "conflict"),
             ((CollaborationError,), HTTPStatus.BAD_REQUEST, "collaboration_unavailable"),
+            ((WorkspaceError,), HTTPStatus.BAD_REQUEST, "workspace_unavailable"),
             ((IdentityValidationError, PersistenceValidationError, IngestionError,
               ProductError, ValueError), HTTPStatus.BAD_REQUEST, "validation_failed"),
             ((PersistenceStateError,), HTTPStatus.CONFLICT, "state_conflict"),
@@ -244,6 +247,7 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/session.mjs"></script>\n'
                 '  <script type="module" src="/collab.mjs"></script>\n'
                 '  <script type="module" src="/collab_ui.mjs"></script>\n'
+                '  <script type="module" src="/workspaces.mjs"></script>\n'
                 '  <script type="module" src="/live_shell.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
@@ -274,6 +278,13 @@ class ProductHandler(BaseHTTPRequestHandler):
         if path == "/api/product/channel/messages":
             channel_id = (params.get("channel_id") or [""])[0]
             self._send_json(product.read_messages(self._token(), channel_id))
+            return
+        if path == "/api/product/workspaces":
+            self._send_json(product.list_my_workspaces(self._token()))
+            return
+        if path == "/api/product/workspace":
+            wid = (params.get("workspace_id") or [""])[0]
+            self._send_json(product.get_workspace(self._token(), wid))
             return
         if path in {"/api/product/preview", "/api/webmcp/preview"}:
             draft_id = (params.get("draft_id") or [""])[0]
@@ -455,6 +466,64 @@ class ProductHandler(BaseHTTPRequestHandler):
                 token, str(body.get("intro_id", "")),
                 request_id=body.get("request_id"),
                 confirmed=bool(body.get("confirmed", False)), **security))
+            return
+        if path == "/api/product/workspace/create":
+            self._send_json(product.create_workspace(
+                token, str(body.get("intro_id", "")),
+                title=str(body.get("title", "")), brief=str(body.get("brief", "")),
+                **security))
+            return
+        if path == "/api/product/workspace/invite":
+            self._send_json(product.workspace_invite(
+                token, str(body.get("workspace_id", "")),
+                str(body.get("invitee_user_id", "")),
+                role=str(body.get("role", "member")), **security))
+            return
+        if path == "/api/product/workspace/respond":
+            self._send_json(product.workspace_respond_invite(
+                token, str(body.get("workspace_id", "")),
+                accept=bool(body.get("accept", False)), **security))
+            return
+        if path == "/api/product/workspace/remove":
+            self._send_json(product.workspace_remove_member(
+                token, str(body.get("workspace_id", "")),
+                str(body.get("target_user_id", "")), **security))
+            return
+        if path == "/api/product/workspace/leave":
+            self._send_json(product.workspace_leave(
+                token, str(body.get("workspace_id", "")), **security))
+            return
+        if path == "/api/product/workspace/brief":
+            self._send_json(product.workspace_update_brief(
+                token, str(body.get("workspace_id", "")), str(body.get("brief", "")),
+                expected_version=int(body.get("expected_version", 1)), **security))
+            return
+        if path == "/api/product/workspace/note":
+            self._send_json(product.workspace_add_note(
+                token, str(body.get("workspace_id", "")), str(body.get("body", "")),
+                **security))
+            return
+        if path == "/api/product/workspace/task":
+            self._send_json(product.workspace_add_task(
+                token, str(body.get("workspace_id", "")), str(body.get("title", "")),
+                **security))
+            return
+        if path == "/api/product/workspace/task_state":
+            self._send_json(product.workspace_set_task_state(
+                token, str(body.get("workspace_id", "")), str(body.get("task_id", "")),
+                str(body.get("state", "")), **security))
+            return
+        if path == "/api/product/workspace/link":
+            self._send_json(product.workspace_link_match(
+                token, str(body.get("workspace_id", "")), str(body.get("session_id", "")),
+                str(body.get("why", "")), **security))
+            return
+        if path == "/api/product/workspace/artifact":
+            self._send_json(product.workspace_add_artifact(
+                token, str(body.get("workspace_id", "")),
+                label=str(body.get("label", "")), kind=str(body.get("kind", "file")),
+                sha256=str(body.get("sha256", "")), size_bytes=int(body.get("size_bytes", 0)),
+                **security))
             return
         if path == "/api/product/channel/send":
             self._send_json(product.send_message(
