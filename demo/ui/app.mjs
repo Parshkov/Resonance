@@ -3,6 +3,7 @@ const CONTEXT_CONTRACT = "resonance-ui-context/0.1";
 const CANONICAL_MODE = "analogical";
 const CANONICAL_K = 15;
 const PRIMARY_CLASSIFICATION = "analogical";
+const NEGATIVE_CLASSIFICATION = "negative";
 const PRIMARY_LIMIT = 4;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -44,13 +45,18 @@ function isDiscoverable(row) {
 
 export function selectPrimaryMatches(payload) {
   assertAcceptedDiscovery(payload);
-  const selected = [];
-  for (const match of payload.matches) {
-    if (!isDiscoverable(match)) continue;
-    if (match.hard_rejection !== null) continue;
-    if (match.mode_classification !== PRIMARY_CLASSIFICATION) continue;
-    selected.push(match);
-    if (selected.length === PRIMARY_LIMIT) break;
+  // Analogical resonances first (the R9 rule). A live person's thought may
+  // resonate only directly or approximately; those are resonances too, so
+  // remaining slots take the next eligible non-negative matches in backend
+  // order instead of rendering nothing. Never sorted, never rescored.
+  const eligible = payload.matches.filter((match) =>
+    isDiscoverable(match) && match.hard_rejection === null &&
+    match.mode_classification !== NEGATIVE_CLASSIFICATION);
+  const selected = eligible.filter((match) => match.mode_classification === PRIMARY_CLASSIFICATION)
+    .slice(0, PRIMARY_LIMIT);
+  for (const match of eligible) {
+    if (selected.length >= PRIMARY_LIMIT) break;
+    if (!selected.includes(match)) selected.push(match);
   }
   return selected;
 }
@@ -352,7 +358,7 @@ function renderMap(context, payload, primary, others, rejected) {
   const unlocated = document.getElementById("unlocated-anchor");
   unlocated.hidden = !unlocatedPrimary;
   if (unlocatedPrimary) setText("unlocated-name", unlocatedPrimary.person_pseudonym);
-  setText("map-status-text", `${primary.length} flagship analogies · backend order intact`);
+  setText("map-status-text", `${primary.length} resonances · backend order intact`);
   document.getElementById("map-status").classList.remove("is-loading");
 }
 
@@ -411,7 +417,7 @@ function selectMatch(sessionId) {
 
 function renderDiscovery(payload) {
   const primary = selectPrimaryMatches(payload);
-  if (!primary.length) throw new Error("No eligible analogical matches were returned");
+  if (!primary.length) throw new Error("No eligible resonances were returned for this thought");
   state.payload = payload;
   state.primary = primary;
   state.selectedSessionId = primary[0].session_id;
@@ -451,6 +457,13 @@ function setSourceControls(source, loading = false) {
 
 function showError(error) {
   document.getElementById("app-shell").dataset.state = "error";
+  // Never leave the previous source's cards/evidence on screen next to an
+  // error for the current one.
+  document.getElementById("match-list")?.replaceChildren();
+  state.primary = [];
+  state.selectedSessionId = null;
+  setText("evidence-heading", "No resonance to show");
+  setText("evidence-subtitle", error.message);
   setText("map-status-text", `Discovery unavailable: ${error.message}`);
   setText("source-note", "No results rendered · accepted source validation failed closed");
   setSourceControls(state.source, false);
@@ -463,10 +476,21 @@ async function loadSource(source) {
   url.searchParams.set("source", source);
   window.history.replaceState({}, "", url);
   try {
-    const response = await fetch(`/api/discover?source=${encodeURIComponent(source)}`, {cache: "no-store"});
+    const [response, contextResponse] = await Promise.all([
+      fetch(`/api/discover?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
+      fetch(`/api/context?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
+    ]);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
     assertAcceptedDiscovery(payload);
+    // The active-thought panel follows the source: the visitor's own shared
+    // thought on the live product, the labelled fixture thought on replay.
+    if (contextResponse.ok) {
+      const context = await contextResponse.json();
+      assertAcceptedContext(context);
+      state.context = context;
+      renderContext(context);
+    }
     renderDiscovery(payload);
     setSourceControls(source, false);
   } catch (error) {

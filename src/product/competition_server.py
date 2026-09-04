@@ -33,7 +33,10 @@ from src.ingestion.identity import (
     INGESTION_SHARED,
 )
 from src.ingestion.service import ShareIntent
-from src.product.mcp_bridge import BridgeError, _slug, build_thought_dna
+from src.product.mcp_bridge import (
+    BridgeError, _has_usable_structure, _insufficient_structure_message, _slug,
+    _structure_summary, build_thought_dna,
+)
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
 from src.product.server import (
@@ -287,11 +290,19 @@ class CompetitionHandler(ProductHandler):
             self._send_json({"default_source": "replay", "live_product": True})
             return
         if path == "/api/context":
-            try:
-                token = self._token()
-                context = _live_context(product, token)
-            except Exception:
-                context = None
+            # ?source=replay -> the labelled public replay thought; ?source=live
+            # (or no source) -> the visitor's own shared thought when they have
+            # one, so the page's active-thought panel follows the live view.
+            source = (params.get("source") or ["auto"])[0]
+            if source not in {"auto", "replay", "live"}:
+                raise ValueError("source must be replay or live")
+            context = None
+            if source != "replay":
+                try:
+                    token = self._token()
+                    context = _live_context(product, token)
+                except Exception:
+                    context = None
             self._send_json(context or public_context())
             return
         if path == "/api/discover":
@@ -503,6 +514,18 @@ class CompetitionHandler(ProductHandler):
                     result = product.prepare_raw_text(
                         token, context, presentation=presentation,
                         coarse_location=None, intent=intent, **security)
+                    preview = product.preview(token, str(result["draft_id"]),
+                                              client_id="live-browser-webmcp")
+                    structure = _structure_summary(preview.get("thought_dna"))
+                    if not _has_usable_structure(structure):
+                        # Empty graphs must not become shareable drafts (the
+                        # accepted extractor abstains on implicit prose).
+                        try:
+                            product.discard(token, str(result["draft_id"]), confirmed=True, **security)
+                        except Exception:  # noqa: BLE001 - best effort clean-up
+                            pass
+                        raise ValueError(_insufficient_structure_message(
+                            structure, result.get("abstentions", [])))
             else:
                 # Legacy/demo input: clone the thought currently visible on the
                 # page (clearly labelled), so the tool still works without content.

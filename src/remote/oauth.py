@@ -94,6 +94,39 @@ class OAuthError(Exception):
 # grant store (in-memory default; interface so R15C can back it with Postgres)
 # ---------------------------------------------------------------------------
 
+CONSENT_CSS = """
+:root { color-scheme: dark; --canvas: #0a0a0a; --panel: rgba(255,255,255,.045); --border: rgba(255,255,255,.12);
+  --text: #f2eee8; --text-2: #aaa49b; --gold: #c9b8a0; --bright: #e8d5b7; --rust: #b66d58;
+  --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(1200px 600px at 20% -10%, rgba(201,184,160,.12), transparent 60%), var(--canvas);
+  color: var(--text); font: 16px/1.55 var(--sans); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; }
+main.consent { width: min(640px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 32px 34px 28px; }
+.brand { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; font: 600 12px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--text-2); }
+.mark { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--gold); box-shadow: inset 0 0 0 4px var(--canvas), inset 0 0 0 6px var(--gold); }
+h1 { font: 500 30px/1.15 var(--serif); margin: 0 0 14px; color: var(--bright); }
+p { margin: 0 0 12px; color: var(--text-2); }
+p strong, p em { color: var(--text); }
+code { font: 13px var(--mono); color: var(--gold); word-break: break-all; }
+fieldset { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px 6px; margin: 18px 0 20px; }
+legend { padding: 0 8px; font: 600 12px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
+label.opt { display: block; margin: 6px 0 10px; color: var(--text); cursor: pointer; }
+fieldset p { margin: 8px 0; }
+fieldset p label { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 14px; }
+input[type=text], input[type=password] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+  background: rgba(0,0,0,.35); color: var(--text); font: 15px var(--mono); }
+input[type=text]:focus, input[type=password]:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; }
+button { cursor: pointer; border-radius: 999px; padding: 12px 22px; font: 600 15px var(--sans); border: 1px solid var(--border);
+  background: transparent; color: var(--text); }
+button.primary { background: var(--bright); color: #14120f; border-color: var(--bright); }
+button:hover { filter: brightness(1.08); }
+.fine { margin: 18px 0 0; font-size: 13px; color: var(--text-2); }
+"""
+
+
 @dataclass
 class GrantStore:
     """Durable-shaped store for auth codes, refresh grants and client records.
@@ -290,6 +323,10 @@ class OAuthCore:
                 return self._ok(self._authorization_server_metadata(issuer))
             if method == "GET" and path == "/.well-known/oauth-authorization-server/mcp":
                 return self._ok(self._authorization_server_metadata(issuer))
+            if path == "/oauth/consent.css" and method == "GET":
+                return OAuthResult(200, {"Content-Type": "text/css; charset=utf-8",
+                                         "Cache-Control": "public, max-age=3600"},
+                                   CONSENT_CSS.encode("utf-8"))
             if path == "/oauth/register" and method == "POST":
                 return self._register(body)
             if path == "/oauth/authorize" and method == "GET":
@@ -645,16 +682,22 @@ class OAuthCore:
                 '<label class="opt"><input type="radio" name="identity" value="current" checked> '
                 f'Continue as your current account (<code>{e(current_account)}</code>)</label>')
         guest_checked = "" if current_account else " checked"
-        # No inline script/style: the origin serves CSP default-src 'self'. Styling
-        # (if any) is a separate same-origin stylesheet the transport may add.
+        client = self.store.get_client(clean["client_id"]) or {}
+        client_name = str(client.get("client_name") or "").strip()
+        who = (f"<strong>{e(client_name)}</strong> (<code>{e(clean['client_id'])}</code>)"
+               if client_name else f"A client (<code>{e(clean['client_id'])}</code>)")
+        # No inline script/style: the origin serves CSP default-src 'self'. The
+        # stylesheet is a same-origin resource served by this core.
         return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Authorize Resonance access</title></head>
+<title>Authorize Resonance access</title>
+<link rel="stylesheet" href="/oauth/consent.css"></head>
 <body>
-<main>
+<main class="consent">
+<p class="brand"><span class="mark" aria-hidden="true"></span>Resonance</p>
 <h1>Authorize access to Resonance</h1>
-<p>A client (<code>{e(clean['client_id'])}</code>) is asking to connect to your
+<p>{who} is asking to connect to your
 Resonance account at <code>{e(clean['resource'])}</code> and act as you through
 the Resonance tools.</p>
 <p>This authorization lets the client read and share <em>the Thought DNA you
@@ -672,9 +715,12 @@ every share still needs your separate in-tool confirmation.</p>
 <p><label>Account ID <input type="text" name="user_id" autocomplete="username"></label></p>
 <p><label>Recovery secret <input type="password" name="recovery_secret" autocomplete="current-password"></label></p>
 </fieldset>
-<button type="submit" name="decision" value="approve">Allow access</button>
+<div class="actions">
+<button type="submit" name="decision" value="approve" class="primary">Allow access</button>
 <button type="submit" name="decision" value="deny">Cancel</button>
+</div>
 </form>
+<p class="fine">Private by default. Only the structural Thought DNA you explicitly confirm becomes discoverable; conversation text is never stored.</p>
 </main>
 </body></html>"""
 

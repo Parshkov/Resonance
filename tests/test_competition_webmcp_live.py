@@ -147,6 +147,38 @@ class CompetitionWebMCPTests(unittest.TestCase):
             client.request("POST", "/api/webmcp/prepare", {"request_id": "real-1", "context": "x"})
         self.assertEqual(ctx.exception.code, 409)
 
+    def test_context_follows_the_source_after_a_real_share(self):
+        # The R9 page's active-thought panel used to keep the fixture thought
+        # after the visitor shared their own; /api/context now follows the
+        # source and app.mjs re-renders it on every source switch.
+        client = Client(self.base)
+        client.guest()
+        _, public, _ = client.request("GET", "/api/context?source=live")
+        self.assertEqual(public["active_thought"]["thought_id"], "thought-aria-plasma-lens")
+        thought = {"topic": "Panic buying after a shortage rumour", "domain": "consumer-economics",
+                   "nodes": [{"id": "b0", "label": "supply shortage rumour", "role": "problem"},
+                             {"id": "b1", "label": "synchronized bulk purchases", "role": "mechanism"},
+                             {"id": "b2", "label": "empty shelves", "role": "outcome"}],
+                   "relations": [{"source": "b0", "target": "b1", "type": "causes"},
+                                 {"source": "b1", "target": "b2", "type": "causes"}]}
+        client.request("POST", "/api/webmcp/prepare", {"request_id": "ctx-1", "thought": thought})
+        _, preview, _ = client.request("GET", "/api/webmcp/preview")
+        client.request("POST", "/api/webmcp/share", {"request_id": "ctx-2", "confirm": True,
+                                                     "confirmation_token": preview["confirmation_token"]})
+        _, live, _ = client.request("GET", "/api/context?source=live")
+        self.assertEqual({n["label"] for n in live["active_thought"]["nodes"]},
+                         {n["label"] for n in thought["nodes"]})
+        self.assertEqual(live["presentation"]["topic"], "Panic buying after a shortage rumour")
+        self.assertTrue(live["consent"]["shared_with_resonance"])
+        _, replay, _ = client.request("GET", "/api/context?source=replay")
+        self.assertEqual(replay["active_thought"]["thought_id"], "thought-aria-plasma-lens")
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/context?source=nope")
+        self.assertEqual(ctx.exception.code, 400)
+        with urlopen(self.base + "/app.mjs", timeout=10) as response:
+            app = response.read().decode()
+        self.assertIn("fetch(`/api/context?source=${encodeURIComponent(source)}`", app)
+
     def test_webmcp_prepare_raw_context_and_invalid_thought(self):
         client = Client(self.base)
         client.guest()
@@ -171,6 +203,22 @@ class CompetitionWebMCPTests(unittest.TestCase):
             client.request("POST", "/api/webmcp/prepare",
                            {"request_id": "both-1", "context": "x", "thought": {"nodes": [], "relations": []}})
         self.assertEqual(ctx.exception.code, 400)
+        # implicit prose: the accepted extractor abstains; the product must not
+        # leave an empty shareable draft behind but tell the agent what to pass
+        client = Client(self.base)
+        client.guest()
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/webmcp/prepare", {
+                "request_id": "implicit-1",
+                "context": "Whenever the upstream degrades, thousands of clients notice timeouts "
+                           "at once and retry, and the whole tier ends up saturated."})
+        self.assertEqual(ctx.exception.code, 400)
+        payload = json.loads(ctx.exception.read().decode())
+        self.assertEqual(payload["error"], "validation_failed")
+        self.assertIn("call again with `thought`", payload["message"])
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/webmcp/preview")
+        self.assertEqual(ctx.exception.code, 409)  # no private draft left behind
 
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
         # R17 acceptance finding: the first thing a judge does on the card is a

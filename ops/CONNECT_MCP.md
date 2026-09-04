@@ -63,7 +63,7 @@ What happens, tool by tool:
 | step | tool | what it does |
 |---|---|---|
 | 0 | `resonance_whoami` | confirms the key maps to your account |
-| 1 | `resonance_prepare_thought` | your assistant passes a labelled causal graph (`nodes` with roles problem / mechanism / state / outcome / constraint / method / evidence / resource / agent; `relations` typed causes / prevents / requires / part_of / constrains / supports / contradicts) or raw text as a fallback. Returns the exact preview and a one-time confirmation token. **Nothing is discoverable yet.** |
+| 1 | `resonance_prepare_thought` | your assistant passes a labelled causal graph (`nodes` with roles problem / mechanism / state / outcome / constraint / method / evidence / resource / agent; `relations` typed causes / prevents / requires / part_of / constrains / supports / contradicts) or raw text as a fallback. Returns the exact preview, a `structure` summary and a one-time confirmation token. **Nothing is discoverable yet.** Raw text is only followed through explicit cues ("causes", "leads to", "prevents"…); implicit prose makes the extractor abstain and the tool then refuses with a message asking for a labelled `thought` instead of leaving an empty draft. |
 | 2 | `resonance_share_thought` | only with `confirm=true` after you approved the preview. Only the structural graph is stored; the conversation text is never retained. |
 | 3 | `resonance_discover` | accepted structural discovery against everything other people share; matches in backend order with scores and mapped correspondences. |
 | 4 | `resonance_explain_match` | full evidence for one match. |
