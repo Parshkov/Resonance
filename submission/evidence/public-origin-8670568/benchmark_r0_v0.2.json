@@ -1,0 +1,80 @@
+{
+ "benchmark_version": "r0-v0.2",
+ "build_seconds": 0.1756,
+ "calibration": {
+  "analogy_over_coincidence": 1.0,
+  "analogy_over_generic_motif": 1.0,
+  "classification_accuracy": 1.0,
+  "negative_false_positive_rate": 0.0,
+  "pairs": 72,
+  "polarity_rejection": 1.0,
+  "positive_node_f1": 0.8469,
+  "positive_recall_at_20": 1.0,
+  "positive_recall_at_5": 1.0
+ },
+ "corpus_n": 176,
+ "engine": {
+  "engine_version": "resonance-engine/0.2",
+  "index_config_hash": "fe4e295af0a15a3a5ed0bf1fd9bc0aebe65d024e87bcc1aab529287e2df5013b",
+  "verifier_config_hash": "12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77"
+ },
+ "fixture_files": {
+  "graphs.jsonl": "0458b44f113951d8f0b46fe1e78541fb4fcc9669ca458e84c8262db95decbb42",
+  "pairs.jsonl": "2f2986599eae4f40fde99658c09f2d1c31ca43ab0276790acdf44aa4f1de0bfe"
+ },
+ "gate": {
+  "analogy_over_coincidence": 1.0,
+  "analogy_over_generic_motif": 1.0,
+  "classification_accuracy": 1.0,
+  "negative_false_positive_rate": 0.0,
+  "pairs": 72,
+  "polarity_rejection": 1.0,
+  "positive_node_f1": 0.8469,
+  "positive_recall_at_20": 1.0,
+  "positive_recall_at_5": 1.0
+ },
+ "gates": {
+  "analogy_over_coincidence": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "analogy_over_generic_motif": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "classification_accuracy": {
+   "observed": 1.0,
+   "required": 0.7,
+   "status": "pass"
+  },
+  "negative_false_positive_rate": {
+   "observed": 0.0,
+   "required": 0.1,
+   "status": "pass"
+  },
+  "polarity_rejection": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "positive_node_f1": {
+   "observed": 0.8469,
+   "required": 0.8,
+   "status": "pass"
+  },
+  "positive_recall_at_20": {
+   "observed": 1.0,
+   "required": 0.95,
+   "status": "pass"
+  },
+  "positive_recall_at_5": {
+   "observed": 1.0,
+   "required": 0.85,
+   "status": "pass"
+  }
+ },
+ "overall_status": "pass",
+ "query_latency_mean_seconds": 0.6831
+}
