@@ -132,6 +132,24 @@ def _coarse_location(value: Any) -> dict[str, Any] | None:
             "city": city[:80], "region": region[:80], "lat": lat, "lon": lon}
 
 
+def _structure_summary(thought_dna: Any) -> dict[str, int]:
+    dna = thought_dna if isinstance(thought_dna, Mapping) else {}
+    return {"nodes": len(dna.get("nodes") or []), "relations": len(dna.get("relations") or [])}
+
+
+def _has_usable_structure(structure: Mapping[str, int]) -> bool:
+    return structure.get("nodes", 0) >= 2 and structure.get("relations", 0) >= 1
+
+
+def _insufficient_structure_message(structure: Mapping[str, int], abstentions: Any) -> str:
+    notes = "; ".join(str(a) for a in (abstentions or [])) or "no explicit causal cues found"
+    return (f"no shareable structure could be extracted from the text "
+            f"({structure.get('nodes', 0)} nodes, {structure.get('relations', 0)} relations: {notes}). "
+            "The extractor only follows explicit cues and never invents structure. Extract the "
+            "causal structure yourself and call again with `thought`: nodes with roles "
+            f"{sorted(NODE_ROLES)} and relations typed {sorted(RELATION_TYPES)}.")
+
+
 def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str, Any]:
     """Turn `{nodes:[{label, role, id?}], relations:[{source, target, type}]}`
     into canonical manual-provenance Thought DNA.  `source`/`target` may name a
@@ -566,6 +584,17 @@ class RemoteMCPBridge:
             prepared = self.product.prepare_raw_text(token, str(context), **common)
         draft_id = str(prepared["draft_id"])
         preview = self.product.preview(token, draft_id, client_id=CLIENT_ID)
+        structure = _structure_summary(preview.get("thought_dna"))
+        if thought is None and not _has_usable_structure(structure):
+            # The accepted extractor abstains on implicit prose instead of
+            # inventing structure. An empty graph must not become a shareable
+            # draft: discard it and tell the agent what to do instead.
+            try:
+                self.product.discard(token, draft_id, confirmed=True, **self._security())
+            except Exception:  # noqa: BLE001 - best effort clean-up
+                pass
+            raise BridgeError("validation_failed", _insufficient_structure_message(
+                structure, prepared.get("abstentions", [])))
         return {
             "contract_version": BRIDGE_CONTRACT,
             "draft_id": draft_id,
@@ -573,6 +602,8 @@ class RemoteMCPBridge:
             "discoverable": False,
             "input_kind": prepared.get("input_kind"),
             "source_retention": prepared.get("source_retention", "not_retained"),
+            "structure": structure,
+            "abstentions": prepared.get("abstentions", []),
             "warnings": prepared.get("warnings", []),
             "will_become_discoverable": {
                 "thought_dna": preview.get("thought_dna"),

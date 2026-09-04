@@ -171,6 +171,22 @@ class CompetitionWebMCPTests(unittest.TestCase):
             client.request("POST", "/api/webmcp/prepare",
                            {"request_id": "both-1", "context": "x", "thought": {"nodes": [], "relations": []}})
         self.assertEqual(ctx.exception.code, 400)
+        # implicit prose: the accepted extractor abstains; the product must not
+        # leave an empty shareable draft behind but tell the agent what to pass
+        client = Client(self.base)
+        client.guest()
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/webmcp/prepare", {
+                "request_id": "implicit-1",
+                "context": "Whenever the upstream degrades, thousands of clients notice timeouts "
+                           "at once and retry, and the whole tier ends up saturated."})
+        self.assertEqual(ctx.exception.code, 400)
+        payload = json.loads(ctx.exception.read().decode())
+        self.assertEqual(payload["error"], "validation_failed")
+        self.assertIn("call again with `thought`", payload["message"])
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/webmcp/preview")
+        self.assertEqual(ctx.exception.code, 409)  # no private draft left behind
 
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
         # R17 acceptance finding: the first thing a judge does on the card is a

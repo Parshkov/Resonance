@@ -323,6 +323,18 @@ class RemoteMCPHttpTests(unittest.TestCase):
                        "A review SLA prevents the pile-up."})
         self.assertFalse(err, prep)
         self.assertEqual(prep["input_kind"], "raw_text_fallback")
+        self.assertEqual(prep["structure"], {"nodes": len(prep["will_become_discoverable"]["thought_dna"]["nodes"]),
+                                             "relations": len(prep["will_become_discoverable"]["thought_dna"]["relations"])})
+        self.assertGreaterEqual(prep["structure"]["relations"], 1)
+        # implicit prose: the extractor abstains, the bridge refuses to leave an
+        # empty shareable draft and tells the model to pass `thought` instead
+        err2, weak = chat.call("resonance_prepare_thought", {
+            "context": "Whenever the upstream degrades, thousands of clients notice timeouts "
+                       "at once and retry, and the whole tier ends up saturated."})
+        self.assertTrue(err2, weak)
+        self.assertIn("call again with `thought`", json.dumps(weak))
+        _, mine = chat.call("resonance_my_thoughts", {})
+        self.assertFalse([s for s in mine["sessions"] if s.get("discoverable")])
         bad = chat.rpc("tools/call", {"name": "resonance_nope", "arguments": {}})
         self.assertEqual(bad["error"]["code"], -32602)
         unknown = chat.rpc("frobnicate")
