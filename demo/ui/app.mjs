@@ -463,10 +463,21 @@ async function loadSource(source) {
   url.searchParams.set("source", source);
   window.history.replaceState({}, "", url);
   try {
-    const response = await fetch(`/api/discover?source=${encodeURIComponent(source)}`, {cache: "no-store"});
+    const [response, contextResponse] = await Promise.all([
+      fetch(`/api/discover?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
+      fetch(`/api/context?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
+    ]);
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
     assertAcceptedDiscovery(payload);
+    // The active-thought panel follows the source: the visitor's own shared
+    // thought on the live product, the labelled fixture thought on replay.
+    if (contextResponse.ok) {
+      const context = await contextResponse.json();
+      assertAcceptedContext(context);
+      state.context = context;
+      renderContext(context);
+    }
     renderDiscovery(payload);
     setSourceControls(source, false);
   } catch (error) {

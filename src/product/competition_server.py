@@ -290,11 +290,19 @@ class CompetitionHandler(ProductHandler):
             self._send_json({"default_source": "replay", "live_product": True})
             return
         if path == "/api/context":
-            try:
-                token = self._token()
-                context = _live_context(product, token)
-            except Exception:
-                context = None
+            # ?source=replay -> the labelled public replay thought; ?source=live
+            # (or no source) -> the visitor's own shared thought when they have
+            # one, so the page's active-thought panel follows the live view.
+            source = (params.get("source") or ["auto"])[0]
+            if source not in {"auto", "replay", "live"}:
+                raise ValueError("source must be replay or live")
+            context = None
+            if source != "replay":
+                try:
+                    token = self._token()
+                    context = _live_context(product, token)
+                except Exception:
+                    context = None
             self._send_json(context or public_context())
             return
         if path == "/api/discover":
