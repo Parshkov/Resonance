@@ -360,6 +360,22 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertEqual(authd["query"].get("error"), "access_denied")
 
     # -- no secret in the consent page ----------------------------------
+    def test_consent_page_names_the_client_and_is_styled_without_inline_css(self):
+        client_id = self.register_client()
+        c = self.c()
+        _, challenge = _pkce(b"consent-style-seed-000000000000000001")
+        auth = c.authorize(challenge=challenge, state="st", client_id=client_id,
+                           resource=self.base + "/mcp", decision="deny")
+        page = auth["get_body"]
+        self.assertIn("<strong>Test</strong>", page)          # registered client_name
+        self.assertIn('href="/oauth/consent.css"', page)
+        self.assertNotIn("<style", page)
+        self.assertNotIn("<script", page)
+        status, headers, body = c.get("/oauth/consent.css")
+        self.assertEqual(status, 200)
+        self.assertTrue(headers.get("Content-Type", "").startswith("text/css"))
+        self.assertIn("main.consent", body.decode())
+
     def test_consent_page_carries_no_token(self):
         c = self.c()
         _, challenge = _pkce()

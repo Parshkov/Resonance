@@ -317,7 +317,7 @@ class StreamableHTTPHandler(BaseHTTPRequestHandler):
         oauth_paths = ("/.well-known/oauth-protected-resource",
                        "/.well-known/oauth-authorization-server",
                        "/oauth/authorize", "/oauth/token",
-                       "/oauth/register", "/oauth/revoke")
+                       "/oauth/register", "/oauth/revoke", "/oauth/consent.css")
         if not (route in oauth_paths or route.startswith("/.well-known/oauth-")):
             return False
         try:
