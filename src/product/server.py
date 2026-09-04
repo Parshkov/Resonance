@@ -144,8 +144,14 @@ def build_runtime(
     *,
     allowed_origins: frozenset[str],
     confirmation_secret: bytes | None = None,
-    seed: bool = True,
+    seed: bool | None = None,
 ) -> ProductRuntime:
+    """``seed=None`` seeds the R7 demo corpus only for an ephemeral ``:memory:``
+    database (local development, tests). A persistent database is never seeded
+    unless the operator asks for it explicitly (``--seed-demo`` /
+    ``RESONANCE_SEED_DEMO=1``); seeded rows are demo personas, not people."""
+    if seed is None:
+        seed = db_path == ":memory:"
     # Explicit path or DSN: a postgres:// / postgresql:// target selects the
     # PostgreSQL repository, anything else is a SQLite file (or ":memory:").
     # Previously this hard-wired SQLiteRepository, so a DSN was silently treated
@@ -878,12 +884,13 @@ def main(argv: list[str] | None = None) -> None:
                         help="allowed browser origin (repeatable)")
     parser.add_argument("--secret-file", default=None,
                         help="file holding the stable draft-confirmation secret")
-    parser.add_argument("--no-seed", action="store_true",
-                        help="start with an empty live corpus (no R7 seed baseline); "
-                             "RESONANCE_SEED_DEMO=0 in the environment has the same effect")
+    parser.add_argument("--seed-demo", action="store_true",
+                        help="seed the R7 demo corpus (25 labelled demo personas) into this database; "
+                             "RESONANCE_SEED_DEMO=1 has the same effect. Persistent databases are "
+                             "never seeded by default; :memory: always is")
     args = parser.parse_args(argv)
-    if os.environ.get("RESONANCE_SEED_DEMO", "1").strip().lower() in ("0", "false", "no", "off"):
-        args.no_seed = True
+    seed = True if args.db == ":memory:" else (
+        args.seed_demo or os.environ.get("RESONANCE_SEED_DEMO", "").strip().lower() in ("1", "true", "yes", "on"))
     origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
     try:
         secret = _resolve_secret(args.secret_file, os.environ, args.db)
@@ -891,7 +898,7 @@ def main(argv: list[str] | None = None) -> None:
         parser.error(str(exc))
     runtime = build_runtime(args.db, allowed_origins=origins,
                             confirmation_secret=secret,
-                            seed=not args.no_seed)
+                            seed=seed)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
     server = serve(args.host, args.port, runtime=runtime)

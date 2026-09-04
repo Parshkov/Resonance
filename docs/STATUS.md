@@ -34,6 +34,7 @@ Updated: 2026-09-04
 - Engine 0.1 gate reports under `src/*/reports/r0-v0.1-*.json` are kept as history; they were computed on the single-template v0.1 corpus and are not comparable with 0.2.
 - Import-time monkey-patch modules (`review_hardening`, `review_alignment`) were folded into the classes they patched; behaviour is unchanged and now visible in one place.
 - The second remote MCP server and its 15-tool vocabulary were removed; `src/remote/server.py` is a thin factory over the product server.
+- Persistent databases are no longer seeded with demo personas by default (`--seed-demo` / `RESONANCE_SEED_DEMO=1` opt in; `python3 -m src.persistence --db <DSN> purge-demo` cleans an already seeded production).
 
 ## Next falsification targets
 

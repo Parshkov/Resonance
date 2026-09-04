@@ -99,3 +99,31 @@ class DemoPersonaAndScrubTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DemoSeedPolicyTests(unittest.TestCase):
+    def test_persistent_database_is_not_seeded_by_default_and_purge_demo_cleans_a_seeded_one(self):
+        import tempfile
+        from pathlib import Path
+        from src.persistence.seed import purge_demo
+        with tempfile.TemporaryDirectory() as tmp:
+            db = str(Path(tmp) / "live.sqlite3")
+            rt = build_runtime(db, allowed_origins=frozenset({"http://127.0.0.1"}), confirmation_secret=b"x" * 32)
+            self.assertEqual(rt.live.health().sessions, 0)
+            rt.live.repo.close()
+            rt = build_runtime(db, allowed_origins=frozenset({"http://127.0.0.1"}), confirmation_secret=b"x" * 32, seed=True)
+            self.assertEqual(rt.live.health().sessions, 25)
+            creds = rt.product.register_guest()
+            self.assertIsNotNone(rt.live.get_user(creds.user_id))
+            result = purge_demo(rt.live)
+            self.assertEqual(result["sessions_deleted"], 25)
+            self.assertGreater(result["users_revoked"], 0)
+            self.assertEqual(rt.live.health().discoverable, 0)
+            self.assertIsNotNone(rt.live.get_user(creds.user_id))      # real account untouched
+            self.assertFalse(rt.live.get_user(creds.user_id).hidden)
+            self.assertEqual(purge_demo(rt.live), {"sessions_deleted": 0, "users_revoked": 0})
+            rt.live.repo.close()
+
+    def test_in_memory_runtime_is_seeded_for_local_development(self):
+        rt = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        self.assertEqual(rt.live.health().sessions, 25)

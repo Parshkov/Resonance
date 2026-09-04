@@ -13,7 +13,7 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 | confirmation secret | `RESONANCE_CONFIRMATION_SECRET` env (≥ 32 bytes) or `--secret-file` | **required** with a persistent DB — the server refuses to start without it so prepared private drafts survive restarts. Never put it on the command line or in the image. |
 | browser origin allowlist | `--origin https://your.host` (repeatable) | must be the **exact** `https://` origin browsers will use; this is the CSRF/Origin check. Add a second `--origin` for a platform default host alongside a custom domain. |
 | bind address / port | `--host 0.0.0.0 --port $PORT` | the image reads `PORT` from the platform |
-| seed | default seeds the accepted R7 corpus (create-only, idempotent across restarts); `--no-seed` starts empty | |
+| demo seed | **off by default** for any persistent database (real participants only). `--seed-demo` or `RESONANCE_SEED_DEMO=1` seeds the 25 labelled R7 demo personas (create-only, idempotent); `python3 -m src.persistence --db <DSN> purge-demo` tombstones seeded demo sessions and revokes the persona accounts. `:memory:` is always seeded (local dev/tests). | production was seeded before 2026-09-04; run `purge-demo` once to clean it |
 
 Migrations under `ops/migrations/` are applied automatically at startup on both
 backends (`0005_oauth_grants` makes OAuth codes / refresh grants / client
@@ -29,11 +29,11 @@ On PostgreSQL 16.13, from a clean database, executed in a real browser
 (headless Chromium, two separate cookie jars) against the server started with
 exactly the command in the `Dockerfile`:
 
-- all three migrations apply and the R7 seed loads (25 sessions);
+- all three migrations apply and (when `RESONANCE_SEED_DEMO=1`) the R7 demo seed loads (25 sessions);
 - the full #86 human-UI scenario passes — B clicks **Request intro**, A
   **Accept**s, A opens the channel and **Send**s, B reads the message;
 - after killing and restarting the process: users, sessions, the accepted
-  intro, the channel and the message all persist, the seed does not duplicate,
+  intro, the channel and the message all persist, a demo seed does not duplicate,
   and the discovery index rebuilds to `index_current: true`.
 
 Two fixes were required for PostgreSQL to work at all. The first landed on
@@ -61,7 +61,7 @@ that first real build, so nobody repeats them:
   `PGDATA=/var/lib/postgresql/data/pgdata`; `DATABASE_URL` points at the
   private host `postgres.railway.internal:5432`.
 - Health-check success is Railway's own probe of `/api/product/health`, i.e.
-  migrations applied and the seed loaded before traffic is routed.
+  migrations applied (and, only when requested, the demo seed loaded) before traffic is routed.
 - **Push auto-deploy is ON since 2026-09-04 16:30 UTC.** Until then it could
   not even be toggled (`canEnable: false, reason: NO_INSTALLATION`): the
   service was linked to `Parshkov/Resonance` by name only and the Railway

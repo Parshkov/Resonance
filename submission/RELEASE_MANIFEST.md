@@ -1,5 +1,15 @@
 # Resonance — release manifest
 
+> **Superseded (2026-09-04, engine 0.2 / PR #158):** everything below describes
+> engine 0.1 (`resonance-engine/0.1`, verifier hash `3e107bc4…`) and a
+> production that was seeded with 25 demo personas. Engine 0.2 changes scores,
+> classification, extraction and the retrieval ranking (ADR-0004), removes the
+> second remote MCP server, and stops seeding persistent databases by default.
+> A new release freeze is required: re-run the public-origin evidence on the
+> engine 0.2 deployment, run `purge-demo` on production, and re-pin the SHA,
+> deployment id and suite count here. The sections below are kept unchanged as
+> the historical record.
+
 > **Status update (2026-09-04, post-competition):** the sponsor confirmed the
 > competition entry was not registered, so the judging freeze below is
 > historical. Production has moved on; see **§0 Current production** first.
