@@ -239,7 +239,6 @@ class ProductHandler(BaseHTTPRequestHandler):
             html = (UI_DIR / "index.html").read_text(encoding="utf-8")
             injected = html.replace(
                 "</body>",
-                '  <script>window.RESONANCE_MODE = "live";</script>\n'
                 '  <script type="module" src="/webmcp.mjs"></script>\n'
                 '  <script type="module" src="/deeplink.mjs"></script>\n'
                 '  <script type="module" src="/session.mjs"></script>\n'

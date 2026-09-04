@@ -304,7 +304,10 @@ class ProductHttpTests(unittest.TestCase):
         request = Request(self.base + "/", headers={"Origin": self.origin})
         with urlopen(request, timeout=10) as response:
             html = response.read().decode("utf-8")
-        self.assertIn('window.RESONANCE_MODE = "live"', html)
+        # The former inline `window.RESONANCE_MODE` marker was refused by the
+        # page's own CSP (default-src 'self') and had no readers; live mode is
+        # now carried by live_shell.mjs as a body data attribute.
+        self.assertNotIn("<script>window.RESONANCE_MODE", html)
         self.assertIn('src="/webmcp.mjs"', html)
         self.assertIn('src="/deeplink.mjs"', html)
         self.assertIn('src="/session.mjs"', html)

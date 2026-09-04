@@ -30,8 +30,16 @@ function markLiveShell() {
   setText("source-note", "Live product · discovery runs on your authenticated session");
   const consent = document.getElementById("header-consent");
   if (consent) {
-    const label = consent.querySelector("span");
-    if (label) label.textContent = "Live product";
+    // The status pill holds an icon span plus the label span; replace the
+    // label wherever it sits rather than assuming it is first.
+    let replaced = false;
+    for (const span of consent.querySelectorAll("span")) {
+      if (/checking consent/i.test(span.textContent || "")) {
+        span.textContent = "Live product";
+        replaced = true;
+      }
+    }
+    if (!replaced) consent.textContent = "Live product";
   }
   // The replay/live source switch is an R9 demo affordance with no backend here.
   for (const button of document.querySelectorAll(".source-option")) {
