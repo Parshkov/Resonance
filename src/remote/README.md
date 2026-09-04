@@ -1,63 +1,63 @@
-# R15 — remote MCP: authenticated Streamable HTTP
+# R15 — remote MCP: authenticated Streamable HTTP over the live product
 
-One service layer, many transports: `ProductService` is the seam every
-transport converges on (authorization rules, per-subject rate limits, and the
-untrusted-input size cap live HERE, once). The remote endpoint, the accepted
-local stdio server, and any future WebMCP/UI call the same methods — no
-business or matching semantics in transport handlers, enforced by source-scan
-test exactly as in every accepted layer.
+One service layer, many transports. The remote endpoint is a thin adapter
+(`RemoteProductService`) over the accepted **`LiveProductService`** — the exact
+methods the human UI, browser WebMCP, and local stdio call. Authorization rules,
+per-subject rate limits, consent, and the untrusted-input caps live in the
+accepted layers, once; no business or matching semantics live in the transport
+(source-scan test).
 
 ```bash
-python3 -m src.remote.server --port 8899 --issue-test-token
+python3 -m src.remote.server --host 127.0.0.1 --port 8899   # /mcp
 ```
 
 ## Protocol (honest scope)
 
-MCP **2025-03-26 Streamable HTTP**: `POST /mcp` carries JSON-RPC; responses
-are always `application/json` (permitted by the spec in place of an SSE
-stream); sessions via `Mcp-Session-Id` issued at `initialize`. `GET /mcp`
-returns 405 — no server-initiated streaming in v0.1, stated rather than
-half-implemented.
+MCP **2025-03-26 Streamable HTTP**: `POST /mcp` carries JSON-RPC; responses are
+`application/json` (permitted in place of an SSE stream). Sessions via
+`Mcp-Session-Id` issued at `initialize` and **bound to the authenticating
+subject** — a bearer that resolves to a different subject cannot reuse a
+session. An unknown/expired session on a session-requiring request returns
+**HTTP 404** so the client re-initializes (sessions are in-memory; a redeploy
+invalidates them). `GET /mcp` returns 405 — no server-initiated streaming.
+The request body is bounded (413 over the cap); one bad `tools/call` never
+kills the server.
 
-## Authentication (two grades, declared)
+## Authentication (tied to the accepted identity model)
 
-- **Bearer tokens** — full-strength for pilot/integration use: opaque
-  random, constant-time compared, per-subject.
-- **OAuth 2.1 authorization-code + PKCE (S256 only)** — the flow shape agent
-  ecosystems require: `/oauth/authorize` binds a single-use, expiring code to
-  the challenge; `/oauth/token` verifies the verifier. **Demo-grade by
-  declaration:** static demo user, no consent UI, no refresh tokens,
-  in-memory stores. A compliance surface for client interop, not an IdP.
+The remote **bearer token IS the accepted R12 access token** — there is no
+separate token directory. `identity.authenticate(bearer)` resolves the subject,
+so remote MCP, WebMCP, the UI and stdio share one identity model and one set of
+authorization rules.
 
-## Rich results (maintainer scope update honored)
+- **OAuth 2.1 authorization-code + PKCE (S256 only):** `/oauth/authorize`
+  authenticates through R12 (`login` with a recovery secret, or a fresh guest)
+  and issues a single-use, expiring code bound to the `code_challenge`;
+  `/oauth/token` verifies the verifier and returns the R12 access token.
+  **Demo-grade by declaration:** no consent UI, no refresh tokens, no
+  `.well-known` discovery metadata, no dynamic client registration, in-memory
+  code store. Header-capable clients (bearer) work today; hosted connectors that
+  require OAuth discovery/redirect are a documented follow-up.
+- **Bearer** for local integration/tests: the R12 access token in
+  `Authorization: Bearer …`.
 
-`discover_resonance` returns the full R8 DTO three ways at once:
-`structuredContent` (versioned, machine-readable), a `text` JSON fallback,
-and an `EmbeddedResource` SVG map (`image/svg+xml`) drawn ONLY from consented
-match locations and aggregation buckets already present in the DTO — the
-visual can never see hidden users or influence ranking. Clients without
-image rendering still receive the complete structured/text payload.
+## Tools (15, over the live product)
 
-## Remote tool surface (v0.1) and per-client interop honesty
+`resonance_whoami`; `resonance_prepare_thought` (structured candidate **or**
+raw chat `context=…`) / `resonance_get_share_preview` /
+`resonance_share_thought` / `resonance_update_consent` (R12C);
+`resonance_discover` / `resonance_get_match` (R13B — `structuredContent` + an
+`EmbeddedResource` SVG map drawn only from consented data, never influencing
+rank); `resonance_request_intro` / `resonance_list_requests` /
+`resonance_respond_intro` / `resonance_send_message` / `resonance_read_messages`
+(R14); `resonance_create_workspace` / `resonance_get_workspace` /
+`resonance_list_workspaces` (R14B). Writes require `confirm`; reads carry
+`readOnlyHint`; any returned user text carries `untrustedContentHint`.
 
-Exposed: `ingest_thought`, `discover_resonance`, `compare_thoughts`,
-`get_thought`. **Not exposed remotely:** `index_thought`,
-`save_snapshot`/`load_snapshot` (shared-state writes and admin persistence
-wait for #89's authorization/retention semantics), `explain_resonance`
-(cache-coupled; use `compare_thoughts`). Calling them returns `-32601`.
+## Real external-chat ingestion
 
-Standard remote MCP support does **not** mean every client plan exposes every
-capability: expect `structuredContent` and embedded resources to render
-fully in MCP-native agent clients, text-only in minimal ones, and OAuth
-availability to vary by ecosystem plan; the text fallback carries the
-complete result everywhere. Verified in this repo: stdlib urllib client
-(tests) end-to-end including PKCE.
-
-## Security posture (subject to #89)
-
-Authenticated subject on every call; per-subject token-bucket rate limit
-(surfaced as a tool error, not a silent drop); UGC size-capped and never
-evaluated; sessions unguessable; write path absent remotely. #89's full
-threat-model gate (cross-user scoping over a durable store, retention,
-abuse) intentionally lands with R11/R12 — this transport adds no shared
-mutable state to protect yet.
+`resonance_prepare_thought(context=<selected conversation>)` is the canonical
+path for an external LLM client: raw chat text is privately extracted into
+Thought DNA (raw source not retained), previewed, explicitly shared, and
+discovered against another independently ingested user's chat — proven in
+`tests/test_remote_mcp.py` with no fixture as a query or match.

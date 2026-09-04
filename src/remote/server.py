@@ -323,6 +323,16 @@ class StreamableHTTPHandler(BaseHTTPRequestHandler):
         headers = {}
         if new_session and new_session != session_id:
             headers["Mcp-Session-Id"] = new_session
+        # MCP spec: an unknown/expired session on a session-requiring request is
+        # HTTP 404 so the client re-initializes (sessions are in-memory and a
+        # redeploy invalidates them). Subject-mismatch on a *known* session stays
+        # a JSON-RPC error over 200.
+        method = message.get("method")
+        needs_session = method not in ("initialize", "notifications/initialized")
+        if (needs_session and message.get("id") is not None
+                and session_id not in self.core.sessions):
+            self._send(404, reply, headers)
+            return
         self._send(202 if reply is None else 200, reply, headers)
 
     # -- OAuth 2.1 code + PKCE tied to the accepted R12 identity ----------

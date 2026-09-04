@@ -141,11 +141,14 @@ class RemoteMcpTests(unittest.TestCase):
         self.assertIn("error", reply)
         self.assertIn("different authenticated subject", reply["error"]["message"])
 
-    def test_unknown_session_and_get_405(self):
+    def test_unknown_session_is_404_and_get_405(self):
         c = self.client(); c.oauth_guest()
         c.session = "not-a-real-session"
-        status, reply = c.rpc("ping", mid=4)
-        self.assertIn("error", reply)
+        # MCP spec: unknown/expired session on a session-requiring request -> 404
+        # so the client re-initializes.
+        with self.assertRaises(HTTPError) as ctx:
+            c.rpc("ping", mid=4)
+        self.assertEqual(ctx.exception.code, 404)
         req = Request(self.base + "/mcp")
         with self.assertRaises(HTTPError) as ctx:
             urlopen(req, timeout=10)
