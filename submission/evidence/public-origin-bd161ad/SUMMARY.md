@@ -30,7 +30,7 @@ The smoke ran unmodified on this deployment. Step 1 (401 challenge / `WWW-Authen
 
 ## P5 notes (browser)
 
-- **Connectivity.** Run 1 (no proxy args) failed at `page.goto` with `net::ERR_CONNECTION_RESET`, same as the previous pass. Run 2 succeeded with the container HTTPS proxy passed as the Playwright `proxy.server` and `--ssl-version-max=tls1.2` added to Chromium args. Those are the only launch changes; they were applied through environment variables in `browser_harness_copy.py`, a copy of the harness committed here. The product harness file was not edited. The proxy address line in `browser_run2.txt` is redacted.
+- **Connectivity.** Run 1 (no proxy args) failed at `page.goto` with `net::ERR_CONNECTION_RESET`, same as the previous pass. Run 2 succeeded with the container HTTPS proxy passed as the Playwright `proxy.server` and `--ssl-version-max=tls1.2` added to Chromium args. Those are the only launch changes; they were applied through environment variables in `browser_harness_copy.py`, a copy of the harness committed here. The product harness file was not edited. No proxy address or credential appears in `browser_run2.txt`.
 - **Harness copy diff vs `submission/evidence/browser_harness.py`.** Two additions: (1) optional `CHROME_EXTRA_ARGS` / `CHROME_PROXY` env vars for the launch; (2) captures `#header-consent` on the plain-Chromium (no shim) first load as `native_header_consent` and prints it as an `[INFO]` line. Nothing else changed.
 - **LIVE discover after share.** `resonance_discover {source: live}` returned `source=live`, `result_id=result-d0375551e41bce2cbe8f7119`, and **13** entries in `matches_in_backend_order` (previous pass on the old deployment: 0). After clicking Live MCP, **4** match cards were visible (`cards=4`), screenshot `browser/browser_04_after_discover.png`. The sidebar in that screenshot reads "BACKEND ORDER PRESERVED · 04 shown" and a footer row "12 other backend results" (4 + 12 = 16 does not equal the 13 reported by the tool result; recorded as observed, not investigated).
 - **Header consent pill on first load in PLAIN Chromium (no shim).** `#header-consent` = **`Shared with Resonance`** and `#webmcp-status` = **`WebMCP · unavailable`** on a never-shared guest. This is unchanged from the previous pass. With the shim installed, the same first load shows `Private · not discoverable` and `WebMCP · private`, and after the explicit share it flips to `Shared with Resonance` / `WebMCP · LIVE shared`. So the misleading "Shared with Resonance" pill on a never-shared guest is specific to the WebMCP-unavailable path and is still present on bd161ad.
@@ -47,7 +47,7 @@ Nothing else deviated. All five verification phases passed.
 ## Redaction notes
 
 - `webmcp_discover_409.md`: guest `csrf_token` and `recovery_secret` values replaced with `<redacted>`.
-- `browser_run2.txt`: first line (container proxy address) replaced with a placeholder.
+- `browser_run2.txt`: contains no proxy address or credentials (checked).
 - `smoke.txt`: authorization code already redacted by the script; no bearer/refresh token values are printed.
 - `abc_public.json` / `abc_public.txt`: no token values present (the only "access_token" / "bearer" mentions are check names).
 - `browser/browser_harness.json`: no confirmation_token / access token values present.
