@@ -4,15 +4,19 @@
 >
 > STATUS: staging draft. Every shot marked `[RELEASE CHECK]` must be replaced/verified against the frozen hosted product. Do not fake unavailable features. Real WebMCP invocation must be visibly demonstrated.
 
-## 0:00–0:15 — The question
+> **Judging-guidance ordering:** the working hosted product must be visible in the first 10–15 seconds, the recording starts **already signed in** on the live URL, and a **real** `document.modelContext` WebMCP invocation is shown on screen (DevTools WebMCP panel or the page's tool-status indicator visibly updating). Hard max 2:59.
 
-**Visual:** clean live Resonance page; active user/agent conversation.
+## 0:00–0:15 — Working product + live WebMCP invocation (the hook)
+
+**Visual:** open on the **live** hosted page (`https://resonance-production-cfe3.up.railway.app`), already signed in, product UI fully rendered (map + match cards, not a loading state). Immediately trigger a real browser WebMCP call — `resonance_discover` from the agent surface — and show the tool firing (WebMCP status indicator / DevTools WebMCP panel) and the map/cards updating in the same shot.
 
 **Narration:**
 
-> Search can find similar words. Resonance tries to find something deeper: when two people are using the same underlying reasoning structure, even if they are talking about completely different things.
+> This is Resonance, running live. My agent is calling it through native WebMCP — right here in the browser — and the page updates with people whose ideas share the *structure* of mine, not just the words.
 
 On-screen line: **Context tells you where an idea lives. Structure tells you how it works.**
+
+`[RELEASE CHECK: this opening MUST be the real hosted product and a real WebMCP invocation — no mock, no localhost, no manual DOM edit.]`
 
 ## 0:15–0:38 — Private thought → explicit share
 

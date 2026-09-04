@@ -31,7 +31,23 @@ Canonical product flow for the submitted release:
 9. In the complete product release, a user can request an introduction; the other person must explicitly accept before private collaboration begins.
 10. Accepted connections can continue in a private multi-person idea workspace with notes, tasks, messages, and artifacts. Authorized agents act only within their user's permissions.
 
-**Frozen release status:** TBD — list only the gates actually accepted in the release candidate.
+**Accepted gates as of this packaging pass** (each independently reviewed and merged to `main`; verify against the frozen SHA before submit):
+
+| gate | what it adds | status |
+| --- | --- | --- |
+| R10 WebMCP compliance | six browser-native `document.modelContext` tools | accepted |
+| R11 persistence | durable multi-user store (PostgreSQL/SQLite) | accepted |
+| R12 identity/consent | pseudonymous accounts, per-session consent | accepted |
+| R12B security | one authorization kernel, CSRF/rate/audit | accepted |
+| R12C ingestion | private prepare → preview → explicit share | accepted |
+| R13 live product | authenticated DB-backed discovery + map | accepted |
+| R13B rich results | structured result + consent-safe visuals | accepted |
+| R14 collaboration | intro state machine + private relay messaging | accepted |
+| R14B workspaces | multi-person idea rooms, roles, shared work | accepted |
+| R16 deployment | hosted HTTPS on Railway + PostgreSQL | live at the URL above |
+| R15 remote MCP | authenticated remote MCP for external agents | **submitted (PR #128), pending review — do not claim as live until accepted** |
+
+The competition demo and write-up should describe only the accepted/live gates; R15 remote-MCP is presented as a submitted extension, not a live judged feature, unless it is accepted and deployed before freeze.
 
 ## Why WebMCP matters
 
