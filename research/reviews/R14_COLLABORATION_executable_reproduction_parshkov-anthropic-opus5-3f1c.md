@@ -1318,3 +1318,275 @@ the shipped modules, drive the committed browser code, and modify no
 production file. The single reviewer-side patch, applied only in
 `pg_reverify.py`, is the F3 comment-stripping loader fix, and it is disclosed
 in that probe's own output.
+
+---
+
+# Addendum 2 — verified patches, and why B1a is a pre-existing R13 defect
+
+Written after the maintainer's `REVIEW_INPUT_DELTA` made closure
+`B1+B2+B3+N1+N2`, and after PR #118 (this artifact's first two sections) was
+merged as `d2f0d24`. With the Devpost deadline at Sep 4 01:00 PT, the useful
+contribution stopped being "report" and became "hand over something that runs".
+
+Everything below was applied to a worktree at `3397e96`, executed, and checked
+both ways: each patch fails its regression when reverted and passes with it.
+The author's 11 collaboration tests stay green with all three applied. Nothing
+was pushed to PR #116.
+
+## The live product page never boots for a human (pre-existing, not R14's)
+
+While trying to demonstrate a fix for B1a I could not get the control to render,
+and the reason turned out to be underneath R14 entirely.
+
+Loading `/` from `src/product/server.py` in headless Chromium leaves the page on
+its placeholders forever — `"Checking consent"`, `"Loading accepted context…"`,
+`"Preparing the shared Thought DNA."`, `match cards in DOM: 0` — with two
+independent causes:
+
+1. **`/api/config` and `/api/context` 404 on the live server.** `app.mjs`
+   `boot()` fetches both and throws `"Presentation context is unavailable"` if
+   either is not ok, so `renderContext`, the source buttons and `loadSource`
+   never run. Those routes exist only in the R9 demo server
+   (`demo/ui/server.py:206`).
+2. **The live server's CSP refuses the live-mode marker it injects itself.**
+   `src/product/server.py:111-112` sends `default-src 'self'; frame-ancestors
+   'none'` with no inline allowance, while line 223 injects
+   `<script>window.RESONANCE_MODE = "live";</script>`. Chromium logs *Refused to
+   execute inline script…* and `window.RESONANCE_MODE` evaluates to **`null`**
+   on the live origin.
+
+`test_ui_is_served_with_live_injection` asserts the string
+`window.RESONANCE_MODE = "live"` appears in the served HTML. It does; it just
+never executes. That is the **third** instance in this review of a
+served-source assertion standing in for a behavioural one — the same shape as
+B1's `assertIn("Request intro", ui)` and B2's page-global assumption.
+
+**Attribution.** Verified on accepted `main` @ `d2f0d24` (R13 + R13B merged),
+with no R14 code involved: same two 404s, same CSP refusal,
+`window.RESONANCE_MODE` null, zero match cards. This is an **R13
+page-integration defect**, reported separately on #88, and explicitly not
+charged to R14.
+
+**Consequence for B1a.** R14's "Request intro" control attaches to
+`.match-card[data-session-id]`, so:
+
+- on the **live server** the collaboration modules load but no cards exist;
+- on the **R9 demo server** cards exist but that server injects none of
+  `session.mjs` / `collab.mjs` / `collab_ui.mjs`, so there is no panel at all.
+
+`.collab-request-btn` therefore cannot render anywhere, on any head, with or
+without the `querySession` fix. The candidate patch below is still the right
+change — it removes a guard that can never pass — but it cannot be *demonstrated*
+until the page boots.
+
+Against #88's matrix this independently sinks item 7 (human UI shows the same
+result and map/cards), item 32 (judge flow from the public URL) and item 36
+(independent reviewer completes the flow from repo + URL). Suggested fixes are on
+#88: route the presentation context from the live server, and carry live mode in
+a `data-` attribute rather than an inline script under a strict CSP.
+
+## Patch 1 — N2, author-bound message idempotency
+
+```diff
+--- a/src/collaboration/service.py
++++ b/src/collaboration/service.py
+@@
++        # The author is part of the idempotency identity: a request_id chosen by
++        # another participant's agent must not replay their message as ours.
+         key = _sha_key("collab.message.send", request_id,
+-                       {"channel_id": channel_id, "body": body})
++                       {"author": actor.user_id,
++                        "channel_id": channel_id, "body": body})
+```
+
+Execution corrected my first assumption here, which is worth recording. I
+expected both messages to persist; they do not, because `idempotency_keys` is
+**global** on `request_id` (accepted R11/R12C design). What the patch actually
+does is convert silent data loss into a visible
+`PersistenceConflictError: request_id 'msg-1' was already used for a different
+request`. That is precisely the maintainer's bar — "fails closed or remains
+correctly subject-scoped" — and it is R14-sized. Making both messages persist
+requires namespacing the idempotency keyspace per subject, an R11-level change
+that should not be attempted under deadline.
+
+Same-author replay remains idempotent (one row, same `message_id`) — verified.
+
+## Patch 2 — F4, re-bootstrap once on a rejected CSRF proof
+
+```diff
+--- a/demo/ui/session.mjs
++++ b/demo/ui/session.mjs
+-async function apiFetch(method, path, body) {
++async function sendOnce(method, path, body) {
+   const csrf = await ensureSession();
+   ...
+   const payload = await response.json().catch(() => ({}));
++  return {response, payload};
++}
++
++async function apiFetch(method, path, body) {
++  let {response, payload} = await sendOnce(method, path, body);
++  if (response.status === 403 && payload.error === "csrf_rejected") {
++    // Another tab rotated this subject's session, so the token cached for THIS
++    // tab is stale. Drop it, re-bootstrap once, and retry before failing.
++    try { sessionStorage.removeItem(CSRF_KEY); } catch { /* private mode */ }
++    window.__resonance_csrf = null;
++    bootstrapPromise = null;
++    ({response, payload} = await sendOnce(method, path, body));
++  }
+   if (!response.ok) {
+```
+
+Two-tab browser test, same script as the F4 finding: tab 1's write after tab 2
+bootstraps goes from `Error: csrf_rejected: invalid CSRF proof` on both attempts
+to **`OK`** on both. The tab self-heals instead of being silently write-dead.
+
+## Patch 3 — B1a candidate (correct, not yet demonstrable)
+
+Replaces a guard on a global nothing assigns with the viewer's own session,
+resolved from the authenticated owned-sessions surface. The server already
+enforces requester ownership via `consent_for()`, so this matches the existing
+authorization model rather than widening it.
+
+```diff
+--- a/demo/ui/collab_ui.mjs
++++ b/demo/ui/collab_ui.mjs
++let ownSessionPromise = null;
++
++async function ownQuerySession() {
++  const explicit = document.body.dataset.querySession || window.__query_session;
++  if (explicit) return explicit;
++  if (!ownSessionPromise) {
++    ownSessionPromise = apiFetch("GET", "/api/product/sessions")
++      .then((data) => (data.sessions || [])[0]?.session_id || null)
++      .catch(() => null);
++  }
++  return ownSessionPromise;
++}
++
+ function attachMatchCardButtons() {
+   for (const card of document.querySelectorAll(".match-card[data-session-id]")) {
+     if (card.querySelector(".collab-request-btn")) continue;
+     const target = card.dataset.sessionId;
+-    const fromSession = document.body.dataset.querySession || window.__query_session;
+-    if (!fromSession) continue;
+     ...
+-      try { await requestIntro(fromSession, target, message); }
+-      catch (error) { showError(error.message); }
++      try {
++        const fromSession = await ownQuerySession();
++        if (!fromSession) {
++          showError("Share one of your own ideas first to request an intro.");
++          return;
++        }
++        await requestIntro(fromSession, target, message);
++      } catch (error) { showError(error.message); }
+```
+
+Labelled honestly: **not verified end-to-end**, because no match card exists on
+the live origin to attach to. It should be landed together with the #88 page fix
+and a DOM regression asserting a rendered `.collab-request-btn`.
+
+## Regression module handed to the canonical author
+
+`tests/test_r14_reviewer_regressions.py` — 3 tests, ~20 s, passes with Patches 1
+and 2 applied; the collision test fails at its assertion with Patch 1 reverted.
+
+```python
+"""Reviewer regressions for the two open R14 blockers (N2 and the F4 class)."""
+
+from __future__ import annotations
+
+import unittest
+
+from tests.test_collaboration import request as make_request, two_user_world
+
+
+class MessageIdempotencyIsAuthorScoped(unittest.TestCase):
+    def setUp(self):
+        (self.live, self.identity, self.product, self.alice, self.a_session,
+         self.bob, self.b_session) = two_user_world()
+        intro = make_request(self.product, self.bob, self.b_session, self.a_session)
+        accepted = self.product.respond_intro(
+            self.alice.access_token, intro["intro_id"], accept=True,
+            request_id="acc", confirmed=True)
+        self.channel = accepted["channel_id"]
+
+    def test_cross_author_request_id_collision_fails_closed(self):
+        from src.persistence.errors import PersistenceConflictError
+        bob_msg = self.product.send_message(
+            self.bob.access_token, self.channel, "hello",
+            request_id="msg-1", confirmed=True)
+        with self.assertRaises(PersistenceConflictError):
+            self.product.send_message(
+                self.alice.access_token, self.channel, "hello",
+                request_id="msg-1", confirmed=True)
+        thread = self.product.read_messages(self.alice.access_token,
+                                            self.channel)["messages"]
+        self.assertEqual([m["message_id"] for m in thread], [bob_msg["message_id"]])
+        self.assertEqual([m["author"] for m in thread], ["counterpart"],
+                         "Alice must not see a message attributed to herself "
+                         "that she never sent")
+
+    def test_same_author_replay_is_still_idempotent(self):
+        first = self.product.send_message(
+            self.bob.access_token, self.channel, "same text",
+            request_id="msg-2", confirmed=True)
+        replay = self.product.send_message(
+            self.bob.access_token, self.channel, "same text",
+            request_id="msg-2", confirmed=True)
+        self.assertEqual(first["message_id"], replay["message_id"])
+        thread = self.product.read_messages(self.bob.access_token,
+                                            self.channel)["messages"]
+        self.assertEqual(len(thread), 1, f"replay must not duplicate: {thread}")
+
+
+class RotationDoesNotStrandAnotherClient(unittest.TestCase):
+    def test_rotation_revokes_the_previous_token_and_issues_a_usable_one(self):
+        live, identity, product, alice, a_session, bob, b_session = two_user_world()
+        rotated = product.rotate_session(alice.access_token)
+        self.assertNotEqual(rotated.access_token, alice.access_token)
+        self.assertNotEqual(rotated.csrf_token, alice.csrf_token)
+        from src.identity.models import AuthenticationError
+        with self.assertRaises(AuthenticationError):
+            product.list_requests(alice.access_token)
+        self.assertEqual(product.list_requests(rotated.access_token),
+                         {"incoming": [], "outgoing": []})
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+## Appendix E — live-page probes
+
+`live_page_probe.py` (live server) and `main_page_probe.py` (accepted `main`)
+both: start the product server, open `/` in headless Chromium, and record failed
+requests, console messages, `window.RESONANCE_MODE`, `.match-card` count and the
+first lines of visible text. The `main` variant deliberately touches only
+pre-R14 surfaces so its result is attributable to R13/R13B.
+
+Observed on `3397e96`:
+
+```json
+{"failed_requests": ["404 /api/config", "404 /api/context",
+                     "401 /api/product/rotate", "403 /api/webmcp/discover?source=live"],
+ "match_cards": 0, "match_cards_after_discover": 0,
+ "request_buttons_after_discover": 0,
+ "visible_headline": ["Resonance", "VISUAL DISCOVERY · R9", "Checking consent",
+                      "Collab · WebMCP unavailable", "ACTIVE THOUGHT",
+                      "Loading accepted context…", "Preparing the shared Thought DNA."]}
+```
+
+Observed on accepted `main` @ `d2f0d24`:
+
+```json
+{"failed_requests": ["404 /api/config", "404 /api/context"],
+ "csp_blocked_inline": true, "resonance_mode_set": null, "match_cards": 0,
+ "visible_text": ["Resonance", "VISUAL DISCOVERY · R9", "Checking consent",
+                  "ACTIVE THOUGHT", "Loading accepted context…",
+                  "Preparing the shared Thought DNA."]}
+```
+
+The `main` run is the attribution evidence: identical failure with no R14 code
+present.
