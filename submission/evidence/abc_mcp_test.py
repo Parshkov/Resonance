@@ -20,6 +20,12 @@ through a result_id it does not own... (subject isolation), unknown Mcp-Session-
 Output is privacy-safe: pseudonymous ids, session/result ids, scores, relation mappings,
 state transitions. No tokens, no codes, no raw text beyond short noun-phrase labels.
 stdlib only; reuses ops/oauth_smoke.Smoke for discovery-driven OAuth onboarding.
+
+Corpus hygiene: the three identities share REAL `volunteer` thoughts through the
+real consent flow, so `purge-demo` neither can nor should remove them. The run
+therefore revokes its own guests before exiting (also on failure), and asserts
+that no identity is left owning a discoverable session. Earlier revisions did not,
+which is why the live corpus accumulated duplicated guest rows.
 """
 from __future__ import annotations
 
@@ -185,6 +191,83 @@ def main() -> int:
         return bool(cond)
 
     ids = {n: Identity(n, resource) for n in ("A", "B", "C")}
+    shared: dict[str, dict] = {}
+    try:
+        scenario(resource, ids, shared, ev, ok)
+    except Exception as exc:  # noqa: BLE001 - still write evidence and still clean up
+        ok("scenario completed without an unhandled exception", False, f"{type(exc).__name__}: {exc}"[:300])
+    finally:
+        # even on an early failure the run must not leave a discoverable guest
+        # behind; the corpus is live and shared thoughts are real volunteer rows
+        try:
+            revoke_guests(ids, shared, ev, ok)
+        except Exception as exc:  # noqa: BLE001
+            ev.setdefault("cleanup", {})["error"] = str(exc)[:200]
+
+    ev["checks"] = [{"step": s, "ok": o, "detail": d} for s, o, d in checks]
+    ev["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    failed = [c for c in checks if not c[1]]
+    ev["summary"] = f"{len(checks) - len(failed)}/{len(checks)} checks passed"
+    print("\n" + ev["summary"] + (f"; FAILED: {', '.join(c[0] for c in failed)}" if failed else ""))
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(ev, indent=2)
+        for secret in {i.smoke.access_token for i in ids.values()} | {i.smoke.refresh_token for i in ids.values()}:
+            if secret:
+                assert secret not in text, "token leaked into evidence"
+        Path(args.out).write_text(text + "\n")
+    return 1 if failed else 0
+
+
+def revoke_guests(ids: dict, shared: dict, ev: dict, ok=None) -> dict:
+    """Leave no discoverable guest behind.
+
+    Every identity this script onboards shares a real `volunteer` thought through
+    the real consent flow, so `purge-demo` cannot and must not remove it. The run
+    therefore revokes its own guests before it exits; otherwise each acceptance
+    run permanently adds another duplicate to the live corpus. Idempotent: a
+    session already revoked earlier in the scenario is reported as `already`.
+    """
+    if "cleanup" in ev:
+        return ev["cleanup"]
+    rows = []
+    for name in sorted(shared):
+        session_id = (shared.get(name) or {}).get("session_id")
+        ident = ids.get(name)
+        if not session_id or ident is None:
+            continue
+        row = {"identity": name, "session_id": session_id}
+        if (shared.get(name) or {}).get("revoked"):
+            row["revoked"] = True
+            row["already"] = True          # revoked earlier by the scenario itself
+            rows.append(row)
+            continue
+        try:
+            res = ident.call("resonance_stop_sharing", {"session_id": session_id, "confirm": True})
+            row["revoked"] = res.get("revoked") is True or res.get("discoverable") is False
+            row["discoverable"] = res.get("discoverable")
+        except Exception as exc:  # noqa: BLE001 - cleanup must never mask the run's verdict
+            row["revoked"] = False
+            row["error"] = str(exc)[:200]
+        rows.append(row)
+    # the corpus is clean only if no identity still owns a discoverable session
+    still = []
+    for name, ident in ids.items():
+        try:
+            mine = ident.call("resonance_my_thoughts", {})
+        except Exception:  # noqa: BLE001
+            continue
+        still += [s.get("session_id") for s in mine.get("sessions", [])
+                  if s.get("shared") or s.get("discoverable")]
+    ev["cleanup"] = {"revoked": rows, "still_discoverable": still}
+    if ok is not None:
+        ok("cleanup: this run leaves no discoverable guest session behind",
+           all(r.get("revoked") for r in rows) and not still,
+           f"revoked={[r['session_id'] for r in rows if r.get('revoked')]} still_discoverable={still}")
+    return ev["cleanup"]
+
+
+def scenario(resource: str, ids: dict, shared: dict, ev: dict, ok) -> None:
     for n, ident in ids.items():
         ident.onboard()
         ok(f"{n} onboarded via OAuth (guest) + MCP initialize + whoami", bool(ident.user_id),
@@ -192,7 +275,6 @@ def main() -> int:
     ok("three independent identities", len({i.user_id for i in ids.values()}) == 3)
     ev["identities"] = {n: {"user_id": i.user_id} for n, i in ids.items()}
 
-    shared: dict[str, dict] = {}
     for n, ident in ids.items():
         prep = ident.call("resonance_prepare_thought", {"thought": THOUGHTS[n]})
         ok(f"{n} prepare -> private draft (discoverable=false)", prep.get("discoverable") is False and prep.get("confirmation_token"),
@@ -293,6 +375,7 @@ def main() -> int:
     # revoke
     rv = a.call("resonance_stop_sharing", {"session_id": shared["A"]["session_id"], "confirm": True})
     ok("A stop_sharing -> revoked", rv.get("revoked") is True and rv.get("discoverable") is False)
+    shared["A"]["revoked"] = rv.get("revoked") is True
     disc2 = b.call("resonance_discover", {"session_id": shared["B"]["session_id"], "k": 15})
     sids2 = [m.get("session_id") for m in disc2.get("matches_in_backend_order", [])]
     ok("fresh discovery: revoked A is absent immediately", shared["A"]["session_id"] not in sids2,
@@ -324,6 +407,9 @@ def main() -> int:
         data=json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}).encode(),
         headers={"Content-Type": "application/json"})
     ok("access_token in query string does NOT authenticate", status == 401, f"status={status}")
+    # Corpus hygiene: revoke this run's own guests before B's bearer is killed below.
+    revoke_guests(ids, shared, ev, ok)
+
     # revoke B's access token via RFC 7009, then bearer must fail
     _, _, asm = b.smoke._json(resource.rsplit("/", 1)[0] + "/.well-known/oauth-authorization-server")
     rev = asm.get("revocation_endpoint")
@@ -334,19 +420,6 @@ def main() -> int:
         st2, _, _ = b.rpc("tools/list")
         ok("revoked access token stops working on /mcp", st == 200 and st2 == 401, f"revoke={st} then /mcp={st2}")
 
-    ev["checks"] = [{"step": s, "ok": o, "detail": d} for s, o, d in checks]
-    ev["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    failed = [c for c in checks if not c[1]]
-    ev["summary"] = f"{len(checks) - len(failed)}/{len(checks)} checks passed"
-    print("\n" + ev["summary"] + (f"; FAILED: {', '.join(c[0] for c in failed)}" if failed else ""))
-    if args.out:
-        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-        text = json.dumps(ev, indent=2)
-        for secret in {i.smoke.access_token for i in ids.values()} | {i.smoke.refresh_token for i in ids.values()}:
-            if secret:
-                assert secret not in text, "token leaked into evidence"
-        Path(args.out).write_text(text + "\n")
-    return 1 if failed else 0
 
 
 if __name__ == "__main__":
