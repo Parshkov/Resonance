@@ -162,6 +162,55 @@ curl -s -X POST "$ORIGIN/api/product/guest" -H 'Content-Type: application/json' 
 
 Then open `$ORIGIN/` in Chrome and run the judge flow from `HACKATHON.md`.
 
+## Canonical MCP OAuth on the production origin (R15C, #136)
+
+A hosted MCP client (Claude, ChatGPT, Cursor…) that is given only
+`https://<origin>/mcp` must be able to authorize through the browser — no
+manual MCP key, bearer, capability URL or custom header in the normal path.
+Production wiring for that lives in `src/product/oauth_mount.py`; the protocol
+core itself is `src/remote/**` (R15A, #134) and is attached to the runtime as
+`runtime.oauth_core`.
+
+What the origin serves once the core is attached:
+
+| path | purpose |
+| --- | --- |
+| `POST /mcp` without a valid bearer | `401` + `WWW-Authenticate: Bearer realm="resonance", resource_metadata="<issuer>/.well-known/oauth-protected-resource"` (RFC 9728) |
+| `GET /.well-known/oauth-protected-resource` | resource = `<issuer>/mcp`, `authorization_servers` = `[<issuer>]` |
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata: authorize / token / register / revoke endpoints, `S256`, grant types |
+| `GET /oauth/authorize` | browser consent page (login or continue as guest, explicit consent), PKCE + `state` + `redirect_uri` validated before any redirect |
+| `POST /oauth/authorize` | same-site form submit → `302` to the exact `redirect_uri` with `code` + `state` |
+| `POST /oauth/token`, `/oauth/register`, `/oauth/revoke` | token exchange / refresh, RFC 7591 client registration, revocation |
+
+Issuer: the process only ever sees plain HTTP behind the platform proxy, so the
+absolute issuer is `PUBLIC_ORIGIN` (the single `https://` allowed origin); the
+fallbacks are `X-Forwarded-Proto`/`X-Forwarded-Host` (Railway always sets both)
+and then `Host`. Nothing in the OAuth core reads `Host` itself. The identity
+cookie stays `SameSite=Strict`: the cross-site arrival at `GET /oauth/authorize`
+carries no cookie, the consent form's own POST does, so the grant binds to the
+browser account the person already uses on the site when one exists.
+
+Smoke from any machine that can reach the origin (never prints tokens):
+
+```bash
+python3 ops/oauth_smoke.py https://<origin>/mcp          # human pastes the callback URL
+python3 ops/oauth_smoke.py http://127.0.0.1:8788/mcp --auto-consent   # local
+```
+
+Human test card (starts with the `/mcp` URL only, no secret ever typed):
+
+1. In your MCP client add a remote server with URL `https://<origin>/mcp` and no credentials.
+2. The client discovers the authorization requirement by itself (no error about a missing key).
+3. Your browser opens the Resonance authorization page on `https://<origin>/oauth/authorize…`.
+4. Sign in with your recovery secret, or continue as guest.
+5. Read the consent screen and approve.
+6. The browser returns you to the client; the client reports Resonance as connected.
+7. The client lists Resonance tools (12 `resonance_*` tools).
+8. Ask the assistant to call `resonance_whoami`: it returns your pseudonymous `user_id` and display label.
+
+The manual MCP key path (Collaboration panel → **Create MCP key**, or
+`/mcp/<key>`) remains available as a debug fallback only.
+
 ## Known limits at the time of writing
 
 - The R9 visual discovery view (map, match cards) does not initialise on the
