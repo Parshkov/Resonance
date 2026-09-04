@@ -819,6 +819,8 @@ def main(argv: list[str] | None = None) -> None:
     runtime = build_runtime(args.db, allowed_origins=origins,
                             confirmation_secret=secret,
                             seed=not args.no_seed)
+    # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
+    oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
     server = serve(args.host, args.port, runtime=runtime)
     # Never echo credentials: a PostgreSQL DSN carries the password, and this
     # line lands in platform logs (privacy-safe logs are an R16 gate).

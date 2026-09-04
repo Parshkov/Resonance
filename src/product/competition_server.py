@@ -34,6 +34,7 @@ from src.ingestion.identity import (
 )
 from src.ingestion.service import ShareIntent
 from src.persistence.errors import PersistenceConflictError
+from src.product import oauth_mount
 from src.product.server import (
     DEFAULT_HOST,
     DEFAULT_PORT,
@@ -534,6 +535,8 @@ def main(argv: list[str] | None = None) -> None:
     runtime = build_runtime(args.db, allowed_origins=origins,
                             confirmation_secret=secret,
                             seed=not args.no_seed)
+    # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
+    oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
     server = serve(args.host, args.port, runtime=runtime)
     print(f"competition product on http://{args.host}:{args.port} "
           f"(origins: {sorted(origins)}; db: {_redact_db(args.db)}; mode: LIVE+WebMCP)")

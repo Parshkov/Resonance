@@ -107,6 +107,26 @@ def resolve_bearer(core: Any, token: str | None, *, issuer: str) -> str | None:
     return core.resolve_bearer(token, resource=resource_url(issuer))
 
 
+def attach_core(runtime: Any, *, issuer: str) -> Any | None:
+    """Attach the R15A OAuth core to the runtime at process start.
+
+    Zero-config: the core module is imported lazily; when it is absent (or
+    exposes a different factory) production keeps running without the OAuth
+    paths (404) and `/mcp` unchanged, and the reason is printed once — never a
+    token, never a secret.
+    """
+    try:
+        from src.remote.oauth_core import build_oauth_core  # R15A-owned (#134)
+    except ImportError as exc:
+        print(f"oauth: core not attached ({exc.__class__.__name__}: {exc}); "
+              f"/mcp keeps bearer-only access")
+        return None
+    core = build_oauth_core(runtime, issuer=issuer)
+    runtime.oauth_core = core
+    print(f"oauth: core attached; issuer {issuer}; resource {resource_url(issuer)}")
+    return core
+
+
 def split_origin(url: str) -> tuple[str, str]:
     parts = urlsplit(url)
     return parts.scheme, parts.netloc
