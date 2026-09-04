@@ -222,6 +222,7 @@ Nothing below is claimed as done. Each item names who has to do it.
 
 **Engineering, not blocking this freeze**
 
-- R9 presentation: when every live match is `negative` the page shows a match count with an empty primary rail and keeps stale REPLAY evidence. It needs an explicit empty state and a summary consistent with what is rendered.
+- ~~R9 presentation: when every live match is `negative` the page shows a match count with an empty primary rail and keeps stale REPLAY evidence.~~ **Fixed and deployed** (#167, `b6b43c5`): the empty case is now its own state with honest counts and an explanation, and an error clears every surface a rendered result owns. Verified against the live origin with `submission/evidence/r9_empty_state_harness.py`: 16/16 — evidence in `submission/evidence/public-origin-b6b43c5/`.
+  - Left open, small: `submission/evidence/browser_harness.py` still asserts `cards > 0` after a LIVE discover. That is now an imprecise expectation rather than a defect — the correct assertion is `cards > 0` **iff** the payload holds at least one discoverable non-`negative` match. Until the assertion is made precise (or the live corpus holds a resonance for the page's own thought), Card A reports 16/18 with that check red for a correct product state. Not changed here so that no acceptance assertion is relaxed inside a freeze.
 - Corpus scale replay at 10^4–10^5 graphs.
 - Card D (two real people, one recorded run).

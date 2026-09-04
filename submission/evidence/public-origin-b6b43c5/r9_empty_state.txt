@@ -1,0 +1,18 @@
+[PASS] baseline REPLAY renders match cards — cards=4
+[PASS] baseline populates evidence and drawer — summary='10 matches · 5 rejected' kicker='WHY KWAME A. RESONATES'
+[PASS] an empty result is its own state, not an error — data-state='empty'
+[PASS] no match cards are shown — cards=0
+[PASS] the summary no longer claims matches that are not shown — summary='10 returned · 0 resonances · 5 rejected' (was '10 matches · 5 rejected')
+[PASS] the evidence panel drops the previous source's identity — kicker='NO RESONANCE IN THIS CORPUS' (was 'WHY KWAME A. RESONATES')
+[PASS] stale mapping rows are gone — mapping_rows=0
+[PASS] stale relation chips are gone — chips=0
+[PASS] the returned-but-refused candidates stay inspectable — drawer_rows=15
+[PASS] the map reports zero resonances — map_status='0 resonances · every returned candidate was refused'
+[PASS] the heading says why nothing is shown — heading='Nothing cleared the resonance bar'
+[PASS] replay renders again after the empty state — cards=4
+[PASS] a failure is reported as an error — data-state='error'
+[PASS] the error state leaves no result data from the previous source — {"cards": 0, "mappings": 0, "chips": 0, "drawer": 0, "markers": 0, "connections": 0, "summary": "\u2014", "kicker": "Evidence", "contradictionHidden": true}
+[PASS] no uncaught JavaScript exceptions
+[PASS] no unexpected console errors
+
+16/16 checks passed
