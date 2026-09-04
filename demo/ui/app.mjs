@@ -5,6 +5,7 @@ const CANONICAL_K = 15;
 const PRIMARY_CLASSIFICATION = "analogical";
 const NEGATIVE_CLASSIFICATION = "negative";
 const PRIMARY_LIMIT = 4;
+const SHARE_REQUIRED = "share_required";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const state = {
@@ -520,7 +521,10 @@ function renderDiscovery(payload) {
   button.title = snapshot;
   setText("source-note", state.source === "live"
     ? "LIVE · accepted discover_resonance MCP path · analogical / k=15"
-    : "REPLAY · genuine accepted R8 fixture · analogical / k=15");
+    // Say what the replay cards are. They are a genuine accepted capture of an
+    // engine response, but the people in them are fixture personas, and a
+    // visitor must never mistake them for participants in the live corpus.
+    : "REPLAY · accepted R8 fixture · example personas, not real participants · analogical / k=15");
   setText("runtime-badge", state.source === "live" ? "Accepted MCP · local" : "Deterministic · offline");
   document.getElementById("app-shell").dataset.state = "ready";
 }
@@ -535,6 +539,45 @@ function setSourceControls(source, loading = false) {
   });
   document.getElementById("map-status").classList.toggle("is-loading", loading);
   if (loading) setText("map-status-text", source === "live" ? "Calling accepted discovery MCP…" : "Loading accepted replay fixture…");
+}
+
+// The visitor's own panel, emptied. `clearResults()` owns the discovery
+// surfaces; this owns the "Active thought" column, which is the surface that
+// used to show the fixture thought to somebody who had shared nothing.
+function clearActiveThought() {
+  state.context = null;
+  setText("thought-id", "No thought shared yet");
+  const title = document.getElementById("thought-heading");
+  title.replaceChildren(document.createTextNode("Nothing shared with Resonance"));
+  setText("thought-caption", "Resonance holds no thought for this visitor.");
+  setText("user-message", "You have not shared a thought yet.");
+  setText("agent-message",
+    "Nothing about you is discoverable, and nothing is compared. Share a thought "
+    + "explicitly and this panel will show exactly what became discoverable.");
+  document.getElementById("dna-chain")?.replaceChildren();
+  document.getElementById("declared-context")?.replaceChildren();
+  setText("request-mode", CANONICAL_MODE);
+  setText("request-k", `k=${CANONICAL_K}`);
+}
+
+// A visitor who has shared nothing is the product's normal starting state, not
+// an error and not a reason to show invented people. It gets its own state.
+function renderUnshared() {
+  clearResults();
+  clearActiveThought();
+  setText("response-summary", "Nothing shared · nothing discovered");
+  setText("map-status-text", "Nothing shared yet · no discovery was run");
+  setText("evidence-kicker", "Nothing shared yet");
+  setText("evidence-heading", "Share a thought to see who resonates");
+  setText("evidence-subtitle",
+    "Resonance compares the causal structure of a thought you have explicitly "
+    + "shared. Until you share one there is nothing to compare, so nothing is "
+    + "shown. Connect an agent to this page or to the Resonance MCP connector, "
+    + "prepare a thought, read the preview, and confirm the share.");
+  setText("source-note", "LIVE · nothing shared by this visitor · no discovery was run");
+  setText("runtime-badge", "Live · nothing shared");
+  document.getElementById("app-shell").dataset.state = "unshared";
+  setSourceControls(state.source, false);
 }
 
 function showError(error) {
@@ -562,6 +605,10 @@ async function loadSource(source) {
       fetch(`/api/context?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
     ]);
     const payload = await response.json();
+    if (response.status === 409 && payload?.error === SHARE_REQUIRED) {
+      renderUnshared();
+      return;
+    }
     if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
     assertAcceptedDiscovery(payload);
     // The active-thought panel follows the source: the visitor's own shared
@@ -616,12 +663,19 @@ async function boot() {
       fetch("/api/config", {cache: "no-store"}),
       fetch("/api/context", {cache: "no-store"}),
     ]);
-    if (!configResponse.ok || !contextResponse.ok) throw new Error("Presentation context is unavailable");
+    if (!configResponse.ok) throw new Error("Presentation context is unavailable");
     const config = await configResponse.json();
-    const context = await contextResponse.json();
-    assertAcceptedContext(context);
-    state.context = context;
-    renderContext(context);
+    // A first-time visitor has no context of their own: /api/context answers
+    // 409 share_required rather than handing back the fixture thought. That is
+    // a state to render, not a boot failure — loadSource renders it below.
+    const context = await contextResponse.json().catch(() => null);
+    const unshared = contextResponse.status === 409 && context?.error === SHARE_REQUIRED;
+    if (!unshared) {
+      if (!contextResponse.ok) throw new Error("Presentation context is unavailable");
+      assertAcceptedContext(context);
+      state.context = context;
+      renderContext(context);
+    }
 
     document.querySelectorAll(".source-option").forEach((button) => {
       button.addEventListener("click", () => loadSource(button.dataset.source));
