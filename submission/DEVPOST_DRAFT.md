@@ -34,7 +34,7 @@ Canonical product flow for the submitted release:
 ### Two transports, honestly separated
 
 - **Browser WebMCP (competition eligibility):** the page registers native `document.modelContext` tools; a browser agent invokes them and the page visibly updates. On the current build the browser `resonance_prepare_thought` builds from the labelled flagship page thought — it does **not** silently receive the user's ChatGPT conversation.
-- **Remote MCP from a real LLM chat (the cross-chat product):** an external LLM client passes the real selected conversation context to `resonance_prepare_thought(context=…)` over authenticated remote MCP; Resonance privately extracts Thought DNA, previews/shares it, and discovers against another independently ingested user's chat. This is submitted as **R15 (PR #128), pending review** — presented as a submitted extension, not claimed as live, unless accepted and deployed before freeze.
+- **Remote MCP from a real LLM chat (the cross-chat product):** an external LLM client passes the real selected conversation context to `resonance_prepare_thought(context=…)` over authenticated remote MCP; Resonance privately extracts Thought DNA, previews/shares it, and discovers against another independently ingested user's chat. This is **live on the same origin** (`https://resonance-production-cfe3.up.railway.app/mcp`): a hosted MCP client is given only that URL, discovers OAuth (RFC 9728 / 8414 / 7591, PKCE S256), the person approves an explicit consent page (guest or sign-in), and the chat can then prepare → preview → share → discover from the same PostgreSQL product state the browser uses. Verified on the public origin by an automated hosted-client probe and a three-identity structural test (see `submission/RELEASE_MANIFEST.md`); a real ChatGPT/Claude custom-connector session is listed there as executed or pending — the write-up never claims a client that did not actually connect.
 
 **Accepted gates as of this packaging pass** (each independently reviewed and merged to `main`; verify against the frozen SHA before submit):
 
@@ -50,9 +50,9 @@ Canonical product flow for the submitted release:
 | R14 collaboration | intro state machine + private relay messaging | accepted |
 | R14B workspaces | multi-person idea rooms, roles, shared work | accepted |
 | R16 deployment | hosted HTTPS on Railway + PostgreSQL | live at the URL above |
-| R15 remote MCP | authenticated remote MCP for external agents | **submitted (PR #128), pending review — do not claim as live until accepted** |
+| R15 remote MCP (+ R15A–C OAuth) | authenticated remote MCP for external agents, standards OAuth onboarding from the canonical `/mcp` URL | integrated on `main` and live on the origin; R15B independent review recorded on #135 |
 
-The competition demo and write-up should describe only the accepted/live gates; R15 remote-MCP is presented as a submitted extension, not a live judged feature, unless it is accepted and deployed before freeze.
+The competition mechanism is browser WebMCP; remote MCP is an additional transport over the same product state and is described as such.
 
 ## Why WebMCP matters
 
@@ -146,8 +146,8 @@ Long-term question:
 - Live application: `https://resonance-production-cfe3.up.railway.app` (Railway, PostgreSQL-backed; judge path in `HACKATHON.md`)
 - Public repository: `https://github.com/Parshkov/Resonance`
 - Demo video (<3:00, public YouTube): `TBD`
-- Frozen release/tag: `TBD`
-- Judge instructions: `TBD`
+- Frozen release/tag: see `submission/RELEASE_MANIFEST.md` (exact `main` SHA + Railway deployment id)
+- Judge instructions: `submission/HUMAN_TEST_CARDS.md` (Card A native WebMCP; Cards B/C hosted MCP clients) and README "Judge path"
 
 ## Final truthfulness checklist
 

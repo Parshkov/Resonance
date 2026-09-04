@@ -110,7 +110,8 @@ class Identity:
         status, headers, _ = s._rpc("ping", mid=1, bearer=None)
         assert status == 401, f"{self.name}: unauth /mcp status {status}"
         import re
-        m = re.search(r'resource_metadata="([^"]+)"', headers.get("WWW-Authenticate", ""))
+        www = headers.get("WWW-Authenticate") or headers.get("www-authenticate") or ""
+        m = re.search(r'resource_metadata="([^"]+)"', www)
         assert m, f"{self.name}: no resource_metadata in challenge"
         _, _, prm = s._json(m.group(1))
         issuer = prm["authorization_servers"][0].rstrip("/")

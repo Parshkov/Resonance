@@ -6,39 +6,47 @@ with an AI assistant. The live product exposes a **remote MCP server**
 hand the *structure* of what you are working on to Resonance and find people
 whose reasoning resonates.
 
-Endpoint: `https://<live origin>/mcp` (production: see `HACKATHON.md`).
+Endpoint: `https://resonance-production-cfe3.up.railway.app/mcp` (the only thing a user needs).
 
-## 1. Get your key (30 seconds, in the browser)
+## 1. Connect with the URL only (canonical path — no key)
 
-1. Open the live origin in Chrome. A guest account is created for you.
-2. Top bar → **Collaboration** → **Connect your chat (MCP)** → **Create MCP key**.
-3. Copy the snippet for your client. The key is shown once; it is a second
-   login for the same account, so everything your chat does appears in the
-   same panel. Anyone holding the key acts as you: treat it like a password.
+Give your MCP client exactly one thing:
 
-## 2. Connect your client
-
-**Claude Code / Claude Desktop (CLI)**
-
-```bash
-claude mcp add --transport http resonance https://<live origin>/mcp \
-  --header "Authorization: Bearer <key>"
+```
+https://resonance-production-cfe3.up.railway.app/mcp
 ```
 
-**Cursor, Windsurf, any `mcp.json` client**
+The origin answers an unauthenticated request with a standard challenge
+(`401` + `WWW-Authenticate … resource_metadata`), publishes RFC 9728 / RFC 8414
+metadata and RFC 7591 registration, and opens a Resonance consent page in your
+browser: continue as a pseudonymous guest, sign in with a recovery secret, or
+continue as the account already signed in on this browser. Approve, and the
+client receives an OAuth 2.1 token (PKCE S256, rotating refresh with
+`offline_access`); the token *is* an R12 session of that account, so whatever
+your chat shares appears in the same Collaboration panel.
 
-```json
-{"mcpServers": {"resonance": {"url": "https://<live origin>/mcp",
-                              "headers": {"Authorization": "Bearer <key>"}}}}
-```
+- claude.ai custom connector / Claude Desktop / Claude Code: add the URL, let
+  the client discover OAuth (`claude mcp add --transport http resonance
+  https://resonance-production-cfe3.up.railway.app/mcp`).
+- ChatGPT developer-mode app (Business / Enterprise / Edu): Create → MCP server
+  URL → OAuth → Scan tools.
+- Cursor / Windsurf / any `mcp.json` client with OAuth support: `{"url": "…/mcp"}`.
 
-**Clients that accept only a URL** (claude.ai custom connector, ChatGPT
-connectors in developer mode): use the capability URL
-`https://<live origin>/mcp/<key>` with authentication set to "none".
-The key travels in the path; do not paste that URL anywhere public.
+Disconnecting in the client (or `POST /oauth/revoke`) invalidates the grant
+immediately; the next `/mcp` call is `401`.
+
+## 2. Developer fallback — manual key (debug only, not the normal path)
+
+For clients that cannot run OAuth at all you may mint a key in the browser
+(Collaboration → **Connect your chat (MCP)** → **Create MCP key**) and send it
+as `Authorization: Bearer <key>`, or as the capability URL `…/mcp/<key>` for
+URL-only clients. The key is a second login for the same account; treat it
+like a password and never publish the URL. This is a fallback for debugging,
+not the onboarding judges or users are asked to perform.
 
 The server answers `initialize`, `tools/list`, `tools/call`, `ping`; `GET /mcp`
-is `405` (no SSE stream is offered), `DELETE /mcp` is `204`.
+is `405` (no SSE stream is offered), `DELETE /mcp` is `204`. The transport is
+stateless: no `Mcp-Session-Id` is issued, so a redeploy never strands a client.
 
 ## 3. Run a real test
 
