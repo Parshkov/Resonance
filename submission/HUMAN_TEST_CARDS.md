@@ -29,8 +29,13 @@ then shows the pill `WebMCP · unavailable`; that is the browser, not the site.
 3. Ask the agent to call `resonance_discover` with `{ "source": "live" }`
    BEFORE sharing. Expect: the tool fails closed with `share_required`
    ("discovery needs a shared thought first …"). Nothing is discoverable yet.
-4. `resonance_prepare_thought` `{ "request_id": "card-a-1" }` → expect
-   `discoverable: false`; WebMCP pill `WebMCP · private draft ready`.
+4. Ask the agent to extract the causal structure of something you are actually
+   working on and call `resonance_prepare_thought`
+   `{ "request_id": "card-a-1", "thought": { "topic": …, "domain": …, "nodes": [...], "relations": [...] } }`
+   (or `{ "request_id": "card-a-1", "context": "<a few sentences>" }`) → expect
+   `discoverable: false`, `input_kind: agent_structured` (or `raw_text_fallback`);
+   WebMCP pill `WebMCP · private draft ready`. Without `thought`/`context` the
+   page's visible thought is used instead.
 5. `resonance_get_share_preview` `{}` → expect the Thought DNA nodes /
    relations and a `confirmation_token`. Read it: this is exactly what would
    become discoverable.

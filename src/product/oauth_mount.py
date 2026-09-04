@@ -119,18 +119,27 @@ def attach_core(runtime: Any, *, issuer: str) -> Any | None:
     token, never a secret.
     """
     try:
-        from src.remote.oauth import GrantStore, OAuthCore  # R15A-owned (#134)
+        from src.remote.oauth import GrantStore, OAuthCore, RepositoryGrantStore  # R15A-owned (#134)
     except ImportError as exc:
         print(f"oauth: core not attached ({exc.__class__.__name__}: {exc}); "
               f"/mcp keeps bearer-only access")
         return None
     # The core's bearer IS the R12 access token (durable in the identity event
-    # log); codes / refresh grants / client registrations live in the in-memory
-    # GrantStore of this one production replica and are re-created by the
-    # client's normal re-authorization after a redeploy.
-    core = OAuthCore(runtime.identity, GrantStore())
+    # log). Codes / refresh grants / client registrations are durable too when
+    # the runtime carries a repository (PostgreSQL/SQLite, migration 0005), so
+    # a redeploy no longer forces hosted clients to re-authorize; the
+    # in-memory store remains the fallback for runtimes without one.
+    repository = getattr(getattr(runtime, "live", None), "repo", None)
+    if repository is not None and hasattr(repository, "put_grant"):
+        store: Any = RepositoryGrantStore(repository)
+        durability = "durable"
+    else:
+        store = GrantStore()
+        durability = "in-memory"
+    core = OAuthCore(runtime.identity, store)
     runtime.oauth_core = core
-    print(f"oauth: core attached; issuer {issuer}; resource {resource_url(issuer)}")
+    print(f"oauth: core attached; issuer {issuer}; resource {resource_url(issuer)}; "
+          f"grants {durability}")
     return core
 
 

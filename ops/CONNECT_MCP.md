@@ -32,8 +32,10 @@ your chat shares appears in the same Collaboration panel.
   URL → OAuth → Scan tools.
 - Cursor / Windsurf / any `mcp.json` client with OAuth support: `{"url": "…/mcp"}`.
 
-Disconnecting in the client (or `POST /oauth/revoke`) invalidates the grant
-immediately; the next `/mcp` call is `401`.
+Disconnecting in the client (or `POST /oauth/revoke` with either token)
+invalidates the refresh grant **and** the access token issued with it
+(RFC 7009 §2.1); the next `/mcp` call is `401`. Grants are stored in the
+product database, so a redeploy does not disconnect you.
 
 ## 2. Developer fallback — manual key (debug only, not the normal path)
 

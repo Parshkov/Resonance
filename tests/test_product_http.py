@@ -50,6 +50,41 @@ class HttpClient:
         return payload
 
 
+class HeadRequestTests(unittest.TestCase):
+    """Link scanners / uptime checkers preflight with HEAD; the stdlib handler
+    answered 501 on the public origin. HEAD must mirror GET's headers."""
+
+    @classmethod
+    def setUpClass(cls):
+        from src.product.server import build_runtime, serve
+        pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}))
+        cls.server = serve("127.0.0.1", 0, runtime=pending)
+        host, port = cls.server.server_address[:2]
+        cls.base = f"http://{host}:{port}"
+        cls.server.RequestHandlerClass.runtime = build_runtime(
+            ":memory:", allowed_origins=frozenset({cls.base}))
+        threading.Thread(target=cls.server.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    def test_head_mirrors_get_headers_without_body(self):
+        for path in ("/", "/api/product/health", "/webmcp.mjs"):
+            with urlopen(Request(self.base + path, method="GET"), timeout=10) as get:
+                get_len, get_type = get.headers.get("Content-Length"), get.headers.get("Content-Type")
+            with urlopen(Request(self.base + path, method="HEAD"), timeout=10) as head:
+                self.assertEqual(head.status, 200, path)
+                self.assertEqual(head.headers.get("Content-Length"), get_len, path)
+                self.assertEqual(head.headers.get("Content-Type"), get_type, path)
+                self.assertEqual(head.headers.get("Permissions-Policy"), "tools=(self)")
+                self.assertEqual(head.read(), b"")
+        with self.assertRaises(HTTPError) as ctx:
+            urlopen(Request(self.base + "/mcp", method="HEAD"), timeout=10)
+        self.assertEqual(ctx.exception.code, 405)
+
+
 class ProductHttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

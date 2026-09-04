@@ -154,6 +154,7 @@ class SQLiteRepository:
             self._begin()
             try:
                 for table in (
+                    "oauth_grants",
                     "messages",
                     "channels",
                     "intros",
@@ -271,6 +272,46 @@ class SQLiteRepository:
         if not row["response_json"]:
             raise PersistenceConflictError(f"request_id {key.request_id!r} is still in progress")
         return loads(row["response_json"])
+
+    # ------------------------------------------------------------------
+    # OAuth grants (opaque records; never corpus content)
+    # ------------------------------------------------------------------
+    def put_grant(self, kind: str, key: str, record: Mapping[str, Any], *,
+                  user_id: str | None = None, expires_at: float | None = None) -> None:
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO oauth_grants(kind, grant_key, user_id, record_json, expires_at, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(kind, grant_key) DO UPDATE SET user_id = excluded.user_id, "
+                "record_json = excluded.record_json, expires_at = excluded.expires_at",
+                (kind, key, user_id, dumps(dict(record)), expires_at, _now()),
+            )
+
+    def get_grant(self, kind: str, key: str) -> Mapping[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT record_json FROM oauth_grants WHERE kind = ? AND grant_key = ?", (kind, key)
+            ).fetchone()
+            return loads(row["record_json"]) if row is not None else None
+
+    def pop_grant(self, kind: str, key: str) -> Mapping[str, Any] | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT record_json FROM oauth_grants WHERE kind = ? AND grant_key = ?", (kind, key)
+            ).fetchone()
+            if row is None:
+                return None
+            self._conn.execute(
+                "DELETE FROM oauth_grants WHERE kind = ? AND grant_key = ?", (kind, key)
+            )
+            return loads(row["record_json"])
+
+    def delete_grants_for_user(self, kind: str, user_id: str) -> int:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM oauth_grants WHERE kind = ? AND user_id = ?", (kind, user_id)
+            )
+            return int(cur.rowcount or 0)
 
     def lookup_idempotency(self, key: IdempotencyKey) -> Mapping[str, Any] | None:
         with self._lock:

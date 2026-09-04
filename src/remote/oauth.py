@@ -136,6 +136,11 @@ class GrantStore:
     def revoke_refresh(self, token: str) -> bool:
         return self.refresh.pop(_hash(token), None) is not None
 
+    def pop_refresh(self, token: str) -> dict[str, Any] | None:
+        """Revoke a refresh grant and return its record (for the RFC 7009
+        cascade onto the sibling access token); None when unknown."""
+        return self.refresh.pop(_hash(token), None)
+
     def revoke_refresh_for_subject(self, user_id: str) -> int:
         gone = [h for h, r in self.refresh.items() if r.get("user_id") == user_id]
         for h in gone:
@@ -148,6 +153,64 @@ class GrantStore:
 
     def get_client(self, client_id: str) -> dict[str, Any] | None:
         return self.clients.get(client_id)
+
+
+class RepositoryGrantStore(GrantStore):
+    """GrantStore backed by the product repository (PostgreSQL/SQLite).
+
+    Same record shapes and single-use semantics as the in-memory store, but
+    codes, refresh grants and client registrations survive a redeploy, so a
+    hosted MCP client is not forced to re-authorize after every release.
+    Secrets (codes, refresh tokens) are stored under their SHA-256 only.
+    """
+
+    KIND_CODE = "code"
+    KIND_REFRESH = "refresh"
+    KIND_CLIENT = "client"
+
+    def __init__(self, repository: Any, *, clock: Any = time.time) -> None:
+        super().__init__(clock=clock)
+        self.repository = repository
+
+    # -- authorization codes --------------------------------------------
+    def put_code(self, code: str, record: Mapping[str, Any]) -> None:
+        self.repository.put_grant(self.KIND_CODE, _hash(code), dict(record),
+                                  expires_at=record.get("expires"))
+
+    def take_code(self, code: str) -> dict[str, Any] | None:
+        record = self.repository.pop_grant(self.KIND_CODE, _hash(code))
+        if record is None or record.get("expires", 0) < self.clock():
+            return None
+        return dict(record)
+
+    # -- refresh grants -------------------------------------------------
+    def put_refresh(self, token: str, record: Mapping[str, Any]) -> None:
+        self.repository.put_grant(self.KIND_REFRESH, _hash(token), dict(record),
+                                  user_id=record.get("user_id"), expires_at=record.get("expires"))
+
+    def take_refresh(self, token: str) -> dict[str, Any] | None:
+        record = self.repository.pop_grant(self.KIND_REFRESH, _hash(token))
+        if record is None or record.get("expires", 0) < self.clock():
+            return None
+        return dict(record)
+
+    def revoke_refresh(self, token: str) -> bool:
+        return self.repository.pop_grant(self.KIND_REFRESH, _hash(token)) is not None
+
+    def pop_refresh(self, token: str) -> dict[str, Any] | None:
+        record = self.repository.pop_grant(self.KIND_REFRESH, _hash(token))
+        return dict(record) if record is not None else None
+
+    def revoke_refresh_for_subject(self, user_id: str) -> int:
+        return int(self.repository.delete_grants_for_user(self.KIND_REFRESH, user_id))
+
+    # -- clients --------------------------------------------------------
+    def put_client(self, client_id: str, record: Mapping[str, Any]) -> None:
+        self.repository.put_grant(self.KIND_CLIENT, client_id, dict(record))
+
+    def get_client(self, client_id: str) -> dict[str, Any] | None:
+        record = self.repository.get_grant(self.KIND_CLIENT, client_id)
+        return dict(record) if record is not None else None
 
 
 # Backwards-compatible alias: the retired demo PKCE store name still resolves so
@@ -508,6 +571,9 @@ class OAuthCore:
                 "client_id": client_id,
                 "scope": scope,
                 "expires": self.clock() + self.refresh_ttl,
+                # RFC 7009 §2.1: revoking the refresh token SHOULD also revoke
+                # the access token issued with it; keep it reachable for that.
+                "access_token": access_token,
             })
             body["refresh_token"] = refresh
         return OAuthResult(200, {"Content-Type": "application/json",
@@ -521,13 +587,27 @@ class OAuthCore:
         # RFC 7009: always answer 200, whether or not the token was known.
         if token:
             if hint == "refresh_token":
-                if not self.store.revoke_refresh(token):
+                if not self._revoke_refresh_grant(token):
                     self._revoke_access(token)
             else:
                 if not self._revoke_access(token):
-                    self.store.revoke_refresh(token)
+                    self._revoke_refresh_grant(token)
         return OAuthResult(200, {"Content-Type": "application/json",
                                  "Cache-Control": "no-store"}, _json_body({}))
+
+    def _revoke_refresh_grant(self, token: str) -> bool:
+        """Revoke a refresh grant and cascade onto the access token issued with
+        it (RFC 7009 §2.1), so a client that disconnects is really logged out."""
+        record = self.store.pop_refresh(token)
+        if record is None:
+            return False
+        sibling = record.get("access_token")
+        if sibling:
+            try:
+                self.identity.logout(sibling)
+            except Exception:  # noqa: BLE001 - already expired/logged out
+                pass
+        return True
 
     def _revoke_access(self, token: str) -> bool:
         try:
