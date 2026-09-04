@@ -5,14 +5,14 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import secrets
 import threading
 import unittest
 from urllib.error import HTTPError
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from src.product.server import build_runtime
-from src.remote.auth import CodeStore
 from src.remote.server import TOOLS, build_httpd
 from tests.test_product_live import PRES, QUERY_DNA, r7_dna
 
@@ -24,11 +24,19 @@ def _pkce():
     return verifier, challenge
 
 
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class RemoteClient:
+    REDIRECT_URI = "https://client.example/cb"
+
     def __init__(self, base):
         self.base = base
         self.bearer = None
         self.session = None
+        self._opener = build_opener(_NoRedirect())
 
     def form(self, path, fields):
         req = Request(self.base + path, data=urlencode(fields).encode(),
@@ -36,6 +44,38 @@ class RemoteClient:
                       method="POST")
         with urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read())
+
+    def authorize(self, *, challenge, state, client_id="test-client",
+                  redirect_uri=None, resource=None, scope="resonance",
+                  identity="guest", decision="approve", extra=None):
+        """Drive GET consent -> POST decision; return the 302 Location query."""
+        redirect_uri = redirect_uri or self.REDIRECT_URI
+        params = {"response_type": "code", "client_id": client_id,
+                  "redirect_uri": redirect_uri, "code_challenge": challenge,
+                  "code_challenge_method": "S256", "state": state, "scope": scope}
+        if resource is not None:
+            params["resource"] = resource
+        # GET renders the explicit consent page (or a validation error before redirect).
+        get = Request(self.base + "/oauth/authorize?" + urlencode(params), method="GET")
+        with self._opener.open(get, timeout=10) as r:
+            page_status, page = r.status, r.read().decode()
+        fields = dict(params, decision=decision, identity=identity, **(extra or {}))
+        post = Request(self.base + "/oauth/authorize", data=urlencode(fields).encode(),
+                       headers={"Content-Type": "application/x-www-form-urlencoded"},
+                       method="POST")
+        try:
+            with self._opener.open(post, timeout=10) as r:
+                return {"page_status": page_status, "page": page,
+                        "status": r.status, "location": None, "query": {}}
+        except HTTPError as e:
+            loc = e.headers.get("Location") if e.code in (301, 302, 303, 307) else None
+            q = {k: v[0] for k, v in parse_qs(urlparse(loc).query).items()} if loc else {}
+            return {"page_status": page_status, "page": page, "status": e.code,
+                    "location": loc, "query": q}
+
+    def redirect_location(self, resp):
+        # The no-redirect opener raises on 3xx; capture Location via a fetch.
+        return resp["location"]
 
     def rpc(self, method, params=None, *, bearer=True, mid=1):
         headers = {"Content-Type": "application/json"}
@@ -57,17 +97,19 @@ class RemoteClient:
     def call(self, name, arguments=None, mid=2):
         return self.rpc("tools/call", {"name": name, "arguments": arguments or {}}, mid=mid)
 
-    def oauth_guest(self):
+    def oauth_guest(self, *, client_id="test-client", scope="resonance"):
         verifier, challenge = _pkce()
-        status, authd = self.form("/oauth/authorize", {
-            "code_challenge": challenge, "code_challenge_method": "S256",
-            "redirect_uri": "https://client/cb", "client_id": "test"})
+        state = secrets.token_urlsafe(8)
+        authd = self.authorize(challenge=challenge, state=state, client_id=client_id,
+                               scope=scope)
+        code = authd["query"].get("code")
+        assert code and authd["query"].get("state") == state, authd
         status, tok = self.form("/oauth/token", {
-            "grant_type": "authorization_code", "code": authd["code"],
-            "code_verifier": verifier, "redirect_uri": "https://client/cb",
-            "client_id": "test"})
+            "grant_type": "authorization_code", "code": code,
+            "code_verifier": verifier, "redirect_uri": self.REDIRECT_URI,
+            "client_id": client_id})
         self.bearer = tok["access_token"]
-        return authd, tok
+        return {"code": code, "state": state, "verifier": verifier}, tok
 
     def initialize(self):
         return self.rpc("initialize", {"protocolVersion": "2025-03-26"})
@@ -77,7 +119,6 @@ class RemoteMcpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"https://x"}))
-        cls.runtime.remote_auth = CodeStore()
         cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -122,14 +163,20 @@ class RemoteMcpTests(unittest.TestCase):
 
     def test_pkce_wrong_verifier_and_replay_rejected(self):
         c = self.client()
-        _, challenge = _pkce()
-        status, authd = c.form("/oauth/authorize", {
-            "code_challenge": challenge, "code_challenge_method": "S256",
-            "redirect_uri": "https://client/cb", "client_id": "test"})
+        verifier, challenge = _pkce()
+        authd = c.authorize(challenge=challenge, state="s1", client_id="test")
+        code = authd["query"]["code"]
+        # wrong verifier -> invalid_grant
         with self.assertRaises(HTTPError) as ctx:
             c.form("/oauth/token", {"grant_type": "authorization_code",
-                                    "code": authd["code"], "code_verifier": "wrong",
-                                    "redirect_uri": "https://client/cb", "client_id": "test"})
+                                    "code": code, "code_verifier": "wrong",
+                                    "redirect_uri": c.REDIRECT_URI, "client_id": "test"})
+        self.assertEqual(ctx.exception.code, 400)
+        # the code is single-use even after a failed verify -> replay rejected
+        with self.assertRaises(HTTPError) as ctx:
+            c.form("/oauth/token", {"grant_type": "authorization_code",
+                                    "code": code, "code_verifier": verifier,
+                                    "redirect_uri": c.REDIRECT_URI, "client_id": "test"})
         self.assertEqual(ctx.exception.code, 400)
 
     def test_session_bound_to_subject(self):
@@ -141,11 +188,14 @@ class RemoteMcpTests(unittest.TestCase):
         self.assertIn("error", reply)
         self.assertIn("different authenticated subject", reply["error"]["message"])
 
-    def test_unknown_session_and_get_405(self):
+    def test_unknown_session_is_404_and_get_405(self):
         c = self.client(); c.oauth_guest()
         c.session = "not-a-real-session"
-        status, reply = c.rpc("ping", mid=4)
-        self.assertIn("error", reply)
+        # MCP spec: an unknown/expired session on a session-requiring request is
+        # HTTP 404 so the client re-initializes.
+        with self.assertRaises(HTTPError) as ctx:
+            c.rpc("ping", mid=4)
+        self.assertEqual(ctx.exception.code, 404)
         req = Request(self.base + "/mcp")
         with self.assertRaises(HTTPError) as ctx:
             urlopen(req, timeout=10)

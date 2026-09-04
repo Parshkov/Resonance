@@ -12,12 +12,17 @@ import inspect
 import json
 import threading
 import unittest
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 from src.product.server import build_runtime
-from src.remote.auth import CodeStore
 from src.remote.server import build_httpd
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 # Written by hand for this test: three "conversations" a person might have
 # with their assistant. A and B share causal SHAPE across unrelated domains;
@@ -47,21 +52,43 @@ CHAT_C_WRONG_STRUCTURE = (
 class Chat:
     """One person's assistant: its own OAuth/PKCE bearer and MCP session."""
 
+    REDIRECT_URI = "https://client.example/cb"
+
     def __init__(self, base: str):
         self.base = base
+        self._opener = build_opener(_NoRedirect())
         verifier = base64.urlsafe_b64encode(b"v" * 48).rstrip(b"=").decode()
         challenge = base64.urlsafe_b64encode(
             hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-        authd = self.form("/oauth/authorize", {
-            "code_challenge": challenge, "code_challenge_method": "S256",
-            "redirect_uri": "https://client/cb", "client_id": "realchat"})
+        # Full hosted-client handshake: consent page GET, approve POST, follow the
+        # redirect for code+state, then exchange with the verifier.
+        params = {"response_type": "code", "client_id": "realchat",
+                  "redirect_uri": self.REDIRECT_URI, "code_challenge": challenge,
+                  "code_challenge_method": "S256", "state": "realchat-state",
+                  "scope": "resonance"}
+        get = Request(self.base + "/oauth/authorize?" + urlencode(params), method="GET")
+        with self._opener.open(get, timeout=10) as r:
+            assert r.status == 200
+        query = self._authorize_post(dict(params, identity="guest", decision="approve"))
+        assert query.get("code") and query.get("state") == "realchat-state", query
         tok = self.form("/oauth/token", {
-            "grant_type": "authorization_code", "code": authd["code"],
-            "code_verifier": verifier, "redirect_uri": "https://client/cb",
+            "grant_type": "authorization_code", "code": query["code"],
+            "code_verifier": verifier, "redirect_uri": self.REDIRECT_URI,
             "client_id": "realchat"})
         self.bearer = tok["access_token"]
         self.session = None
         self.rpc("initialize", {"protocolVersion": "2025-03-26"})
+
+    def _authorize_post(self, fields):
+        post = Request(self.base + "/oauth/authorize", data=urlencode(fields).encode(),
+                       headers={"Content-Type": "application/x-www-form-urlencoded"},
+                       method="POST")
+        try:
+            with self._opener.open(post, timeout=10):
+                return {}
+        except HTTPError as e:
+            loc = e.headers.get("Location") or ""
+            return {k: v[0] for k, v in parse_qs(urlparse(loc).query).items()}
 
     def form(self, path, fields):
         req = Request(self.base + path, data=urlencode(fields).encode(),
@@ -102,7 +129,6 @@ class RealChatRemoteMcpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"https://x"}))
-        cls.runtime.remote_auth = CodeStore()
         cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
