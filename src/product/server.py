@@ -40,7 +40,8 @@ from src.ingestion.service import (
     IngestionError,
     ShareIntent,
 )
-from src.persistence import LiveCorpusService, SQLiteRepository
+from src.persistence import LiveCorpusService
+from src.persistence.factory import open_repository
 from src.persistence.errors import (
     PersistenceConflictError,
     PersistenceStaleIndexError,
@@ -85,7 +86,11 @@ def build_runtime(
     confirmation_secret: bytes | None = None,
     seed: bool = True,
 ) -> ProductRuntime:
-    live = LiveCorpusService(SQLiteRepository(db_path))
+    # Explicit path or DSN: a postgres:// / postgresql:// target selects the
+    # PostgreSQL repository, anything else is a SQLite file (or ":memory:").
+    # Previously this hard-wired SQLiteRepository, so a DSN was silently treated
+    # as a file name and the live product could never run on PostgreSQL.
+    live = LiveCorpusService(open_repository(db_path))
     if seed:
         seed_r7(live)
     identity = IdentityService(
@@ -171,7 +176,14 @@ class ProductHandler(BaseHTTPRequestHandler):
         return self.headers.get("X-Resonance-CSRF")
 
     def _cookie_for(self, token: str) -> str:
-        return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Strict; Path=/")
+        # Behind a TLS-terminating proxy the process only ever sees plain HTTP,
+        # so derive `Secure` from the deployment contract instead: when every
+        # allowed browser origin is https://, the cookie must never travel over
+        # http. Local http://127.0.0.1 runs and tests keep the plain form.
+        origins = self.runtime.allowed_origins
+        secure = "; Secure" if origins and all(
+            o.startswith("https://") for o in origins) else ""
+        return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Strict; Path=/{secure}")
 
     def _security_kwargs(self) -> dict[str, Any]:
         return {

@@ -1,0 +1,17 @@
+.git
+.github
+.superdesign
+.pytest_cache
+__pycache__
+**/__pycache__
+*.py[cod]
+*.sqlite
+*.sqlite3
+var/
+demo/report.json
+demo/transcript.jsonl
+tests/
+research/
+submission/
+agents/
+work/
