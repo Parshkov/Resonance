@@ -114,13 +114,12 @@ class RealChatRemoteMcpTests(unittest.TestCase):
         cls.httpd.server_close()
 
     def test_no_fixture_helper_builds_the_chats(self):
-        # The chats are literal strings in this module; no fixture import or
-        # helper call constructs them.
-        source = inspect.getsource(inspect.getmodule(self))
-        self.assertNotIn("from tests.test_product_live", source)
-        self.assertNotIn("from src.product.competition_server", source)
-        for call in ("r7_dna(", "QUERY_DNA[", "_flagship_session(", "seed_r7("):
-            self.assertNotIn(call, source)
+        # The chats are literal strings in this module; no fixture helper is
+        # even imported here, so none can have constructed them.
+        names = set(vars(inspect.getmodule(self)))
+        self.assertFalse(names & {"r7_dna", "QUERY_DNA", "PRES", "_flagship_session", "seed_r7"})
+        for chat in (CHAT_A, CHAT_B, CHAT_C_WRONG_STRUCTURE):
+            self.assertIsInstance(chat, str)
 
     def test_two_independent_chats_discover_each_other_on_structure(self):
         alice, bob, carol = Chat(self.base), Chat(self.base), Chat(self.base)
