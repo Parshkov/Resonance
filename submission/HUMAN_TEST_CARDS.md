@@ -74,6 +74,9 @@ then shows the pill `WebMCP · unavailable`; that is the browser, not the site.
    scores; "Explain the first match" → `resonance_explain_match`.
 8. "Stop sharing." → `resonance_stop_sharing` → `revoked: true`.
 
+Executed evidence for steps 1–4 and 7 (real Claude custom connector, OAuth,
+production): `submission/evidence/hosted-client-claude/card_b_claude_connector_2026-09-04.md`.
+
 ## Card C — hosted MCP client, canonical URL only (ChatGPT developer-mode app)
 
 Requires a ChatGPT workspace with developer mode (Business / Enterprise / Edu).
