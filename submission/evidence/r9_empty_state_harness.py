@@ -120,6 +120,19 @@ def main() -> int:
         ok("the heading says why nothing is shown",
            "cleared the resonance bar" in (text(page, "#evidence-heading") or "").lower(),
            f"heading={text(page, '#evidence-heading')!r}")
+        empty_card = page.evaluate("""() => {
+            const c = document.getElementById('contradiction-card');
+            if (!c) return null;
+            const display = getComputedStyle(c).display;
+            return {hidden: c.hidden, display,
+                    visibleText: display !== 'none' ? c.innerText.trim() : ''};
+        }""")
+        # Same blind spot as in the error state below: this card carried a
+        # "Loading rejected results…" placeholder across the empty state while
+        # its `hidden` property read true, because the class sets `display: grid`.
+        ok("the contradiction card is never hidden-but-still-rendered in the empty state",
+           bool(empty_card) and (empty_card["display"] == "none" or not empty_card["hidden"]),
+           json.dumps(empty_card))
         if args.out:
             Path(args.out).mkdir(parents=True, exist_ok=True)
             page.screenshot(path=str(Path(args.out) / "r9_empty_state.png"))
@@ -135,7 +148,9 @@ def main() -> int:
         page.wait_for_timeout(2000)
         state = page.evaluate("() => document.getElementById('app-shell').dataset.state")
         ok("a failure is reported as an error", state == "error", f"data-state={state!r}")
-        leftovers = page.evaluate("""() => ({
+        leftovers = page.evaluate("""() => {
+            const card = document.getElementById('contradiction-card');
+            return {
             cards: document.querySelectorAll('.match-card').length,
             mappings: document.querySelectorAll('.mapping-row').length,
             chips: document.querySelectorAll('.relation-chip').length,
@@ -144,13 +159,25 @@ def main() -> int:
             connections: document.querySelectorAll('#connection-layer > *').length,
             summary: (document.getElementById('response-summary')||{}).textContent,
             kicker: (document.getElementById('evidence-kicker')||{}).textContent,
-            contradictionHidden: (document.getElementById('contradiction-card')||{}).hidden,
-        })""")
+            contradictionHidden: card ? card.hidden : null,
+            // The `hidden` PROPERTY is not evidence that anything left the
+            // screen. `.contradiction-card { display: grid }` beat the browser
+            // default for `[hidden]`, so this card read back hidden === true
+            // while still showing "Loading rejected results… / 0 REJECTED"
+            // over the empty and error states. Ask the renderer, not the DOM.
+            contradictionDisplay: card ? getComputedStyle(card).display : null,
+            contradictionVisibleText: card && getComputedStyle(card).display !== 'none'
+                ? card.innerText.trim() : '',
+        };}""")
         ok("the error state leaves no result data from the previous source",
            all(leftovers[k] == 0 for k in ("cards", "mappings", "chips", "drawer", "markers", "connections"))
            and leftovers["contradictionHidden"] is True
            and "matches" not in (leftovers["summary"] or ""),
            json.dumps(leftovers))
+        ok("a hidden contradiction card is actually off screen, not just flagged hidden",
+           leftovers["contradictionDisplay"] == "none",
+           f"computed display={leftovers['contradictionDisplay']!r}; "
+           f"visible text={leftovers['contradictionVisibleText'][:80]!r}")
 
         # Uncaught exceptions are the real signal. Console *resource* errors are
         # expected: a replay-only demo server has no live /api/context, and the
