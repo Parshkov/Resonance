@@ -104,6 +104,7 @@ function panel() {
       "through the WebMCP tools; both surfaces read the same authorized record."}),
     el("div", {id: "collab-error", className: "collab-error", role: "alert"}),
     el("div", {id: "collab-share", className: "collab-section"}),
+    el("div", {id: "collab-connect", className: "collab-section"}),
     el("div", {id: "collab-initiate", className: "collab-section"}),
     el("div", {id: "collab-requests", className: "collab-section"}),
     el("div", {id: "collab-channel", className: "collab-section"}),
@@ -208,6 +209,50 @@ async function refreshShare() {
       ]),
     );
   }
+}
+
+// ---- connect a real chat (remote MCP key) ------------------------------
+
+function codeBlock(text) {
+  const pre = el("pre", {className: "collab-code"});
+  pre.textContent = text; // key material and commands: text only
+  return pre;
+}
+
+function renderConnect() {
+  const host = document.getElementById("collab-connect");
+  if (!host) return;
+  host.replaceChildren(
+    el("h3", {textContent: "Connect your chat (MCP)"}),
+    el("p", {className: "collab-muted", textContent:
+      "Give the assistant you already talk to (Claude, Cursor, any MCP client) access to " +
+      "this account. It extracts the structure of what you are working on, previews it, and " +
+      "shares only after you approve — then discovers people whose reasoning resonates."}),
+    el("div", {className: "collab-compose"}, [
+      actionButton("Create MCP key", async () => {
+        const creds = await apiFetch("POST", "/api/product/mcp_key", {});
+        const endpoint = creds.endpoint || `${window.location.origin}/mcp`;
+        const withKey = creds.endpoint_with_key || `${endpoint}/${creds.mcp_key}`;
+        const out = document.getElementById("collab-connect-out");
+        out.replaceChildren(
+          el("p", {className: "collab-muted", textContent:
+            "Shown once — anyone holding this key acts as you in Resonance. " +
+            `Expires ${creds.expires_at}.`}),
+          el("h4", {className: "collab-subhead", textContent: "Claude Code / Claude Desktop (CLI)"}),
+          codeBlock(`claude mcp add --transport http resonance ${endpoint} \\\n  --header "Authorization: Bearer ${creds.mcp_key}"`),
+          el("h4", {className: "collab-subhead", textContent: "Cursor / Windsurf / any mcp.json"}),
+          codeBlock(JSON.stringify({mcpServers: {resonance: {url: endpoint,
+            headers: {Authorization: `Bearer ${creds.mcp_key}`}}}}, null, 2)),
+          el("h4", {className: "collab-subhead", textContent: "Clients that only take a URL (claude.ai custom connector, ChatGPT)"}),
+          codeBlock(withKey),
+          el("p", {className: "collab-muted", textContent:
+            "Then, in your chat: “Connect me to Resonance: extract the structure of what I’m " +
+            "working on, show me the preview, and after I approve, share it and discover who resonates.”"}),
+        );
+      }, true),
+    ]),
+    el("div", {id: "collab-connect-out"}),
+  );
 }
 
 // ---- intro initiation -------------------------------------------------
@@ -432,6 +477,7 @@ function scheduleRefresh() {
 
 function init() {
   panel();
+  renderConnect();
   refreshAll();
   // Any successful write through session.mjs (WebMCP tools, workspace tools,
   // this panel) re-reads the authorized record so the panel never goes stale.

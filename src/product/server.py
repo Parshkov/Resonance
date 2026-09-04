@@ -53,6 +53,12 @@ from src.collaboration import CollaborationError
 from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product.service import LiveProductService, ProductError, StaleResultError
+from src.product.mcp_bridge import (
+    INVALID_REQUEST,
+    PARSE_ERROR,
+    RemoteMCPBridge,
+    bearer_token,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 UI_DIR = REPO / "demo" / "ui"
@@ -77,6 +83,17 @@ STATIC = {
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/favicon.ico": ("favicon.svg", "image/svg+xml"),
 }
+
+def _mcp_path_token(path: str) -> str | None:
+    """`/mcp` -> "" (key must come in the Authorization header);
+    `/mcp/<key>` -> key; anything else -> None."""
+    if path == "/mcp":
+        return ""
+    if path.startswith("/mcp/"):
+        key = path[len("/mcp/"):]
+        return key if key and "/" not in key else None
+    return None
+
 
 HEAD_INJECTION = (
     '  <link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
@@ -217,9 +234,79 @@ class ProductHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         try:
+            if _mcp_path_token(parsed.path) is not None:
+                self._handle_mcp(parsed.path)
+                return
             self._route_post(parsed.path)
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        # Streamable HTTP clients may terminate a session explicitly; the
+        # bridge is stateless, so acknowledge without state.
+        if _mcp_path_token(urlparse(self.path).path) is not None:
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self._security_headers()
+            self.end_headers()
+            return
+        self._send_error_json(HTTPStatus.NOT_FOUND, "not_found", "unknown path")
+
+    # -- remote MCP (Streamable HTTP, R17) ------------------------------------
+    def _handle_mcp(self, path: str) -> None:
+        """POST /mcp[/<key>]: one JSON-RPC message (or batch) per request,
+        answered with a single JSON body (no SSE stream is offered)."""
+        token = bearer_token(self.headers.get("Authorization"), _mcp_path_token(path) or None)
+        if not token:
+            self.send_response(HTTPStatus.UNAUTHORIZED)
+            self.send_header("WWW-Authenticate", 'Bearer realm="resonance", error="invalid_token"')
+            body = json.dumps({"error": "authentication_failed",
+                               "message": "send the account's MCP key as Authorization: Bearer "
+                                          "<key> (mint it in the Collaboration panel)"}).encode()
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self._security_headers()
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        # Authenticate up front so a bad key is a 401, not a per-tool error.
+        self.runtime.identity.authenticate(token)
+        length = int(self.headers.get("Content-Length") or 0)
+        if length < 0 or length > MAX_BODY_BYTES:
+            raise IngestionError("request body exceeds product bound")
+        raw = self.rfile.read(length) if length else b""
+        try:
+            message = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            self._send_json({"jsonrpc": "2.0", "id": None,
+                             "error": {"code": PARSE_ERROR, "message": "invalid JSON"}},
+                            HTTPStatus.BAD_REQUEST)
+            return
+        bridge = RemoteMCPBridge(self.runtime.product)
+        if isinstance(message, list):
+            if not message:
+                self._send_json({"jsonrpc": "2.0", "id": None,
+                                 "error": {"code": INVALID_REQUEST, "message": "empty batch"}},
+                                HTTPStatus.BAD_REQUEST)
+                return
+            responses = [r for r in (bridge.handle(m, token) for m in message) if r is not None]
+            if not responses:
+                self._send_accepted()
+                return
+            body = json.dumps(responses, ensure_ascii=False, default=str).encode("utf-8")
+            self._send_bytes(body, "application/json; charset=utf-8")
+            return
+        response = bridge.handle(message, token)
+        if response is None:
+            self._send_accepted()
+            return
+        body = json.dumps(response, ensure_ascii=False, default=str).encode("utf-8")
+        self._send_bytes(body, "application/json; charset=utf-8")
+
+    def _send_accepted(self) -> None:
+        self.send_response(HTTPStatus.ACCEPTED)
+        self.send_header("Content-Length", "0")
+        self._security_headers()
+        self.end_headers()
 
     def _handle_error(self, exc: Exception) -> None:
         mapping = [
@@ -265,6 +352,15 @@ class ProductHandler(BaseHTTPRequestHandler):
         if path in STATIC:
             filename, content_type = STATIC[path]
             self._send_bytes((UI_DIR / filename).read_bytes(), content_type)
+            return
+        if _mcp_path_token(path) is not None:
+            # No server->client SSE stream is offered; Streamable HTTP clients
+            # treat 405 on GET as "POST only", which is the whole bridge.
+            self.send_response(HTTPStatus.METHOD_NOT_ALLOWED)
+            self.send_header("Allow", "POST, DELETE")
+            self.send_header("Content-Length", "0")
+            self._security_headers()
+            self.end_headers()
             return
         if path == "/api/product/health":
             health = self.runtime.live.health()
@@ -380,6 +476,29 @@ class ProductHandler(BaseHTTPRequestHandler):
             product.logout(self._token())
             self._send_json({"logged_out": True},
                             cookie=f"{COOKIE_NAME}=; Max-Age=0; Path=/")
+            return
+        if path == "/api/product/mcp_key":
+            # R17: mint a second identity session for the SAME account so the
+            # person's chat client can act through the remote MCP bridge.
+            # Cookie + CSRF authenticated like every other browser write; the
+            # browser session itself is untouched (no rotation).
+            token = self._token()
+            identity = self.runtime.identity
+            actor = identity.authenticate(token)
+            identity._require_csrf(actor, self._csrf(), self._origin())  # noqa: SLF001 — same gate as writes
+            creds = identity._issue_session(actor.user_id, actor_type="agent")  # noqa: SLF001
+            host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
+            scheme = self.headers.get("X-Forwarded-Proto") or "http"
+            origin = f"{scheme}://{host}" if host else ""
+            self._send_json({
+                "user_id": creds.user_id,
+                "mcp_key": creds.access_token,
+                "expires_at": creds.expires_at,
+                "endpoint": f"{origin}/mcp",
+                "endpoint_with_key": f"{origin}/mcp/{creds.access_token}",
+                "note": "Shown once. Anyone holding this key acts as this account "
+                        "in Resonance; treat it like a password.",
+            })
             return
         if path == "/api/product/rotate":
             creds = product.rotate_session(self._token())
