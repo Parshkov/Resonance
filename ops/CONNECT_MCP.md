@@ -6,14 +6,20 @@ with an AI assistant. The live product exposes a **remote MCP server**
 hand the *structure* of what you are working on to Resonance and find people
 whose reasoning resonates.
 
-Endpoint: `https://resonance-production-cfe3.up.railway.app/mcp` (the only thing a user needs).
+Endpoint: `https://resonance.parshkov.com/mcp` (the only thing a user needs).
+
+The platform host `https://resonance-production-cfe3.up.railway.app/mcp` still
+works and is still a valid audience — a client already registered against it
+keeps its grant and does not have to re-authorize. Both hosts publish their own
+RFC 9728 / RFC 8414 metadata naming themselves, so nothing breaks either way;
+`resonance.parshkov.com` is simply the address the project publishes.
 
 ## 1. Connect with the URL only (canonical path — no key)
 
 Give your MCP client exactly one thing:
 
 ```
-https://resonance-production-cfe3.up.railway.app/mcp
+https://resonance.parshkov.com/mcp
 ```
 
 The origin answers an unauthenticated request with a standard challenge
@@ -27,7 +33,7 @@ your chat shares appears in the same Collaboration panel.
 
 - claude.ai custom connector / Claude Desktop / Claude Code: add the URL, let
   the client discover OAuth (`claude mcp add --transport http resonance
-  https://resonance-production-cfe3.up.railway.app/mcp`).
+  https://resonance.parshkov.com/mcp`).
 - ChatGPT developer-mode app (Business / Enterprise / Edu): Create → MCP server
   URL → OAuth → Scan tools.
 - Cursor / Windsurf / any `mcp.json` client with OAuth support: `{"url": "…/mcp"}`.

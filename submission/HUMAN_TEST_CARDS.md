@@ -4,8 +4,8 @@ Everything below runs against the public origin only. Never type a key, a
 bearer token or a `/mcp/<secret>` URL in any of these cards: if a step asks
 you for one, that is a FAIL to report.
 
-- Origin: `https://resonance-production-cfe3.up.railway.app`
-- Canonical MCP URL: `https://resonance-production-cfe3.up.railway.app/mcp`
+- Origin: `https://resonance.parshkov.com`
+- Canonical MCP URL: `https://resonance.parshkov.com/mcp`
 - Report back: the deployment id shown in `submission/RELEASE_MANIFEST.md`, the
   step number where anything deviated, the visible text, and a screenshot /
   screen recording. No tokens, no raw chat text.
@@ -45,10 +45,13 @@ browser really has the surface, and revokes its own share at the end. Executed
 run on `8670568`: 24/24, `mode: NATIVE` —
 `submission/evidence/public-origin-8670568/card-a-browser/`.
 
-1. Open the origin. Expect: the R9 page renders 4 replay cards; header pill
-   `Private · not discoverable`; WebMCP pill `WebMCP · private` (registration
-   succeeded) — if it says `WebMCP · unavailable`, the browser has no
-   `document.modelContext`; stop and report the browser version.
+1. Open the origin. Expect: **no match cards** — you have shared nothing, so the
+   page opens on its unshared state (`#app-shell[data-state="unshared"]`) and
+   says so. Header pill `Private · not discoverable`; WebMCP pill
+   `WebMCP · private` (registration succeeded) — if it says
+   `WebMCP · unavailable`, the browser has no `document.modelContext`; stop and
+   report the browser version. (Before #169 this step expected four replay
+   personas; the fixture is no longer the default view.)
 2. In the browser's agent/tool panel (or DevTools → WebMCP panel) confirm the
    tools are listed: `resonance_prepare_thought`, `resonance_get_share_preview`,
    `resonance_share_prepared_thought`, `resonance_discover`,
@@ -85,7 +88,7 @@ run on `8670568`: 24/24, `mode: NATIVE` —
 ## Card B — hosted MCP client, canonical URL only (Claude custom connector)
 
 1. Claude → Settings → Connectors → **Add custom connector** → URL
-   `https://resonance-production-cfe3.up.railway.app/mcp`; leave auth to the
+   `https://resonance.parshkov.com/mcp`; leave auth to the
    client (OAuth is discovered automatically).
 2. The client opens the Resonance authorization page. Choose **Continue as
    guest** (or sign in with a recovery secret), then **Approve**.
@@ -110,7 +113,7 @@ production): `submission/evidence/hosted-client-claude/card_b_claude_connector_2
 Requires a ChatGPT workspace with developer mode (Business / Enterprise / Edu).
 
 1. Settings → Apps & Connectors → Advanced → Developer mode → **Create**.
-2. MCP server URL = `https://resonance-production-cfe3.up.railway.app/mcp`;
+2. MCP server URL = `https://resonance.parshkov.com/mcp`;
    authentication = **OAuth**; **Scan tools**.
 3. The Resonance authorization page opens → **Continue as guest** → **Approve**.
 4. ChatGPT lists the `resonance_*` tools. New chat with the app enabled:
@@ -138,7 +141,7 @@ hosted client and not a "not supported" result. It cannot reach a local server;
 the canonical public URL is exactly what it needs.
 
 1. grok.com → **Connectors** → **New Connector** → **Custom**.
-2. MCP server URL = `https://resonance-production-cfe3.up.railway.app/mcp`;
+2. MCP server URL = `https://resonance.parshkov.com/mcp`;
    complete the authentication the server asks for (OAuth is discovered).
 3. The Resonance authorization page opens → **Continue as guest** → **Approve**.
 4. New chat with the connector enabled: "Call resonance_whoami." → `person-…`.
