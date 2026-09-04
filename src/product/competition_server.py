@@ -50,6 +50,7 @@ from src.product.server import (
     _resolve_secret,
     build_runtime,
     startup_purge_demo,
+    startup_purge_sessions,
 )
 
 WEBMCP_CONTRACT = "resonance-webmcp/0.1"
@@ -655,6 +656,7 @@ def main(argv: list[str] | None = None) -> None:
                             confirmation_secret=secret,
                             seed=seed)
     startup_purge_demo(runtime)
+    startup_purge_sessions(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     # Per request the issuer is re-derived from the host actually addressed
     # (`ProductHandler._issuer`), so every allowed origin serves its own
