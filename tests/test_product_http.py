@@ -300,6 +300,55 @@ class ProductHttpTests(unittest.TestCase):
         row = next(m for m in rich["matches"] if m["session_id"] == a_session)
         self.assertEqual(row["intro_state"], "accepted")
 
+    def test_workspace_flow_over_http(self):
+        from src.ingestion.service import ShareIntent
+        alice = self.client(); alice.guest()
+        bob = self.client(); bob.guest()
+
+        def share(client, source, tid, intro=True):
+            status, prepared, _ = client.request("POST", "/api/product/prepare", {
+                "candidate": r7_dna(source, tid), "presentation": dict(PRES),
+                "share_intent": {"share_display_profile": True,
+                                 "receive_intro_requests": intro}})
+            status, preview, _ = client.request(
+                "GET", f"/api/product/preview?draft_id={prepared['draft_id']}")
+            client.request("POST", "/api/product/share", {
+                "draft_id": prepared["draft_id"],
+                "confirmation_token": preview["confirmation_token"], "confirmed": True})
+            return prepared["session_id"]
+
+        a_sess = share(alice, "ses-gabe-warehouse", "ws-a")
+        b_sess = share(bob, QUERY_DNA, "ws-b")
+        status, intro, _ = bob.request("POST", "/api/product/intro/request", {
+            "from_session_id": b_sess, "target_session_id": a_sess,
+            "message": "connect?", "request_id": "wri", "confirmed": True})
+        status, incoming, _ = alice.request("GET", "/api/product/intro/list")
+        iid = incoming["incoming"][0]["intro_id"]
+        alice.request("POST", "/api/product/intro/respond", {
+            "intro_id": iid, "accept": True, "request_id": "wai", "confirmed": True})
+
+        status, ws, _ = alice.request("POST", "/api/product/workspace/create", {
+            "intro_id": iid, "title": "Plasma×Warehouse", "brief": "compare"})
+        wid = ws["workspace_id"]
+        # Bob invited -> cannot read until accept
+        with self.assertRaises(HTTPError) as ctx:
+            bob.request("GET", f"/api/product/workspace?workspace_id={wid}")
+        self.assertEqual(ctx.exception.code, 400)
+        bob.request("POST", "/api/product/workspace/respond", {
+            "workspace_id": wid, "accept": True})
+        bob.request("POST", "/api/product/workspace/note", {
+            "workspace_id": wid, "body": "throttle input power"})
+        status, full, _ = alice.request("GET", f"/api/product/workspace?workspace_id={wid}")
+        self.assertEqual([n["body"] for n in full["notes"]], ["throttle input power"])
+        self.assertEqual(len(full["members"]), 2)
+        self.assertEqual({m["state"] for m in full["members"]}, {"active"})
+        bob_member = next(m for m in full["members"] if m["role"] == "member")
+        # remove Bob -> immediate loss
+        alice.request("POST", "/api/product/workspace/remove", {
+            "workspace_id": wid, "target_user_id": bob_member["user_id"]})
+        with self.assertRaises(HTTPError):
+            bob.request("GET", f"/api/product/workspace?workspace_id={wid}")
+
     def test_ui_is_served_with_live_injection(self):
         request = Request(self.base + "/", headers={"Origin": self.origin})
         with urlopen(request, timeout=10) as response:
@@ -313,11 +362,13 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('src="/session.mjs"', html)
         self.assertIn('src="/collab.mjs"', html)
         self.assertIn('src="/collab_ui.mjs"', html)
+        self.assertIn('src="/workspaces.mjs"', html)
         # R13 live-origin shell state (#88): the module that moves the R9 page
         # off its loading placeholders when /api/config is absent is served and
         # injected after the collaboration panel so it can reorder it.
         self.assertIn('src="/live_shell.mjs"', html)
         self.assertLess(html.index('src="/collab_ui.mjs"'), html.index('src="/live_shell.mjs"'))
+        self.assertLess(html.index('src="/workspaces.mjs"'), html.index('src="/live_shell.mjs"'))
         with urlopen(Request(self.base + "/live_shell.mjs"), timeout=10) as response:
             shell = response.read().decode("utf-8")
         self.assertIn("markLiveShell", shell)
