@@ -286,25 +286,87 @@ class StreamableHTTPHandler(BaseHTTPRequestHandler):
             return header[len("Bearer "):].strip()
         return None
 
+    def _issuer(self) -> str:
+        """The absolute origin clients discovered. Injected via `--issuer` /
+        PUBLIC_ORIGIN when set (the R15C production seam); otherwise derived from
+        the proxy forwarding headers, then the request Host, then the bind
+        address. The OAuth core itself never reads Host."""
+        forced = getattr(self, "issuer_override", None)
+        if forced:
+            return forced.rstrip("/")
+        host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host")
+        if host:
+            scheme = self.headers.get("X-Forwarded-Proto") or "http"
+            return f"{scheme}://{host}".rstrip("/")
+        addr = self.server.server_address
+        return f"http://{addr[0]}:{addr[1]}"
+
+    def _oauth_headers(self) -> dict[str, str]:
+        h = {}
+        for name in ("Cookie", "X-Forwarded-Proto", "X-Forwarded-Host", "Host"):
+            v = self.headers.get(name)
+            if v is not None:
+                h[name] = v
+        return h
+
+    def _dispatch_oauth(self, method: str) -> bool:
+        """Delegate an OAuth/metadata path to the transport-neutral core. Returns
+        True if the path was handled here."""
+        parsed = urlparse(self.path)
+        route = parsed.path
+        oauth_paths = ("/.well-known/oauth-protected-resource",
+                       "/.well-known/oauth-authorization-server",
+                       "/oauth/authorize", "/oauth/token",
+                       "/oauth/register", "/oauth/revoke")
+        if not (route in oauth_paths or route.startswith("/.well-known/oauth-")):
+            return False
+        try:
+            body = self._body()
+        except ValueError as exc:
+            self._send(413, {"error": "invalid_request", "error_description": str(exc)})
+            return True
+        result = self.oauth.handle(method, route, parse_qs(parsed.query),
+                                   self._oauth_headers(), body, issuer=self._issuer())
+        self._send_raw(result.status, result.body, result.headers)
+        return True
+
+    def _send_raw(self, status, body: bytes, headers):
+        self.send_response(status)
+        for k, v in (headers or {}).items():
+            self.send_header(k, v)
+        if "Content-Length" not in (headers or {}):
+            self.send_header("Content-Length", str(len(body)))
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if body:
+            self.wfile.write(body)
+
     def do_GET(self):  # noqa: N802
+        if self._dispatch_oauth("GET"):
+            return
         if urlparse(self.path).path == "/mcp":
             self._send(405, {"error": "server-initiated streaming not supported in v0.2; POST JSON-RPC"})
         else:
             self._send(404, {"error": "not found"})
 
     def do_POST(self):  # noqa: N802
+        if self._dispatch_oauth("POST"):
+            return
         route = urlparse(self.path).path
-        if route == "/oauth/authorize":
-            return self._authorize()
-        if route == "/oauth/token":
-            return self._token()
         if route != "/mcp":
             return self._send(404, {"error": "not found"})
         bearer = self._bearer()
-        subject = self.service.subject_for(bearer)
+        issuer = self._issuer()
+        resource = self.oauth.resource_for(issuer)
+        # One audience-checked bearer gate for /mcp, then the accepted R12 subject.
+        resolved = self.oauth.resolve_bearer(bearer, resource=resource)
+        subject = self.service.subject_for(resolved) if resolved else None
         if subject is None:
-            return self._send(401, {"error": "valid bearer token required"},
-                              {"WWW-Authenticate": "Bearer"})
+            return self._send(401,
+                              {"error": "invalid_token",
+                               "error_description": "authorize at " + resource +
+                               " (no manual key or header needed)"},
+                              {"WWW-Authenticate": self.oauth.challenge_header(issuer)})
         try:
             raw = self._body()
         except ValueError as exc:
@@ -315,70 +377,45 @@ class StreamableHTTPHandler(BaseHTTPRequestHandler):
             return self._send(400, {"jsonrpc": "2.0", "id": None,
                                     "error": {"code": PARSE_ERROR, "message": "parse error"}})
         session_id = self.headers.get("Mcp-Session-Id")
+        # MCP Streamable HTTP: an unknown/expired session on a session-requiring
+        # request is HTTP 404 so the client re-initializes (sessions are
+        # in-memory; a redeploy invalidates them). initialize/notifications and
+        # notifications-only messages are exempt. A subject-mismatch on a KNOWN
+        # session stays a JSON-RPC error over 200 (handled in the core).
+        method = message.get("method") if isinstance(message, dict) else None
+        needs_session = method not in ("initialize", "notifications/initialized")
+        if (needs_session and isinstance(message, dict) and message.get("id") is not None
+                and (session_id is None or session_id not in self.core.sessions)):
+            return self._send(404, {"jsonrpc": "2.0", "id": message.get("id"),
+                                    "error": {"code": INVALID_REQUEST,
+                                              "message": "unknown or expired Mcp-Session-Id; reinitialize"}})
         # Stash the bearer on the session at initialize time so tool dispatch can
         # authenticate live-product calls with the exact token.
         reply, new_session = self.core.handle(message, subject, session_id)
         if new_session and new_session in self.core.sessions:
-            self.core.sessions[new_session]["bearer"] = bearer
+            self.core.sessions[new_session]["bearer"] = resolved
         headers = {}
         if new_session and new_session != session_id:
             headers["Mcp-Session-Id"] = new_session
         self._send(202 if reply is None else 200, reply, headers)
 
-    # -- OAuth 2.1 code + PKCE tied to the accepted R12 identity ----------
-    def _authorize(self):
-        form = parse_qs(self._body().decode("utf-8"))
-        g = lambda k: (form.get(k) or [""])[0]
-        if g("code_challenge_method") != "S256":
-            return self._send(400, {"error": "invalid_request",
-                                    "error_description": "PKCE S256 required"})
-        # Authenticate through R12: an existing user (user_id + recovery_secret)
-        # or a fresh guest. Identity is never caller-asserted beyond the proof.
-        try:
-            if g("user_id") and g("recovery_secret"):
-                creds = self.service.identity.login(g("user_id"), g("recovery_secret"),
-                                                   actor_type="agent")
-            else:
-                creds = self.service.identity.register_guest(actor_type="agent")
-        except Exception as exc:  # noqa: BLE001
-            return self._send(400, {"error": "access_denied",
-                                    "error_description": type(exc).__name__})
-        try:
-            code = self.service.runtime.remote_auth.issue_code(
-                creds.access_token, g("code_challenge"), g("redirect_uri"), g("client_id"))
-        except ValueError as exc:
-            return self._send(400, {"error": "invalid_request",
-                                    "error_description": str(exc)})
-        body = {"code": code}
-        if getattr(creds, "recovery_secret", None):
-            body["recovery_secret"] = creds.recovery_secret
-            body["user_id"] = creds.user_id
-        self._send(200, body)
 
-    def _token(self):
-        form = parse_qs(self._body().decode("utf-8"))
-        g = lambda k: (form.get(k) or [""])[0]
-        if g("grant_type") != "authorization_code":
-            return self._send(400, {"error": "unsupported_grant_type"})
-        try:
-            access_token = self.service.runtime.remote_auth.exchange_code(
-                g("code"), g("code_verifier"), g("redirect_uri"), g("client_id"))
-        except ValueError as exc:
-            return self._send(400, {"error": "invalid_grant",
-                                    "error_description": str(exc)})
-        self._send(200, {"access_token": access_token, "token_type": "Bearer"})
-
-
-def build_httpd(host="127.0.0.1", port=8899, *, runtime=None):
+def build_httpd(host="127.0.0.1", port=8899, *, runtime=None, issuer=None):
     from src.product.server import build_runtime
-    from .auth import CodeStore
+    from .oauth import GrantStore, OAuthCore
     if runtime is None:
         runtime = build_runtime(":memory:", allowed_origins=frozenset({f"http://{host}:{port}"}))
-    if not hasattr(runtime, "remote_auth"):
-        runtime.remote_auth = CodeStore()
+    # `remote_auth` is the shared grant store; keep the attribute name for
+    # compatibility with runtimes wired by earlier code.
+    store = getattr(runtime, "remote_auth", None)
+    if not isinstance(store, GrantStore):
+        store = GrantStore()
+        runtime.remote_auth = store
+    oauth = OAuthCore(runtime.identity, store)
     service = RemoteProductService(runtime)
     handler = type("BoundHandler", (StreamableHTTPHandler,),
-                   {"core": RemoteMCP(service), "service": service})
+                   {"core": RemoteMCP(service), "service": service, "oauth": oauth,
+                    "issuer_override": issuer})
     return ThreadingHTTPServer((host, port), handler)
 
 
@@ -387,8 +424,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8899)
+    parser.add_argument("--issuer", default=None,
+                        help="absolute public origin for discovery URLs (e.g. behind a proxy)")
     args = parser.parse_args()
-    httpd = build_httpd(args.host, args.port)
+    httpd = build_httpd(args.host, args.port, issuer=args.issuer)
     print(f"remote MCP on http://{args.host}:{args.port}/mcp")
     httpd.serve_forever()
     return 0

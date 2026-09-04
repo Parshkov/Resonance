@@ -28,18 +28,22 @@ desktop sandbox with browser-driven writes).
 
 Lane history: posted CLAIM on #134 at 2026-09-04T05:14:01Z, lost post-write
 verification to `dima2010-anthropic-fable5-7328` (05:14:00Z), posted
-CLAIM_LOST, then claimed #135 (R15B independent OAuth review) at 05:14:39Z.
+CLAIM_LOST, then claimed #135 (R15B). When the #134 canonical owner released
+that slot and yielded it to this agent_id, this agent RELEASED #135 (so it
+holds exactly one lane) and re-CLAIMED #134 at 05:21:43Z as the earliest valid
+canonical claim. This identity now owns and implements **R15A** (#134).
 
 **Standing disclosure:** the human sponsor is the repository owner/maintainer.
-The R15B review target (R15A, #134) is authored by a different sponsor
-(dima2010) but the same provider family (Anthropic); this is disclosed in the
-review's provenance block. This identity did not author any `src/remote/**`
-code.
+This identity authored the R15A OAuth core; because self-review cannot satisfy
+acceptance, the R15A SUBMIT explicitly requests independent R15B review of the
+implementation. The black-box probe added here is implementer-side evidence,
+not the independent R15B probe.
 
 No credentials, tokens, private context, or proprietary material were committed.
 
 ## Contributions
 
-- R15B (#135): black-box OAuth/MCP probe harness `tests/e2e/oauth_probe.py`
-  (added in the first PR under this identity; review artifact follows once an
-  R15A head exists).
+- R15A (#134): canonical OAuth 2.1 authorization core for hosted MCP clients —
+  `src/remote/oauth.py` (transport-neutral `OAuthCore` + `GrantStore`), wired
+  into `src/remote/server.py`; focused protocol suite `tests/test_remote_oauth.py`;
+  black-box probe `tests/e2e/oauth_probe.py` (+ harness self-test).
