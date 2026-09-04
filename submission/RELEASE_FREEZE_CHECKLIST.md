@@ -11,7 +11,7 @@
 - [x] Thought DNA schema: `thought-dna/0.1` (`schemas/thought-dna-0.1.schema.json`)
 - [x] contracts: discovery `resonance-discovery/0.1`; UI context `resonance-ui-context/0.1`; rich result `resonance-rich-result/0.1`; collaboration `resonance-collab/0.1`; workspaces `resonance-workspace/0.1`
 - [x] WebMCP contract/tool manifest hash: contract `resonance-webmcp/0.1`, six tools (`resonance_prepare_thought`, `resonance_get_share_preview`, `resonance_share_prepared_thought`, `resonance_discover`, `resonance_get_match`, `resonance_update_consent`) served from `demo/ui/webmcp_live.mjs` on the live origin; record `sha256sum demo/ui/webmcp_live.mjs` at freeze
-- [ ] remote MCP contract/version if included: R15 **completion** submitted as PR #128 (`resonance-remote-mcp/0.2`, rebuilt on the live product), pending independent review. Include in the release only if accepted and deployed before freeze; otherwise the live origin exposes WebMCP + product API only. Do NOT claim remote MCP as live until verified.
+- [x] remote MCP contract/version: **included** — `resonance-remote-mcp/0.1` bridge on `/mcp` (12 tools, `src/product/mcp_bridge.py`) + canonical OAuth 2.1 core (`src/remote/oauth.py`, R15A `c7d78a0`, mounted by R15C #141); exact SHA/deployment in `submission/RELEASE_MANIFEST.md`
 - [x] seeded corpus/snapshot hashes recorded: `demo/corpus/sessions.jsonl` sha256 `eba6f76e23a702f891d356754cd9bf96df727bf6c61581cd8c8431c3d4dff925` (R7 seed, create-only import; production seeded 25 sessions)
 - [ ] build/deploy environment recorded without secrets
 

@@ -21,7 +21,7 @@ On-screen line: **Context tells you where an idea lives. Structure tells you how
 > **Two paths, honestly separated (maintainer story correction):**
 > **(A) Browser WebMCP** — competition-eligibility path, visible in-page agent tool invocation. On current `main` the browser `resonance_prepare_thought` builds from the **labelled flagship page thought**, NOT the viewer's ChatGPT conversation — the video must not imply otherwise.
 > **(B) Remote MCP from a real LLM chat** — the actual cross-chat product: an external LLM client passes the *real selected conversation context* to `resonance_prepare_thought(context=…)` over remote MCP, which privately extracts Thought DNA and discovers against another independently ingested chat.
-> Show **(B)** as a live segment ONLY if the R15 revision (PR #128) is accepted and deployed and independently tested before freeze. Until then, label the remote-chat capability **"pending / submitted"** on screen and in narration — do not present it as live.
+> **(B) is live** on the same origin (R15 integrated via #132, OAuth onboarding via #141, verified on the public origin — see `submission/RELEASE_MANIFEST.md`). It may be shown as a short live segment AFTER the WebMCP core story, using the canonical `/mcp` URL only (no key on screen). It is an additional capability, not the competition mechanism.
 
 ## 0:15–0:38 — Private thought → explicit share
 

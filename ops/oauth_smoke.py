@@ -39,6 +39,17 @@ from urllib.request import HTTPCookieProcessor, HTTPRedirectHandler, Request, bu
 REDIRECT_URI = "http://127.0.0.1:8765/callback"  # loopback, never contacted
 
 
+class _Headers(dict):
+    """Case-insensitive header view: an HTTP/2 edge (Railway) lowercases every
+    header name, while Python's http.server keeps canonical case."""
+
+    def __init__(self, raw) -> None:
+        super().__init__((k.lower(), v) for k, v in raw.items())
+
+    def get(self, key, default=None):  # noqa: D401
+        return super().get(str(key).lower(), default)
+
+
 class _NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
         return None
@@ -98,9 +109,9 @@ class Smoke:
         req = Request(url, data=data, method=method, headers=headers or {})
         try:
             with self.opener.open(req, timeout=20) as r:
-                return r.status, dict(r.headers), r.read()
+                return r.status, _Headers(r.headers), r.read()
         except HTTPError as e:
-            return e.code, dict(e.headers), e.read()
+            return e.code, _Headers(e.headers), e.read()
 
     def _json(self, url, **kw):
         status, headers, body = self._req(url, **kw)
