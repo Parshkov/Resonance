@@ -18,6 +18,11 @@ On-screen line: **Context tells you where an idea lives. Structure tells you how
 
 `[RELEASE CHECK: this opening MUST be the real hosted product and a real WebMCP invocation — no mock, no localhost, no manual DOM edit.]`
 
+> **Two paths, honestly separated (maintainer story correction):**
+> **(A) Browser WebMCP** — competition-eligibility path, visible in-page agent tool invocation. On current `main` the browser `resonance_prepare_thought` builds from the **labelled flagship page thought**, NOT the viewer's ChatGPT conversation — the video must not imply otherwise.
+> **(B) Remote MCP from a real LLM chat** — the actual cross-chat product: an external LLM client passes the *real selected conversation context* to `resonance_prepare_thought(context=…)` over remote MCP, which privately extracts Thought DNA and discovers against another independently ingested chat.
+> Show **(B)** as a live segment ONLY if the R15 revision (PR #128) is accepted and deployed and independently tested before freeze. Until then, label the remote-chat capability **"pending / submitted"** on screen and in narration — do not present it as live.
+
 ## 0:15–0:38 — Private thought → explicit share
 
 **Visual:** user-selected idea; browser agent invokes `resonance_prepare_thought`; page visibly shows PRIVATE/PREPARED. Open share preview with Thought DNA nodes/relations and consented display/location fields.

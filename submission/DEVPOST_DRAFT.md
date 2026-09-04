@@ -31,6 +31,11 @@ Canonical product flow for the submitted release:
 9. In the complete product release, a user can request an introduction; the other person must explicitly accept before private collaboration begins.
 10. Accepted connections can continue in a private multi-person idea workspace with notes, tasks, messages, and artifacts. Authorized agents act only within their user's permissions.
 
+### Two transports, honestly separated
+
+- **Browser WebMCP (competition eligibility):** the page registers native `document.modelContext` tools; a browser agent invokes them and the page visibly updates. On the current build the browser `resonance_prepare_thought` builds from the labelled flagship page thought — it does **not** silently receive the user's ChatGPT conversation.
+- **Remote MCP from a real LLM chat (the cross-chat product):** an external LLM client passes the real selected conversation context to `resonance_prepare_thought(context=…)` over authenticated remote MCP; Resonance privately extracts Thought DNA, previews/shares it, and discovers against another independently ingested user's chat. This is submitted as **R15 (PR #128), pending review** — presented as a submitted extension, not claimed as live, unless accepted and deployed before freeze.
+
 **Accepted gates as of this packaging pass** (each independently reviewed and merged to `main`; verify against the frozen SHA before submit):
 
 | gate | what it adds | status |
