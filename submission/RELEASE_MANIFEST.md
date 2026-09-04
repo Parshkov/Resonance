@@ -15,7 +15,7 @@
 | DB migrations | `0001_init` … `0004_workspaces`, **`0005_oauth_grants`** (durable OAuth codes / refresh grants / client registrations) |
 | since the frozen record | durable OAuth grants (no re-authorization after redeploy); RFC 7009 refresh→access revoke cascade; HEAD support; browser `resonance_prepare_thought` accepts the agent's real `thought`/`context`; empty raw-text drafts refused with guidance; live view shows the person's own thought and renders direct/approximate resonances; styled OAuth consent page naming the client; R15D hosted-client probe tooling merged |
 | suites | 440 OK on `01193f1`; 443 OK on the #149 tree (2 skipped each) |
-| public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (pending the pass-2 verification session) |
+| public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (deployment `86aebe9b`: HEAD + consent.css OK, OAuth smoke 27/27, hosted probe 9/9 required + 6/6 optional, A/B/C 35/35, remote-MCP empty-draft refusal 7/7, browser path 11/11 incl. `/api/context?source=live` = own thought and implicit-prose 400 + no draft left, Playwright: own thought rendered on Live MCP with 3 resonance cards for 15 backend rows, consent page named + styled) |
 | still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome; a real ChatGPT / Claude connector session (Cards A–C) |
 
 # WebMCP Challenge release manifest (frozen competition record)
