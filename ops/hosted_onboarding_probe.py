@@ -307,15 +307,19 @@ class OnboardingProbe:
     def initialize(self) -> Step:
         status, doc = self._rpc("initialize", {"protocolVersion": "2025-03-26"})
         proto = (((doc or {}).get("result") or {}).get("protocolVersion"))
-        ok = status == 200 and proto == "2025-03-26" and bool(self.session_id)
+        # Mcp-Session-Id is optional in Streamable HTTP: a server may be stateful
+        # (issues + binds a session) or stateless (bearer authenticates each
+        # request). Require a valid initialize result, not a session.
+        ok = status == 200 and proto == "2025-03-26"
+        mode = "stateful (session bound)" if self.session_id else "stateless (bearer per request)"
         return self._record(Step("MCP initialize (Bearer)", ok, True,
-                                 f"session={'issued' if self.session_id else 'missing'}",
-                                 status))
+                                 f"protocol {proto}; {mode}", status))
 
     def tools_list(self) -> Step:
         status, doc = self._rpc("tools/list")
         tools = (((doc or {}).get("result") or {}).get("tools")) or []
         names = [t.get("name") for t in tools]
+        self.tool_names = set(names)
         ok = status == 200 and any(n and n.startswith("resonance_") for n in names)
         return self._record(Step("tools/list", ok, True, f"{len(names)} tools", status,
                                  {"tool_names": names}))
@@ -335,9 +339,20 @@ class OnboardingProbe:
         return status, result, (result.get("structuredContent") or {})
 
     def smoke(self) -> Step:
+        # Works against both the 15-tool remote surface (separate
+        # get_share_preview) and the 12-tool product surface (prepare returns the
+        # confirmation_token directly, share requires request_id). Uses a UNIQUE
+        # cue-laden chat each run so the deterministic Thought-DNA id is fresh
+        # (the product forbids re-sharing the same DNA).
+        tools = getattr(self, "tool_names", set())
+        uniq = secrets.token_hex(3)
+        chat = (f"Our {uniq} rollout stalls because the staging queue is a bottleneck. "
+                f"The bottleneck causes delayed builds, and delayed builds lead to "
+                f"hotfix pileups, so release confidence drops. Adding a parallel lane "
+                f"prevents the pileup and supports steadier ships.")
         try:
             _, res, sc = self._call("resonance_prepare_thought",
-                                    {"context": SAMPLE_CHAT,
+                                    {"context": chat,
                                      "presentation": {"domain": "engineering",
                                                       "topic": "process",
                                                       "cluster_id": "c1"},
@@ -346,11 +361,14 @@ class OnboardingProbe:
                 return self._record(Step("post-connect smoke", False, False,
                                          f"prepare produced no draft ({sc})"))
             draft = sc["draft_id"]
-            _, res, sc = self._call("resonance_get_share_preview", {"draft_id": draft})
-            token = sc.get("confirmation_token")
-            _, res, sc = self._call("resonance_share_thought",
-                                    {"draft_id": draft, "confirmation_token": token,
-                                     "confirm": True})
+            token = sc.get("confirmation_token")     # product surface: token in prepare
+            session_id = sc.get("session_id")
+            if not token and "resonance_get_share_preview" in tools:
+                _, res, sc = self._call("resonance_get_share_preview", {"draft_id": draft})
+                token = sc.get("confirmation_token")
+            share_args = {"draft_id": draft, "confirmation_token": token, "confirm": True,
+                          "request_id": "probe-" + secrets.token_hex(8)}
+            _, res, sc = self._call("resonance_share_thought", share_args)
             if res.get("isError") or not sc.get("session_id"):
                 return self._record(Step("post-connect smoke", False, False,
                                          f"share failed ({sc})"))
@@ -358,7 +376,7 @@ class OnboardingProbe:
             _, res, sc = self._call("resonance_discover", {"session_id": session_id, "k": 5})
             ok = not res.get("isError")
             n = len(sc.get("matches", []))
-            return self._record(Step("post-connect smoke (prepare→preview→share→discover)",
+            return self._record(Step("post-connect smoke (prepare→share→discover)",
                                      ok, False, f"shared {session_id}, discover ok ({n} matches)"))
         except Exception as exc:  # noqa: BLE001
             return self._record(Step("post-connect smoke", False, False, f"exception: {exc}"))
