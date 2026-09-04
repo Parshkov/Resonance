@@ -52,7 +52,7 @@ on purpose.
 
 ```bash
 # repository gates (any machine)
-python3 -m unittest discover -s tests                 # 460 tests, 1 skip without PostgreSQL
+python3 -m unittest discover -s tests                 # 463 tests, 1 skip without PostgreSQL
 python3 benchmark/r0-v0.2/runner.py                  # engine gates, exit 0
 python3 benchmark/extraction-v0.2/runner.py          # extractor gates, exit 0
 
@@ -91,12 +91,20 @@ Card B steps 1–6 executed by an agent; a human still has to do it once).
 - The live corpus carries duplicated guest sessions left by repeated acceptance
   runs (4× panic buying, 4× retry observability, 2× "Shared thought" as of
   generation 348). They are real `volunteer` rows, so `purge-demo` leaves them.
-  Either the owner deletes them, or the acceptance scripts learn to revoke
-  their own guests at the end (`resonance_stop_sharing` / consent revoke).
+  **New runs no longer add to the pile:** `abc_mcp_test.py` and
+  `hosted_onboarding_probe.py --smoke` now revoke their own guests before
+  exiting (#161), and `browser_harness.py` already did. Deleting the rows that
+  accumulated before that fix is still an owner action.
 - On production the classical A/A' pair (irrigation retry storm vs delivery
-  retry storm) is `approximate` with one contradiction, not `analogical`; see
-  the evidence summary. Whether one contradicting relation should demote an
-  otherwise systematic mapping is for the ADR-0004 gold review.
+  retry storm) is `approximate`, not `analogical`. The earlier reading — that a
+  single contradicting relation demoted an otherwise systematic mapping — was
+  wrong and is corrected in `docs/decisions/ADR-0005-...`: the pair shares
+  vocabulary (`surface_semantic` 0.44 >= `T_SAME_WORDS` 0.30), so `classify()`
+  takes the same-subject-matter branch where `analogical` is unreachable by
+  construction, and returns `approximate` because one query relation has no
+  counterpart (`r_direct` 0.86). Whether the analogy branch should be gated on
+  domain overlap alone is an open policy question for the human gold review
+  (ADR-0005); it needs human-authored gold, not a threshold change.
 
 - Benchmark v0.2 gold is agent-authored; human review pending (ADR-0004).
 - Corpus scale replay 10^4–10^5 not done.
