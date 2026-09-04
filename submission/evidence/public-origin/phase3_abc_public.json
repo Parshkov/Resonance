@@ -1,0 +1,1496 @@
+{
+  "resource": "https://resonance-production-cfe3.up.railway.app/mcp",
+  "started_utc": "2026-09-04T06:20:49Z",
+  "steps": [
+    {
+      "step": "onboard A (register + PKCE + guest consent + token)",
+      "pass": true
+    },
+    {
+      "step": "initialize A",
+      "pass": true
+    },
+    {
+      "step": "whoami A returns account",
+      "pass": true
+    },
+    {
+      "step": "onboard B (register + PKCE + guest consent + token)",
+      "pass": true
+    },
+    {
+      "step": "initialize B",
+      "pass": true
+    },
+    {
+      "step": "whoami B returns account",
+      "pass": true
+    },
+    {
+      "step": "onboard C (register + PKCE + guest consent + token)",
+      "pass": true
+    },
+    {
+      "step": "initialize C",
+      "pass": true
+    },
+    {
+      "step": "whoami C returns account",
+      "pass": true
+    },
+    {
+      "step": "three distinct accounts",
+      "pass": true,
+      "user_ids": [
+        "person-2672f00ddb",
+        "person-318b8c85ff",
+        "person-71d0ada06a"
+      ]
+    },
+    {
+      "step": "A raw-text prepare (not shared) accepted",
+      "pass": true
+    },
+    {
+      "step": "A prepare_thought (structured) -> private draft + confirmation_token",
+      "pass": true
+    },
+    {
+      "step": "A share without confirm refused",
+      "pass": true
+    },
+    {
+      "step": "A share_thought(confirm=true) -> discoverable",
+      "pass": true
+    },
+    {
+      "step": "B prepare_thought (structured) -> private draft + confirmation_token",
+      "pass": true
+    },
+    {
+      "step": "B share without confirm refused",
+      "pass": true
+    },
+    {
+      "step": "B share_thought(confirm=true) -> discoverable",
+      "pass": true
+    },
+    {
+      "step": "C prepare_thought (structured) -> private draft + confirmation_token",
+      "pass": true
+    },
+    {
+      "step": "C share without confirm refused",
+      "pass": true
+    },
+    {
+      "step": "C share_thought(confirm=true) -> discoverable",
+      "pass": true
+    },
+    {
+      "step": "B my_thoughts shows B's session discoverable",
+      "pass": true
+    },
+    {
+      "step": "B discover returns result_id",
+      "pass": true
+    },
+    {
+      "step": "B discover: A present in matches",
+      "pass": true
+    },
+    {
+      "step": "B discover: B (self) absent",
+      "pass": true
+    },
+    {
+      "step": "B discover: A ranked above C (or C not accepted at all)",
+      "pass": true,
+      "rank_A": 0,
+      "rank_C": null
+    },
+    {
+      "step": "B explain_match(result_id, A) ok",
+      "pass": true
+    },
+    {
+      "step": "A cannot read B's result (subject isolation -> error)",
+      "pass": true
+    },
+    {
+      "step": "C request_intro to A without discovery (observed, no expectation asserted)",
+      "pass": true,
+      "observed_error": null,
+      "observed_state": "requested"
+    },
+    {
+      "step": "B request_intro -> A created",
+      "pass": true
+    },
+    {
+      "step": "B request_intro replay with same request_id is idempotent",
+      "pass": true,
+      "replay_intro_id_equal": true,
+      "error": null
+    },
+    {
+      "step": "A list_intros shows B's incoming intro",
+      "pass": true
+    },
+    {
+      "step": "A respond_intro(accept) -> channel",
+      "pass": true
+    },
+    {
+      "step": "A send_message delivered",
+      "pass": true
+    },
+    {
+      "step": "B read_messages sees A's message",
+      "pass": true
+    },
+    {
+      "step": "C (non-member) cannot read the channel",
+      "pass": true
+    },
+    {
+      "step": "A stop_sharing -> revoked",
+      "pass": true
+    },
+    {
+      "step": "A whoami no longer lists the session as shared",
+      "pass": true,
+      "shared_thoughts": [],
+      "private_thoughts_count": 2
+    },
+    {
+      "step": "B discover after revoke: A absent from matches AND rejected",
+      "pass": true
+    },
+    {
+      "step": "B explain_match on old result after A revoked (observed)",
+      "pass": true,
+      "observed_error": "stale_result"
+    },
+    {
+      "step": "cleanup: B stop_sharing",
+      "pass": true
+    },
+    {
+      "step": "cleanup: C stop_sharing",
+      "pass": true
+    }
+  ],
+  "health": {
+    "ok": true,
+    "mode": "live",
+    "freshness": {
+      "db_generation": 81,
+      "serving_generation": 81,
+      "index_current": true,
+      "engine_snapshot": "f7f839d595712aa5467cc12fd91b19c44ccc944f2f0a415f466b4240f8a05892"
+    }
+  },
+  "onboarding": [
+    {
+      "identity": "A",
+      "registration_status": 201,
+      "token_status": 200,
+      "got_access_token": true,
+      "got_refresh_token": true,
+      "client_id_prefix": "resonanc…",
+      "initialize": {
+        "status": 200,
+        "protocolVersion": "2025-06-18",
+        "serverInfo": {
+          "name": "resonance",
+          "version": "0.1.0"
+        },
+        "mcp_session_id_header_present": false
+      },
+      "whoami": {
+        "user_id": "person-2672f00ddb",
+        "actor_type": "agent",
+        "display_label": "guest-e1a81b",
+        "shared_thoughts": [],
+        "contract_version": "resonance-remote-mcp/0.1"
+      }
+    },
+    {
+      "identity": "B",
+      "registration_status": 201,
+      "token_status": 200,
+      "got_access_token": true,
+      "got_refresh_token": true,
+      "client_id_prefix": "resonanc…",
+      "initialize": {
+        "status": 200,
+        "protocolVersion": "2025-06-18",
+        "serverInfo": {
+          "name": "resonance",
+          "version": "0.1.0"
+        },
+        "mcp_session_id_header_present": false
+      },
+      "whoami": {
+        "user_id": "person-318b8c85ff",
+        "actor_type": "agent",
+        "display_label": "guest-50261f",
+        "shared_thoughts": [],
+        "contract_version": "resonance-remote-mcp/0.1"
+      }
+    },
+    {
+      "identity": "C",
+      "registration_status": 201,
+      "token_status": 200,
+      "got_access_token": true,
+      "got_refresh_token": true,
+      "client_id_prefix": "resonanc…",
+      "initialize": {
+        "status": 200,
+        "protocolVersion": "2025-06-18",
+        "serverInfo": {
+          "name": "resonance",
+          "version": "0.1.0"
+        },
+        "mcp_session_id_header_present": false
+      },
+      "whoami": {
+        "user_id": "person-71d0ada06a",
+        "actor_type": "agent",
+        "display_label": "guest-31fdde",
+        "shared_thoughts": [],
+        "contract_version": "resonance-remote-mcp/0.1"
+      }
+    }
+  ],
+  "raw_text_prepare_A_not_shared": {
+    "http_status": 200,
+    "input_kind": "raw_text_fallback",
+    "source_retention": "not_retained",
+    "draft_id": "draft-650612fee09ff8c1a8a550c7",
+    "discoverable": false,
+    "warnings": [],
+    "extracted_node_count": 0,
+    "extracted_relation_count": 0,
+    "error": null
+  },
+  "shares": {
+    "A": {
+      "identity": "A",
+      "prepare_status": 200,
+      "draft_id": "draft-2a9c6da965a9093fcc81725a",
+      "session_id_at_prepare": "ses-d1135a3b0d3c0e1e",
+      "input_kind": "agent_structured",
+      "source_retention": "not_retained",
+      "discoverable_after_prepare": false,
+      "requires_explicit_confirmation": true,
+      "preview_node_count": 7,
+      "preview_relation_count": 7,
+      "preview_relations": [
+        [
+          "a0",
+          "causes",
+          "a1"
+        ],
+        [
+          "a1",
+          "causes",
+          "a2"
+        ],
+        [
+          "a2",
+          "causes",
+          "a3"
+        ],
+        [
+          "a3",
+          "causes",
+          "a1"
+        ],
+        [
+          "a4",
+          "constrains",
+          "a1"
+        ],
+        [
+          "a5",
+          "prevents",
+          "a3"
+        ],
+        [
+          "a6",
+          "prevents",
+          "a2"
+        ]
+      ],
+      "presentation": {
+        "topic": "Retry storm turns partial outage into full outage",
+        "domain": "distributed-systems",
+        "cluster_id": "retry-storm-turns-partial-outage-into-full-outag"
+      },
+      "error": null,
+      "message": null,
+      "share_without_confirm": {
+        "http_status": 200,
+        "error": "confirmation_required"
+      },
+      "share_status": 200,
+      "shared": true,
+      "discoverable_after_share": true,
+      "session_id": "ses-d1135a3b0d3c0e1e",
+      "share_error": null
+    },
+    "B": {
+      "identity": "B",
+      "prepare_status": 200,
+      "draft_id": "draft-b21c6656bb1a3e92e04dd104",
+      "session_id_at_prepare": "ses-fadeaeda06454f9d",
+      "input_kind": "agent_structured",
+      "source_retention": "not_retained",
+      "discoverable_after_prepare": false,
+      "requires_explicit_confirmation": true,
+      "preview_node_count": 7,
+      "preview_relation_count": 7,
+      "preview_relations": [
+        [
+          "b0",
+          "causes",
+          "b1"
+        ],
+        [
+          "b1",
+          "causes",
+          "b2"
+        ],
+        [
+          "b2",
+          "causes",
+          "b3"
+        ],
+        [
+          "b3",
+          "causes",
+          "b1"
+        ],
+        [
+          "b4",
+          "constrains",
+          "b1"
+        ],
+        [
+          "b5",
+          "prevents",
+          "b3"
+        ],
+        [
+          "b6",
+          "prevents",
+          "b2"
+        ]
+      ],
+      "presentation": {
+        "topic": "Panic buying turns a rumour into a shortage",
+        "domain": "retail-logistics",
+        "cluster_id": "panic-buying-turns-a-rumour-into-a-shortage"
+      },
+      "error": null,
+      "message": null,
+      "share_without_confirm": {
+        "http_status": 200,
+        "error": "confirmation_required"
+      },
+      "share_status": 200,
+      "shared": true,
+      "discoverable_after_share": true,
+      "session_id": "ses-fadeaeda06454f9d",
+      "share_error": null
+    },
+    "C": {
+      "identity": "C",
+      "prepare_status": 200,
+      "draft_id": "draft-f32641f67c86ae7358bdd2d6",
+      "session_id_at_prepare": "ses-7b29b88cdefd3761",
+      "input_kind": "agent_structured",
+      "source_retention": "not_retained",
+      "discoverable_after_prepare": false,
+      "requires_explicit_confirmation": true,
+      "preview_node_count": 7,
+      "preview_relation_count": 6,
+      "preview_relations": [
+        [
+          "c0",
+          "causes",
+          "c1"
+        ],
+        [
+          "c2",
+          "part_of",
+          "c4"
+        ],
+        [
+          "c3",
+          "part_of",
+          "c4"
+        ],
+        [
+          "c1",
+          "supports",
+          "c2"
+        ],
+        [
+          "c4",
+          "supports",
+          "c5"
+        ],
+        [
+          "c6",
+          "requires",
+          "c3"
+        ]
+      ],
+      "presentation": {
+        "topic": "Outage retries and timeouts dashboard",
+        "domain": "distributed-systems",
+        "cluster_id": "outage-retries-and-timeouts-dashboard"
+      },
+      "error": null,
+      "message": null,
+      "share_without_confirm": {
+        "http_status": 200,
+        "error": "confirmation_required"
+      },
+      "share_status": 200,
+      "shared": true,
+      "discoverable_after_share": true,
+      "session_id": "ses-7b29b88cdefd3761",
+      "share_error": null
+    }
+  },
+  "session_ids": {
+    "A": "ses-d1135a3b0d3c0e1e",
+    "B": "ses-fadeaeda06454f9d",
+    "C": "ses-7b29b88cdefd3761"
+  },
+  "B_my_thoughts": {
+    "ses-fadeaeda06454f9d": "discoverable"
+  },
+  "B_discover_1": {
+    "http_status": 200,
+    "result_id": "result-21330ad10b4fd06cf06984be",
+    "query_session_id": "ses-fadeaeda06454f9d",
+    "source": "live",
+    "discovery_contract": "resonance-discovery/0.1",
+    "match_count": 6,
+    "rejected_count": 0,
+    "order": [
+      "ses-d1135a3b0d3c0e1e",
+      "ses-gabe-warehouse",
+      "ses-jonas-diagnostics",
+      "ses-lina-scaffold",
+      "ses-mei-battery-heat",
+      "ses-omar-chronology"
+    ],
+    "rank_A": 0,
+    "rank_C": null,
+    "A_in_rejected": false,
+    "C_in_rejected": false,
+    "match_A": {
+      "session_id": "ses-d1135a3b0d3c0e1e",
+      "person_pseudonym": "guest-e1a81b",
+      "scores": {
+        "structural": 0.8875000000000001,
+        "semantic": 0.09659863945578231,
+        "r_direct": 1.0,
+        "y_systematicity": 1.0,
+        "coverage_containment": 1.0,
+        "contradiction": 0.0,
+        "h_sign_conflict": false
+      },
+      "rank_fields": {},
+      "evidence": {
+        "preserved_relation_count": 7,
+        "top_correspondences": [
+          {
+            "query_node": "b0",
+            "candidate_node": "a0",
+            "query_label": "shortage rumour",
+            "candidate_label": "partial upstream outage"
+          },
+          {
+            "query_node": "b1",
+            "candidate_node": "a1",
+            "query_label": "synchronized bulk purchasing",
+            "candidate_label": "synchronized client retries"
+          },
+          {
+            "query_node": "b2",
+            "candidate_node": "a2",
+            "query_label": "demand amplification",
+            "candidate_label": "request amplification"
+          },
+          {
+            "query_node": "b3",
+            "candidate_node": "a3",
+            "query_label": "empty shelves",
+            "candidate_label": "cascading saturation"
+          },
+          {
+            "query_node": "b4",
+            "candidate_node": "a4",
+            "query_label": "per-customer purchase cap",
+            "candidate_label": "per-client retry budget"
+          }
+        ],
+        "mapped_node_count": 7,
+        "contradiction_count": 0,
+        "preserved_relations": [
+          {
+            "query_relation": "r0",
+            "candidate_relation": "r0"
+          },
+          {
+            "query_relation": "r1",
+            "candidate_relation": "r1"
+          },
+          {
+            "query_relation": "r2",
+            "candidate_relation": "r2"
+          },
+          {
+            "query_relation": "r3",
+            "candidate_relation": "r3"
+          },
+          {
+            "query_relation": "r4",
+            "candidate_relation": "r4"
+          }
+        ]
+      },
+      "display": {
+        "cluster_id": "retry-storm-turns-partial-outage-into-full-outag",
+        "topic": "Retry storm turns partial outage into full outage",
+        "domain": "distributed-systems"
+      },
+      "other_keys": [
+        "actions",
+        "confidence",
+        "hard_rejection",
+        "match_id",
+        "mode_classification"
+      ]
+    },
+    "match_C": null,
+    "rejected_C": null,
+    "top_5": [
+      {
+        "session_id": "ses-d1135a3b0d3c0e1e",
+        "person_pseudonym": "guest-e1a81b",
+        "scores": {
+          "structural": 0.8875000000000001,
+          "semantic": 0.09659863945578231,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "rank_fields": {},
+        "evidence": {
+          "preserved_relation_count": 7,
+          "top_correspondences": [
+            {
+              "query_node": "b0",
+              "candidate_node": "a0",
+              "query_label": "shortage rumour",
+              "candidate_label": "partial upstream outage"
+            },
+            {
+              "query_node": "b1",
+              "candidate_node": "a1",
+              "query_label": "synchronized bulk purchasing",
+              "candidate_label": "synchronized client retries"
+            },
+            {
+              "query_node": "b2",
+              "candidate_node": "a2",
+              "query_label": "demand amplification",
+              "candidate_label": "request amplification"
+            },
+            {
+              "query_node": "b3",
+              "candidate_node": "a3",
+              "query_label": "empty shelves",
+              "candidate_label": "cascading saturation"
+            },
+            {
+              "query_node": "b4",
+              "candidate_node": "a4",
+              "query_label": "per-customer purchase cap",
+              "candidate_label": "per-client retry budget"
+            }
+          ],
+          "mapped_node_count": 7,
+          "contradiction_count": 0,
+          "preserved_relations": [
+            {
+              "query_relation": "r0",
+              "candidate_relation": "r0"
+            },
+            {
+              "query_relation": "r1",
+              "candidate_relation": "r1"
+            },
+            {
+              "query_relation": "r2",
+              "candidate_relation": "r2"
+            },
+            {
+              "query_relation": "r3",
+              "candidate_relation": "r3"
+            },
+            {
+              "query_relation": "r4",
+              "candidate_relation": "r4"
+            }
+          ]
+        },
+        "display": {
+          "cluster_id": "retry-storm-turns-partial-outage-into-full-outag",
+          "topic": "Retry storm turns partial outage into full outage",
+          "domain": "distributed-systems"
+        },
+        "other_keys": [
+          "actions",
+          "confidence",
+          "hard_rejection",
+          "match_id",
+          "mode_classification"
+        ]
+      },
+      {
+        "session_id": "ses-gabe-warehouse",
+        "person_pseudonym": "Gabe S.",
+        "scores": {
+          "structural": 0.676890756302521,
+          "semantic": 0.028571428571428574,
+          "r_direct": 0.5714285714285714,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.14285714285714285,
+          "h_sign_conflict": false
+        },
+        "rank_fields": {},
+        "evidence": {
+          "preserved_relation_count": 4,
+          "top_correspondences": [
+            {
+              "query_node": "b0",
+              "candidate_node": "n0",
+              "query_label": "shortage rumour",
+              "candidate_label": "inbound surge"
+            },
+            {
+              "query_node": "b1",
+              "candidate_node": "n1",
+              "query_label": "synchronized bulk purchasing",
+              "candidate_label": "staging pile-up"
+            },
+            {
+              "query_node": "b2",
+              "candidate_node": "n2",
+              "query_label": "demand amplification",
+              "candidate_label": "dock congestion"
+            },
+            {
+              "query_node": "b3",
+              "candidate_node": "n5",
+              "query_label": "empty shelves",
+              "candidate_label": "missed SLA"
+            },
+            {
+              "query_node": "b4",
+              "candidate_node": "n3",
+              "query_label": "per-customer purchase cap",
+              "candidate_label": "labor cap"
+            }
+          ],
+          "mapped_node_count": 7,
+          "contradiction_count": 1,
+          "preserved_relations": [
+            {
+              "query_relation": "r0",
+              "candidate_relation": "r0"
+            },
+            {
+              "query_relation": "r1",
+              "candidate_relation": "r1"
+            },
+            {
+              "query_relation": "r2",
+              "candidate_relation": "r2"
+            },
+            {
+              "query_relation": "r5",
+              "candidate_relation": "r4"
+            }
+          ]
+        },
+        "display": {
+          "cluster_id": "accumulating-intermediary-failure",
+          "topic": "inbound staging pile-up",
+          "domain": "logistics"
+        },
+        "other_keys": [
+          "actions",
+          "confidence",
+          "hard_rejection",
+          "match_id",
+          "mode_classification"
+        ]
+      },
+      {
+        "session_id": "ses-jonas-diagnostics",
+        "person_pseudonym": "Jonas H.",
+        "scores": {
+          "structural": 0.2822619047619047,
+          "semantic": 0.023809523809523808,
+          "r_direct": 0.2857142857142857,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.07142857142857142,
+          "h_sign_conflict": false
+        },
+        "rank_fields": {},
+        "evidence": {
+          "preserved_relation_count": 2,
+          "top_correspondences": [
+            {
+              "query_node": "b0",
+              "candidate_node": "n0",
+              "query_label": "shortage rumour",
+              "candidate_label": "undiagnosed fever"
+            },
+            {
+              "query_node": "b1",
+              "candidate_node": "n5",
+              "query_label": "synchronized bulk purchasing",
+              "candidate_label": "treatment lock"
+            },
+            {
+              "query_node": "b2",
+              "candidate_node": "n7",
+              "query_label": "demand amplification",
+              "candidate_label": "inflammatory state"
+            },
+            {
+              "query_node": "b3",
+              "candidate_node": "n1",
+              "query_label": "empty shelves",
+              "candidate_label": "panel sequencing"
+            },
+            {
+              "query_node": "b4",
+              "candidate_node": "n4",
+              "query_label": "per-customer purchase cap",
+              "candidate_label": "sample volume cap"
+            }
+          ],
+          "mapped_node_count": 7,
+          "contradiction_count": 1,
+          "preserved_relations": [
+            {
+              "query_relation": "r3",
+              "candidate_relation": "r4"
+            },
+            {
+              "query_relation": "r4",
+              "candidate_relation": "r7"
+            }
+          ]
+        },
+        "display": {
+          "cluster_id": "method-resource-hub",
+          "topic": "undiagnosed inflammatory fever",
+          "domain": "clinical-diagnostics"
+        },
+        "other_keys": [
+          "actions",
+          "confidence",
+          "hard_rejection",
+          "match_id",
+          "mode_classification"
+        ]
+      },
+      {
+        "session_id": "ses-lina-scaffold",
+        "person_pseudonym": "Lina F.",
+        "scores": {
+          "structural": 0.2822619047619047,
+          "semantic": 0.023809523809523808,
+          "r_direct": 0.2857142857142857,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.07142857142857142,
+          "h_sign_conflict": false
+        },
+        "rank_fields": {},
+        "evidence": {
+          "preserved_relation_count": 2,
+          "top_correspondences": [
+            {
+              "query_node": "b0",
+              "candidate_node": "n0",
+              "query_label": "shortage rumour",
+              "candidate_label": "missing prerequisite"
+            },
+            {
+              "query_node": "b1",
+              "candidate_node": "n5",
+              "query_label": "synchronized bulk purchasing",
+              "candidate_label": "course completion"
+            },
+            {
+              "query_node": "b2",
+              "candidate_node": "n7",
+              "query_label": "demand amplification",
+              "candidate_label": "confidence gap"
+            },
+            {
+              "query_node": "b3",
+              "candidate_node": "n1",
+              "query_label": "empty shelves",
+              "candidate_label": "scaffolded studio"
+            },
+            {
+              "query_node": "b4",
+              "candidate_node": "n4",
+              "query_label": "per-customer purchase cap",
+              "candidate_label": "contact-hour cap"
+            }
+          ],
+          "mapped_node_count": 7,
+          "contradiction_count": 1,
+          "preserved_relations": [
+            {
+              "query_relation": "r3",
+              "candidate_relation": "r4"
+            },
+            {
+              "query_relation": "r4",
+              "candidate_relation": "r7"
+            }
+          ]
+        },
+        "display": {
+          "cluster_id": "method-resource-hub",
+          "topic": "missing prerequisite module",
+          "domain": "education"
+        },
+        "other_keys": [
+          "actions",
+          "confidence",
+          "hard_rejection",
+          "match_id",
+          "mode_classification"
+        ]
+      },
+      {
+        "session_id": "ses-mei-battery-heat",
+        "person_pseudonym": "Mei L.",
+        "scores": {
+          "structural": 0.676890756302521,
+          "semantic": 0.023809523809523808,
+          "r_direct": 0.5714285714285714,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.14285714285714285,
+          "h_sign_conflict": false
+        },
+        "rank_fields": {},
+        "evidence": {
+          "preserved_relation_count": 4,
+          "top_correspondences": [
+            {
+              "query_node": "b0",
+              "candidate_node": "n0",
+              "query_label": "shortage rumour",
+              "candidate_label": "cell heat"
+            },
+            {
+              "query_node": "b1",
+              "candidate_node": "n1",
+              "query_label": "synchronized bulk purchasing",
+              "candidate_label": "electrolyte breakdown"
+            },
+            {
+              "query_node": "b2",
+              "candidate_node": "n2",
+              "query_label": "demand amplification",
+              "candidate_label": "rising resistance"
+            },
+            {
+              "query_node": "b3",
+              "candidate_node": "n5",
+              "query_label": "empty shelves",
+              "candidate_label": "capacity fade"
+            },
+            {
+              "query_node": "b4",
+              "candidate_node": "n3",
+              "query_label": "per-customer purchase cap",
+              "candidate_label": "charge-rate cap"
+            }
+          ],
+          "mapped_node_count": 7,
+          "contradiction_count": 1,
+          "preserved_relations": [
+            {
+              "query_relation": "r0",
+              "candidate_relation": "r0"
+            },
+            {
+              "query_relation": "r1",
+              "candidate_relation": "r1"
+            },
+            {
+              "query_relation": "r2",
+              "candidate_relation": "r2"
+            },
+            {
+              "query_relation": "r5",
+              "candidate_relation": "r4"
+            }
+          ]
+        },
+        "display": {
+          "cluster_id": "accumulating-intermediary-failure",
+          "topic": "cell heat degradation",
+          "domain": "energy-storage"
+        },
+        "other_keys": [
+          "actions",
+          "confidence",
+          "hard_rejection",
+          "match_id",
+          "mode_classification"
+        ]
+      }
+    ],
+    "aggregation": {
+      "basis": "discoverable_matches_with_shareable_location_only",
+      "anti_inference_minimum": 3,
+      "suppressed_bucket_count": 4,
+      "buckets": []
+    },
+    "freshness": {
+      "db_generation": 91,
+      "serving_generation": 91,
+      "index_current": true,
+      "engine_snapshot": "c7466106c8180896bc38661f39650d5ba5b67e25573c27f812a2ada7b4592ff3"
+    },
+    "error": null,
+    "message": null
+  },
+  "B_explain_A": {
+    "http_status": 200,
+    "error": null,
+    "keys": [
+      "contract_version",
+      "freshness",
+      "match",
+      "result_id",
+      "source"
+    ],
+    "scores": null,
+    "evidence": null,
+    "match": {
+      "session_id": "ses-d1135a3b0d3c0e1e",
+      "person_pseudonym": "guest-e1a81b",
+      "scores": {
+        "structural": 0.8875000000000001,
+        "semantic": 0.09659863945578231,
+        "r_direct": 1.0,
+        "y_systematicity": 1.0,
+        "coverage_containment": 1.0,
+        "contradiction": 0.0,
+        "h_sign_conflict": false
+      },
+      "rank_fields": {},
+      "evidence": {
+        "preserved_relation_count": 7,
+        "top_correspondences": [
+          {
+            "query_node": "b0",
+            "candidate_node": "a0",
+            "query_label": "shortage rumour",
+            "candidate_label": "partial upstream outage"
+          },
+          {
+            "query_node": "b1",
+            "candidate_node": "a1",
+            "query_label": "synchronized bulk purchasing",
+            "candidate_label": "synchronized client retries"
+          },
+          {
+            "query_node": "b2",
+            "candidate_node": "a2",
+            "query_label": "demand amplification",
+            "candidate_label": "request amplification"
+          },
+          {
+            "query_node": "b3",
+            "candidate_node": "a3",
+            "query_label": "empty shelves",
+            "candidate_label": "cascading saturation"
+          },
+          {
+            "query_node": "b4",
+            "candidate_node": "a4",
+            "query_label": "per-customer purchase cap",
+            "candidate_label": "per-client retry budget"
+          }
+        ],
+        "mapped_node_count": 7,
+        "contradiction_count": 0,
+        "preserved_relations": [
+          {
+            "query_relation": "r0",
+            "candidate_relation": "r0"
+          },
+          {
+            "query_relation": "r1",
+            "candidate_relation": "r1"
+          },
+          {
+            "query_relation": "r2",
+            "candidate_relation": "r2"
+          },
+          {
+            "query_relation": "r3",
+            "candidate_relation": "r3"
+          },
+          {
+            "query_relation": "r4",
+            "candidate_relation": "r4"
+          }
+        ]
+      },
+      "display": {
+        "cluster_id": "retry-storm-turns-partial-outage-into-full-outag",
+        "topic": "Retry storm turns partial outage into full outage",
+        "domain": "distributed-systems"
+      },
+      "other_keys": [
+        "actions",
+        "confidence",
+        "hard_rejection",
+        "match_id",
+        "mode_classification"
+      ]
+    }
+  },
+  "A_explain_Bs_result": {
+    "http_status": 200,
+    "error": "validation_failed",
+    "message": "discovery result is unknown, expired, or not yours; run discovery again"
+  },
+  "C_request_intro_A_without_discovery": {
+    "http_status": 200,
+    "error": null,
+    "message": "hello",
+    "intro_id": "intro-50dd6b087f0338ab27711fba",
+    "state": "requested"
+  },
+  "B_request_intro_A": {
+    "http_status": 200,
+    "intro_id": "intro-9789876e207f91c20d932a3f",
+    "state": "requested",
+    "direction": "outgoing",
+    "error": null,
+    "message": null,
+    "keys": [
+      "counterpart_display",
+      "created_at",
+      "direction",
+      "from_session_id",
+      "intro_id",
+      "message",
+      "state",
+      "to_session_id",
+      "untrusted",
+      "updated_at"
+    ]
+  },
+  "A_list_intros": {
+    "http_status": 200,
+    "incoming_count": 2,
+    "outgoing_count": 0,
+    "incoming_match": {
+      "intro_id": "intro-9789876e207f91c20d932a3f",
+      "direction": "incoming",
+      "state": "requested",
+      "from_session_id": null,
+      "to_session_id": "ses-d1135a3b0d3c0e1e"
+    }
+  },
+  "A_respond_intro_accept": {
+    "http_status": 200,
+    "state": "accepted",
+    "channel_id": "chan-72f1577a5d75aeb71567953d",
+    "error": null,
+    "keys": [
+      "channel_id",
+      "counterpart_display",
+      "created_at",
+      "direction",
+      "from_session_id",
+      "intro_id",
+      "message",
+      "state",
+      "to_session_id",
+      "untrusted",
+      "updated_at"
+    ]
+  },
+  "A_send_message": {
+    "http_status": 200,
+    "message_id": "msg-cdd54ce04cff60fe37aed0b5",
+    "delivered": true,
+    "error": null
+  },
+  "B_read_messages": {
+    "http_status": 200,
+    "message_count": 1,
+    "message_ids": [
+      "msg-cdd54ce04cff60fe37aed0b5"
+    ],
+    "senders_pseudonymised": [
+      null
+    ],
+    "error": null,
+    "keys": [
+      "channel_id",
+      "intro_id",
+      "messages",
+      "note"
+    ]
+  },
+  "C_read_channel_not_member": {
+    "http_status": 200,
+    "error": "collaboration_unavailable"
+  },
+  "A_stop_sharing": {
+    "http_status": 200,
+    "revoked": true,
+    "discoverable": false,
+    "error": null
+  },
+  "B_discover_2_after_A_revoked": {
+    "http_status": 200,
+    "result_id": "result-03578f3a26b76154f057aa68",
+    "order": [
+      "ses-gabe-warehouse",
+      "ses-jonas-diagnostics",
+      "ses-lina-scaffold",
+      "ses-mei-battery-heat",
+      "ses-omar-chronology"
+    ],
+    "rejected": [],
+    "A_in_matches": false,
+    "A_in_rejected": false,
+    "blocked_rows_removed": 0,
+    "error": null
+  },
+  "B_explain_A_after_revoke": {
+    "http_status": 200,
+    "error": "stale_result",
+    "message": "durable corpus changed after this discovery; run discovery again"
+  },
+  "finished_utc": "2026-09-04T06:21:13Z",
+  "calls": [
+    {
+      "identity": "A",
+      "tool": "resonance_whoami",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 255,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_prepare_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1074,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_prepare_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1082,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_share_thought",
+      "http_status": 200,
+      "is_error": true,
+      "ms": 185,
+      "jsonrpc_error": null,
+      "error": {
+        "error": "confirmation_required",
+        "message": "confirm=true is required after the person explicitly approved this action"
+      }
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_share_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1156,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_explain_match",
+      "http_status": 200,
+      "is_error": true,
+      "ms": 190,
+      "jsonrpc_error": null,
+      "error": {
+        "error": "validation_failed",
+        "message": "discovery result is unknown, expired, or not yours; run discovery again"
+      }
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_list_intros",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 191,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_respond_intro",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 209,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_send_message",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 264,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_stop_sharing",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1114,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "A",
+      "tool": "resonance_whoami",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 359,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_whoami",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 280,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_prepare_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1120,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_share_thought",
+      "http_status": 200,
+      "is_error": true,
+      "ms": 184,
+      "jsonrpc_error": null,
+      "error": {
+        "error": "confirmation_required",
+        "message": "confirm=true is required after the person explicitly approved this action"
+      }
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_share_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1177,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_my_thoughts",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 218,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_discover",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 449,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_explain_match",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 297,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_request_intro",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 324,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_request_intro",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 290,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_read_messages",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 201,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_discover",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 427,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_explain_match",
+      "http_status": 200,
+      "is_error": true,
+      "ms": 256,
+      "jsonrpc_error": null,
+      "error": {
+        "error": "stale_result",
+        "message": "durable corpus changed after this discovery; run discovery again"
+      }
+    },
+    {
+      "identity": "B",
+      "tool": "resonance_stop_sharing",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1077,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_whoami",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 265,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_prepare_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1165,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_share_thought",
+      "http_status": 200,
+      "is_error": true,
+      "ms": 188,
+      "jsonrpc_error": null,
+      "error": {
+        "error": "confirmation_required",
+        "message": "confirm=true is required after the person explicitly approved this action"
+      }
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_share_thought",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1231,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_request_intro",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 312,
+      "jsonrpc_error": null
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_read_messages",
+      "http_status": 200,
+      "is_error": true,
+      "ms": 178,
+      "jsonrpc_error": null,
+      "error": {
+        "error": "collaboration_unavailable",
+        "message": "intro or channel unavailable to authenticated subject"
+      }
+    },
+    {
+      "identity": "C",
+      "tool": "resonance_stop_sharing",
+      "http_status": 200,
+      "is_error": false,
+      "ms": 1007,
+      "jsonrpc_error": null
+    }
+  ],
+  "mcp_session_id_header_seen": {
+    "A": false,
+    "B": false,
+    "C": false
+  },
+  "summary": {
+    "passed": 41,
+    "total": 41,
+    "failed_steps": []
+  }
+}
