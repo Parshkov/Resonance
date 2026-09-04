@@ -1,0 +1,1589 @@
+{
+  "origin": "https://resonance-production-cfe3.up.railway.app",
+  "started_utc": "2026-09-04T06:28:44Z",
+  "runs": {
+    "native_plain": {
+      "typeof_document_modelContext": "undefined",
+      "typeof_navigator_modelContext": "undefined",
+      "resonanceWebMCP": {
+        "contract": "resonance-webmcp/0.1",
+        "toolNames": [
+          "resonance_prepare_thought",
+          "resonance_get_share_preview",
+          "resonance_share_prepared_thought",
+          "resonance_discover",
+          "resonance_get_match",
+          "resonance_update_consent"
+        ],
+        "mode": "live-product"
+      },
+      "title": "Resonance \u2014 Visual Discovery",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36",
+      "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nShared with Resonance\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+      "header_consent_text": "Shared with Resonance",
+      "header_consent_data_shared": null,
+      "webmcp_status_text": "WebMCP \u00b7 unavailable",
+      "has_private_pill": false,
+      "has_webmcp_badge": true,
+      "chromium_version": "141.0.7390.37",
+      "args": [],
+      "console_tail": [
+        "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'."
+      ],
+      "screenshot": "phase5_page.png"
+    },
+    "native_with_flags": {
+      "typeof_document_modelContext": "undefined",
+      "typeof_navigator_modelContext": "undefined",
+      "resonanceWebMCP": {
+        "contract": "resonance-webmcp/0.1",
+        "toolNames": [
+          "resonance_prepare_thought",
+          "resonance_get_share_preview",
+          "resonance_share_prepared_thought",
+          "resonance_discover",
+          "resonance_get_match",
+          "resonance_update_consent"
+        ],
+        "mode": "live-product"
+      },
+      "title": "Resonance \u2014 Visual Discovery",
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/141.0.0.0 Safari/537.36",
+      "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nShared with Resonance\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+      "header_consent_text": "Shared with Resonance",
+      "header_consent_data_shared": null,
+      "webmcp_status_text": "WebMCP \u00b7 unavailable",
+      "has_private_pill": false,
+      "has_webmcp_badge": true,
+      "chromium_version": "141.0.7390.37",
+      "args": [
+        "--enable-features=WebMCP,WebMCPTesting"
+      ],
+      "console_tail": [
+        "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'."
+      ]
+    },
+    "harness": {
+      "label": "HARNESS: page-registered tools executed via injected modelContext shim, NOT native WebMCP discovery",
+      "chromium_version": "141.0.7390.37",
+      "steps": [
+        {
+          "step": "1 discover(replay)",
+          "tool": "resonance_discover",
+          "args": {
+            "source": "replay"
+          },
+          "ok": false,
+          "error": {
+            "message": "unexpected product error",
+            "code": "internal_error",
+            "status": 500
+          },
+          "result": null,
+          "header": {
+            "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nPrivate \u00b7 not discoverable\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+            "header_consent_text": "Private \u00b7 not discoverable",
+            "header_consent_data_shared": "false",
+            "webmcp_status_text": "WebMCP \u00b7 private",
+            "has_private_pill": true,
+            "has_webmcp_badge": true
+          }
+        },
+        {
+          "step": "2 prepare_thought(pulse-1)",
+          "tool": "resonance_prepare_thought",
+          "args": {
+            "request_id": "pulse-1"
+          },
+          "ok": true,
+          "error": null,
+          "result": {
+            "contract_version": "resonance-webmcp/0.1",
+            "draft_id": "draft-0370cf7bd555ac43129b6e12",
+            "session_id": "ses-2520e25614e4f3c3",
+            "discoverable": false,
+            "source_retention": "not_retained",
+            "input_kind": "agent_structured",
+            "next_step": "Preview exactly what will be shared, then confirm.",
+            "matches_count": 0,
+            "matches_slim": [],
+            "rejected_count": 0,
+            "rejected_slim": []
+          },
+          "header": {
+            "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nPrivate \u00b7 not discoverable\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+            "header_consent_text": "Private \u00b7 not discoverable",
+            "header_consent_data_shared": "false",
+            "webmcp_status_text": "WebMCP \u00b7 private draft ready",
+            "has_private_pill": true,
+            "has_webmcp_badge": true
+          }
+        },
+        {
+          "step": "3 get_share_preview",
+          "tool": "resonance_get_share_preview",
+          "args": {},
+          "ok": true,
+          "error": null,
+          "result": {
+            "contract_version": "resonance-webmcp/0.1",
+            "draft_id": "draft-0370cf7bd555ac43129b6e12",
+            "confirmation_token": "<redacted>",
+            "will_become_discoverable": {
+              "thought": {
+                "schema_version": "thought-dna/0.1",
+                "thought_id": "thought-webmcp-51ace1eb46bf18ea",
+                "source": {
+                  "text": "",
+                  "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                },
+                "provenance": {
+                  "kind": "manual",
+                  "extractor": null,
+                  "human_id": "parshkov-xai-grok46-t2n9"
+                },
+                "nodes": [
+                  {
+                    "id": "n0",
+                    "label": "plasma lens heat",
+                    "role": "problem",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n1",
+                    "label": "ionization cascade",
+                    "role": "mechanism",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n2",
+                    "label": "beam wander",
+                    "role": "state",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n3",
+                    "label": "aperture budget",
+                    "role": "constraint",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n4",
+                    "label": "adaptive cooling",
+                    "role": "method",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual",
+                    "knowledge": {
+                      "about": [],
+                      "requires": [
+                        {
+                          "id": "local:demo:adaptive-cooling",
+                          "conf": 1,
+                          "via": "seed"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "n5",
+                    "label": "focal collapse",
+                    "role": "outcome",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual",
+                    "knowledge": {
+                      "about": [],
+                      "requires": [
+                        {
+                          "id": "local:demo:stabilization",
+                          "conf": 1,
+                          "via": "seed"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "id": "n6",
+                    "label": "interferometry",
+                    "role": "evidence",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n7",
+                    "label": "coolant loop",
+                    "role": "resource",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n8",
+                    "label": "optics operator",
+                    "role": "agent",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "n9",
+                    "label": "recombination loop",
+                    "role": "mechanism",
+                    "spans": [],
+                    "extract_conf": 1,
+                    "atomic": true,
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  }
+                ],
+                "relations": [
+                  {
+                    "id": "r0",
+                    "source": "n0",
+                    "target": "n1",
+                    "type": "causes",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r1",
+                    "source": "n1",
+                    "target": "n2",
+                    "type": "causes",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r2",
+                    "source": "n2",
+                    "target": "n5",
+                    "type": "causes",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r3",
+                    "source": "n3",
+                    "target": "n4",
+                    "type": "constrains",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r4",
+                    "source": "n4",
+                    "target": "n5",
+                    "type": "prevents",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r5",
+                    "source": "n4",
+                    "target": "n7",
+                    "type": "requires",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r6",
+                    "source": "n6",
+                    "target": "n4",
+                    "type": "supports",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r7",
+                    "source": "n9",
+                    "target": "n1",
+                    "type": "part_of",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r8",
+                    "source": "n9",
+                    "target": "n2",
+                    "type": "causes",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  },
+                  {
+                    "id": "r9",
+                    "source": "n8",
+                    "target": "n4",
+                    "type": "supports",
+                    "extract_conf": 1,
+                    "spans": [],
+                    "assertion": "asserted",
+                    "modality": "actual"
+                  }
+                ]
+              },
+              "presentation": {
+                "cluster_id": "accumulating-intermediary-failure",
+                "domain": "plasma-optics",
+                "topic": "plasma lens thermal bloom"
+              },
+              "location": null
+            },
+            "currently_shared": false,
+            "requires_explicit_confirmation": true,
+            "source_retention": "not_retained",
+            "matches_count": 0,
+            "matches_slim": [],
+            "rejected_count": 0,
+            "rejected_slim": []
+          },
+          "header": {
+            "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nPrivate \u00b7 not discoverable\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+            "header_consent_text": "Private \u00b7 not discoverable",
+            "header_consent_data_shared": "false",
+            "webmcp_status_text": "WebMCP \u00b7 private draft ready",
+            "has_private_pill": true,
+            "has_webmcp_badge": true
+          }
+        },
+        {
+          "step": "4 share_prepared_thought(pulse-2, confirm=true)",
+          "tool": "resonance_share_prepared_thought",
+          "args": {
+            "request_id": "pulse-2",
+            "confirm": true,
+            "confirmation_token": "<redacted>"
+          },
+          "ok": true,
+          "error": null,
+          "result": {
+            "contract_version": "resonance-webmcp/0.1",
+            "draft_id": "draft-0370cf7bd555ac43129b6e12",
+            "session_id": "ses-2520e25614e4f3c3",
+            "shared": true,
+            "discoverable": true,
+            "matches_count": 0,
+            "matches_slim": [],
+            "rejected_count": 0,
+            "rejected_slim": []
+          },
+          "header": {
+            "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nShared with Resonance\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+            "header_consent_text": "Shared with Resonance",
+            "header_consent_data_shared": "true",
+            "webmcp_status_text": "WebMCP \u00b7 LIVE shared",
+            "has_private_pill": false,
+            "has_webmcp_badge": true
+          },
+          "screenshot": "phase5_after_share.png"
+        },
+        {
+          "step": "5 discover(live)",
+          "tool": "resonance_discover",
+          "args": {
+            "source": "live"
+          },
+          "ok": true,
+          "error": null,
+          "result": {
+            "contract_version": "resonance-webmcp/0.1",
+            "result_id": "result-e2b27a3688f3da003de857a0",
+            "source": "live",
+            "discovery_contract": "resonance-discovery/0.1",
+            "query": {
+              "thought_id": "thought-webmcp-51ace1eb46bf18ea",
+              "mode": "analogical",
+              "provenance": {
+                "engine_version": "resonance-engine/0.1",
+                "interface_version": "resonance-interfaces/0.1",
+                "discovery_contract_version": "resonance-discovery/0.1",
+                "metadata_schema_version": "resonance-demo-corpus/0.1",
+                "verifier_config_hash": "3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f893dbb1b1d",
+                "corpus_snapshot": "e594ce4f99db43242781e9b9163fb3500640ba4c3d16f31982f68aabc4d84125"
+              }
+            },
+            "matches_in_backend_order": [
+              {
+                "match_id": "776be7e044f703f913d6361f",
+                "person_pseudonym": "Aria K.",
+                "session_id": "ses-aria-plasma-lens",
+                "mode_classification": "direct",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 1,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "plasma lens heat"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "ionization cascade"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "beam wander"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "aperture budget"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "adaptive cooling"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "plasma lens thermal bloom",
+                  "domain": "plasma-optics",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "Pacific Northwest",
+                    "city": "Portland",
+                    "lat": 45.5,
+                    "lon": -122.7,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "91d772076a80f7dc9d9ecc2a",
+                "person_pseudonym": "Diego R.",
+                "session_id": "ses-diego-chiller",
+                "mode_classification": "complementary",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 0.025,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "thermal-budget gap"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "heat-path analysis"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "hot-spot map"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "lab time limit"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "closed-loop chiller design"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "complementary-bridge",
+                  "topic": "closed-loop chiller design",
+                  "domain": "thermal-engineering",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "North Atlantic",
+                    "city": "Reykjavik",
+                    "lat": 64.1,
+                    "lon": -21.9,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "7ac55834dd87123b06b4886f",
+                "person_pseudonym": "Gabe S.",
+                "session_id": "ses-gabe-warehouse",
+                "mode_classification": "analogical",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 0.03333333333333333,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "inbound surge"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "staging pile-up"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "dock congestion"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "labor cap"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "wave planning"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "inbound staging pile-up",
+                  "domain": "logistics"
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "2b5ff4d6936c9d2bdab22e02",
+                "person_pseudonym": "Kwame A.",
+                "session_id": "ses-kwame-traffic",
+                "mode_classification": "analogical",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 0.08333333333333333,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "peak inflow"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "spillback wave"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "queue saturation"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "green-time budget"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "adaptive signal timing"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "peak-hour spillback",
+                  "domain": "urban-mobility",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "East Africa",
+                    "city": "Nairobi",
+                    "lat": -1.3,
+                    "lon": 36.8,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "d061f00164c5fc478445f761",
+                "person_pseudonym": "Mei L.",
+                "session_id": "ses-mei-battery-heat",
+                "mode_classification": "analogical",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 0.05,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "cell heat"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "electrolyte breakdown"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "rising resistance"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "charge-rate cap"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "thermal control"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "cell heat degradation",
+                  "domain": "energy-storage",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "Texas",
+                    "city": "Austin",
+                    "lat": 30.3,
+                    "lon": -97.7,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "5cc140a3943d93c21186ad06",
+                "person_pseudonym": "Noah R.",
+                "session_id": "ses-noah-org-overload",
+                "mode_classification": "analogical",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 0.09166666666666666,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "inbox overload"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "meeting cascade"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "coordination lag"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "headcount freeze"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "delegation protocol"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "inbox overload cascade",
+                  "domain": "organizations",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "Central Europe",
+                    "city": "Berlin",
+                    "lat": 52.5,
+                    "lon": 13.4,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "5bd4a07c4e6756d296907e51",
+                "person_pseudonym": "Yuki T.",
+                "session_id": "ses-yuki-stabilization",
+                "mode_classification": "complementary",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8875000000000001,
+                  "semantic": 0.09166666666666666,
+                  "r_direct": 1,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 10,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "wavefront jitter"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "sensor lag"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "pointing wander"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "actuator stroke limit"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "adaptive-optics loop"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "complementary-bridge",
+                  "topic": "wavefront stabilization",
+                  "domain": "beam-control",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "Kanto",
+                    "city": "Tsukuba",
+                    "lat": 36.1,
+                    "lon": 140.1,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "545cdbede1cb595a697c595b",
+                "person_pseudonym": "Theo M.",
+                "session_id": "ses-theo-plasma-granular",
+                "mode_classification": "approximate",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8626190476190476,
+                  "semantic": 1,
+                  "r_direct": 0.9,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 9,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "plasma lens heat"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "ionization cascade"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "beam wander"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "aperture budget"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "adaptive cooling"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    },
+                    {
+                      "query_relation": "r5",
+                      "candidate_relation": "r5"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "transparent thermal mediator",
+                  "domain": "plasma-optics",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "Pacific Northwest",
+                    "city": "Seattle",
+                    "lat": 47.6,
+                    "lon": -122.3,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "18235089af99429a137d1fa2",
+                "person_pseudonym": "Sora N.",
+                "session_id": "ses-sora-plasma-partial",
+                "mode_classification": "approximate",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.8144444444444445,
+                  "semantic": 1,
+                  "r_direct": 0.8,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 8,
+                  "preserved_relation_count": 8,
+                  "contradiction_count": 0,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "plasma lens heat"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "ionization cascade"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "beam wander"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "aperture budget"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "adaptive cooling"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r0",
+                      "candidate_relation": "r0"
+                    },
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r2",
+                      "candidate_relation": "r2"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "accumulating-intermediary-failure",
+                  "topic": "partial plasma-lens chain",
+                  "domain": "plasma-optics",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "Kansai",
+                    "city": "Kyoto",
+                    "lat": 35,
+                    "lon": 135.8,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "f7a555b8e04a98a13112cfe4",
+                "person_pseudonym": "Sam D.",
+                "session_id": "ses-sam-plasma-rewire",
+                "mode_classification": "negative",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.7000000000000002,
+                  "semantic": 1,
+                  "r_direct": 0.8,
+                  "y_systematicity": 1,
+                  "coverage_containment": 1,
+                  "contradiction": 0.4,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 10,
+                  "preserved_relation_count": 8,
+                  "contradiction_count": 4,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n0",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "plasma lens heat"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n1",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "ionization cascade"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n2",
+                      "query_label": "beam wander",
+                      "candidate_label": "beam wander"
+                    },
+                    {
+                      "query_node": "n3",
+                      "candidate_node": "n3",
+                      "query_label": "aperture budget",
+                      "candidate_label": "aperture budget"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "adaptive cooling"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r1",
+                      "candidate_relation": "r1"
+                    },
+                    {
+                      "query_relation": "r3",
+                      "candidate_relation": "r3"
+                    },
+                    {
+                      "query_relation": "r4",
+                      "candidate_relation": "r4"
+                    },
+                    {
+                      "query_relation": "r5",
+                      "candidate_relation": "r5"
+                    },
+                    {
+                      "query_relation": "r6",
+                      "candidate_relation": "r6"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "same-words-wrong-structure",
+                  "topic": "plasma words rewired",
+                  "domain": "plasma-optics",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "California",
+                    "city": "San Diego",
+                    "lat": 32.7,
+                    "lon": -117.2,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              },
+              {
+                "match_id": "587a0038c95244a4b1a45e4f",
+                "person_pseudonym": "Camille B.",
+                "session_id": "ses-camille-portrait",
+                "mode_classification": "negative",
+                "hard_rejection": null,
+                "scores": {
+                  "structural": 0.09892361111111111,
+                  "semantic": 0,
+                  "r_direct": 0.1,
+                  "y_systematicity": 0.5,
+                  "coverage_containment": 1,
+                  "contradiction": 0.15,
+                  "h_sign_conflict": false
+                },
+                "confidence": "provisional",
+                "evidence": {
+                  "mapped_node_count": 8,
+                  "preserved_relation_count": 1,
+                  "contradiction_count": 2,
+                  "top_correspondences": [
+                    {
+                      "query_node": "n0",
+                      "candidate_node": "n1",
+                      "query_label": "plasma lens heat",
+                      "candidate_label": "soft portrait light"
+                    },
+                    {
+                      "query_node": "n1",
+                      "candidate_node": "n2",
+                      "query_label": "ionization cascade",
+                      "candidate_label": "bokeh preference"
+                    },
+                    {
+                      "query_node": "n2",
+                      "candidate_node": "n3",
+                      "query_label": "beam wander",
+                      "candidate_label": "shallow focus"
+                    },
+                    {
+                      "query_node": "n4",
+                      "candidate_node": "n4",
+                      "query_label": "adaptive cooling",
+                      "candidate_label": "prime lens choice"
+                    },
+                    {
+                      "query_node": "n6",
+                      "candidate_node": "n7",
+                      "query_label": "interferometry",
+                      "candidate_label": "histogram check"
+                    }
+                  ],
+                  "preserved_relations": [
+                    {
+                      "query_relation": "r8",
+                      "candidate_relation": "r2"
+                    }
+                  ]
+                },
+                "display": {
+                  "share_state": "discoverable",
+                  "cluster_id": "unrelated-distractor",
+                  "topic": "portrait lens choice",
+                  "domain": "photography",
+                  "location": {
+                    "kind": "synthetic_coarse",
+                    "region": "\u00cele-de-France",
+                    "city": "Paris",
+                    "lat": 48.9,
+                    "lon": 2.3,
+                    "precision": "city"
+                  }
+                },
+                "actions": [
+                  "compare",
+                  "explain",
+                  "request_intro"
+                ]
+              }
+            ],
+            "aggregation": {
+              "basis": "discoverable_matches_with_shareable_location_only",
+              "anti_inference_minimum": 3,
+              "suppressed_bucket_count": 9,
+              "buckets": []
+            },
+            "freshness": {
+              "db_generation": 104,
+              "serving_generation": 104,
+              "index_current": true,
+              "engine_snapshot": "e594ce4f99db43242781e9b9163fb3500640ba4c3d16f31982f68aabc4d84125"
+            },
+            "location_note": "Location and distance are presentation-only and never influence matching, ranking, or scores. Missing location never lowers resonance.",
+            "matches_count": 0,
+            "matches_slim": [],
+            "rejected_count": 0,
+            "rejected_slim": []
+          },
+          "header": {
+            "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nShared with Resonance\nCORPUS\ne594ce4f\u2026d84125\nReplay fixture\nLive MCP\nCollaboration",
+            "header_consent_text": "Shared with Resonance",
+            "header_consent_data_shared": "true",
+            "webmcp_status_text": "WebMCP \u00b7 LIVE DB discovery",
+            "has_private_pill": false,
+            "has_webmcp_badge": true
+          },
+          "screenshot": "phase5_after_discover.png"
+        },
+        {
+          "step": "6 get_match",
+          "skipped": true,
+          "reason": "no result_id or no matches from live discover",
+          "live_keys": [
+            "aggregation",
+            "contract_version",
+            "discovery_contract",
+            "freshness",
+            "location_note",
+            "matches_in_backend_order",
+            "query",
+            "result_id",
+            "source"
+          ]
+        },
+        {
+          "step": "7 update_consent(shared=false)",
+          "tool": "resonance_update_consent",
+          "args": {
+            "request_id": "pulse-3",
+            "shared": false
+          },
+          "ok": true,
+          "error": null,
+          "result": {
+            "contract_version": "resonance-webmcp/0.1",
+            "session_id": "ses-2520e25614e4f3c3",
+            "shared": false,
+            "revoked": true,
+            "discoverable": false,
+            "matches_count": 0,
+            "matches_slim": [],
+            "rejected_count": 0,
+            "rejected_slim": []
+          },
+          "header": {
+            "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nPrivate \u00b7 not discoverable\nCORPUS\ne594ce4f\u2026d84125\nReplay fixture\nLive MCP\nCollaboration",
+            "header_consent_text": "Private \u00b7 not discoverable",
+            "header_consent_data_shared": "false",
+            "webmcp_status_text": "WebMCP \u00b7 private",
+            "has_private_pill": true,
+            "has_webmcp_badge": true
+          }
+        }
+      ],
+      "registered_tool_names": [
+        "resonance_request_intro",
+        "resonance_list_requests",
+        "resonance_respond_intro",
+        "resonance_send_message",
+        "resonance_read_messages",
+        "resonance_create_workspace",
+        "resonance_list_workspaces",
+        "resonance_get_workspace",
+        "resonance_respond_workspace_invite",
+        "resonance_add_workspace_note",
+        "resonance_add_workspace_task",
+        "resonance_prepare_thought",
+        "resonance_get_share_preview",
+        "resonance_share_prepared_thought",
+        "resonance_discover",
+        "resonance_get_match",
+        "resonance_update_consent"
+      ],
+      "registered_tool_schemas_ok": true,
+      "state_after_load": {
+        "header_innerText": "Resonance\n\nVISUAL DISCOVERY \u00b7 R9\n\nPrivate \u00b7 not discoverable\nCORPUS\n5868db42\u2026ca222f\nReplay fixture\nLive MCP\nCollaboration",
+        "header_consent_text": "Private \u00b7 not discoverable",
+        "header_consent_data_shared": "false",
+        "webmcp_status_text": "WebMCP \u00b7 private",
+        "has_private_pill": true,
+        "has_webmcp_badge": true
+      },
+      "preview_had_confirmation_token": true,
+      "console_tail": [
+        "warning: Error with Permissions-Policy header: Unrecognized feature: 'tools'.",
+        "error: Failed to load resource: the server responded with a status of 500 ()"
+      ]
+    }
+  },
+  "launch_notes": [
+    "default launch failed: BrowserType.launch: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550; using /opt/pw-browsers/chromium",
+    "default launch failed: BrowserType.launch: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550; using /opt/pw-browsers/chromium",
+    "default launch failed: BrowserType.launch: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550; using /opt/pw-browsers/chromium"
+  ],
+  "native_modelContext_present": false,
+  "finished_utc": "2026-09-04T06:29:05Z"
+}
