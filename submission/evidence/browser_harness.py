@@ -108,7 +108,10 @@ def main() -> int:
         pg.goto(args.origin + "/", wait_until="networkidle", timeout=60000)
         pg.wait_for_timeout(1500)
         names = pg.evaluate("document.modelContext.__tools.map(t => t.name)")
-        ok("HARNESS: page registered its tools via document.modelContext.registerTool", len(names) == 6, ", ".join(names))
+        six = ["resonance_prepare_thought", "resonance_get_share_preview", "resonance_share_prepared_thought",
+               "resonance_discover", "resonance_get_match", "resonance_update_consent"]
+        ok("HARNESS: page registered its tools via document.modelContext.registerTool (six R10 tools + collaboration/workspace tools)",
+           all(n in names for n in six), f"{len(names)} tools: " + ", ".join(names))
         ok("HARNESS: status pill reports registration", (text(pg, "#webmcp-status") or "").startswith("WebMCP ·"), text(pg, "#webmcp-status"))
         ev["harness_tools"] = names
         ev["header_before"] = text(pg, "#header-consent")
