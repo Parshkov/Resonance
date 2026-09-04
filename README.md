@@ -742,6 +742,16 @@ inspect and invoke the tools through `document.modelContext`.
 
 Resonance has a working, LLM-free matching engine (engine 0.2) and a deployed product around it. The honest state is kept in [`docs/STATUS.md`](docs/STATUS.md); the decision that produced engine 0.2 is [ADR-0004](docs/decisions/ADR-0004-concept-aligned-analogy-and-benchmark-v0.2.md).
 
+The current release freeze is **engine 0.2 on `0aea577`** (2026-09-04), live at
+<https://resonance-production-cfe3.up.railway.app> with the canonical MCP endpoint at `/mcp`.
+On that commit 463 tests pass, both v0.2 benchmark gates pass with gold unedited, and the full
+acceptance set was executed directly against the public origin: OAuth onboarding 9/9 required
+steps, OAuth smoke 27/27, a real three-person structural test over `/mcp` 36/36, a browser run
+against the live page, and a hosted-client run through a real Claude custom connector. The
+release identity is [`submission/RELEASE_MANIFEST.md`](submission/RELEASE_MANIFEST.md) §0; the
+executed evidence, including what did **not** pass, is
+[`submission/evidence/public-origin-0aea577/`](submission/evidence/public-origin-0aea577/).
+
 What is validated today, on Benchmark v0.2 (eight distinct reasoning skeletons, four domains each, eighteen case families, gate split never used for tuning):
 
 - same words, different structure → rejected;
@@ -750,7 +760,7 @@ What is validated today, on Benchmark v0.2 (eight distinct reasoning skeletons, 
 - partial, paraphrased, permuted, granular and extraction-noisy variants → retrieved and classified correctly;
 - prose with explicit connectives → a grounded Thought Graph without any LLM.
 
-What is **not** validated: real user thoughts at scale, corpus sizes beyond a few hundred graphs, implicit causation in prose, and native WebMCP discovery on a hosted client. Benchmark gold is agent-authored and awaits independent human review.
+What is **not** validated: real user thoughts at scale, corpus sizes beyond a few hundred graphs, implicit causation in prose, and native WebMCP discovery in a WebMCP-enabled browser — stock Chromium exposes no `document.modelContext`, so that claim is not made. Benchmark gold is agent-authored and awaits independent human review. One classification question is deliberately left open rather than tuned: whether two thoughts that share vocabulary but sit in different domains should be `approximate` or `analogical` ([ADR-0005](docs/decisions/ADR-0005-same-vocabulary-cross-domain-verdict.md)).
 
 The pipeline in code:
 

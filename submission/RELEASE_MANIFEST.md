@@ -1,14 +1,13 @@
 # Resonance — release manifest
 
-> **Superseded (2026-09-04, engine 0.2 / PR #158):** everything below describes
-> engine 0.1 (`resonance-engine/0.1`, verifier hash `3e107bc4…`) and a
-> production that was seeded with 25 demo personas. Engine 0.2 changes scores,
-> classification, extraction and the retrieval ranking (ADR-0004), removes the
-> second remote MCP server, and stops seeding persistent databases by default.
-> A new release freeze is required: re-run the public-origin evidence on the
-> engine 0.2 deployment, run `purge-demo` on production, and re-pin the SHA,
-> deployment id and suite count here. The sections below are kept unchanged as
-> the historical record.
+> **Engine 0.2 freeze taken (2026-09-04).** The engine 0.2 re-freeze that the
+> previous banner demanded is done: the public-origin evidence was re-run on the
+> engine 0.2 deployment, `purge-demo` ran on production (it found nothing to
+> delete — the database never held seeded personas), and **§0 Current
+> production** below is re-pinned to the new SHA, deployment id and suite count.
+> Sections 1–5 describe **engine 0.1** (`resonance-engine/0.1`, verifier hash
+> `3e107bc4…`) and are kept unchanged as the historical competition record; they
+> are not the current release. Read §0 first.
 
 > **Status update (2026-09-04, post-competition):** the sponsor confirmed the
 > competition entry was not registered, so the judging freeze below is
@@ -20,15 +19,21 @@
 
 | field | value |
 | --- | --- |
-| `main` / production SHA | `e1d4314dad0aa2599429cc960aaadb4ca326e412` (PR #156, docs/evidence only on top of the last code change `9b51262` PR #152; earlier #149 `3c7dc80`, #147 `01193f1`, #139 `f3ace6c`) |
-| Railway deployment | `07cb3311-3916-4aab-97bf-7f216ec77946` — SUCCESS 16:31:11 UTC (code identical to `6ec0959e` = `9b51262`); startup log `oauth: core attached; … grants durable` then `competition product … mode: LIVE+WebMCP` (earlier `86aebe9b`, `28ff8d4a`) |
-| DB migrations | `0001_init` … `0004_workspaces`, **`0005_oauth_grants`** (durable OAuth codes / refresh grants / client registrations) |
-| since the frozen record | durable OAuth grants (no re-authorization after redeploy); RFC 7009 refresh→access revoke cascade; HEAD support; browser `resonance_prepare_thought` accepts the agent's real `thought`/`context`; empty raw-text drafts refused with guidance; live view shows the person's own thought and renders direct/approximate resonances; styled OAuth consent page naming the client; R15D hosted-client probe tooling merged; raw-text Thought DNA ids namespaced per person/attempt (same sentences can be prepared again / by another person) |
-| suites | 440 OK on `01193f1`; 443 OK on `3c7dc80`; 446 OK on `9b51262` (2 skipped each) |
-| public-origin evidence | `submission/evidence/public-origin-01193f1/` (deployment `28ff8d4a`: HEAD 4/4, OAuth 27/27, A/B/C 35/35, revoke cascade 12/12, browser-path prepare 7/7, re-smoke 27/27); `public-origin-3c7dc80/` (deployment `86aebe9b`: HEAD + consent.css OK, OAuth smoke 27/27, hosted probe 9/9 required + 6/6 optional, A/B/C 35/35, remote-MCP empty-draft refusal 7/7, browser path 11/11 incl. `/api/context?source=live` = own thought and implicit-prose 400 + no draft left, Playwright: own thought rendered on Live MCP with 3 resonance cards for 15 backend rows, consent page named + styled); `public-origin-9b51262/` (deployment `6ec0959e`: OAuth 27/27, A/B/C 35/35, re-prepare regression 12/12) |
-| hosted Claude client on production (Card B) | **executed 2026-09-04 ≈16:35 UTC** from the owner's claude.ai custom connector `Resonance` (OAuth, no manual key) inside a Claude Code cloud session: `whoami` → `person-b1bd2e2c90bc3c51`; `my_thoughts` → one discoverable thought (shared 15:12 UTC on the same account); `discover` → `result-19790231e038d12d3964071b`, 8 live rows with structural evidence, 1 hard-rejected; `explain_match` OK. Steps 5–6 not repeated and step 8 not executed (both change the owner's live share state and need their in-chat approval). Evidence: `submission/evidence/hosted-client-claude/card_b_claude_connector_2026-09-04.md` |
-| still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome (Card A); ChatGPT developer-mode app (Card C); an approved share + stop_sharing issued from inside a claude.ai chat in one recorded run |
-| ops state (2026-09-04 16:30 UTC) | the owner installed the Railway GitHub App on `Parshkov/Resonance`; after re-linking the source (`connect-service-source`, branch `main`) Railway reports auto-deploy `{"enabled": true, "canEnable": true}` and built `e1d4314` as deployment `07cb3311` (SUCCESS 16:31:11 UTC). A `DAILY` backup schedule on volume `postgres-data` was staged through Railway's agent; the API cannot read it back, so a completed backup must be confirmed in the dashboard. |
+| `main` / production SHA | **`0aea577fb0dbf2bc741f68e176be95c551d2b494`** — the last commit that changes runtime behaviour (PR #163, on top of #162 `9a79eb8` and #161 `b86016a`, themselves on `3267ea5` / `c66951b` / `443ba1c` = engine 0.2). Commits merged after it in this freeze (#164 evidence, this manifest update) are **documentation and evidence only** and do not alter the deployed engine. |
+| Railway deployment | **`834818b1-d512-4e13-8bcf-638402e8b605`** — SUCCESS 20:53:20 UTC, `commitHash 0aea577f…`, branch `main`, auto-deploy; startup log `oauth: core attached; issuer https://resonance-production-cfe3.up.railway.app; resource …/mcp; grants durable` then `competition product on http://0.0.0.0:8080 (…; mode: LIVE+WebMCP)`; **no** `purge-demo` line. Earlier this day: `8971524a` (`9a79eb8`), `5b64991d` (`b86016a`), `140130fa` (`3267ea5`), `357dd391`/`275c646c`/`c3da2cae` (`c66951b`, the purge sequence). |
+| Railway project / service / env | `resonance-live` (`670bcce5-0908-4eeb-81a6-decbdaba7e4c`) / `resonance` (`172aa183-cb11-47f5-a38a-a33482f93cf8`) / `production` (`da338ecd-9e65-477a-917e-59ff96dd7253`) |
+| engine identity (from `GET /api/product/health`) | `resonance-engine/0.2`, `resonance-score/0.2`, `scoring-v0.2-concept-aligned-analogy/0.2`, `resonance-index/0.2.0`, `resonance-fingerprint/0.2.0-multi+concept`, `resonance-semantics/0.2.0+resonance-lexicon/0.2.6`, extractor `0.2.0`, `verifier_config_hash 12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77` |
+| demo personas | **none.** `corpus.demo_personas_present: false`, `demo_sessions: 0`, `sessions_by_kind {"volunteer": 62}`. `RESONANCE_PURGE_DEMO=1` was run once on `c66951b` and logged `sessions_deleted=0 users_revoked=0` — the production database never held seeded personas; the variable is empty again and `RESONANCE_SEED_DEMO` has never been set on production. |
+| DB migrations | `0001_init`, `0002_recovery_generation`, `0003_collaboration`, `0004_workspaces`, `0005_oauth_grants` (`ops/migrations/`) |
+| since the engine 0.1 record | engine 0.2 end to end (ADR-0004: deterministic lexicon semantics, concept retrieval channel, `label_identity` contradictions, classification v0.2, three-level confidence, over-fetch + verified ranking); extractor v0.2; Benchmark v0.2 and extraction-v0.2 gates; the second remote MCP server removed; persistent databases no longer seeded with demo personas; `engine.*` and `corpus.*` exposed in health; acceptance runs revoke their own guest shares (#161); a consumed candidate relation can no longer also be counted as contradicting (#162); `resonance_prepare_thought` accepts `topic`/`domain` on the `context` path (#163) |
+| suites | **463 OK, 1 skipped** on `0aea577` (the skip needs a local PostgreSQL); 461 OK on `3267ea5` before this run's two new test classes |
+| repository gates | `python3 benchmark/r0-v0.2/runner.py` → `overall_status: pass`, exit 0; `python3 benchmark/extraction-v0.2/runner.py` → `overall_status: pass`, exit 0. r0-v0.2 gate values: classification accuracy 1.0, polarity rejection 1.0, negative FPR 0.0, positive node F1 0.8469, Recall@5 1.0, Recall@20 1.0. **Gold was not edited and is still awaiting human review (ADR-0004).** |
+| public-origin evidence | **`submission/evidence/public-origin-0aea577/`** — the first full acceptance set run *directly* against the public origin (health, `hosted_onboarding_probe` 9/9 required, `oauth_smoke` 27/27, `abc_mcp_test` 36/36, Card A in a real Chromium 16/18 with screenshots, Card B through the real Claude custom connector). Earlier: `public-origin-c66951b/` (purge + hosted-connector discover on engine 0.2), `public-origin-01193f1/`, `public-origin-3c7dc80/`, `public-origin-9b51262/` (all engine 0.1). |
+| Card A (browser WebMCP) | executed on `0aea577` against the live origin in Chromium 141: 16/18. Native `document.modelContext` is **absent** in stock Chromium and remains **unclaimed**; the `cards=0` check is correct fail-closed behaviour (`primary_matches()` drops every `negative` match and every live match currently is `negative`) around two open R9 presentation defects. A human run in a WebMCP-enabled Chrome is still outstanding. |
+| Card B (hosted Claude client) | executed on `0aea577` by an agent through the real Claude custom connector: `whoami` → `prepare_thought` → preview → `share_thought(confirm: true)` → `discover` → `explain_match` → `stop_sharing` (`revoked: true`), guest session revoked afterwards. **A human still has to run it once end to end.** |
+| still untested / must not claim | native `document.modelContext` in a WebMCP-enabled Chrome (Card A step 1–2); ChatGPT developer-mode app (Card C); two real people in one recorded run (Card D); corpus scale replay 10^4–10^5; human review of the Benchmark v0.2 and extraction-v0.2 gold |
+| known open items | ten pre-existing duplicate guest sessions in the live corpus (ids in the evidence summary) need an owner-side deletion; ADR-0005 (`approximate` vs `analogical` for same-vocabulary cross-domain pairs) is **open** and needs human-authored gold; the R9 page shows a match count with an empty primary rail and a stale evidence panel when every live match is `negative` |
+| secrets | `RESONANCE_DB`, `RESONANCE_CONFIRMATION_SECRET`, `PUBLIC_ORIGIN`, `PORT` supplied by Railway variables only; none in the repo. `RESONANCE_DB` and `RESONANCE_CONFIRMATION_SECRET` were not read or modified during this freeze. |
 
 # WebMCP Challenge release manifest (frozen competition record)
 
