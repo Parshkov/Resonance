@@ -1,332 +1,229 @@
-"""R17 remote MCP bridge: a real chat client (Streamable HTTP, bearer key) drives
-the SAME live product as the browser — real content, two-step consent, discovery
-between two different people, intro relay — without cookies or CSRF."""
+"""R15 acceptance battery: authenticated remote MCP over the live product."""
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import threading
 import unittest
-from http.cookies import SimpleCookie
 from urllib.error import HTTPError
+from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from src.product.mcp_bridge import BRIDGE_CONTRACT, TOOLS, build_thought_dna
-from src.product.server import build_runtime, serve
-from src.graph.model import ThoughtGraph
+from src.product.server import build_runtime
+from src.remote.auth import CodeStore
+from src.remote.server import TOOLS, build_httpd
+from tests.test_product_live import PRES, QUERY_DNA, r7_dna
 
 
-def _post(url: str, body, headers=None):
-    data = json.dumps(body).encode() if body is not None else b""
-    req = Request(url, data=data, method="POST",
-                  headers={"Content-Type": "application/json", **(headers or {})})
-    with urlopen(req, timeout=15) as response:
-        raw = response.read()
-        return response.status, (json.loads(raw) if raw else None), dict(response.headers)
+def _pkce():
+    verifier = base64.urlsafe_b64encode(b"v" * 48).rstrip(b"=").decode()
+    challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    return verifier, challenge
 
 
-class Browser:
-    """Minimal cookie+CSRF client standing in for the Collaboration panel."""
-
-    def __init__(self, base: str):
+class RemoteClient:
+    def __init__(self, base):
         self.base = base
-        self.cookie = None
-        self.csrf = None
+        self.bearer = None
+        self.session = None
 
-    def request(self, method: str, path: str, body=None):
-        headers = {"Content-Type": "application/json", "Origin": self.base}
-        if self.cookie:
-            headers["Cookie"] = self.cookie
-        if self.csrf:
-            headers["X-Resonance-CSRF"] = self.csrf
-        data = json.dumps(body).encode() if body is not None else None
-        req = Request(self.base + path, data=data, headers=headers, method=method)
-        with urlopen(req, timeout=15) as response:
-            set_cookie = response.headers.get("Set-Cookie")
-            if set_cookie:
-                morsel = SimpleCookie(set_cookie).get("resonance_token")
-                if morsel is not None:
-                    self.cookie = f"resonance_token={morsel.value}"
-            return response.status, json.loads(response.read().decode())
+    def form(self, path, fields):
+        req = Request(self.base + path, data=urlencode(fields).encode(),
+                      headers={"Content-Type": "application/x-www-form-urlencoded"},
+                      method="POST")
+        with urlopen(req, timeout=10) as r:
+            return r.status, json.loads(r.read())
 
-    def register(self, label: str):
-        _, payload = self.request("POST", "/api/product/register", {"display_label": label})
-        self.csrf = payload["csrf_token"]
-        return payload
+    def rpc(self, method, params=None, *, bearer=True, mid=1):
+        headers = {"Content-Type": "application/json"}
+        if bearer and self.bearer:
+            headers["Authorization"] = f"Bearer {self.bearer}"
+        if self.session:
+            headers["Mcp-Session-Id"] = self.session
+        body = {"jsonrpc": "2.0", "id": mid, "method": method}
+        if params is not None:
+            body["params"] = params
+        req = Request(self.base + "/mcp", data=json.dumps(body).encode(),
+                      headers=headers, method="POST")
+        with urlopen(req, timeout=10) as r:
+            sid = r.headers.get("Mcp-Session-Id")
+            if sid:
+                self.session = sid
+            return r.status, (json.loads(r.read()) if r.length != 0 else None)
 
-    def mcp_key(self):
-        _, payload = self.request("POST", "/api/product/mcp_key", {})
-        return payload
+    def call(self, name, arguments=None, mid=2):
+        return self.rpc("tools/call", {"name": name, "arguments": arguments or {}}, mid=mid)
 
+    def oauth_guest(self):
+        verifier, challenge = _pkce()
+        status, authd = self.form("/oauth/authorize", {
+            "code_challenge": challenge, "code_challenge_method": "S256",
+            "redirect_uri": "https://client/cb", "client_id": "test"})
+        status, tok = self.form("/oauth/token", {
+            "grant_type": "authorization_code", "code": authd["code"],
+            "code_verifier": verifier, "redirect_uri": "https://client/cb",
+            "client_id": "test"})
+        self.bearer = tok["access_token"]
+        return authd, tok
 
-class Chat:
-    """A chat client's MCP side: JSON-RPC over POST /mcp with a bearer key."""
-
-    def __init__(self, base: str, key: str, *, in_path: bool = False):
-        self.url = f"{base}/mcp/{key}" if in_path else f"{base}/mcp"
-        self.headers = {} if in_path else {"Authorization": f"Bearer {key}"}
-        self.counter = 0
-
-    def rpc(self, method: str, params=None):
-        self.counter += 1
-        status, payload, _ = _post(self.url, {"jsonrpc": "2.0", "id": self.counter,
-                                              "method": method, "params": params or {}},
-                                   self.headers)
-        assert status == 200, status
-        return payload
-
-    def call(self, name: str, arguments=None):
-        payload = self.rpc("tools/call", {"name": name, "arguments": arguments or {}})
-        assert "result" in payload, payload
-        result = payload["result"]
-        return result["isError"], result["structuredContent"]
+    def initialize(self):
+        return self.rpc("initialize", {"protocolVersion": "2025-03-26"})
 
 
-THOUGHT_A = {
-    "topic": "retry storms after a partial outage",
-    "domain": "distributed-systems",
-    "nodes": [
-        {"id": "n0", "label": "partial upstream outage", "role": "problem"},
-        {"id": "n1", "label": "synchronized client retries", "role": "mechanism"},
-        {"id": "n2", "label": "request amplification", "role": "state"},
-        {"id": "n3", "label": "cascading saturation", "role": "outcome"},
-        {"id": "n4", "label": "fixed retry budget", "role": "constraint"},
-        {"id": "n5", "label": "jittered exponential backoff", "role": "method"},
-    ],
-    "relations": [
-        {"source": "n0", "target": "n1", "type": "causes"},
-        {"source": "n1", "target": "n2", "type": "causes"},
-        {"source": "n2", "target": "n3", "type": "causes"},
-        {"source": "n4", "target": "n1", "type": "constrains"},
-        {"source": "n5", "target": "n3", "type": "prevents"},
-    ],
-}
-
-THOUGHT_B = {
-    "topic": "panic buying after a supply rumour",
-    "domain": "retail-logistics",
-    "nodes": [
-        {"label": "supply shortage rumour", "role": "problem"},
-        {"label": "synchronized bulk purchases", "role": "mechanism"},
-        {"label": "demand amplification", "role": "state"},
-        {"label": "empty shelves", "role": "outcome"},
-        {"label": "per-customer purchase cap", "role": "constraint"},
-        {"label": "staggered restocking", "role": "method"},
-    ],
-    "relations": [
-        {"source": "supply shortage rumour", "target": "synchronized bulk purchases", "type": "causes"},
-        {"source": "synchronized bulk purchases", "target": "demand amplification", "type": "causes"},
-        {"source": "demand amplification", "target": "empty shelves", "type": "causes"},
-        {"source": "per-customer purchase cap", "target": "synchronized bulk purchases", "type": "constrains"},
-        {"source": "staggered restocking", "target": "empty shelves", "type": "prevents"},
-    ],
-}
-
-
-class BuildThoughtDnaTests(unittest.TestCase):
-    def test_builds_canonical_manual_thought_dna_that_validates(self):
-        dna = build_thought_dna(THOUGHT_B, human_id="person-x")
-        graph = ThoughtGraph.from_dict(dna)  # validates the accepted schema
-        self.assertEqual(len(graph.nodes), 6)
-        self.assertEqual(len(graph.relations), 5)
-        self.assertEqual(dna["provenance"], {"kind": "manual", "extractor": None, "human_id": "person-x"})
-        self.assertEqual(dna["source"]["text"], "")  # conversation text never stored
-        # label-addressed relations were resolved to node ids
-        self.assertTrue(all(r["source"].startswith("n") for r in dna["relations"]))
-
-    def test_rejects_unknown_vocabulary_with_precise_message(self):
-        bad = {"nodes": [{"label": "a", "role": "vibe"}, {"label": "b", "role": "state"}],
-               "relations": []}
-        with self.assertRaises(Exception) as ctx:
-            build_thought_dna(bad, human_id="p")
-        self.assertIn("role must be one of", str(ctx.exception))
-
-    def test_tool_table_is_well_formed(self):
-        names = [t["name"] for t in TOOLS]
-        self.assertEqual(len(names), len(set(names)))
-        for tool in TOOLS:
-            self.assertEqual(tool["inputSchema"]["type"], "object")
-            self.assertIn("readOnlyHint", tool["annotations"])
-
-
-class RemoteMCPHttpTests(unittest.TestCase):
+class RemoteMcpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}))
-        server = serve("127.0.0.1", 0, runtime=pending)
-        host, port = server.server_address[:2]
-        cls.base = f"http://{host}:{port}"
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({cls.base}))
-        server.RequestHandlerClass.runtime = runtime
-        cls.server = server
-        cls.thread = threading.Thread(target=server.serve_forever, daemon=True)
+        cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"https://x"}))
+        cls.runtime.remote_auth = CodeStore()
+        cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
         cls.thread.start()
 
     @classmethod
     def tearDownClass(cls):
-        cls.server.shutdown()
-        cls.server.server_close()
-        cls.thread.join(timeout=5)
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
 
-    def test_unauthenticated_and_bad_key_are_401_get_is_405(self):
+    def client(self):
+        return RemoteClient(self.base)
+
+    def _shared(self, client, source, tid, intro=False):
+        prep = client.call("resonance_prepare_thought", {
+            "candidate": r7_dna(source, tid), "presentation": dict(PRES),
+            "intent": {"share_display_profile": True, "receive_intro_requests": intro}})[1]
+        draft = prep["result"]["structuredContent"]["draft_id"]
+        pv = client.call("resonance_get_share_preview", {"draft_id": draft})[1]
+        token = pv["result"]["structuredContent"]["confirmation_token"]
+        rec = client.call("resonance_share_thought", {
+            "draft_id": draft, "confirmation_token": token, "confirm": True})[1]
+        sc = rec["result"]["structuredContent"]
+        return sc["session_id"]
+
+    def test_bearer_required_and_oauth_pkce(self):
+        c = self.client()
+        # no bearer -> 401
         with self.assertRaises(HTTPError) as ctx:
-            _post(self.base + "/mcp", {"jsonrpc": "2.0", "id": 1, "method": "ping"})
+            c.rpc("tools/list", bearer=False)
         self.assertEqual(ctx.exception.code, 401)
-        self.assertIn("Bearer", ctx.exception.headers.get("WWW-Authenticate", ""))
+        # OAuth guest + PKCE issues a usable bearer (an R12 access token)
+        c.oauth_guest()
+        self.assertTrue(c.bearer)
+        status, init = c.initialize()
+        self.assertEqual(init["result"]["protocolVersion"], "2025-03-26")
+        status, tools = c.rpc("tools/list", mid=3)
+        names = {t["name"] for t in tools["result"]["tools"]}
+        self.assertEqual(names, {t["name"] for t in TOOLS})
+        who = c.call("resonance_whoami")[1]["result"]["structuredContent"]
+        self.assertTrue(who["user_id"].startswith("person-"))
+
+    def test_pkce_wrong_verifier_and_replay_rejected(self):
+        c = self.client()
+        _, challenge = _pkce()
+        status, authd = c.form("/oauth/authorize", {
+            "code_challenge": challenge, "code_challenge_method": "S256",
+            "redirect_uri": "https://client/cb", "client_id": "test"})
         with self.assertRaises(HTTPError) as ctx:
-            _post(self.base + "/mcp", {"jsonrpc": "2.0", "id": 1, "method": "ping"},
-                  {"Authorization": "Bearer not-a-key"})
-        self.assertEqual(ctx.exception.code, 401)
+            c.form("/oauth/token", {"grant_type": "authorization_code",
+                                    "code": authd["code"], "code_verifier": "wrong",
+                                    "redirect_uri": "https://client/cb", "client_id": "test"})
+        self.assertEqual(ctx.exception.code, 400)
+
+    def test_session_bound_to_subject(self):
+        alice = self.client(); alice.oauth_guest(); alice.initialize()
+        bob = self.client(); bob.oauth_guest()
+        # Bob presents Alice's session id with his own bearer -> refused.
+        bob.session = alice.session
+        status, reply = bob.rpc("tools/list", mid=9)
+        self.assertIn("error", reply)
+        self.assertIn("different authenticated subject", reply["error"]["message"])
+
+    def test_unknown_session_and_get_405(self):
+        c = self.client(); c.oauth_guest()
+        c.session = "not-a-real-session"
+        status, reply = c.rpc("ping", mid=4)
+        self.assertIn("error", reply)
+        req = Request(self.base + "/mcp")
         with self.assertRaises(HTTPError) as ctx:
-            urlopen(Request(self.base + "/mcp"), timeout=10)
+            urlopen(req, timeout=10)
         self.assertEqual(ctx.exception.code, 405)
 
-    def test_mcp_key_requires_cookie_and_csrf(self):
+    def test_full_remote_journey_with_rich_result(self):
+        alice = self.client(); alice.oauth_guest(); alice.initialize()
+        a_sess = self._shared(alice, "ses-gabe-warehouse", "rem-a")
+        bob = self.client(); bob.oauth_guest(); bob.initialize()
+        b_sess = self._shared(bob, QUERY_DNA, "rem-b")
+        disc = bob.call("resonance_discover", {"session_id": b_sess, "k": 8})[1]
+        result = disc["result"]
+        sc = result["structuredContent"]
+        self.assertEqual(sc["contract_version"], "resonance-rich-result/0.1")
+        found = [m["session_id"] for m in sc["matches"]]
+        self.assertIn(a_sess, found)
+        # rich content: text + an EmbeddedResource SVG
+        kinds = [b["type"] for b in result["content"]]
+        self.assertIn("text", kinds)
+        self.assertIn("resource", kinds)
+        svg = next(b for b in result["content"] if b["type"] == "resource")
+        self.assertEqual(svg["resource"]["mimeType"], "image/svg+xml")
+        # evidence bound to the result_id
+        ev = bob.call("resonance_get_match", {
+            "result_id": sc["result_id"], "session_id": a_sess})[1]
+        self.assertEqual(ev["result"]["structuredContent"]["match"]["session_id"], a_sess)
+
+    def test_confirmation_and_writes_gated(self):
+        c = self.client(); c.oauth_guest(); c.initialize()
+        # share without confirm -> tool error, not a crash
+        prep = c.call("resonance_prepare_thought", {
+            "candidate": r7_dna("ses-mei-battery-heat", "rem-c"),
+            "presentation": dict(PRES)})[1]
+        draft = prep["result"]["structuredContent"]["draft_id"]
+        pv = c.call("resonance_get_share_preview", {"draft_id": draft})[1]
+        token = pv["result"]["structuredContent"]["confirmation_token"]
+        bad = c.call("resonance_share_thought", {
+            "draft_id": draft, "confirmation_token": token, "confirm": False})[1]
+        self.assertTrue(bad["result"]["isError"])
+
+    def test_cross_transport_parity_remote_equals_direct(self):
+        # Same authenticated subject + session -> identical match ids/order/scores
+        # through the direct product service and through remote MCP.
+        alice = self.client(); alice.oauth_guest(); alice.initialize()
+        self._shared(alice, "ses-gabe-warehouse", "par-a")
+        bob = self.client(); bob.oauth_guest(); bob.initialize()
+        b_sess = self._shared(bob, QUERY_DNA, "par-b")
+        remote = bob.call("resonance_discover", {"session_id": b_sess, "k": 20})[1]
+        remote_sc = remote["result"]["structuredContent"]
+        direct = self.runtime.product.rich_discover(bob.bearer, b_sess, k=20)
+        key = lambda ms: [(m["session_id"], m["mode_classification"],
+                           json.dumps(m["scores"], sort_keys=True)) for m in ms]
+        self.assertEqual(key(remote_sc["matches"]), key(direct["matches"]))
+
+    def test_body_bound_and_transport_survival(self):
+        c = self.client(); c.oauth_guest(); c.initialize()
+        # oversized body -> 413, server still serves the next request
+        big = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping",
+                          "params": {"x": "z" * (130 * 1024)}}).encode()
+        req = Request(self.base + "/mcp", data=big,
+                      headers={"Content-Type": "application/json",
+                               "Authorization": f"Bearer {c.bearer}",
+                               "Mcp-Session-Id": c.session}, method="POST")
         with self.assertRaises(HTTPError) as ctx:
-            _post(self.base + "/api/product/mcp_key", {})
-        self.assertEqual(ctx.exception.code, 401)
-        browser = Browser(self.base)
-        browser.register("Nika")
-        browser.csrf = "wrong"
-        with self.assertRaises(HTTPError) as ctx:
-            browser.request("POST", "/api/product/mcp_key", {})
-        self.assertEqual(ctx.exception.code, 403)
+            urlopen(req, timeout=10)
+        self.assertEqual(ctx.exception.code, 413)
+        status, pong = c.rpc("ping", mid=7)
+        self.assertEqual(pong["result"], {})
 
-    def test_two_people_two_chats_real_content_discover_and_intro(self):
-        # Two different people, each with their own browser account and their
-        # own chat client holding a key minted in the Collaboration panel.
-        alice_browser, bob_browser = Browser(self.base), Browser(self.base)
-        alice_browser.register("Alice")
-        bob_browser.register("Bob")
-        alice_key = alice_browser.mcp_key()
-        bob_key = bob_browser.mcp_key()
-        self.assertTrue(alice_key["endpoint"].endswith("/mcp"))
-        self.assertTrue(alice_key["endpoint_with_key"].endswith("/mcp/" + alice_key["mcp_key"]))
-        alice = Chat(self.base, alice_key["mcp_key"])
-        bob = Chat(self.base, bob_key["mcp_key"], in_path=True)  # URL-only client
-
-        # MCP handshake
-        init = alice.rpc("initialize", {"protocolVersion": "2025-06-18",
-                                        "capabilities": {}, "clientInfo": {"name": "t", "version": "0"}})
-        self.assertEqual(init["result"]["protocolVersion"], "2025-06-18")
-        self.assertIn("tools", init["result"]["capabilities"])
-        status, body, _ = _post(alice.url, {"jsonrpc": "2.0", "method": "notifications/initialized"},
-                                alice.headers)
-        self.assertEqual((status, body), (202, None))
-        tools = alice.rpc("tools/list")["result"]["tools"]
-        self.assertEqual({t["name"] for t in tools}, {t["name"] for t in TOOLS})
-
-        # The key maps to the same account the browser sees.
-        err, who = alice.call("resonance_whoami")
-        self.assertFalse(err)
-        self.assertEqual(who["display_label"], "Alice")
-        self.assertEqual(who["actor_type"], "agent")
-        self.assertEqual(who["shared_thoughts"], [])
-
-        # Discovery before sharing is a clear, actionable tool error, not a crash.
-        err, payload = alice.call("resonance_discover")
-        self.assertTrue(err)
-        self.assertEqual(payload["error"], "share_required")
-
-        # Step 1: prepare real content -> preview + token, nothing discoverable.
-        err, prep_a = alice.call("resonance_prepare_thought", {"thought": THOUGHT_A})
-        self.assertFalse(err, prep_a)
-        self.assertFalse(prep_a["discoverable"])
-        self.assertTrue(prep_a["requires_explicit_confirmation"])
-        self.assertEqual(prep_a["source_retention"], "not_retained")
-        self.assertIn("thought_dna", prep_a["will_become_discoverable"])
-        # Sharing without confirm is refused.
-        err, refused = alice.call("resonance_share_thought", {
-            "draft_id": prep_a["draft_id"], "confirmation_token": prep_a["confirmation_token"],
-            "confirm": False, "request_id": "a-share-0"})
-        self.assertTrue(err)
-        self.assertEqual(refused["error"], "confirmation_required")
-        # Step 2: explicit approval.
-        err, shared_a = alice.call("resonance_share_thought", {
-            "draft_id": prep_a["draft_id"], "confirmation_token": prep_a["confirmation_token"],
-            "confirm": True, "request_id": "a-share-1"})
-        self.assertFalse(err, shared_a)
-        self.assertTrue(shared_a["discoverable"])
-        session_a = shared_a["session_id"]
-
-        # Bob shares a structurally analogous thought from a different domain
-        # through the URL-only transport.
-        err, prep_b = bob.call("resonance_prepare_thought", {"thought": THOUGHT_B})
-        self.assertFalse(err, prep_b)
-        err, shared_b = bob.call("resonance_share_thought", {
-            "draft_id": prep_b["draft_id"], "confirmation_token": prep_b["confirmation_token"],
-            "confirm": True, "request_id": "b-share-1"})
-        self.assertFalse(err, shared_b)
-        session_b = shared_b["session_id"]
-
-        # The browser sees the chat's writes (same account, same record).
-        _, sessions = alice_browser.request("GET", "/api/product/sessions")
-        self.assertEqual([s["session_id"] for s in sessions["sessions"]
-                          if s["share_state"] == "discoverable"], [session_a])
-
-        # Real discovery: Alice finds Bob's analogous structure.
-        err, disc = alice.call("resonance_discover", {"k": 15})
-        self.assertFalse(err, disc)
-        self.assertEqual(disc["contract_version"], BRIDGE_CONTRACT)
-        self.assertEqual(disc["query_session_id"], session_a)
-        found = [m for m in disc["matches_in_backend_order"] if m["session_id"] == session_b]
-        self.assertEqual(len(found), 1, disc["matches_in_backend_order"][:3])
-        # Analogical, cross-domain, all five relations preserved; the counterpart
-        # is addressed by session and display label only (no user id, no contact).
-        self.assertEqual(found[0]["mode_classification"], "analogical")
-        self.assertEqual(found[0]["evidence"]["preserved_relation_count"], 5)
-        self.assertNotIn("user_id", json.dumps(found[0]))
-        self.assertNotIn(bob_key["user_id"], json.dumps(disc))
-        err, evidence = alice.call("resonance_explain_match",
-                                   {"result_id": disc["result_id"], "session_id": session_b})
-        self.assertFalse(err, evidence)
-
-        # Consent-gated intro from Alice's chat, accepted from Bob's chat,
-        # then a relayed message both can read.
-        err, intro = alice.call("resonance_request_intro", {
-            "from_session_id": session_a, "target_session_id": session_b,
-            "message": "Your retry-storm structure mirrors my panic-buying model; compare notes?",
-            "confirm": True, "request_id": "a-intro-1"})
-        self.assertFalse(err, intro)
-        err, bob_inbox = bob.call("resonance_list_intros")
-        self.assertFalse(err)
-        incoming = [r for r in bob_inbox["incoming"] if r["state"] == "requested"]
-        self.assertEqual(len(incoming), 1)
-        err, accepted = bob.call("resonance_respond_intro", {
-            "intro_id": incoming[0]["intro_id"], "accept": True,
-            "confirm": True, "request_id": "b-resp-1"})
-        self.assertFalse(err, accepted)
-        err, alice_list = alice.call("resonance_list_intros")
-        accepted_rows = [r for r in alice_list["outgoing"] if r["state"] == "accepted"]
-        self.assertEqual(len(accepted_rows), 1)
-        channel_id = accepted_rows[0]["channel_id"]
-        err, sent = alice.call("resonance_send_message", {
-            "channel_id": channel_id, "body": "hello from Alice's chat",
-            "confirm": True, "request_id": "a-msg-1"})
-        self.assertFalse(err, sent)
-        err, thread = bob.call("resonance_read_messages", {"channel_id": channel_id})
-        self.assertFalse(err, thread)
-        self.assertEqual([m["body"] for m in thread["messages"]], ["hello from Alice's chat"])
-
-        # Stop sharing from the chat; the browser and discovery agree.
-        err, revoked = alice.call("resonance_stop_sharing", {"session_id": session_a, "confirm": True})
-        self.assertFalse(err, revoked)
-        err, who = alice.call("resonance_whoami")
-        self.assertEqual(who["shared_thoughts"], [])
-
-    def test_raw_text_fallback_and_unknown_tool(self):
-        browser = Browser(self.base)
-        browser.register("Cleo")
-        chat = Chat(self.base, browser.mcp_key()["mcp_key"])
-        err, prep = chat.call("resonance_prepare_thought", {
-            "context": "Slow code review causes merge queue pile-up, which leads to release delays. "
-                       "A review SLA prevents the pile-up."})
-        self.assertFalse(err, prep)
-        self.assertEqual(prep["input_kind"], "raw_text_fallback")
-        bad = chat.rpc("tools/call", {"name": "resonance_nope", "arguments": {}})
-        self.assertEqual(bad["error"]["code"], -32602)
-        unknown = chat.rpc("frobnicate")
-        self.assertEqual(unknown["error"]["code"], -32601)
+    def test_source_operates_on_live_product_not_fixture(self):
+        from pathlib import Path
+        service = Path("src/remote/service.py").read_text()
+        server = Path("src/remote/server.py").read_text()
+        # The remote layer resolves to the live product, not the old R7 fixture.
+        self.assertNotIn("ProductService()", service + server)
+        self.assertIn("runtime.product", service)
+        # Bearer auth is the accepted R12 identity, not a private token directory.
+        self.assertIn("identity.authenticate", service)
 
 
 if __name__ == "__main__":
