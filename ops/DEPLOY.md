@@ -60,6 +60,11 @@ that first real build, so nobody repeats them:
   private host `postgres.railway.internal:5432`.
 - Health-check success is Railway's own probe of `/api/product/health`, i.e.
   migrations applied and the seed loaded before traffic is routed.
+- **Entrypoint is `src.product.competition_server`** (the image default, and
+  set explicitly as the Railway start command): the live product handler plus
+  the R9/R10 presentation routes and the live WebMCP module, so the public
+  page shows the visual discovery view on real data and registers the six
+  tools. `RESONANCE_ENTRYPOINT=src.product.server` runs the API-only server.
 
 1. **Create the project.** railway.com → **New Project** → **Deploy from GitHub
    repo** → `Parshkov/Resonance`, branch `main`. Railway detects the Dockerfile.

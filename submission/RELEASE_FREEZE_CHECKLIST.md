@@ -4,15 +4,15 @@
 
 ## 1. Exact release identity
 
-- [ ] release commit: `TBD`
-- [ ] release tag: `TBD`
-- [ ] live URL: `TBD`
-- [ ] database schema/migration version: `TBD`
-- [ ] Thought DNA schema: `TBD`
-- [ ] discovery contract: `TBD`
-- [ ] WebMCP contract/tool manifest hash: `TBD`
-- [ ] remote MCP contract/version if included: `TBD`
-- [ ] seeded corpus/snapshot hashes recorded: `TBD`
+- [ ] release commit: `TBD` — pin the `main` SHA that is deployed at freeze time (production redeploys from `main`; current head at the time of writing: see `git log -1 origin/main`)
+- [ ] release tag: `TBD` — proposed `v0.1.0-webmcp`
+- [x] live URL: `https://resonance-production-cfe3.up.railway.app` (Railway, project `resonance-live`, PostgreSQL 16 + pgvector image; entrypoint `src.product.competition_server`; see `ops/DEPLOY.md`)
+- [x] database schema/migration version: `resonance-persistence/0.3` — migrations `0001_init`, `0002_recovery_generation`, `0003_collaboration` (applied on production PostgreSQL at first boot)
+- [x] Thought DNA schema: `thought-dna/0.1` (`schemas/thought-dna-0.1.schema.json`)
+- [x] discovery contract: `resonance-discovery/0.1`; UI context `resonance-ui-context/0.1`; collaboration `resonance-collab/0.1`
+- [x] WebMCP contract/tool manifest hash: contract `resonance-webmcp/0.1`, six tools (`resonance_prepare_thought`, `resonance_get_share_preview`, `resonance_share_prepared_thought`, `resonance_discover`, `resonance_get_match`, `resonance_update_consent`) served from `demo/ui/webmcp_live.mjs` on the live origin; record `sha256sum demo/ui/webmcp_live.mjs` at freeze
+- [x] remote MCP contract/version if included: **not included** in the release candidate (R15 foundation PR #93 is pending rebuild; the live origin exposes WebMCP + product API only)
+- [x] seeded corpus/snapshot hashes recorded: `demo/corpus/sessions.jsonl` sha256 `eba6f76e23a702f891d356754cd9bf96df727bf6c61581cd8c8431c3d4dff925` (R7 seed, create-only import; production seeded 25 sessions)
 - [ ] build/deploy environment recorded without secrets
 
 ## 2. Competition eligibility
