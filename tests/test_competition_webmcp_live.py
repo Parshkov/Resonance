@@ -104,7 +104,7 @@ class CompetitionWebMCPTests(unittest.TestCase):
                       live[unavailable:unavailable + 600])
         with urlopen(self.base + "/app.mjs", timeout=10) as response:
             app = response.read().decode()
-        shared = app.index('"Shared with Resonance"')
+        shared = app.index('el("span", "", "Shared with Resonance")')
         self.assertIn('window.__resonanceWebMCP?.mode !== "live-product"', app[shared - 400:shared])
 
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
