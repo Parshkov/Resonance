@@ -17,6 +17,9 @@ import argparse
 import os
 import json
 import secrets
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.cookies import SimpleCookie
@@ -67,6 +70,31 @@ UI_DIR = REPO / "demo" / "ui"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8788
 MAX_BODY_BYTES = 96 * 1024
+# Unauthenticated account creation is bounded per client address so an
+# anonymous caller cannot grow the database or spam introductions.
+REGISTRATION_LIMIT = 20
+REGISTRATION_WINDOW_SECONDS = 3600.0
+_registration_hits: dict[str, deque] = {}
+_registration_lock = threading.Lock()
+
+
+def _client_ip(headers: Mapping[str, str], peer: str) -> str:
+    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
+    return forwarded or peer
+
+
+def registration_allowed(ip: str, *, now: float | None = None) -> bool:
+    if ip in ("127.0.0.1", "::1", "localhost", ""):
+        return True                        # local development / test harness
+    now = time.monotonic() if now is None else now
+    with _registration_lock:
+        hits = _registration_hits.setdefault(ip, deque())
+        while hits and now - hits[0] > REGISTRATION_WINDOW_SECONDS:
+            hits.popleft()
+        if len(hits) >= REGISTRATION_LIMIT:
+            return False
+        hits.append(now)
+        return True
 COOKIE_NAME = "resonance_token"
 
 STATIC = {
@@ -539,6 +567,12 @@ class ProductHandler(BaseHTTPRequestHandler):
     # -- POST --------------------------------------------------------------
     def _route_post(self, path: str) -> None:
         product = self.runtime.product
+        if path in ("/api/product/guest", "/api/product/register"):
+            ip = _client_ip(self.headers, self.client_address[0] if self.client_address else "")
+            if not registration_allowed(ip):
+                self._send_error_json(HTTPStatus.TOO_MANY_REQUESTS, "rate_limited",
+                                      "too many accounts created from this address; try later")
+                return
         if path == "/api/product/guest":
             creds = product.register_guest()
             self._send_json(
@@ -845,8 +879,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--secret-file", default=None,
                         help="file holding the stable draft-confirmation secret")
     parser.add_argument("--no-seed", action="store_true",
-                        help="start with an empty live corpus (no R7 seed baseline)")
+                        help="start with an empty live corpus (no R7 seed baseline); "
+                             "RESONANCE_SEED_DEMO=0 in the environment has the same effect")
     args = parser.parse_args(argv)
+    if os.environ.get("RESONANCE_SEED_DEMO", "1").strip().lower() in ("0", "false", "no", "off"):
+        args.no_seed = True
     origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
     try:
         secret = _resolve_secret(args.secret_file, os.environ, args.db)

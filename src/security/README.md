@@ -40,7 +40,7 @@ On MCP initialize, call `SessionGrantRegistry.bind()` after authentication. On e
 
 A protocol session belonging to another subject/client is rejected even when the session ID itself is valid. Policy-generation changes are re-evaluated from authoritative state before a checkpoint can advance.
 
-OAuth authorization endpoints should use `AuthorizationCodeBroker.issue_code()` with a server-authenticated `RequestContext`; there is intentionally no `user` or `username` parameter.
+OAuth authorization lives in `src/remote/oauth.py` (`OAuthCore`, PKCE S256, audience-bound access tokens); the earlier `AuthorizationCodeBroker` duplicate in this package was removed on 2026-09-04. Authorization codes are issued only for a server-authenticated subject; there is intentionally no `user` or `username` parameter.
 
 ## Deployment controls that remain deployment evidence
 

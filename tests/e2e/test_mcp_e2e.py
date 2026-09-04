@@ -69,11 +69,11 @@ class DemoAcceptanceTests(unittest.TestCase):
         self.assertEqual(self.report.get("protocol"), "2024-11-05")
         identity = self.report.get("identity") or {}
         self.assertEqual(identity.get("adapter_version"), "resonance-mcp/0.1")
-        self.assertEqual(identity.get("engine_version"), "resonance-engine/0.1")
+        self.assertEqual(identity.get("engine_version"), "resonance-engine/0.2")
         self.assertEqual(identity.get("interface_version"), "resonance-interfaces/0.1")
         self.assertEqual(
             identity.get("verifier_config_hash"),
-            "3e107bc4850537730949d013ffa0f335b3ddbf9b0d64bb640fe34f893dbb1b1d",
+            "12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77",
         )
 
     def test_five_required_scenarios_and_error_diagnostics(self):

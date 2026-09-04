@@ -30,6 +30,13 @@ ENGINE_VERSION = "resonance-engine/0.2"
 
 
 CLASS_RANK = {"direct": 0, "approximate": 1, "analogical": 2, "complementary": 3, "negative": 4}
+# Retrieval proposes, verification ranks (ADR-0004): fetch a larger candidate
+# pool than the caller asked for, verify all of it, and return the best k by
+# verified score. Hard-rejected candidates that sat inside the caller's
+# retrieval window are returned too, after the kept rows, as contradiction
+# evidence rather than silently dropped.
+RETRIEVAL_OVERFETCH = 4
+MIN_VERIFY_POOL = 24
 
 
 def _verified_sort_key(hit: ResonanceHit):
@@ -130,7 +137,10 @@ class ResonanceEngine:
         self._require_bound()
         hits: list[ResonanceHit] = []
         rarity = self.candidate_index.motif_rarity(graph)
-        for candidate in self.candidate_index.query(graph, mode=mode, k=k):
+        pool = max(k * RETRIEVAL_OVERFETCH, MIN_VERIFY_POOL)
+        retrieval_position: dict[str, int] = {}
+        for position, candidate in enumerate(self.candidate_index.query(graph, mode=mode, k=pool), start=1):
+            retrieval_position[candidate.candidate_id] = position
             target = self.store.get(candidate.candidate_id)
             if target is None:
                 raise EngineIntegrityError(
@@ -141,9 +151,11 @@ class ResonanceEngine:
             self._explanations[(graph.thought_id, candidate.candidate_id)] = verification
             hits.append(ResonanceHit(candidate=self._flag_synced(candidate, verification),
                                      verification=verification))
-        # Verified order (ADR-0004): retrieval proposes, verification ranks.
-        # Hard-rejected candidates sink to the end in their retrieval order.
-        return tuple(sorted(hits, key=_verified_sort_key))
+        ordered = sorted(hits, key=_verified_sort_key)
+        kept = [h for h in ordered if not h.verification.hard_rejection][:k]
+        rejected = [h for h in ordered if h.verification.hard_rejection
+                    and retrieval_position.get(h.candidate.candidate_id, pool + 1) <= k]
+        return tuple(kept + rejected)
 
     def compare(self, a: ThoughtGraph, b: ThoughtGraph, *, mode: str) -> VerifierResult:
         require_mode(mode)

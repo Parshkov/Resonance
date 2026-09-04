@@ -28,6 +28,11 @@ from src.discovery import ConsentRegistry, DiscoveryService, SessionProfile
 from src.engine import ResonanceEngine
 from src.graph import ThoughtDNAValidationError, ThoughtGraph, validate_thought
 
+from .projection import (
+    is_private_audit_event,
+    validate_projection_parts,
+    validate_stored_session,
+)
 from .errors import (
     PersistenceConflictError,
     PersistenceNotFoundError,
@@ -129,7 +134,14 @@ class LiveCorpusService:
         self.registry = ConsentRegistry({})
         self.discovery = DiscoveryService(self.engine, self.registry)
         self._serving_generation: int | None = None
-        self.rebuild_index()
+        self._startup_degraded_reason: str | None = None
+        try:
+            self.rebuild_index()
+        except PersistenceStateError as exc:
+            # Keep the object alive in a fail-closed degraded state so an
+            # authorized repair/revoke path can recover the bad row.
+            self._serving_generation = None
+            self._startup_degraded_reason = str(exc)
 
     # ------------------------------------------------------------------
     # generation / health
@@ -194,6 +206,8 @@ class LiveCorpusService:
                     "db_generation": db_generation,
                     "serving_generation": self._serving_generation,
                     "index_current": current,
+                    **({"degraded_reason": self._startup_degraded_reason}
+                       if self._startup_degraded_reason else {}),
                 },
             )
 
@@ -515,9 +529,21 @@ class LiveCorpusService:
         Existing session IDs require immutable ownership and an expected_version.
         A retry with the same request_id returns the original committed result.
         """
+        validate_projection_parts(consent=consent, location=location, presentation=presentation)
         with self._lock:
             if self.repo.get_user(user_id) is None:
                 raise PersistenceNotFoundError(user_id)
+            thought_id_claim = thought_dna.get("thought_id") if isinstance(thought_dna, Mapping) else None
+            if isinstance(thought_id_claim, str):
+                prior = self.repo.get_session_by_thought(thought_id_claim)
+                if prior is not None and prior.session_id != session_id:
+                    # v0.1 policy: a durable thought_id is never rebound to a new
+                    # session, including after deletion. Re-sharing requires a new
+                    # Thought DNA id, preserving tombstone/history semantics.
+                    raise PersistenceConflictError(
+                        "thought_id is already reserved; a new session (including "
+                        "re-share after delete) requires a new Thought DNA id"
+                    )
             if not session_id.startswith("ses-"):
                 raise PersistenceValidationError("session_id must start with 'ses-'")
             try:
@@ -600,6 +626,10 @@ class LiveCorpusService:
         request_id: str | None = None,
         rebuild: bool = True,
     ) -> SessionRecord:
+        current_for_validation = self.repo.get_session(session_id)
+        if current_for_validation is not None:
+            validate_projection_parts(consent=consent, location=current_for_validation.location,
+                                      presentation=current_for_validation.presentation)
         with self._lock:
             state = consent if isinstance(consent, ConsentState) else ConsentState.from_mapping(consent)
             key = self._idempotency_key(
@@ -642,6 +672,20 @@ class LiveCorpusService:
         request_id: str | None = None,
         rebuild: bool = True,
     ) -> SessionRecord:
+        if expected_version is not None and request_id is None:
+            current = self.repo.get_session(session_id)
+            if current is not None and int(current.version) != int(expected_version):
+                # A request that cannot possibly commit reports the stale-version
+                # conflict before replacement metadata is validated; with a
+                # request_id the idempotent replay path runs first.
+                raise PersistenceConflictError(f"stale session version for {session_id!r}")
+        current = self.repo.get_session(session_id)
+        if current is not None:
+            validate_projection_parts(
+                consent=current.consent,
+                location=location if location is not None else current.location,
+                presentation=presentation if presentation is not None else current.presentation,
+            )
         with self._lock:
             key = self._idempotency_key(
                 request_id,
@@ -788,6 +832,7 @@ class LiveCorpusService:
             session = self.repo.get_session(session_id)
             if session is None or not session.is_discoverable():
                 return None
+            validate_stored_session(session)
             user = self.repo.get_user(session.user_id)
             if user is None or user.hidden:
                 return None
@@ -820,13 +865,27 @@ class LiveCorpusService:
             return self.registry.get(thought_id)
 
     def audit_log(self) -> list[dict[str, Any]]:
-        return [event.to_public_dict() for event in self.repo.list_audit()]
+        """Public audit view. The durable audit table is also the identity-event
+        backing store; verifier hashes and auth-session identifiers are internal
+        security state and never enter the public view."""
+        return [event.to_public_dict() for event in self.repo.list_audit()
+                if not is_private_audit_event(str(event.to_public_dict().get("event_type", "")))]
 
     # ------------------------------------------------------------------
     # deterministic rebuild
     # ------------------------------------------------------------------
     def rebuild_index(self) -> str:
         """Build off to the side; publish atomically only for one DB generation."""
+        try:
+            snapshot = self._rebuild_index_locked()
+        except PersistenceStateError as exc:
+            self._serving_generation = None
+            self._startup_degraded_reason = str(exc)
+            raise
+        self._startup_degraded_reason = None
+        return snapshot
+
+    def _rebuild_index_locked(self) -> str:
         with self._lock:
             start_generation = self.repo.get_corpus_generation()
             engine = ResonanceEngine()
@@ -837,6 +896,7 @@ class LiveCorpusService:
                 user = self.repo.get_user(session.user_id)
                 if user is None or user.hidden:
                     continue
+                validate_stored_session(session)
                 try:
                     validate_thought(session.thought_dna)
                 except ThoughtDNAValidationError as exc:

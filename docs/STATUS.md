@@ -1,90 +1,42 @@
-# Resonance — 60 Hour Build Status
+# Resonance — Status
 
-## Clock
+Updated: 2026-09-04
 
-Start: **2026-08-29 19:26 America/Los_Angeles**
+## Where the project actually is
 
-Target window:
+| layer | state | evidence |
+|---|---|---|
+| Thought DNA schema v0.1 | frozen, validated, canonical hashing | `src/graph`, `tests/test_thought_dna_schema.py` |
+| Deterministic semantics (no LLM) | engine 0.2: lexicon + stems + relatedness | `src/semantics`, `tests/test_semantics.py` |
+| Retrieval | structural + concept + content channels, IDF, verified re-ranking | `src/fingerprint`, `src/index`, `src/engine/reports/r0-v0.2-e2e.json` |
+| Verification / scoring | FGW conditional gradient + scoring policy v0.2 | `src/alignment`, `src/scoring`, ADR-0004 |
+| Extraction from prose | cue extractor v0.2, edge F1 0.94 on 22 prose cases | `src/extraction`, `benchmark/extraction-v0.2` |
+| Benchmark | v0.2: 8 skeletons × 4 domains × 18 families, gate split untouched by tuning | `benchmark/r0-v0.2` |
+| Product (MCP, WebMCP, OAuth, persistence) | deployed; one MCP vocabulary (`src/product/mcp_bridge.py`) | `src/product`, `ops/DEPLOY.md` |
 
-- 40 hours: **2026-08-31 11:26 PT**
-- 60 hours: **2026-09-01 07:26 PT**
+## What is validated
 
-## Current phase
+- Same words / different structure → rejected (polarity flips are hard-rejected; full permutations raise `label_identity` contradictions).
+- Different words / same abstract structure → `analogical`, on 8 skeletons × 3 other domains each, and on the hand-authored demo corpus.
+- Same skeleton with concept-free labels (template coincidence) → `negative`.
+- Partial, granular, paraphrased, permuted and extraction-noisy variants → retrieved in the top 5 among distractors and classified correctly.
+- Prose → graph without an LLM for texts that carry explicit connectives; cue-free prose yields an honest empty graph.
 
-**R0 — scientific / algorithmic architecture selection**
+## What is not validated
 
-Resonance is the project. Research is the current state used to select the implementation.
+- Real user thoughts at scale: every benchmark graph is authored (by agents), not extracted from real conversations. Independent human review of the v0.2 gold is pending.
+- Corpus scale 10^4–10^6: no replay beyond a few hundred graphs.
+- Extraction of implicit causation (no connective) is abstained by design.
+- Native WebMCP browser discovery on a hosted client (see `submission/RELEASE_MANIFEST.md`).
 
-## Public research program
+## Process notes
 
-The R0 process is public and reproducible:
+- Engine 0.1 gate reports under `src/*/reports/r0-v0.1-*.json` are kept as history; they were computed on the single-template v0.1 corpus and are not comparable with 0.2.
+- Import-time monkey-patch modules (`review_hardening`, `review_alignment`) were folded into the classes they patched; behaviour is unchanged and now visible in one place.
+- The second remote MCP server and its 15-tool vocabulary were removed; `src/remote/server.py` is a thin factory over the product server.
 
-```text
-Mission
-  -> independent submission(s)
-  -> comparative/adversarial review
-  -> benchmark / falsification
-  -> ADR
-  -> implementation
-```
+## Next falsification targets
 
-Canonical files:
-
-- `PRINCIPLES.md`
-- `OPEN_RESEARCH.md`
-- `ROADMAP.md`
-- `CONTRIBUTING.md`
-- `research/R0_EXECUTION_PLAN.md`
-- `research/missions/`
-- `research/submissions/`
-- `research/reviews/`
-- `research/logbook/`
-- `docs/decisions/`
-
-## R0 active runs
-
-- A — Structure Mapping / cognitive analogy
-- B1 — Relational Constellation Fingerprinting — GPT-5.6 Sol MAX
-- B2 — Relational Constellation Fingerprinting — Claude Opus 5, blind from B1
-- C1 — Approximate Graph Alignment — Claude Opus 5
-- C2 — Approximate Graph Alignment — GPT-5.6 Sol MAX, blind from C1
-- D — multiscale / granularity invariance
-- E — Knowledge DNA
-- F — Thought extraction
-- G — benchmark / falsification
-- H — architecture red team
-
-B and C are intentionally duplicated across independent model families because they form the core retrieval/verification engine.
-
-## Working hypothesis
-
-```text
-Thought
-→ multiscale relational landmarks
-→ sparse fingerprints
-→ inverted / ANN candidate retrieval
-→ coherent structural alignment
-→ resonance score + explanation
-```
-
-A candidate match is valuable only when multiple local correspondences support a coherent relational alignment rather than merely sharing vocabulary.
-
-## R0 gate
-
-Before core implementation, produce:
-
-1. Decision Matrix
-2. Invariance Specification
-3. Retrieval ADR
-4. Verification ADR
-5. Thought DNA v0.1
-6. Benchmark v0.1
-7. Resonance scoring / explanation contract
-
-## Current core phrase
-
-> Find isomorphic, approximately isomorphic, causally analogous, or complementary subgraphs inside independently evolving human Thought Graphs.
-
-## Orchestration
-
-GitHub issues track the primary R0 runs and the synthesis gate. Raw research artifacts must still be committed under `research/submissions/` so the durable scientific record remains versioned in the repository.
+1. A corpus of real extracted thoughts (consented) with two-human gold; compare engine 0.2 against a whole-thought embedding baseline.
+2. Scale replay of the concept channel at 10^4–10^5 graphs.
+3. Lexicon coverage audit on real labels; add classes only with two independent examples.

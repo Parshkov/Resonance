@@ -64,3 +64,12 @@ Stage-attributed outcome, preserved rather than compensated:
   fixtures without knowledge annotations).
 
 Requires Python ≥ 3.10 (interfaces contract).
+
+## v0.2 (ADR-0004)
+
+`find(k)` over-fetches `max(4k, 24)` candidates, verifies all of them with the
+query's corpus rarity, and returns the best `k` by verified score followed by
+hard-rejected candidates from the caller's retrieval window. Engine version
+`resonance-engine/0.2`. Reports: `reports/r0-v0.2-e2e.json` (engine 0.2 on
+Benchmark v0.2) and `reports/r0-v0.2-baseline-engine-0.1.json` (engine 0.1 on
+the same corpus, for the record).

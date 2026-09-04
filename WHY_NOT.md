@@ -46,3 +46,20 @@ When rejecting an approach, add:
 - evidence against it;
 - whether rejection is permanent or conditional;
 - what new evidence would justify revisiting it.
+## Why not treat role-skeleton agreement as analogy? (2026-09-04)
+
+- **Tempting because** it is fully vocabulary-invariant and makes every cross-domain relabelling "match".
+- **Evidence against:** on Benchmark v0.2, engine 0.1 accepted 4/4 template coincidences (same skeleton, concept-free labels) as analogies; three unrelated 5-node graphs with the same skeleton scored structural 0.888. R0-H predicted exactly this.
+- **Decision:** analogy requires abstract-concept correspondence from the deterministic lexicon (ADR-0004). Rejection is conditional: reconsider if a human-reviewed real corpus shows concept alignment adds nothing.
+
+## Why not derive the OAuth issuer from the Host header? (2026-09-04)
+
+- **Tempting because** it works behind any proxy without configuration.
+- **Evidence against:** with two https origins configured, a caller-controlled `X-Forwarded-Host` became the issuer of every metadata document (metadata poisoning).
+- **Decision:** the issuer comes from the configured allowlist; a header value is used only when it is itself an allowed origin (loopback excepted for local development). Permanent.
+
+## Why not patch service classes at import time? (2026-09-04)
+
+- **Tempting because** review fixes land as a small isolated delta.
+- **Evidence against:** three `install()` shims silently rewrote eight methods of classes defined elsewhere; agents reading the classes could not see the real behaviour.
+- **Decision:** folded into the classes (`src/persistence/projection.py`, `IdentityService._normalize_location`). Permanent.

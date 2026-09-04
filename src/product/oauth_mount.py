@@ -27,24 +27,31 @@ def public_issuer(allowed_origins: frozenset[str] | set[str] | None,
                   headers: Mapping[str, str] | None = None) -> str:
     """Absolute origin browsers and hosted clients see.
 
-    Order: the deployment contract (the single https allowed origin, i.e.
-    `PUBLIC_ORIGIN`) wins; behind a proxy the process itself only ever sees
-    plain HTTP, so `Host` alone would produce `http://0.0.0.0:8080`. Fallbacks
-    use the edge's forwarded headers, then `Host`.
+    The issuer is the trust anchor of every OAuth metadata document, so it is
+    never derived from a request header the caller controls. Order: the single
+    https allowed origin wins; otherwise a forwarded/Host-derived origin is
+    used ONLY when it is itself an allowed origin; otherwise the first https
+    allowed origin, then the first allowed origin. With no allowlist at all
+    (local development) the Host header is the only information available.
     """
-    https = sorted(o.rstrip("/") for o in (allowed_origins or ()) if o.startswith("https://"))
+    origins = sorted(o.rstrip("/") for o in (allowed_origins or ()))
+    https = [o for o in origins if o.startswith("https://")]
     if len(https) == 1:
         return https[0]
     headers = headers or {}
-    host = headers.get("X-Forwarded-Host") or headers.get("Host") or ""
-    host = host.split(",", 1)[0].strip()
-    if host:
-        proto = (headers.get("X-Forwarded-Proto") or "http").split(",", 1)[0].strip()
-        return f"{proto}://{host}"
-    if len(https) > 1:
+    host = (headers.get("X-Forwarded-Host") or headers.get("Host") or "").split(",", 1)[0].strip()
+    proto = (headers.get("X-Forwarded-Proto") or "http").split(",", 1)[0].strip()
+    candidate = f"{proto}://{host}" if host else ""
+    if candidate and candidate in origins:
+        return candidate
+    loopback = host.split(":", 1)[0] in ("127.0.0.1", "localhost", "[::1]", "::1")
+    if candidate and loopback and not https and proto == "http":
+        return candidate                # local development / tests on an ephemeral port
+    if https:
         return https[0]
-    origins = sorted(o.rstrip("/") for o in (allowed_origins or ()))
-    return origins[0] if origins else "http://127.0.0.1"
+    if origins:
+        return origins[0]
+    return candidate or "http://127.0.0.1"
 
 
 def resource_url(issuer: str) -> str:

@@ -36,3 +36,14 @@ policy.
 key. `query(..., k=K)` returns every candidate whose primary rank is
 `<= K`, so a tied-best group is not truncated by graph name. Rank- and
 recall-consuming gates must read `channel_ranks`, not list position.
+
+## v0.2 (ADR-0004)
+
+Channels: `structural` (label-free keys), `concept` (lexicon keys), `content`
+(BM25 over stems, normalised by the query self-score), `knowledge`. Keys are
+IDF-weighted; a key is skipped only when more than 50% of a corpus (>= 20
+graphs) carries it, so common motifs are down-weighted rather than dropped.
+`analogical` mode ranks by the fused score 0.45·structural + 0.40·concept +
+0.15·content; `structural` mode stays label-free. `motif_rarity(graph)` gives
+the corpus-relative rarity of a skeleton for scoring. `channel_ranks["primary"]`
+is the fused rank.
