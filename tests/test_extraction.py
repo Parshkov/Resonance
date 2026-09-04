@@ -80,7 +80,7 @@ class ExtractionTests(unittest.TestCase):
         self.assertGreaterEqual(len(first.graph.relations), 1)
 
     def test_overlap_merge_does_not_leave_dangling_relation_source(self):
-        result = CueExtractor().extract("A caused by A B C strong heat causes D")
+        result = CueExtractor().extract("Failure is caused by strong heat, and strong heat causes damage.")
         ids = {node.id for node in result.graph.nodes}
         for rel in result.graph.relations:
             self.assertIn(rel.source, ids)

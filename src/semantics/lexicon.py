@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from .stem import stem
 
-LEXICON_VERSION = "resonance-lexicon/0.2.5"
+LEXICON_VERSION = "resonance-lexicon/0.2.6"
 
 # concept -> (role_hint | None, terms)
 # role_hint feeds extraction and soft role compatibility; None = no hint.
@@ -230,7 +230,7 @@ CONCEPTS: dict[str, tuple[str | None, tuple[str, ...]]] = {
                                     "thrash", "thrashing", "idle", "idling", "underutilized", "redundant tests", "redundant work", "double work", "duplicated effort", "duplicate work", "repeated work", "wasted rework", "wasted demolition")),
     # ---- epistemic / methods ---------------------------------------------
     "EVIDENCE": ("evidence", ("data", "dataset", "proof", "prove", "finding", "findings",
-                              "result", "results", "observation", "observed", "experiment", "experimental",
+                              "observation", "observed", "experiment", "experimental",
                               "measurement", "measured", "study", "survey", "sample", "statistic",
                               "statistics", "record", "log entry", "report", "trace", "audit trail",
                               "benchmark", "test result", "slide", "specimen", "sherd", "witness statement", "statement", "testimony", "satellite", "station record", "bank record", "call record", "field data", "survey data", "readout", "sample data")),
