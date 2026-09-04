@@ -1,0 +1,13 @@
+[PASS] page loaded with shim; tools registered — title='Resonance — Visual Discovery' heading_before='plasma lens thermal bloom → ionization cascade'
+[PASS] resonance_prepare_thought WITH structured thought -> private draft — {"discoverable": false, "input_kind": "agent_structured", "source_retention": "not_retained", "session_id": "ses-63816917ae7ca4e4"}
+[PASS] resonance_get_share_preview shows own 5 labels + confirmation_token — nodes=5 relations=5 topic='Panic buying after a shortage rumour'
+[PASS] resonance_share_prepared_thought (confirm+token) -> shared — {"shared": true, "discoverable": true, "session_id": "ses-63816917ae7ca4e4"}
+[PASS] resonance_discover {source:live} -> live matches — result_id=set n=15
+[FAIL] #thought-heading starts with 'Panic buying after a shortage rumour' — heading='plasma lens thermal bloom → ionization cascade'
+[PASS] #map-status-text captured — map_status_text='Calling accepted discovery MCP…'
+[PASS] .match-card count == 4 — count=4 classes=['match-card is-selected', 'match-card', 'match-card', 'match-card'] labels=[None, None, None, None]
+[PASS] resonance_update_consent {shared:false} -> revoked — {"shared": false, "revoked": true, "discoverable": false}
+[PASS] consent page 200 and shows client name 'Claude (custom connector)' — status=200 title='Authorize Resonance access'
+[PASS] consent stylesheet applied: main.consent borderRadius == '22px' — borderRadius='22px' stylesheets=['https://resonance-production-cfe3.up.railway.app/oauth/consent.css']
+
+10/11 checks passed

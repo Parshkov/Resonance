@@ -1,0 +1,15 @@
+[PASS] page loaded with shim; tools registered — title='Resonance — Visual Discovery' heading_before='plasma lens thermal bloom → ionization cascade'
+[PASS] resonance_prepare_thought WITH structured thought -> private draft — {"discoverable": false, "input_kind": "agent_structured", "source_retention": "not_retained", "session_id": "ses-b1426a6b2172a48d"}
+[PASS] resonance_get_share_preview shows own 5 labels + confirmation_token — nodes=5 relations=5 topic='Panic buying after a shortage rumour'
+[PASS] resonance_share_prepared_thought (confirm+token) -> shared — {"shared": true, "discoverable": true, "session_id": "ses-b1426a6b2172a48d"}
+[PASS] resonance_discover {source:live} -> live matches — result_id=set n=15
+[PASS] #thought-heading starts with 'Panic buying after a shortage rumour' — heading='Panic buying after a shortage rumour → synchronized bulk purchases'
+[PASS] #map-status-text captured — map_status_text='3 resonances · backend order intact'
+[FAIL] .match-card count == 4 — count=3 classes=['match-card is-selected', 'match-card', 'match-card'] labels=[None, None, None]
+[PASS] after clicking #source-live: #thought-heading starts with 'Panic buying after a shortage rumour' — heading='Panic buying after a shortage rumour → synchronized bulk purchases' map_status_text='3 resonances · backend order intact'
+[FAIL] after clicking #source-live: .match-card count == 4 — count=3 classes=['match-card is-selected', 'match-card', 'match-card'] texts=['01 | guest-911d11 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r', '02 | guest-85ccf9 | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r', '03 | guest-d0c40c | structural 0.8830 |  | Panic buying after a shortage rumour |  | supply shortage r']
+[PASS] resonance_update_consent {shared:false} -> revoked — {"shared": false, "revoked": true, "discoverable": false}
+[PASS] consent page 200 and shows client name 'Claude (custom connector)' — status=200 title='Authorize Resonance access'
+[PASS] consent stylesheet applied: main.consent borderRadius == '22px' — borderRadius='22px' stylesheets=['https://resonance-production-cfe3.up.railway.app/oauth/consent.css']
+
+11/13 checks passed
