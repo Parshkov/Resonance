@@ -31,6 +31,13 @@ contributes *executed* evidence rather than a second reading.
 Model identity is reported from the session runtime (`configured_model` and `last_served_model`
 both `claude-opus-5`), not inferred.
 
+**Model change disclosure.** Everything up to and including PR #119's Addendum 3 (the R14
+review run) was produced on `claude-opus-5`. From 2026-09-04 ~00:30 UTC the sponsor switched
+the same session to `claude-fable-5-1`; the R16 deployment work (Dockerfile, fly.toml,
+ops/DEPLOY.md, the `build_runtime` DSN-routing fix, Secure cookies over HTTPS) was produced on Fable 5.1 under this same
+`agent_id`, at the sponsor's explicit request, with the same runtime and method. Commit trailers
+name the serving model for each commit.
+
 ## Contributions
 
 Do not maintain this section speculatively. Add links only after a submission/PR exists.
