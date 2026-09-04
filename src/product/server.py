@@ -71,7 +71,17 @@ STATIC = {
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
     "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
     "/live_shell.mjs": ("live_shell.mjs", "text/javascript; charset=utf-8"),
+    # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
+    # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
+    "/live_ui.css": ("live_ui.css", "text/css; charset=utf-8"),
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
+    "/favicon.ico": ("favicon.svg", "image/svg+xml"),
 }
+
+HEAD_INJECTION = (
+    '  <link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
+    '  <link rel="stylesheet" href="/live_ui.css">\n</head>'
+)
 
 
 @dataclass
@@ -240,7 +250,7 @@ class ProductHandler(BaseHTTPRequestHandler):
         product = self.runtime.product
         if path in {"/", "/index.html"}:
             html = (UI_DIR / "index.html").read_text(encoding="utf-8")
-            injected = html.replace(
+            injected = html.replace("</head>", HEAD_INJECTION, 1).replace(
                 "</body>",
                 '  <script type="module" src="/webmcp.mjs"></script>\n'
                 '  <script type="module" src="/deeplink.mjs"></script>\n'

@@ -369,6 +369,22 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('src="/live_shell.mjs"', html)
         self.assertLess(html.index('src="/collab_ui.mjs"'), html.index('src="/live_shell.mjs"'))
         self.assertLess(html.index('src="/workspaces.mjs"'), html.index('src="/live_shell.mjs"'))
+        # R16 Chrome audit: the collaboration drawer is styled by a linked
+        # stylesheet (CSP default-src 'self' forbids inline styles) and the page
+        # ships a favicon, both injected into <head>; served with proper types.
+        self.assertIn('href="/live_ui.css"', html)
+        self.assertIn('href="/favicon.svg"', html)
+        self.assertLess(html.index('href="/live_ui.css"'), html.index("</head>"))
+        self.assertLess(html.index("</head>"), html.index('src="/collab_ui.mjs"'))
+        with urlopen(Request(self.base + "/live_ui.css"), timeout=10) as response:
+            self.assertTrue(response.headers["Content-Type"].startswith("text/css"))
+            css = response.read().decode("utf-8")
+        self.assertIn(".collab-drawer", css)
+        self.assertIn(".collab-toggle", css)
+        for icon in ("/favicon.svg", "/favicon.ico"):
+            with urlopen(Request(self.base + icon), timeout=10) as response:
+                self.assertEqual(response.headers["Content-Type"], "image/svg+xml")
+                self.assertIn(b"<svg", response.read())
         with urlopen(Request(self.base + "/live_shell.mjs"), timeout=10) as response:
             shell = response.read().decode("utf-8")
         self.assertIn("markLiveShell", shell)
@@ -467,6 +483,18 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn("querySession", ui)
         # the stale R9 placeholder is hidden at runtime
         self.assertIn("intro-unavailable", ui)
+        # R16 Chrome audit: the panel is a top-bar-toggled drawer (never a 4th
+        # item of the 3-column workspace grid), refreshes after any successful
+        # write made through session.mjs, and offers the human share path.
+        self.assertIn("collab-toggle", ui)
+        self.assertIn("collab-drawer", ui)
+        self.assertNotIn('getElementById("main-workspace")', ui)
+        self.assertIn("resonance:write", ui)
+        self.assertIn("/api/webmcp/preview", ui)
+        self.assertIn("/api/webmcp/share", ui)
+        self.assertNotIn("style.cssText", ui)  # presentation lives in live_ui.css
+        with urlopen(Request(self.base + "/session.mjs"), timeout=10) as response:
+            self.assertIn("resonance:write", response.read().decode("utf-8"))
         # session bootstrap shares the token across tabs (F4) and self-heals
         with urlopen(Request(self.base + "/session.mjs"), timeout=10) as response:
             session = response.read().decode("utf-8")

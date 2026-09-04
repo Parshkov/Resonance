@@ -274,7 +274,17 @@ class CompetitionHandler(ProductHandler):
             token = self._token()
             session_id = _owned_live_session(product, token)
             if not session_id:
-                raise PermissionError("share the current thought before LIVE discovery")
+                # Not an error in the product: the visitor simply has not shared
+                # a thought yet. PermissionError was unmapped and surfaced as a
+                # 500 "unexpected product error" in the R9 view.
+                self._send_json(
+                    {"error": "share_required",
+                     "message": "LIVE discovery needs a shared thought first: run "
+                                "resonance_prepare_thought → resonance_get_share_preview → "
+                                "resonance_share_prepared_thought (or use the Collaboration "
+                                "panel), then choose Live MCP again."},
+                    HTTPStatus.CONFLICT)
+                return
             live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K)
             self._send_json(_legacy_discovery(live))
             return
