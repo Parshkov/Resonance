@@ -1,0 +1,25 @@
+Traceback (most recent call last):
+  File "/home/user/Resonance/submission/evidence/public-origin-bd161ad/browser_harness_copy.py", line 188, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/user/Resonance/submission/evidence/public-origin-bd161ad/browser_harness_copy.py", line 87, in main
+    pg.goto(args.origin + "/", wait_until="networkidle", timeout=60000)
+  File "/usr/local/lib/python3.11/dist-packages/playwright/sync_api/_generated.py", line 9875, in goto
+    self._sync(
+  File "/usr/local/lib/python3.11/dist-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/playwright/_impl/_page.py", line 560, in goto
+    return await self._main_frame.goto(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/playwright/_impl/_frame.py", line 156, in goto
+    await self._channel.send(
+  File "/usr/local/lib/python3.11/dist-packages/playwright/_impl/_connection.py", line 76, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.11/dist-packages/playwright/_impl/_connection.py", line 632, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.Error: Page.goto: net::ERR_CONNECTION_RESET at https://resonance-production-cfe3.up.railway.app/
+Call log:
+  - navigating to "https://resonance-production-cfe3.up.railway.app/", waiting until "networkidle"
+
