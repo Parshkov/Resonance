@@ -68,6 +68,7 @@ STATIC = {
     "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
+    "/live_shell.mjs": ("live_shell.mjs", "text/javascript; charset=utf-8"),
 }
 
 
@@ -243,7 +244,8 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/deeplink.mjs"></script>\n'
                 '  <script type="module" src="/session.mjs"></script>\n'
                 '  <script type="module" src="/collab.mjs"></script>\n'
-                '  <script type="module" src="/collab_ui.mjs"></script>\n</body>',
+                '  <script type="module" src="/collab_ui.mjs"></script>\n'
+                '  <script type="module" src="/live_shell.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
