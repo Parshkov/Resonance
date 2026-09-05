@@ -180,8 +180,22 @@ function setShellState(value) {
   if (shell) shell.dataset.state = value;
 }
 
+// Two decimals. Four is engineering precision that changes nothing a person
+// can act on, and 0.8306 next to a pseudonym reads as machine output rather
+// than as "these two are close". The exact number stays in the API.
 function formatScore(value) {
-  return Number(value).toFixed(4);
+  return Number(value).toFixed(2);
+}
+
+// The engine states a hard rejection as "direction:r_43c1...->r2" or
+// "relation_type:...". That is a diagnostic, and it was printed to people in
+// a <code> box: an identifier they cannot look up, about a decision nobody
+// explained. Both kinds say something plain, so say it.
+function rejectionInWords(reason) {
+  const kind = String(reason || "").split(":")[0];
+  if (kind === "direction") return "the same link, running the opposite way";
+  if (kind === "relation_type") return "the same two ideas, joined by a different kind of link";
+  return "the structures clash";
 }
 
 function shortScore(value) {
@@ -374,7 +388,8 @@ function renderMatches(payload, primary) {
     list.append(card);
   });
   setText("shown-count", primary.length === 1 ? "1 person" : `${primary.length} people`);
-  setText("response-summary", `${payload.matches.length} matches · ${payload.rejected.length} refused`);
+  setText("response-summary",
+          `${payload.matches.length} with the same shape · ${payload.rejected.length} close but not the same`);
   const empty = document.getElementById("matches-empty");
   if (empty) empty.hidden = primary.length > 0;
 }
@@ -430,7 +445,12 @@ function renderEvidence(match) {
       );
       chip.append(line);
     }
-    chip.append(el("span", "relation-chip__pair", `${relation.query_relation} ↔ ${relation.candidate_relation}`));
+    if (!known) {
+      // The candidate side is only an id, and the query side did not resolve.
+      // An id pair says nothing to the person the panel is for, so say what
+      // is actually known instead of printing both.
+      chip.append(el("span", "relation-chip__query", "a link both of you keep"));
+    }
     relations.append(chip);
   });
   setText(
@@ -701,9 +721,9 @@ function renderMap(context, payload, primary, others, rejected) {
     } else {
       addMarker(markers, item, {
         kind: "is-rejected",
-        ariaLabel: `Refused ${item.position}: ${row.person_pseudonym}, ${row.hard_rejection}`,
+        ariaLabel: `Refused ${item.position}: ${row.person_pseudonym}, ${rejectionInWords(row.hard_rejection)}`,
         label: row.person_pseudonym,
-        sublabel: row.hard_rejection,
+        sublabel: rejectionInWords(row.hard_rejection),
         radius: 8,
         onSelect: () => openDrawerAt(row.session_id),
       });
@@ -725,8 +745,11 @@ function renderContradictions(rejected) {
   const first = rejected[0];
   setText("contradiction-topic", first.display.topic);
   setText("contradiction-person", first.person_pseudonym);
-  setText("contradiction-reason", first.hard_rejection);
-  setText("rejected-count", `${rejected.length} refused`);
+  setText("contradiction-reason",
+          `${rejectionInWords(first.hard_rejection)}, so this is not called a resonance`);
+  setText("rejected-count", rejected.length === 1
+    ? "1 near miss like this"
+    : `${rejected.length} near misses like this`);
 }
 
 function drawerRow(payload, row, rejected = false) {
@@ -736,7 +759,8 @@ function drawerRow(payload, row, rejected = false) {
   const copy = el("div");
   copy.append(el("strong", "", `${row.person_pseudonym} · ${row.display.topic}`));
   copy.append(el("span", "", `${row.mode_classification} · ${row.confidence} · ${placeLabel(row.display.location)}`));
-  item.append(copy, el("code", "", rejected ? row.hard_rejection : formatScore(row.scores.structural)));
+  item.append(copy, el("span", "row-figure",
+    rejected ? rejectionInWords(row.hard_rejection) : formatScore(row.scores.structural)));
   return item;
 }
 

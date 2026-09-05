@@ -1109,8 +1109,16 @@ class RemoteMCPBridge:
 
     def tool_respond_intro(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)
+        # Same rule as the HTTP route: an assistant that omits the field, or
+        # sends something that is not a boolean, must not have declined for
+        # the person by accident.
+        decision = arguments.get("accept")
+        if not isinstance(decision, bool):
+            raise BridgeError("validation_failed",
+                              "accept must be true or false: an introduction is "
+                              "never declined by default")
         return self.product.respond_intro(
-            token, str(arguments.get("intro_id", "")), accept=arguments.get("accept") is True,
+            token, self._required_id(arguments, "intro_id"), accept=decision,
             request_id=self._request_id(arguments), confirmed=True, **self._security())
 
     def tool_send_message(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:

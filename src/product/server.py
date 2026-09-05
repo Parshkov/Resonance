@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 import json
+from html import escape
 import secrets
 import threading
 import time
@@ -827,6 +828,28 @@ class ProductHandler(BaseHTTPRequestHandler):
         html = html.replace("__RESONANCE_ORIGIN__", self._issuer())
         self._send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
 
+    def _initial_account(self) -> dict[str, str]:
+        """Who this visitor is, before any JavaScript runs.
+
+        The masthead used to arrive empty and fill itself in from a fetch, so
+        the account appeared a moment late and shoved the row it is in. The
+        server already knows -- the cookie is on the request -- so it says so
+        in the HTML and the page paints once. This is the same override seam as
+        `_initial_app_state`; the API-only server knows nothing about a browser
+        visitor and says nothing.
+        """
+        return {}
+
+    def _stamp_account(self, html: str) -> str:
+        account = self._initial_account()
+        if not account:
+            return html
+        attributes = " ".join(
+            f'data-{key}="{escape(str(value), quote=True)}"'
+            for key, value in sorted(account.items()) if value != "")
+        return html.replace('<div class="account-slot" id="account-slot">',
+                            f'<div class="account-slot" id="account-slot" {attributes}>', 1)
+
     def _initial_app_state(self, params: Mapping[str, list[str]]) -> str:
         """`data-state` to serve in the HTML, before any JavaScript runs.
 
@@ -850,6 +873,7 @@ class ProductHandler(BaseHTTPRequestHandler):
             # before any JavaScript runs.
             html = html.replace('data-state="loading"',
                                 f'data-state="{self._initial_app_state(params)}"', 1)
+            html = self._stamp_account(html)
             injected = html.replace("</head>", HEAD_INJECTION, 1).replace(
                 "</body>",
                 '  <script type="module" src="/webmcp.mjs"></script>\n'
@@ -1166,9 +1190,18 @@ class ProductHandler(BaseHTTPRequestHandler):
                 confirmed=bool(body.get("confirmed", False)), **security))
             return
         if path == "/api/product/intro/respond":
+            # Declining is what happens when nobody chose anything: the field
+            # defaulted to False, so a renamed key, a typo or a half-built
+            # client silently refused a stranger's introduction on this
+            # person's behalf. Refusing to meet someone is a decision, and it
+            # has to be made, not fallen into.
+            decision = body.get("accept")
+            if not isinstance(decision, bool):
+                raise ValueError("accept must be true or false: an introduction "
+                                 "is never declined by default")
             self._send_json(product.respond_intro(
                 token, str(body.get("intro_id", "")),
-                accept=bool(body.get("accept", False)),
+                accept=decision,
                 request_id=body.get("request_id"),
                 confirmed=bool(body.get("confirmed", False)), **security))
             return

@@ -34,20 +34,10 @@
       <nav class="page-nav" id="page-nav" aria-label="On this page" hidden></nav>
 
       <div class="masthead-tools">
-        <!-- Three floating words with no label were a puzzle: a person had to
-             click one to find out what they controlled. The label is visible
-             now, and "Auto" -- which reads as automatic-something -- says what
-             it actually follows. A div with role=radiogroup rather than a
-             fieldset, because a legend cannot be placed inline beside the
-             options it names. -->
-        <div class="theme-switch" id="theme-switch" role="radiogroup" aria-labelledby="theme-switch-label">
-          <span class="theme-switch__label" id="theme-switch-label">Colours</span>
-          <label class="theme-option"><input type="radio" name="theme" value="light"><span>Light</span></label>
-          <label class="theme-option"><input type="radio" name="theme" value="dark"><span>Dark</span></label>
-          <label class="theme-option"><input type="radio" name="theme" value="system"><span>Match device</span></label>
-        </div>
-        <!-- Who you are, and the name other people see you under. Filled by
-             account.mjs once the session state is known. -->
+        <!-- Who you are, and the name other people see you under. Stamped by
+             the server so the bar is painted once, then kept fresh by
+             account.mjs. A preference belongs behind this, not permanently
+             across the top of the page. -->
         <div class="account-slot" id="account-slot"></div>
       </div>
     </header>
@@ -183,6 +173,11 @@
               <span class="status-light" aria-hidden="true"></span>
               <span id="map-status-text">Looking…</span>
             </p>
+            <!-- Where what you are looking at came from. This used to sit in
+                 the footer, under Privacy and Terms, set in monospace -- a
+                 statement about your own data, in the place nobody looks for
+                 status, dressed as debug output. -->
+            <p class="section-provenance" id="source-note"></p>
           </div>
         </div>
 
@@ -244,10 +239,15 @@
               <span class="trigger-hint">in the engine's order</span>
             </button>
 
+            <!-- A near miss, said as one. This card used to be the word
+                 REFUSED over an engine token in a <code> box -- a verdict
+                 nobody explained, about an identifier nobody can look up.
+                 What it means is worth knowing: someone is working on the
+                 same shape with one link the other way round. -->
             <section class="contradiction-card" id="contradiction-card" aria-labelledby="contradiction-heading" hidden>
-              <p class="eyebrow warning-text" id="contradiction-heading">Refused</p>
+              <p class="eyebrow" id="contradiction-heading">Close, but not the same shape</p>
               <p class="contradiction-topic" id="contradiction-topic"></p>
-              <div class="contradiction-meta"><span id="contradiction-person">—</span><code id="contradiction-reason">—</code></div>
+              <div class="contradiction-meta"><span id="contradiction-person">—</span><span id="contradiction-reason">—</span></div>
               <span class="rejected-count" id="rejected-count"></span>
             </section>
           </div>
@@ -376,7 +376,18 @@
         <a href="/terms">Terms</a>
         <a href="/support">Support</a>
       </p>
-      <p class="foot-note" id="source-note"></p>
+      <!-- The colour control's home. account.mjs lifts it into the account
+           panel when there is one, which is where a preference belongs; a
+           visitor who has not signed in still has it here rather than nowhere.
+           One place at a time, and never across the top of the page. -->
+      <div class="theme-home" id="theme-home">
+        <div class="theme-switch" id="theme-switch" role="radiogroup" aria-labelledby="theme-switch-label">
+          <span class="theme-switch__label" id="theme-switch-label">Colours</span>
+          <label class="theme-option"><input type="radio" name="theme" value="light"><span>Light</span></label>
+          <label class="theme-option"><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+          <label class="theme-option"><input type="radio" name="theme" value="system"><span>Match device</span></label>
+        </div>
+      </div>
     </footer>
 
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>

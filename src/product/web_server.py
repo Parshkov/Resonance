@@ -358,6 +358,29 @@ class WebHandler(ProductHandler):
         except Exception:                      # never fail a page load over this
             return "loading"
 
+    def _initial_account(self) -> dict[str, str]:
+        """The masthead's contents, stamped into the HTML it is part of.
+
+        Rendering this from a fetch meant the bar was one height, then another,
+        a moment later -- every load, for everyone. Reading it here costs the
+        lookup the page was going to make anyway.
+        """
+        token = self._visitor_token()
+        if token is None:
+            return {}
+        try:
+            state = self.runtime.product.state(token)
+        except Exception:                      # never fail a page load over this
+            return {}
+        account = (state or {}).get("account") or {}
+        if not account.get("user_id"):
+            return {}
+        return {
+            "account-label": str(account.get("display_label") or ""),
+            "account-email": str(account.get("sign_in_email") or ""),
+            "account-signed-in": "true" if account.get("signed_in") else "false",
+        }
+
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 

@@ -30,7 +30,16 @@ function signInLink(base, className) {
   return link;
 }
 
+function returnThemeHome() {
+  // Whoever is looking must be able to reach it. With no account button there
+  // is no panel to hold it, so it goes back to where the page keeps it.
+  const theme = document.getElementById("theme-switch");
+  const home = document.getElementById("theme-home");
+  if (theme && home && theme.parentElement !== home) home.append(theme);
+}
+
 function renderSignedOut(state, urgent = false) {
+  returnThemeHome();
   const link = signInLink(state.sign_in_url, "account-action");
   if (urgent) link.classList.add("account-action-urgent");
   slot.replaceChildren(link);
@@ -108,6 +117,17 @@ function renderSignedIn(account) {
     panel.append(local);
   }
 
+  // A preference lives behind the account, not across the top of the page.
+  // The control itself is moved, not rebuilt, so shell.mjs keeps the one set
+  // of listeners it bound at load and there is no second copy to disagree.
+  const theme = document.getElementById("theme-switch");
+  if (theme) {
+    const row = element("div", "account-panel__row");
+    row.append(element("p", "account-panel__caption", "Colours"));
+    row.append(theme);
+    panel.append(row);
+  }
+
   // Sign-out changes state, so it is a POST form rather than a link that a
   // prefetch or a link scanner could follow on the person's behalf.
   const form = element("form", "account-panel__out");
@@ -125,6 +145,7 @@ function renderSignedIn(account) {
   });
 
   slot.replaceChildren(button, panel);
+  rendered = fingerprint(account);
   if (gate) gate.hidden = true;
   document.body.dataset.signedIn = "true";
 }
@@ -133,6 +154,25 @@ function initials(label) {
   const words = label.split(/\s+/).filter(Boolean);
   if (!words.length) return "?";
   return (words[0][0] + (words[1]?.[0] || "")).toUpperCase();
+}
+
+// What the server already told us, in the HTML it served. Rendering from this
+// first is what stops the masthead arriving a moment late and shoving the row
+// it sits in -- a jump that happened on every single load.
+function stampedAccount() {
+  if (!slot || !slot.dataset.accountLabel) return null;
+  return {
+    display_label: slot.dataset.accountLabel,
+    sign_in_email: slot.dataset.accountEmail || "",
+    signed_in: slot.dataset.accountSignedIn === "true",
+    user_id: "",
+  };
+}
+
+let rendered = null;
+
+function fingerprint(account) {
+  return [account.display_label, account.sign_in_email, account.signed_in].join("\u0000");
 }
 
 export async function refreshAccount() {
@@ -146,7 +186,8 @@ export async function refreshAccount() {
   }
   const account = state?.account || {};
   if (account.user_id && (account.signed_in || !state.sign_in_required)) {
-    renderSignedIn(account);
+    // Repainting an identical masthead is how a jump gets reintroduced later.
+    if (fingerprint(account) !== rendered) renderSignedIn(account);
     return;
   }
   if (state?.sign_in_required) {
@@ -157,6 +198,9 @@ export async function refreshAccount() {
   if (gate) gate.hidden = true;
 }
 
+// Paint what the server stamped, immediately, before any request goes out.
+const stamped = stampedAccount();
+if (stamped) renderSignedIn(stamped);
 refreshAccount();
 // A share, a revoke or a client authorization can change who the page is
 // acting as; re-read rather than trusting the first answer.

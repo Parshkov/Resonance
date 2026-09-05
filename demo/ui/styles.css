@@ -163,7 +163,11 @@ section:focus { outline: none; }
 
 /* The colour-scheme control: three radios drawn as one segmented control. */
 .theme-switch { display: inline-flex; align-items: center; margin: 0; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2); }
+/* Inside the account panel the row above already says what it is. */
 .theme-switch__label { padding: 0 9px 0 11px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.account-panel .theme-switch { width: 100%; justify-content: space-between; background: var(--paper); }
+.account-panel .theme-switch__label { display: none; }
+.theme-home { display: flex; }
 .theme-option { position: relative; display: inline-flex; }
 .theme-option input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .theme-option span {
@@ -480,14 +484,19 @@ body[data-signed-in="false"] .thought-panel { display: none; }
 .secondary-trigger:hover:not(:disabled) { border-color: var(--ink-3); }
 .trigger-hint { color: var(--ink-3); font-size: 12px; }
 
+/* A near miss is not a fault. This card was painted in the warning colour,
+   with the count pinned into a second column beside a caps micro-label -- so
+   the heading, once it became a sentence, ran down the page one word per line
+   and collided with it. One column, ordinary type, no alarm. */
 .contradiction-card {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin-top: 12px; padding: 12px 14px;
-  border: 1px solid var(--rust-line); border-radius: var(--radius-sm); background: var(--rust-soft);
+  display: grid; gap: 4px; margin-top: 12px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper-3);
 }
+.contradiction-card .eyebrow { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink-2); }
 .contradiction-topic { margin: 2px 0; font-family: var(--serif); font-size: 16px; overflow-wrap: anywhere; }
 .contradiction-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--ink-2); }
-.contradiction-meta code { color: var(--rust); overflow-wrap: anywhere; }
-.rejected-count { grid-column: 2; grid-row: 1; color: var(--rust); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.contradiction-meta #contradiction-reason { color: var(--ink-2); overflow-wrap: anywhere; }
+.rejected-count { font-size: 12px; color: var(--ink-3); }
 
 /* ---- evidence ----------------------------------------------------------- */
 .evidence-head h3 { font-size: clamp(20px, 2vw, 26px); overflow-wrap: anywhere; }
@@ -594,8 +603,11 @@ body[data-signed-in="false"] .thought-panel { display: none; }
 .page-foot { display: grid; gap: 8px; margin-top: clamp(40px, 6vw, 72px); padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 13px; line-height: 1.5; }
 .foot-claim { max-width: var(--measure); color: var(--ink-2); }
 .foot-links { display: flex; flex-wrap: wrap; gap: 14px; }
-.foot-note { font-family: var(--mono); font-size: 11.5px; }
-.foot-note:empty { display: none; }
+/* Provenance reads as a sentence, in the section it is about. In monospace
+   at the bottom of the page it looked like something the machine had leaked
+   rather than something the product was telling you. */
+.section-provenance { margin: 4px 0 0; max-width: var(--measure); font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.section-provenance:empty { display: none; }
 
 /* ---- drawer ------------------------------------------------------------- */
 .drawer-backdrop { position: fixed; z-index: 20; inset: 0; background: rgba(28, 25, 21, 0.35); }
@@ -665,3 +677,7 @@ body[data-signed-in="false"] .thought-panel { display: none; }
   .match-card__index { width: 26px; height: 26px; font-size: 11px; }
   .drawer { width: 100vw; }
 }
+
+/* Replaces a <code> box that held either a score or a raw engine rejection.
+   A person reads a phrase here, not a token, so it is set as text. */
+.row-figure { flex: none; font-size: 12px; line-height: 1.35; color: var(--ink-2); text-align: right; max-width: 22ch; }
