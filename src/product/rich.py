@@ -248,6 +248,69 @@ def render_structure_svg(match: Mapping[str, Any]) -> str:
     return "".join(parts)
 
 
+
+def render_thought_svg(thought_dna: Mapping[str, Any], *, topic: str = "") -> str:
+    """The person's own thought, drawn as its causal spine.
+
+    The site has shown someone their own structure since the redesign; a chat
+    could only describe it. This is the same picture, and it is the one drawing
+    that exists before anybody has matched -- which is most of the time, for
+    most people, and exactly when they are wondering what they actually shared.
+
+    Only the labels and relations the person already approved in the preview
+    are drawn. No ids, no scores, no other person.
+    """
+    nodes = list(thought_dna.get("nodes") or [])
+    relations = list(thought_dna.get("relations") or [])
+    by_id = {str(n.get("id")): n for n in nodes}
+    order = [str(n.get("id")) for n in nodes]
+    width = 900
+    row = 52
+    top = 64 if topic else 34
+    height = top + max(1, len(nodes)) * row + 16
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
+        f'role="img" aria-label="Your thought, drawn as its causal spine">',
+        f'<rect width="{width}" height="{height}" fill="#f4f1eb"/>',
+    ]
+    if topic:
+        parts.append(f'<text x="24" y="34" fill="#1d1a16" font-size="17" '
+                     f'font-family="monospace">{_esc(topic)}</text>')
+        parts.append(f'<text x="24" y="54" fill="#57524a" font-size="12" '
+                     f'font-family="monospace">what causes what, as you '
+                     f'described it</text>')
+    # One label per line, in the order the person gave them, with the relation
+    # that leads into each drawn beside the line above it.
+    incoming = {}
+    for rel in relations:
+        incoming.setdefault(str(rel.get("target")), []).append(rel)
+    y = top + 26
+    centres = {}
+    for node_id in order:
+        node = by_id.get(node_id) or {}
+        label = _esc(str(node.get("label", "")))
+        role = _esc(str(node.get("role", "")))
+        for rel in incoming.get(node_id, []):
+            source = str(rel.get("source"))
+            if source in centres:
+                parts.append(f'<line x1="34" y1="{centres[source] + 8}" x2="34" '
+                             f'y2="{y - 16}" stroke="#8a5a2b" stroke-width="2"/>')
+                parts.append(f'<text x="46" y="{y - 18}" fill="#8a5a2b" '
+                             f'font-size="12" font-family="monospace">'
+                             f'{_esc(str(rel.get("type", "")))}</text>')
+        parts.append(f'<circle cx="34" cy="{y}" r="5" fill="#8a5a2b"/>')
+        parts.append(f'<text x="52" y="{y + 5}" fill="#1d1a16" font-size="15" '
+                     f'font-family="monospace">{label}</text>')
+        if role:
+            parts.append(f'<text x="{width - 24}" y="{y + 5}" fill="#57524a" '
+                         f'font-size="12" font-family="monospace" '
+                         f'text-anchor="end">{role}</text>')
+        centres[node_id] = y
+        y += row
+    parts.append("</svg>")
+    return "".join(parts)
+
+
 def svg_sha256(svg: str) -> str:
     return hashlib.sha256(svg.encode("utf-8")).hexdigest()
 

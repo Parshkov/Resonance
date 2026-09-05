@@ -41,32 +41,98 @@ function renderSignedOut(state, urgent = false) {
   document.body.dataset.signedIn = "false";
 }
 
+function closePanel() {
+  const open = slot.querySelector(".account-panel:not([hidden])");
+  if (!open) return;
+  open.hidden = true;
+  const button = slot.querySelector(".account-button");
+  if (button) button.setAttribute("aria-expanded", "false");
+}
+
+document.addEventListener("click", (event) => {
+  if (slot && !slot.contains(event.target)) closePanel();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closePanel();
+});
+
 function renderSignedIn(account) {
+  // The masthead used to carry three separate texts -- "Signed in", "Others
+  // see you as X", and a Sign out button -- all shouting at the same volume,
+  // and none of them answering the question a person actually has: who am I
+  // here, and who can see what?
+  //
+  // One control now. It shows the only identity that matters on this page,
+  // the name other people see. Opening it says who you signed in as, what
+  // that name is for, and offers the way out. The explanation lives where it
+  // is needed instead of permanently in the bar.
   const label = (account.display_label || account.user_id || "").trim();
-  const who = element("div", "account-who");
-  if (account.signed_in) {
-    who.append(element("span", "account-name", "Signed in"));
-    const seen = element("span", "account-seen");
-    seen.append("Others see you as ", element("strong", "", label));
-    who.append(seen);
-  } else {
-    // A pseudonymous account exists only on a deployment with no sign-in.
-    // Say so: nobody can come back to it from another device.
-    who.append(element("span", "account-name", label));
-    who.append(element("span", "account-seen", "this browser only · how others see you"));
+
+  const button = element("button", "account-button");
+  button.type = "button";
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-haspopup", "dialog");
+  button.append(element("span", "account-button__mark", initials(label)));
+  const naming = element("span", "account-button__naming");
+  naming.append(element("span", "account-button__role", "Your name here"));
+  naming.append(element("span", "account-button__label", label));
+  button.append(naming);
+
+  const panel = element("div", "account-panel");
+  panel.hidden = true;
+  panel.setAttribute("role", "dialog");
+  panel.setAttribute("aria-label", "Your account");
+
+  const seen = element("div", "account-panel__row");
+  seen.append(element("p", "account-panel__caption", "Everyone else sees you as"));
+  seen.append(element("p", "account-panel__value", label));
+  seen.append(element("p", "account-panel__note",
+    "This is the only name anyone here can see. Your real name and your "
+    + "address are never shown to another person."));
+  panel.append(seen);
+
+  if (account.signed_in && account.sign_in_email) {
+    const me = element("div", "account-panel__row");
+    me.append(element("p", "account-panel__caption", "You signed in as"));
+    me.append(element("p", "account-panel__value", account.sign_in_email));
+    me.append(element("p", "account-panel__note",
+      "Only you see this. It is how you get back to this account from another "
+      + "device or another chat."));
+    panel.append(me);
+  } else if (!account.signed_in) {
+    const local = element("div", "account-panel__row");
+    local.append(element("p", "account-panel__caption", "This browser only"));
+    local.append(element("p", "account-panel__note",
+      "There is no sign-in on this deployment, so this account lives in this "
+      + "browser and cannot be reached from another device."));
+    panel.append(local);
   }
-  who.title = account.user_id || "";
+
   // Sign-out changes state, so it is a POST form rather than a link that a
   // prefetch or a link scanner could follow on the person's behalf.
-  const form = element("form", "account-signout");
+  const form = element("form", "account-panel__out");
   form.method = "post";
   form.action = "/auth/sign-out";
-  const button = element("button", "account-action", "Sign out");
-  button.type = "submit";
-  form.appendChild(button);
-  slot.replaceChildren(who, form);
+  const out = element("button", "account-action", "Sign out");
+  out.type = "submit";
+  form.append(out);
+  panel.append(form);
+
+  button.addEventListener("click", () => {
+    const showing = panel.hidden;
+    panel.hidden = !showing;
+    button.setAttribute("aria-expanded", showing ? "true" : "false");
+  });
+
+  slot.replaceChildren(button, panel);
   if (gate) gate.hidden = true;
   document.body.dataset.signedIn = "true";
+}
+
+function initials(label) {
+  const words = label.split(/\s+/).filter(Boolean);
+  if (!words.length) return "?";
+  return (words[0][0] + (words[1]?.[0] || "")).toUpperCase();
 }
 
 export async function refreshAccount() {

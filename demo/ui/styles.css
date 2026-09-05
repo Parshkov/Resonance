@@ -146,12 +146,15 @@ section:focus { outline: none; }
   color: var(--ink-2); font-size: 13.5px; text-decoration: none; white-space: nowrap;
 }
 .page-nav__link:hover { background: var(--paper-3); color: var(--ink); }
-.page-nav__link[aria-current="true"] { background: var(--ink); color: var(--paper); }
+/* A filled pill on one of two items reads as "you are in this mode", and a
+   person then expects the other one to switch something. They are links to
+   places on this page, so the current one is marked, not selected. */
+.page-nav__link[aria-current="true"] { background: var(--paper-3); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
 .nav-badge {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
   background: var(--accent); color: var(--paper-2); font-family: var(--mono); font-size: 11px; font-weight: 600;
 }
-.page-nav__link[aria-current="true"] .nav-badge { background: var(--paper); color: var(--ink); }
+.page-nav__link[aria-current="true"] .nav-badge { background: var(--accent); color: var(--paper); }
 @media (min-width: 980px) {
   .page-nav { order: 0; width: auto; }
 }
@@ -159,7 +162,8 @@ section:focus { outline: none; }
 .masthead-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; min-width: 0; margin-left: auto; }
 
 /* The colour-scheme control: three radios drawn as one segmented control. */
-.theme-switch { display: inline-flex; margin: 0; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2); }
+.theme-switch { display: inline-flex; align-items: center; margin: 0; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2); }
+.theme-switch__label { padding: 0 9px 0 11px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
 .theme-option { position: relative; display: inline-flex; }
 .theme-option input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .theme-option span {
@@ -171,13 +175,47 @@ section:focus { outline: none; }
 .theme-option:hover input:not(:checked) + span { background: var(--paper-3); color: var(--ink); }
 
 /* Who you are, and the name others see. */
-.account-slot { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.account-slot { position: relative; display: flex; align-items: center; min-width: 0; }
 .account-slot:empty { display: none; }
-.account-who { display: grid; gap: 1px; min-width: 0; line-height: 1.25; font-size: 12.5px; color: var(--ink-2); }
-.account-who .account-name { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account-who .account-seen { color: var(--ink-3); font-size: 11.5px; white-space: nowrap; }
-.account-who .account-seen strong { color: var(--ink); font-weight: 600; }
-.account-signout { margin: 0; }
+
+/* One control instead of three competing texts. It shows the only identity
+   this page has -- the name other people see -- and opens the rest. */
+.account-button {
+  display: inline-flex; align-items: center; gap: 9px; min-width: 0;
+  padding: 5px 12px 5px 5px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper-2); color: var(--ink); font: inherit; cursor: pointer;
+  text-align: left;
+}
+.account-button:hover { border-color: var(--ink-3); background: var(--paper-3); }
+.account-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.account-button__mark {
+  display: grid; place-items: center; width: 26px; height: 26px; flex: none;
+  border-radius: 999px; background: var(--accent); color: var(--paper);
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+}
+.account-button__naming { display: grid; gap: 0; min-width: 0; line-height: 1.2; }
+.account-button__role { font-size: 10.5px; color: var(--ink-3); }
+.account-button__label {
+  font-size: 12.5px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch;
+}
+
+.account-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+  width: min(320px, calc(100vw - 32px));
+  display: grid; gap: 14px; padding: 16px;
+  border: 1px solid var(--line); border-radius: 14px; background: var(--paper-2);
+  box-shadow: 0 18px 40px rgba(29, 26, 22, .14);
+}
+.account-panel__row { display: grid; gap: 3px; }
+.account-panel__caption { margin: 0; font-size: 11px; color: var(--ink-3); }
+.account-panel__value {
+  margin: 0; font-size: 14px; font-weight: 600; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.account-panel__note { margin: 2px 0 0; font-size: 12px; line-height: 1.45; color: var(--ink-2); }
+.account-panel__out { margin: 0; }
+.account-panel__out .account-action { width: 100%; }
 .account-action {
   display: inline-flex; align-items: center; min-height: 30px; padding: 0 12px; border-radius: 999px;
   border: 1px solid var(--line); background: transparent; color: var(--ink-2); font: inherit; font-size: 13px;
@@ -617,7 +655,8 @@ body[data-signed-in="false"] .thought-panel { display: none; }
   .masthead { gap: 8px 12px; }
   .wordmark { font-size: 20px; }
   .masthead-tools { width: 100%; justify-content: space-between; margin-left: 0; }
-  .account-who .account-name { max-width: 40vw; }
+  .account-button__label { max-width: 34vw; }
+  .account-panel { right: auto; left: 0; }
   .section-head h2 { font-size: 24px; }
   .thought-title { font-size: 22px; }
   .evidence-metrics { gap: 6px 14px; }

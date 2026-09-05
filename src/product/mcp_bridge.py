@@ -29,6 +29,7 @@ confirmation token.  stdlib only; no matching logic lives here.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import secrets
@@ -233,6 +234,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 
 from src.product import authorship as authorship_rule
 from src.product import phrasing
+from src.product import rich
 
 AUTHORSHIP = {
     "type": "string",
@@ -649,6 +651,43 @@ def _svg_resource(name: str, key: str, svg: str, label: str) -> dict[str, Any]:
     }
 
 
+def _svg_image(svg: str) -> dict[str, Any]:
+    """The same drawing as an MCP image block.
+
+    A client is documented to render `image`; whether it renders an
+    EmbeddedResource carrying SVG is its own business, and several do not --
+    which meant our drawings could reach a chat and be shown as nothing. Both
+    are sent: a client that renders either shows the picture, one that renders
+    neither still has the text, and none of them receives anything the JSON
+    did not already carry.
+    """
+    return {
+        "type": "image",
+        "data": base64.b64encode(svg.encode("utf-8")).decode("ascii"),
+        "mimeType": "image/svg+xml",
+    }
+
+
+_SHARED = {"discoverable"}
+_WITHDRAWN = {"revoked", "deleted", "tombstoned"}
+_PRIVATE = None  # anything else: held here, never made discoverable
+
+
+def _in_state(sessions: Sequence[Mapping[str, Any]],
+              wanted: set[str] | None) -> list[str]:
+    """Session ids in one sharing state, by the state the row itself reports."""
+    out = []
+    for session in sessions:
+        state = str(session.get("share_state") or "").lower()
+        if wanted is None:
+            if state not in _SHARED and state not in _WITHDRAWN:
+                out.append(session["session_id"])
+        elif state in wanted:
+            out.append(session["session_id"])
+    return out
+
+
+
 class RemoteMCPBridge:
     """Stateless JSON-RPC handler; one instance per product runtime."""
 
@@ -838,8 +877,14 @@ class RemoteMCPBridge:
             "user_id": actor.user_id,
             "display_label": getattr(user, "display_label", None) if user is not None else None,
             "actor_type": actor.actor_type,
-            "shared_thoughts": [s["session_id"] for s in owned if s.get("share_state") == "discoverable"],
-            "private_thoughts": [s["session_id"] for s in owned if s.get("share_state") != "discoverable"],
+            "shared_thoughts": _in_state(owned, _SHARED),
+            # Withdrawn is not private. Everything that was not discoverable
+            # fell into one bucket, so a thought this person had already taken
+            # back was reported to them as "kept private here" -- while the
+            # page, correctly, showed nothing of theirs at all. Two answers to
+            # "what do I have here?", and the reassuring one was wrong.
+            "private_thoughts": _in_state(owned, _PRIVATE),
+            "withdrawn_thoughts": _in_state(owned, _WITHDRAWN),
             "freshness": self.product.freshness(),
         }
 
@@ -951,8 +996,32 @@ class RemoteMCPBridge:
                 "session_id": result.get("session_id"), "draft_id": arguments.get("draft_id"),
                 "next_step": "Call resonance_discover to find resonating people."}
 
-    def tool_my_thoughts(self, token: str, _: dict[str, Any]) -> dict[str, Any]:
-        return {"contract_version": BRIDGE_CONTRACT, "sessions": self._owned(token)}
+    def tool_my_thoughts(self, token: str, _: dict[str, Any]) -> Any:
+        """What this person has here, and a picture of it.
+
+        Until somebody matches there is nothing to draw but your own thought,
+        and that is most of the time for most people -- exactly when they are
+        wondering what they actually shared. The page has drawn it since the
+        redesign; a chat could only describe it.
+        """
+        sessions = self._owned(token)
+        result = {"contract_version": BRIDGE_CONTRACT, "sessions": sessions}
+        drawings: list[Mapping[str, Any]] = []
+        for index, session in enumerate(sessions[:3]):
+            dna = session.get("thought_dna") or {}
+            if not (dna.get("nodes") and dna.get("relations")):
+                continue
+            try:
+                svg = rich.render_thought_svg(
+                    dna, topic=str((session.get("presentation") or {}).get("topic") or ""))
+            except Exception as exc:  # noqa: BLE001 - a drawing never costs the answer
+                print(f"[bridge] could not draw a thought: "
+                      f"{type(exc).__name__}: {exc}", flush=True)
+                continue
+            drawings.append(_svg_resource("thought", f"mine/{index}", svg,
+                                          "Your thought, as its causal spine"))
+            drawings.append(_svg_image(svg))
+        return ToolOutput(result, drawings) if drawings else result
 
     def tool_pending_resonances(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         answer = self.product.pending_resonances(
@@ -1010,7 +1079,8 @@ class RemoteMCPBridge:
             return []
         return [_svg_resource("map", result_id, svg,
                               "Where the matches are (coarse, consented, "
-                              "presentation only)")]
+                              "presentation only)"),
+                _svg_image(svg)]
 
     def tool_explain_match(self, token: str, arguments: dict[str, Any]) -> Any:
         result_id = self._required_id(arguments, "result_id")
@@ -1022,7 +1092,8 @@ class RemoteMCPBridge:
             return evidence
         return ToolOutput(evidence, [
             _svg_resource("structure", f"{result_id}/{session_id}", svg,
-                          "Which node answers which, and the relations both kept")])
+                          "Which node answers which, and the relations both kept"),
+            _svg_image(svg)])
 
     def tool_request_intro(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)

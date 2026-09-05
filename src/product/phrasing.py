@@ -50,6 +50,10 @@ def _whoami(r: Result) -> str:
                      "searched for.")
     if private:
         lines.append(f"{_count(private, 'thought is', 'thoughts are')} kept private here.")
+    withdrawn = len(r.get("withdrawn_thoughts") or [])
+    if withdrawn and not shared and not private:
+        lines.append(f"{_count(withdrawn, 'thought was', 'thoughts were')} withdrawn "
+                     "earlier, so there is nothing of yours here now.")
     return " ".join(lines)
 
 

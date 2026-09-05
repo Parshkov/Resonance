@@ -132,5 +132,46 @@ class SpeaksHumanTests(unittest.TestCase):
         self.assertTrue(text)
 
 
+
+class WithdrawnIsNotPrivateTests(unittest.TestCase):
+    """A thought you took back is not "kept private here".
+
+    Everything that was not discoverable fell into one bucket, so someone who
+    had withdrawn their only thought was told by their assistant that one was
+    still held here — while the page, correctly, showed nothing of theirs at
+    all. Two answers to "what do I have here?", and the reassuring one was the
+    wrong one.
+    """
+
+    def setUp(self):
+        self.runtime = build_runtime(":memory:",
+                                     allowed_origins=frozenset({"http://127.0.0.1"}),
+                                     seed=False)
+        self.bridge = RemoteMCPBridge(self.runtime.product)
+        self.token = self.runtime.product.register_guest().access_token
+
+    def test_a_withdrawn_thought_is_reported_as_withdrawn(self):
+        draft = self.bridge.tool_prepare_thought(
+            self.token, {"authorship": "their_own_words", "thought": MINE,
+                         "request_id": "w-1"})
+        shared = self.bridge.tool_share_thought(
+            self.token, {"draft_id": draft["draft_id"], "confirm": True,
+                         "confirmation_token": draft["confirmation_token"],
+                         "request_id": "w-2"})
+        before = self.bridge.tool_whoami(self.token, {})
+        self.assertEqual(len(before["shared_thoughts"]), 1)
+
+        self.bridge.tool_stop_sharing(
+            self.token, {"session_id": shared["session_id"], "confirm": True})
+        after = self.bridge.tool_whoami(self.token, {})
+        self.assertEqual(after["shared_thoughts"], [])
+        self.assertEqual(after["private_thoughts"], [],
+                         "a withdrawn thought must not be called private")
+        self.assertEqual(len(after["withdrawn_thoughts"]), 1)
+
+        said = say("resonance_whoami", after)
+        self.assertIn("withdrawn", said)
+        self.assertNotIn("kept private", said)
+
 if __name__ == "__main__":
     unittest.main()

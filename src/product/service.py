@@ -234,12 +234,20 @@ class LiveProductService:
         if authenticated:
             actor = self.identity.authenticate(access_token)
             user = self.identity.backend.get_user(actor.user_id)
+            claims = self.identity.identity_claims(actor.user_id) or {}
             account = {
                 "user_id": actor.user_id,
                 "display_label": str(getattr(user, "display_label", "") or ""),
                 # Whether this account was signed into, as opposed to a
                 # pseudonymous account on a deployment with no sign-in.
-                "signed_in": bool(self.identity.identity_claims(actor.user_id)),
+                "signed_in": bool(claims),
+                # The person's own sign-in, so the page can answer "who am I
+                # here?" instead of only "you are signed in". It goes to this
+                # account and no further: it is never in a discovery result,
+                # never in a match, and never reaches another participant --
+                # the same thing the consent page already shows them.
+                "sign_in_email": str(claims.get("email") or ""),
+                "sign_in_provider": str(claims.get("provider") or ""),
             }
             owned = [
                 {

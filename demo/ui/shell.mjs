@@ -81,6 +81,34 @@ function watchCurrent(present) {
   for (const section of present) observer.observe(section);
 }
 
+// A link into a section -- a bookmark, a shared URL, a reload with a hash --
+// arrives before the section does. The page boots, asks the server what this
+// person has, and only then reveals the sections that exist; by that time the
+// browser has long given up on the hash. So /#thought landed at the top of the
+// page and read as "there is nothing here", which is the opposite of what the
+// link promised.
+//
+// Honoured once, and only while the person is still at the top: sections keep
+// appearing as data arrives, and yanking someone who has started reading would
+// be worse than the bug.
+let hashHonoured = null;
+
+function honourHash(present, asked = false) {
+  const id = decodeURIComponent(location.hash.replace(/^#/, ""));
+  if (!id || id === hashHonoured) return;
+  const section = present.find((candidate) => candidate.id === id);
+  if (!section) return;
+  hashHonoured = id;
+  // The guard is for the section arriving late on its own. Someone who just
+  // asked for it -- edited the URL, followed a link on the page -- means it,
+  // wherever they happen to be scrolled.
+  if (!asked && window.scrollY > 120) return;
+  section.scrollIntoView({block: "start"});
+  if (!section.hasAttribute("tabindex")) section.setAttribute("tabindex", "-1");
+  section.focus({preventScroll: true});
+  markCurrent(id);
+}
+
 function buildNav() {
   if (!nav) return;
   const present = presentSections();
@@ -105,6 +133,7 @@ function buildNav() {
     nav.append(link);
   }
   watchCurrent(present);
+  honourHash(present);
 }
 
 function watchSections() {
@@ -118,6 +147,11 @@ function watchSections() {
     new MutationObserver(schedule).observe(shell, {attributes: true, attributeFilter: ["data-state"]});
   }
   window.addEventListener("resize", schedule);
+  window.addEventListener("hashchange", () => {
+    hashHonoured = null;
+    honourHash(presentSections(), true);
+    schedule();
+  });
   schedule();
 }
 

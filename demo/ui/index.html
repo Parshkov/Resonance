@@ -34,12 +34,18 @@
       <nav class="page-nav" id="page-nav" aria-label="On this page" hidden></nav>
 
       <div class="masthead-tools">
-        <fieldset class="theme-switch" id="theme-switch">
-          <legend class="visually-hidden">Colour scheme</legend>
+        <!-- Three floating words with no label were a puzzle: a person had to
+             click one to find out what they controlled. The label is visible
+             now, and "Auto" -- which reads as automatic-something -- says what
+             it actually follows. A div with role=radiogroup rather than a
+             fieldset, because a legend cannot be placed inline beside the
+             options it names. -->
+        <div class="theme-switch" id="theme-switch" role="radiogroup" aria-labelledby="theme-switch-label">
+          <span class="theme-switch__label" id="theme-switch-label">Colours</span>
           <label class="theme-option"><input type="radio" name="theme" value="light"><span>Light</span></label>
           <label class="theme-option"><input type="radio" name="theme" value="dark"><span>Dark</span></label>
-          <label class="theme-option"><input type="radio" name="theme" value="system"><span>Auto</span></label>
-        </fieldset>
+          <label class="theme-option"><input type="radio" name="theme" value="system"><span>Match device</span></label>
+        </div>
         <!-- Who you are, and the name other people see you under. Filled by
              account.mjs once the session state is known. -->
         <div class="account-slot" id="account-slot"></div>
