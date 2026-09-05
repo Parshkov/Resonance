@@ -35,9 +35,10 @@ from src.ingestion.service import ShareIntent
 from src.product import authorship as authorship_rule
 from src.product import phrasing
 from src.product.mcp_bridge import (
-    BridgeError, _has_usable_structure, _insufficient_structure_message, _slug,
-    _structure_summary, build_thought_dna,
+    BridgeError, _coarse_location, _has_usable_structure,
+    _insufficient_structure_message, _slug, _structure_summary, build_thought_dna,
 )
+from src.product.service import LOCATION_NOTE
 from src.identity.models import AuthenticationError
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
@@ -284,6 +285,88 @@ def _discovery_view(live: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+GEO_CONTRACT = "resonance-geo-view/0.1"
+
+
+def _place(location: Any) -> dict[str, Any] | None:
+    """A location as the page may show it: the city and region the person
+    agreed to, and coordinates already rounded to a tenth of a degree by the
+    identity layer. The record's own bookkeeping (`kind`, `precision`) stays
+    behind; it says how the row was made, not where anyone is."""
+    if not isinstance(location, Mapping):
+        return None
+    lat, lon = location.get("lat"), location.get("lon")
+    if isinstance(lat, bool) or isinstance(lon, bool) \
+            or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        return None
+    return {
+        "city": str(location.get("city") or ""),
+        "region": str(location.get("region") or ""),
+        "lat": round(float(lat), 1),
+        "lon": round(float(lon), 1),
+    }
+
+
+def _geo_view(product, token: str, session_id: str) -> dict[str, Any]:
+    """Where the people in the viewer's result are, for the page to draw.
+
+    The same authorized discovery the page already reads, reduced to what a
+    map needs. Nothing here is decided: every row is one the viewer already
+    has in `/api/discover`, the region counts are the service's k-anonymous
+    buckets untouched, and location was never an input to any of it.
+
+    A person who did not share a location is still in the list, with no
+    place, so the page can say that they chose not to say -- which is a
+    different fact from there being nobody. Rows the page itself never
+    shows (not discoverable, or hard-rejected) are left out here too.
+    """
+    live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K)
+
+    # The viewer's own place, under the viewer's own current consent -- the
+    # same gate `/api/context` applies. Distances only exist when both sides
+    # consented, which the service already enforced per row.
+    you = None
+    consent = product.identity.policy_source.session_consent(session_id)
+    if consent.get("share_coarse_location"):
+        session = product.identity.backend.get_session(session_id)
+        you = _place(dict(getattr(session, "location", {}) or {}))
+
+    people: list[dict[str, Any]] = []
+    for row in live.get("matches", []):
+        display = row.get("display") or {}
+        if display.get("share_state") != "discoverable" or row.get("hard_rejection") is not None:
+            continue
+        distance = display.get("distance_context") or {}
+        km = distance.get("approx_km")
+        people.append({
+            # For the page to select the same person on the resonance map and
+            # in the evidence. Never rendered as text.
+            "session_id": str(row.get("session_id", "")),
+            "name": str(row.get("person_pseudonym") or "anonymous"),
+            "resonance": row.get("mode_classification") != "negative",
+            "example": display.get("demo_persona") is True,
+            "place": _place(display.get("location")),
+            "about_km": int(km) if isinstance(km, (int, float)) and not isinstance(km, bool) else None,
+        })
+
+    aggregation = live.get("aggregation") or {}
+    return {
+        "contract_version": GEO_CONTRACT,
+        "you": you,
+        "people": people,
+        "regions": {
+            "minimum": int(aggregation.get("anti_inference_minimum", 0)),
+            "hidden": int(aggregation.get("suppressed_bucket_count", 0)),
+            "shown": [
+                {"region": str(b.get("bucket_id", "")), "count": int(b.get("count", 0))}
+                for b in aggregation.get("buckets", [])
+            ],
+        },
+        "rounded_to_degrees": 0.1,
+        "note": live.get("location_note", LOCATION_NOTE),
+    }
+
+
 class WebHandler(ProductHandler):
     bridge: LiveWebMCPBridge
 
@@ -421,6 +504,18 @@ class WebHandler(ProductHandler):
             live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K)
             self._send_json(_discovery_view(live))
             return
+        if path == "/api/geo":
+            # The geographic view of the same result, for geo.mjs. Read under
+            # the same cookie and the same "nothing shared, nothing to show"
+            # answer as /api/discover: a visitor without a shared thought has
+            # no result, so nobody to place.
+            token = self._visitor_token()
+            session_id = _owned_live_session(product, token) if token else None
+            if not session_id:
+                self._send_share_required()
+                return
+            self._send_json(_geo_view(product, token, session_id))
+            return
 
         # The browser tools are the live implementation of the same tool names
         # the standalone demo server under demo/ui/ registers from webmcp.mjs.
@@ -556,9 +651,16 @@ class WebHandler(ProductHandler):
                 authorship_rule.require(body)
             except authorship_rule.AuthorshipError as exc:
                 raise ValueError(str(exc)) from exc
+            # A coarse location travels with the thought only when the person
+            # gave one, and giving one is the consent to show it -- the same
+            # rule the MCP bridge applies. This route used to drop the field
+            # on the floor and record no consent, so every browser share was
+            # placeless whatever the assistant had been told, and the map of
+            # where people are had nobody on it.
+            coarse = _coarse_location(body.get("coarse_location"))
             intent = ShareIntent(
                 share_display_profile=True,
-                share_coarse_location=False,
+                share_coarse_location=coarse is not None,
                 receive_intro_requests=True,
             )
             thought = body.get("thought")
@@ -580,7 +682,7 @@ class WebHandler(ProductHandler):
                 candidate = build_thought_dna(thought, human_id=subject)
                 result = product.prepare_structured(
                     token, candidate, presentation=presentation,
-                    coarse_location=None, intent=intent, **security)
+                    coarse_location=coarse, intent=intent, **security)
             else:
                 if not isinstance(context, str) or len(context) > MAX_CONTEXT_CHARS:
                     raise ValueError(f"context must be text of at most {MAX_CONTEXT_CHARS} characters")
@@ -588,7 +690,7 @@ class WebHandler(ProductHandler):
                 # with a reserved/revoked id for the same sentences.
                 result = product.prepare_raw_text(
                     token, context, source_id=f"{subject}:{request_id}",
-                    presentation=presentation, coarse_location=None,
+                    presentation=presentation, coarse_location=coarse,
                     intent=intent, **security)
                 preview = product.preview(token, str(result["draft_id"]),
                                           client_id="live-browser-webmcp")
