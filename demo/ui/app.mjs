@@ -1,3 +1,14 @@
+/**
+ * The page's own view of a discovery result: your thought, the people whose
+ * reasoning has the same shape, the Resonance map of them, and the evidence
+ * for the one you selected.
+ *
+ * Nothing here matches, ranks, rescores or sorts. Every number on screen is a
+ * number the engine returned, and every order is the engine's order. This
+ * module has no imports so the replay demo (demo/ui/server.py) can serve it
+ * alone; the live modules talk to it through DOM events.
+ */
+
 const DISCOVERY_CONTRACT = "resonance-discovery/0.1";
 const CONTEXT_CONTRACT = "resonance-ui-context/0.1";
 const CANONICAL_MODE = "analogical";
@@ -82,8 +93,7 @@ export function visibleRejected(payload) {
 //
 // Every number shown next to a match is its position in the engine's returned
 // list: `01`…`NN` for `matches[]`, `R1`…`RN` for `rejected[]`. The page never
-// renumbers, so the order is recoverable from any surface (card, marker,
-// drawer row) without trusting the layout.
+// renumbers, so the order is recoverable from any surface.
 function backendPosition(payload, row) {
   const matchIndex = payload.matches.indexOf(row);
   if (matchIndex >= 0) return String(matchIndex + 1).padStart(2, "0");
@@ -100,7 +110,6 @@ function backendPosition(payload, row) {
 //   angle inside sector  = backend order
 //   line weight          = evidence.preserved_relation_count
 //   dashed               = evidence.contradiction_count > 0, or a hard rejection
-// Nothing here ranks, scores or moves a row ahead of another.
 const INNER_RADIUS_RATIO = 0.46;
 const SECTOR_GAP_DEG = 10;
 
@@ -115,7 +124,6 @@ export function structuralRadius(structural, radiusMax, radiusMin) {
 }
 
 export function layoutMap(items, geometry) {
-  // items: [{sessionId, cluster, structural, ...}] already in backend order.
   const {cx, cy, R} = geometry;
   const r0 = R * INNER_RADIUS_RATIO;
   const sectors = new Map();
@@ -167,13 +175,26 @@ function setText(id, value) {
   if (node) node.textContent = value;
 }
 
+function setShellState(value) {
+  const shell = document.getElementById("app-shell");
+  if (shell) shell.dataset.state = value;
+}
+
 function formatScore(value) {
   return Number(value).toFixed(4);
+}
+
+function shortScore(value) {
+  return Number(value).toFixed(2);
 }
 
 function placeLabel(location) {
   if (!location) return "Location not shared";
   return `${location.city} · ${location.region}`;
+}
+
+function humanRelation(type) {
+  return String(type || "").replace(/_/g, " ");
 }
 
 // ---- your thought ---------------------------------------------------------
@@ -200,34 +221,31 @@ function renderContext(context) {
   const thought = context.active_thought;
   const nodes = thought.nodes;
   const topic = context.presentation?.topic || nodes[0]?.label || "Shared thought";
-  const mechanism = nodes.find((node) => node.role === "mechanism")?.label || nodes[1]?.label;
 
   setText("thought-id", thought.thought_id);
   const title = document.getElementById("thought-heading");
-  title.replaceChildren();
-  title.append(document.createTextNode(topic));
-  if (mechanism) {
-    title.append(el("span", "chain-arrow", " → "));
-    title.append(document.createTextNode(mechanism));
-  }
+  title.replaceChildren(document.createTextNode(topic));
   // The fixture thought carries a public caption in `source.text`; a live share
   // carries an empty string there (the raw text is never retained). Nothing is
   // composed on the person's behalf: what is shown is the field, or nothing.
   setText("thought-caption", thought.source?.text || "");
 
-  // On the live product the header pill reflects the visitor's real consent
-  // state (owned by webmcp_live.mjs); the replay narrative must not label a
+  // On the live product the state line reflects the visitor's real consent
+  // state (owned by collab_ui.mjs); the replay narrative must not label a
   // fresh, never-shared guest as "Shared with Resonance".
   if (window.__resonanceWebMCP?.mode !== "live-product") {
-    const consent = document.getElementById("header-consent");
-    consent.replaceChildren(el("span", "status-light"), el("span", "", "Shared with Resonance"));
+    const line = document.getElementById("share-state");
+    if (line) {
+      line.replaceChildren(el("span", "status-light"), el("span", "", "Shared with Resonance"));
+      line.dataset.shared = "true";
+    }
   }
 
   const chain = document.getElementById("dna-chain");
   chain.replaceChildren();
   for (const node of nodes) {
     const row = el("li", "dna-node");
-    row.append(el("code", "", node.id), el("strong", "", node.label), el("span", "", node.role));
+    row.append(el("strong", "", node.label), el("span", "", node.role));
     chain.append(row);
   }
 
@@ -238,9 +256,8 @@ function renderContext(context) {
     const sentence = relationSentence(relation, byId);
     const row = el("li", "dna-relation");
     row.append(
-      el("code", "", relation.id),
       el("span", "", sentence.source),
-      el("span", "relation-type", sentence.type),
+      el("span", "relation-type", humanRelation(sentence.type)),
       el("span", "", sentence.target),
     );
     relations.append(row);
@@ -249,8 +266,8 @@ function renderContext(context) {
   const declared = document.getElementById("declared-context");
   declared.replaceChildren();
   const contextValues = [
-    ["Domain", context.presentation?.domain || "Not shared"],
-    ["Coarse location", context.location ? `${context.location.city} · ${context.location.region}` : "Not shared"],
+    ["Field", context.presentation?.domain || "Not shared"],
+    ["Where", context.location ? `${context.location.city} · ${context.location.region}` : "Location not shared"],
   ];
   for (const [label, value] of contextValues) {
     const item = el("div");
@@ -265,8 +282,16 @@ function renderContext(context) {
 
 function firstCorrespondence(match) {
   const correspondence = match.evidence.top_correspondences[0];
-  if (!correspondence) return "Evidence mapping available";
-  return `${correspondence.query_label} ↔ ${correspondence.candidate_label}`;
+  if (!correspondence) return null;
+  return correspondence;
+}
+
+function strengthWord(structural) {
+  const value = clamp01(structural);
+  if (value >= 0.85) return "very close";
+  if (value >= 0.6) return "close";
+  if (value >= 0.35) return "partial";
+  return "faint";
 }
 
 function renderMatches(payload, primary) {
@@ -292,25 +317,47 @@ function renderMatches(payload, primary) {
     open.type = "button";
     open.setAttribute("aria-pressed", String(match.session_id === state.selectedSessionId));
     open.setAttribute("aria-label",
-      `Open evidence for ${match.person_pseudonym}: ${match.display.topic} (returned in position ${position})`);
+      `Why ${match.person_pseudonym} resonates: ${match.display.topic} (returned in position ${position})`);
+
     const top = el("div", "match-card__top");
-    top.append(
-      el("span", "match-card__person", match.person_pseudonym),
-      el("span", "match-card__score", `structural ${formatScore(match.scores.structural)}`),
-    );
+    top.append(el("span", "match-card__person", match.person_pseudonym));
+    if (match.display.domain) top.append(el("span", "match-card__domain", match.display.domain));
     const topic = el("p", "match-card__topic", match.display.topic);
-    const why = el("p", "match-card__why", firstCorrespondence(match));
+
+    const first = firstCorrespondence(match);
+    const why = el("p", "match-card__why");
+    if (first) {
+      why.append(
+        el("span", "", first.query_label),
+        el("span", "match-card__arrow", " ↔ "),
+        el("span", "", first.candidate_label),
+      );
+    } else {
+      why.textContent = "Evidence available";
+    }
+
+    // The structural score, as a bar and as the number. The bar is the number
+    // drawn, not a judgement about it.
+    const strength = el("div", "match-card__strength");
+    const bar = el("progress", "strength-bar");
+    bar.max = 1;
+    bar.value = clamp01(match.scores.structural);
+    bar.setAttribute("aria-hidden", "true");
+    strength.append(bar,
+      el("span", "strength-word", strengthWord(match.scores.structural)),
+      el("span", "strength-number", shortScore(match.scores.structural)));
+
     const meta = el("div", "match-card__meta");
     meta.append(
       el("span", "classification", match.mode_classification),
-      el("span", "confidence", `confidence ${match.confidence}`),
+      el("span", "confidence", match.confidence),
       el("span", "location", placeLabel(match.display.location)),
     );
     if (match.evidence.contradiction_count > 0) {
       meta.append(el("span", "contradictions",
         `${match.evidence.contradiction_count} contradiction${match.evidence.contradiction_count === 1 ? "" : "s"}`));
     }
-    open.append(top, topic, why, meta);
+    open.append(top, topic, why, strength, meta);
     // Seeded rows are labelled so a real participant never mistakes them for
     // people who can accept an introduction.
     if (match.display.demo_persona === true) {
@@ -326,8 +373,8 @@ function renderMatches(payload, primary) {
     });
     list.append(card);
   });
-  setText("shown-count", `${String(primary.length).padStart(2, "0")} shown`);
-  setText("response-summary", `${payload.matches.length} matches · ${payload.rejected.length} rejected`);
+  setText("shown-count", primary.length === 1 ? "1 person" : `${primary.length} people`);
+  setText("response-summary", `${payload.matches.length} matches · ${payload.rejected.length} refused`);
   const empty = document.getElementById("matches-empty");
   if (empty) empty.hidden = primary.length > 0;
 }
@@ -340,9 +387,9 @@ const SCORE_FIELDS = [
 ];
 
 function renderEvidence(match) {
-  setText("evidence-kicker", `Why ${match.person_pseudonym} resonates`);
-  setText("evidence-heading", match.display.topic);
-  setText("evidence-subtitle", `${match.display.domain} · ${placeLabel(match.display.location)}`);
+  setText("evidence-kicker", "Why this resonates");
+  setText("evidence-heading", `${match.person_pseudonym} · ${match.display.topic}`);
+  setText("evidence-subtitle", `${match.display.domain || "field not shared"} · ${placeLabel(match.display.location)}`);
   setText("metric-class", match.mode_classification);
   setText("metric-structural", formatScore(match.scores.structural));
   setText("metric-confidence", match.confidence);
@@ -355,11 +402,11 @@ function renderEvidence(match) {
     const query = el("div", "mapping-side");
     const role = queryNodes.get(mapping.query_node)?.role;
     query.append(
-      el("small", "", role ? `${mapping.query_node} · ${role}` : mapping.query_node),
+      el("small", "", role ? role : mapping.query_node),
       el("strong", "", mapping.query_label),
     );
     const candidate = el("div", "mapping-side");
-    candidate.append(el("small", "", mapping.candidate_node), el("strong", "", mapping.candidate_label));
+    candidate.append(el("small", "", "theirs"), el("strong", "", mapping.candidate_label));
     row.append(query, el("div", "mapping-arrow", "↔"), candidate);
     mappings.append(row);
   });
@@ -369,7 +416,6 @@ function renderEvidence(match) {
   relations.replaceChildren();
   match.evidence.preserved_relations.forEach((relation) => {
     const chip = el("span", "relation-chip");
-    chip.append(el("span", "relation-chip__pair", `${relation.query_relation} ↔ ${relation.candidate_relation}`));
     const known = queryRelations.get(relation.query_relation);
     if (known) {
       // The query side of a preserved relation is resolvable from the visitor's
@@ -379,16 +425,17 @@ function renderEvidence(match) {
       const line = el("span", "relation-chip__query");
       line.append(
         document.createTextNode(`${sentence.source} `),
-        el("span", "relation-type", sentence.type),
+        el("span", "relation-type", humanRelation(sentence.type)),
         document.createTextNode(` ${sentence.target}`),
       );
       chip.append(line);
     }
+    chip.append(el("span", "relation-chip__pair", `${relation.query_relation} ↔ ${relation.candidate_relation}`));
     relations.append(chip);
   });
   setText(
     "proof-note",
-    `${match.evidence.mapped_node_count} mapped nodes · ${match.evidence.preserved_relation_count} preserved · ${match.evidence.contradiction_count} contradictions. Backend evidence, presented unchanged.`,
+    `${match.evidence.mapped_node_count} nodes correspond · ${match.evidence.preserved_relation_count} relations preserved · ${match.evidence.contradiction_count} contradictions. The engine's evidence, shown unchanged.`,
   );
 
   const scores = document.getElementById("score-list");
@@ -409,13 +456,11 @@ function renderEvidence(match) {
 function mapGeometry() {
   const frame = document.getElementById("map-frame");
   const svg = document.getElementById("resonance-map");
-  const narrow = (frame?.clientWidth || 800) < 600;
+  const narrow = (frame?.clientWidth || 800) < 560;
   const width = narrow ? 560 : 900;
   const height = narrow ? 560 : 620;
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   if (frame) frame.dataset.shape = narrow ? "square" : "wide";
-  // Room outside the rim for the sector letters and, in the wide layout, the
-  // cluster names beside them.
   const R = Math.min(width, height) / 2 - (narrow ? 40 : 52);
   return {width, height, cx: width / 2, cy: height / 2, R, narrow};
 }
@@ -430,8 +475,6 @@ function sectorLetter(index) {
   return SECTOR_LETTERS[index % SECTOR_LETTERS.length] + (index >= SECTOR_LETTERS.length ? String(Math.floor(index / SECTOR_LETTERS.length)) : "");
 }
 
-// Cluster ids are hyphenated slugs; break them at hyphens into short lines so
-// a name fits beside the rim instead of running off the drawing.
 function wrapSlug(slug, maxChars = 18) {
   const lines = [];
   let current = "";
@@ -458,8 +501,6 @@ function renderRings(geometry, r0, sectorArcs) {
     rings.append(svgEl("circle", {
       class: `ring${structural === 1 ? " is-inner" : ""}`, cx, cy, r: radius.toFixed(1),
     }));
-    // Ring values sit along the lower-left diagonal, away from the sector
-    // names, which live outside the rim.
     const theta = (135 * Math.PI) / 180;
     const label = svgEl("text", {
       class: "ring-label",
@@ -549,6 +590,10 @@ function addMarker(layer, item, options) {
       }
     });
   }
+  if (options.kind === "is-query") {
+    // The thought that is out there: a slow breath while it keeps looking.
+    marker.append(svgEl("circle", {class: "marker-halo", r: options.radius + 10}));
+  }
   if (item.contradiction) marker.append(svgEl("circle", {class: "marker-outline", r: options.radius + 5}));
   marker.append(svgEl("circle", {class: "marker-ring", r: options.radius}));
   if (options.kind === "is-query") marker.append(svgEl("circle", {class: "marker-core", r: 3}));
@@ -561,9 +606,6 @@ function addMarker(layer, item, options) {
     marker.append(index);
   }
   if (options.label) {
-    // Labels sit on the far side of the marker from the centre, so neighbours
-    // on the same ring do not stack on top of each other. The centre marker
-    // has no angle: its label goes above.
     const angle = item.angle;
     const distance = options.radius + 8;
     const cos = angle === undefined ? 0 : Math.cos(angle);
@@ -588,7 +630,6 @@ function mapItems(payload, primary, others, rejected) {
   const otherIds = new Set(others.map((match) => match.session_id));
   const rejectedIds = new Set(rejected.map((row) => row.session_id));
   const items = [];
-  // Backend order across the whole response: matches[] then rejected[].
   for (const row of [...payload.matches, ...payload.rejected]) {
     let kind = null;
     if (primaryIds.has(row.session_id)) kind = "primary";
@@ -627,7 +668,7 @@ function renderMap(context, payload, primary, others, rejected) {
   addMarker(markers, {...centre, sessionId: "active-thought", contradiction: false}, {
     kind: "is-query",
     ariaLabel: `Your thought: ${topic}`,
-    label: "Your thought",
+    label: placed.length ? "Your thought" : "Your thought, out here",
     radius: 11,
   });
 
@@ -660,7 +701,7 @@ function renderMap(context, payload, primary, others, rejected) {
     } else {
       addMarker(markers, item, {
         kind: "is-rejected",
-        ariaLabel: `Hard-rejected ${item.position}: ${row.person_pseudonym}, ${row.hard_rejection}`,
+        ariaLabel: `Refused ${item.position}: ${row.person_pseudonym}, ${row.hard_rejection}`,
         label: row.person_pseudonym,
         sublabel: row.hard_rejection,
         radius: 8,
@@ -669,6 +710,8 @@ function renderMap(context, payload, primary, others, rejected) {
     }
   }
 
+  const frame = document.getElementById("map-frame");
+  if (frame) frame.dataset.empty = String(placed.length === 0);
   const unlocated = document.getElementById("unlocated-anchor");
   unlocated.hidden = !unlocatedPrimary;
   if (unlocatedPrimary) setText("unlocated-name", unlocatedPrimary.person_pseudonym);
@@ -683,7 +726,7 @@ function renderContradictions(rejected) {
   setText("contradiction-topic", first.display.topic);
   setText("contradiction-person", first.person_pseudonym);
   setText("contradiction-reason", first.hard_rejection);
-  setText("rejected-count", `${rejected.length} rejected`);
+  setText("rejected-count", `${rejected.length} refused`);
 }
 
 function drawerRow(payload, row, rejected = false) {
@@ -701,6 +744,7 @@ function renderDrawer(payload, others, rejected) {
   setText("secondary-count", String(others.length + rejected.length));
   const trigger = document.getElementById("secondary-trigger");
   trigger.disabled = others.length + rejected.length === 0;
+  trigger.hidden = trigger.disabled;
 
   const matches = document.getElementById("drawer-matches");
   const rejectedList = document.getElementById("drawer-rejected");
@@ -758,29 +802,28 @@ function openDrawerAt(sessionId) {
 }
 
 // Everything below is owned by a rendered discovery result. Whenever a result
-// stops being on screen — a failure, or a successful discovery in which nothing
-// cleared the resonance bar — ALL of it has to go. Clearing only the match list
-// used to leave the previous source's evidence, mapping rows, drawer contents,
-// contradiction card and response counts on screen next to the new source's
-// message, which reads as evidence for a result that was never returned.
+// stops being on screen, ALL of it has to go, so no evidence for a result that
+// was never returned survives next to a new message.
 function clearResults() {
   state.payload = null;
   state.primary = [];
   state.selectedSessionId = null;
 
   document.getElementById("match-list")?.replaceChildren();
-  setText("shown-count", "00 shown");
+  setText("shown-count", "");
   const empty = document.getElementById("matches-empty");
   if (empty) empty.hidden = true;
 
-  setText("evidence-kicker", "Evidence");
+  setText("evidence-kicker", "Why this resonates");
+  setText("evidence-heading", "Select a person");
+  setText("evidence-subtitle", "");
   setText("metric-class", "—");
   setText("metric-structural", "—");
   setText("metric-confidence", "—");
   document.getElementById("mapping-list")?.replaceChildren();
   document.getElementById("relation-chips")?.replaceChildren();
   document.getElementById("score-list")?.replaceChildren();
-  setText("proof-note", "No frontend matching or score calculation.");
+  setText("proof-note", "");
 
   document.getElementById("ring-layer")?.replaceChildren();
   document.getElementById("sector-key")?.replaceChildren();
@@ -795,16 +838,14 @@ function clearResults() {
 
   setText("secondary-count", "0");
   const trigger = document.getElementById("secondary-trigger");
-  if (trigger) trigger.disabled = true;
+  if (trigger) { trigger.disabled = true; trigger.hidden = true; }
   document.getElementById("drawer-matches")?.replaceChildren();
   document.getElementById("drawer-rejected")?.replaceChildren();
-
 }
 
-// A discovery that returns candidates but none that clear the resonance bar is
-// a real, correct answer — the backend refusing to advertise a false analogy —
-// not a failure. It gets its own state and its own honest counts instead of
-// being reported through the error path.
+// A discovery that returns candidates but none that clear the resonance bar,
+// or none at all, is the usual first answer and not a failure. The thought is
+// out there; the map shows it there, alone for now.
 function renderEmpty(payload) {
   clearResults();
   state.payload = payload;
@@ -814,17 +855,26 @@ function renderEmpty(payload) {
   renderDrawer(payload, others, rejected);
   renderMap(state.context, payload, [], others, rejected);
   const empty = document.getElementById("matches-empty");
-  if (empty) empty.hidden = false;
-  setText("response-summary", `${payload.matches.length} returned · 0 resonances · ${payload.rejected.length} rejected`);
-  setText("evidence-kicker", "No resonance yet");
-  setText("evidence-heading", "Nothing cleared the resonance bar");
-  setText("evidence-subtitle",
-    `${payload.matches.length} candidate${payload.matches.length === 1 ? "" : "s"} came back and every one was refused as a resonance. `
-    + "Open “Other returned results” to inspect them.");
-  setText("map-status-text", "0 resonances · every returned candidate was refused");
-  setText("source-note",
-    "Live result for your shared thought · nobody cleared the resonance bar this time.");
-  document.getElementById("app-shell").dataset.state = "empty";
+  if (empty) {
+    empty.hidden = false;
+    // The engine can return rows it will not call a resonance — a close
+    // skeleton with no concept evidence behind it, say. They are real
+    // people and they are on the map and in the roster; say so rather than
+    // letting "nobody" sit next to a marker.
+    let more = empty.querySelector(".waiting-more");
+    if (!more) { more = el("p", "waiting-copy waiting-more"); empty.append(more); }
+    const returned = others.length;
+    more.textContent = returned
+      ? `${returned === 1 ? "One thought" : `${returned} thoughts`} came back with a similar skeleton, which the engine will not call a resonance on structure alone. ${returned === 1 ? "It is" : "They are"} on the map and below, and open to an introduction all the same.`
+      : "";
+    more.hidden = !returned;
+  }
+  setText("response-summary", `${payload.matches.length} returned · 0 resonances · ${payload.rejected.length} refused`);
+  setText("map-status-text", others.length
+    ? `${others.length} returned, none the engine calls a resonance · still looking`
+    : "Nobody yet · still looking");
+  setText("source-note", "Your shared thought, live. Nobody has cleared the bar yet; it keeps looking.");
+  setShellState("empty");
 }
 
 function renderDiscovery(payload) {
@@ -845,40 +895,28 @@ function renderDiscovery(payload) {
   renderDrawer(payload, others, rejected);
   renderEvidence(primary[0]);
   updateSelection();
+  const extra = others.length + rejected.length;
   setText("map-status-text",
-    `${primary.length} resonance${primary.length === 1 ? "" : "s"} · ${others.length} other returned · ${rejected.length} rejected · engine order kept`);
-
-  setText("source-note",
-    "Live result for your shared thought · these are people who have shared one too.");
-  document.getElementById("app-shell").dataset.state = "ready";
-  setConnectOpen(false);
-}
-
-// The connect panel is open while there is nothing shared — it is one of the
-// two ways to start — and folded once something is, because by then it has
-// done its job. A reader who opened it themselves keeps it open.
-let connectTouched = false;
-function setConnectOpen(open) {
-  const details = document.getElementById("connect-details");
-  if (!details || connectTouched) return;
-  details.open = open;
+    `${primary.length} ${primary.length === 1 ? "person" : "people"} with the same shape` +
+    (extra ? ` · ${extra} more returned` : ""));
+  setText("source-note", "Your shared thought, live: these are people who have shared one too.");
+  setShellState("ready");
 }
 
 function setLoading(loading) {
   document.getElementById("map-status").classList.toggle("is-loading", loading);
-  if (loading) setText("map-status-text", "Finding people who resonate…");
+  if (loading) setText("map-status-text", "Looking…");
 }
 
 // The visitor's own panel, emptied. `clearResults()` owns the discovery
-// surfaces; this owns the "Your thought" panel, which is the surface that
-// used to show the fixture thought to somebody who had shared nothing.
+// surfaces; this owns the "Your thought" panel.
 function clearActiveThought() {
   state.context = null;
-  setText("thought-id", "No thought shared yet");
+  setText("thought-id", "—");
   const title = document.getElementById("thought-heading");
-  title.replaceChildren(document.createTextNode("Nothing shared yet"));
+  title.replaceChildren(document.createTextNode("Share one thought"));
   setText("thought-caption",
-    "Share one thought and it starts looking — now, and after you leave. Only its structure is compared; you see that structure before anyone else does.");
+    "In your own words: what causes what, what prevents what. You will see exactly what would become visible before it does.");
   document.getElementById("dna-chain")?.replaceChildren();
   document.getElementById("dna-relations")?.replaceChildren();
   document.getElementById("declared-context")?.replaceChildren();
@@ -891,32 +929,21 @@ function clearActiveThought() {
 function renderUnshared() {
   clearResults();
   clearActiveThought();
-  setText("response-summary", "Nothing shared · nothing discovered");
-  setText("map-status-text", "Nothing shared yet · no discovery was run");
-  setText("evidence-kicker", "Nothing shared yet");
-  setText("evidence-heading", "Share a thought to see who resonates");
-  setText("evidence-subtitle",
-    "Resonance compares the causal structure of a thought you have explicitly "
-    + "shared. Until you share one there is nothing to compare, so nothing is "
-    + "shown. Share one from this page, or from the chat you connect below: "
-    + "you read the preview and confirm before anything becomes discoverable.");
-  setText("source-note", "You have shared nothing, so nothing was searched for.");
-  document.getElementById("app-shell").dataset.state = "unshared";
+  setText("response-summary", "Nothing shared · nothing searched");
+  setText("map-status-text", "Nothing shared yet");
+  setText("source-note", "Nothing of yours is discoverable, so nothing was searched for.");
+  setShellState("unshared");
   setLoading(false);
-  setConnectOpen(true);
 }
 
 function showError(error) {
-  document.getElementById("app-shell").dataset.state = "error";
-  // Never leave the previous source's cards, evidence, drawer, counts or map on
-  // screen next to an error for the current one.
+  setShellState("error");
   clearResults();
   setText("response-summary", "—");
-  setText("evidence-kicker", "Discovery unavailable");
-  setText("evidence-heading", "No resonance to show");
-  setText("evidence-subtitle", error.message);
-  setText("map-status-text", `Discovery unavailable: ${error.message}`);
+  setText("map-status-text", "Could not read the result");
   setText("source-note", "Nothing is shown, because nothing could be read.");
+  document.dispatchEvent(new CustomEvent("resonance:notice",
+    {detail: {message: `Discovery could not be read: ${error.message}`}}));
   setLoading(false);
 }
 
@@ -928,14 +955,15 @@ async function loadResults() {
       fetch("/api/context", {cache: "no-store"}),
     ]);
     const payload = await response.json();
-    if (response.status === 409 && payload?.error === SHARE_REQUIRED) {
+    // 409 share_required: nothing of theirs is discoverable. 401: the cookie
+    // names a session this server no longer knows (it restarted, or the
+    // session was revoked) — which, to a reader, is the same fact.
+    if ((response.status === 409 && payload?.error === SHARE_REQUIRED) || response.status === 401) {
       renderUnshared();
       return;
     }
     if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
     assertAcceptedDiscovery(payload);
-    // The thought panel shows the visitor's own shared thought, which is the
-    // only thought this page ever displays.
     if (contextResponse.ok) {
       const context = await contextResponse.json();
       assertAcceptedContext(context);
@@ -961,53 +989,62 @@ function setDrawer(open) {
   else document.querySelectorAll(".drawer-row.is-highlighted").forEach((row) => row.classList.remove("is-highlighted"));
 }
 
-let toastTimer;
 function showToast(message) {
-  const toast = document.getElementById("toast");
-  toast.textContent = message;
-  toast.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 1800);
+  document.dispatchEvent(new CustomEvent("resonance:toast", {detail: {message}}));
 }
 
-// The onboarding panel is static markup; only three things about it depend on
-// the runtime: which origin is serving (the page is reachable on more than one
-// host, and the connector URL must be the one you actually opened), whether
-// this browser has an agent surface, and the connect button.
-function wireOnboarding() {
+// ---- connect a chat -----------------------------------------------------
+//
+// The instructions are static markup; the runtime supplies the origin (the
+// page is reachable on more than one host, and the address must be the one
+// you actually opened), the copy button, the client picker, and the truth
+// about THIS browser's WebMCP surface.
+
+function wireConnect() {
   const origin = window.location.origin;
   const mcpUrl = `${origin}/mcp`;
   const urlNode = document.getElementById("mcp-url");
   if (urlNode) urlNode.textContent = mcpUrl;
   for (const node of document.querySelectorAll(".onboarding-inline-code")) {
-    // Keep the copy-pasteable snippets honest about the host in the address bar.
-    node.textContent = node.textContent.replace(
-      /https:\/\/[a-z0-9.-]+\/mcp/gi, mcpUrl);
+    node.textContent = node.textContent.replace(/https:\/\/[a-z0-9.-]+\/mcp/gi, mcpUrl);
   }
 
   const copy = document.getElementById("copy-mcp-url");
   copy?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(mcpUrl);
-      showToast("Connector URL copied");
+      showToast("Address copied");
     } catch {
       showToast(mcpUrl);
     }
   });
 
-  document.getElementById("onboarding-connect")?.addEventListener("click", () => {
-    const details = document.getElementById("connect-details");
-    if (details) { details.open = true; connectTouched = true; }
-    document.getElementById("connect-details")?.scrollIntoView({block: "start"});
-  });
-  document.getElementById("connect-details")?.addEventListener("toggle", (event) => {
-    if (event.isTrusted) connectTouched = true;
+  // One client at a time: a tab list, arrow keys included.
+  const tabs = [...document.querySelectorAll("#client-tabs [role=tab]")];
+  const select = (tab, focus = false) => {
+    for (const other of tabs) {
+      const selected = other === tab;
+      other.setAttribute("aria-selected", String(selected));
+      other.tabIndex = selected ? 0 : -1;
+      const panel = document.getElementById(other.getAttribute("aria-controls"));
+      if (panel) panel.hidden = !selected;
+    }
+    if (focus) tab.focus();
+  };
+  tabs.forEach((tab, index) => {
+    tab.addEventListener("click", () => select(tab));
+    tab.addEventListener("keydown", (event) => {
+      const delta = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+      if (event.key === "Home") { event.preventDefault(); select(tabs[0], true); return; }
+      if (event.key === "End") { event.preventDefault(); select(tabs[tabs.length - 1], true); return; }
+      if (!delta) return;
+      event.preventDefault();
+      select(tabs[(index + delta + tabs.length) % tabs.length], true);
+    });
   });
 
   // Say what is true of THIS browser — but say it about the browser, not about
-  // the product. The earlier wording ("there is nothing to register here")
-  // read as though Resonance had no WebMCP support, when what is missing is the
-  // browser's agent surface. The service speaks both transports either way.
+  // the product. Resonance speaks both transports either way.
   const webmcp = document.getElementById("onboarding-webmcp-copy");
   if (webmcp) {
     webmcp.textContent = (document.modelContext || navigator.modelContext)
@@ -1021,22 +1058,15 @@ function wireOnboarding() {
   }
 }
 
-// Leave (or return to) the onboarding state when consent actually changes.
+// Leave (or return to) the unshared state when consent actually changes.
 //
-// This must cost ZERO extra requests. Two earlier versions did not, and both
-// broke Card A's revoke step with "rate limit exceeded": re-running discovery
-// on every write drains a rate-limited action outright, and even a cheap
-// consent read on every write is enough to push an already busy sequence over
-// the limit (30 tokens, refill 1/s). Verified against pristine `main` on the
-// same machine, where the same step passes.
-//
-// The state is already in hand: `webmcp_live.mjs` reads it after every tool
-// write and the collaboration panel reads it after every panel write. They
-// announce it on `resonance:consent`; this only listens, and only re-reads the
-// live view when the answer flipped.
+// This must cost ZERO extra requests: discovery is rate-limited, and a read
+// per write is enough to push a busy sequence over the limit. The modules
+// that write already hold the state and announce it on `resonance:consent`;
+// this only listens, and only re-reads the live view when the answer flipped.
 let lastShared = null;
 function onConsentState(shared) {
-  if (lastShared === null) {                 // first read: boot's loadResults already ran
+  if (lastShared === null) {
     lastShared = shared;
     return;
   }
@@ -1045,8 +1075,6 @@ function onConsentState(shared) {
   loadResults();
 }
 
-// The map is re-laid out from the state already in hand when the frame
-// changes width (the viewBox switches between wide and square). No request.
 let resizeTimer;
 function onResize() {
   clearTimeout(resizeTimer);
@@ -1066,10 +1094,9 @@ async function boot() {
     const contextResponse = await fetch("/api/context", {cache: "no-store"});
     // A first-time visitor has no context of their own: /api/context answers
     // 409 share_required rather than handing back somebody else's thought.
-    // That is a state to render, not a boot failure — loadResults renders it
-    // below.
     const context = await contextResponse.json().catch(() => null);
-    const unshared = contextResponse.status === 409 && context?.error === SHARE_REQUIRED;
+    const unshared = (contextResponse.status === 409 && context?.error === SHARE_REQUIRED)
+      || contextResponse.status === 401;
     if (!unshared) {
       if (!contextResponse.ok) throw new Error("Presentation context is unavailable");
       assertAcceptedContext(context);
@@ -1077,21 +1104,12 @@ async function boot() {
       renderContext(context);
     }
 
-    wireOnboarding();
-    // The onboarding state is "this visitor has shared nothing", and that can
-    // stop being true without a reload: an agent shares through the WebMCP
-    // tools, or the visitor shares from the page itself. Both go
-    // through session.mjs, which announces every successful write.
-    //
-    // Both surfaces already hold the authoritative consent state after a write
-    // and announce it here, so this costs no additional request. See
-    // `onConsentState` for why that matters.
+    wireConnect();
     document.addEventListener("resonance:consent", (event) => {
       onConsentState(event.detail?.shared === true);
     });
     // An agent can run a discovery through the WebMCP tools without touching
-    // this page. The results on screen would then be the previous answer, so
-    // the transport says when it has run one and the page re-reads.
+    // this page; the transport says when it has, and the page re-reads.
     document.addEventListener("resonance:discovered", () => { loadResults(); });
     // An alert about a person who arrived after the share asks for them to be
     // shown on the map and in the evidence.

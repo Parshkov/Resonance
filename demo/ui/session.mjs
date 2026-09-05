@@ -121,8 +121,10 @@ async function apiFetch(method, path, body, { _retried = false } = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     // A token invalidated by another client (rotation elsewhere, expiry) shows
-    // up as csrf_rejected; re-bootstrap once and retry before surfacing it.
-    if (response.status === 403 && payload.error === "csrf_rejected" && !_retried) {
+    // up as csrf_rejected; a cookie this server no longer knows (it restarted,
+    // the session was revoked) as 401. Re-bootstrap once and retry before
+    // surfacing either.
+    if (((response.status === 403 && payload.error === "csrf_rejected") || response.status === 401) && !_retried) {
       await ensureSession({ force: true });
       return apiFetch(method, path, body, { _retried: true });
     }
@@ -137,7 +139,9 @@ async function apiFetch(method, path, body, { _retried = false } = {}) {
   return payload;
 }
 
-// Establish a session as soon as the page loads so tools/UI are ready.
-ensureSession();
+// Establish a session as soon as the page loads so tools/UI are ready. Where
+// a sign-in exists and nobody is signed in, this is refused and announced on
+// `resonance:sign-in-required`; that is a page state, not an exception.
+ensureSession().catch(() => {});
 
 export { CSRF_KEY, apiFetch, ensureSession, getCsrf, rememberCredentials };

@@ -2,36 +2,21 @@
  * Live-product UI additions.
  *
  * Served and linked only by the live product server (CSP `default-src 'self'`):
- * the collaboration surfaces collab_ui.mjs renders INTO the page — the share
- * control, the introduction composer, the requests inbox and the message
- * thread — and the tool-status chips the live modules add to the masthead.
- * Uses the page tokens from styles.css.
+ * the surfaces collab_ui.mjs renders INTO the page — the share composer and
+ * its preview, the introduction composer, the requests inbox and the message
+ * thread — plus the developer key disclosure. Uses the tokens from styles.css.
  *
  * There used to be a right-hand "Collaboration" drawer here. Contacting a
- * person is the product, not an overlay on it, so those surfaces are now
- * sections of the document and this file only styles their parts.
+ * person is the product, not an overlay on it, so those surfaces are sections
+ * of the document and this file only styles their parts.
  */
 
 /* ---- shared parts ---------------------------------------------------- */
-.collab-error { min-height: 1em; margin-bottom: 12px; padding: 8px 12px; border: 1px solid var(--rust-line); border-radius: var(--radius-sm); background: var(--rust-soft); color: var(--rust); font-size: 13px; }
-.collab-error:empty { display: none; }
 .collab-muted { margin: 0 0 8px; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
 .collab-muted:last-child { margin-bottom: 0; }
 .collab-section h3 { margin: 0 0 8px; font-family: var(--serif); font-size: 19px; font-weight: 500; }
 .collab-section h4 { margin: 14px 0 6px; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
 .collab-section h4:first-child { margin-top: 0; }
-
-.collab-button {
-  min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2);
-  color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
-}
-.collab-button:hover { border-color: var(--ink-3); }
-.collab-button:disabled { opacity: 0.5; cursor: default; }
-.collab-button--primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-.collab-button--primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
-.collab-button--quiet { border-color: transparent; background: transparent; color: var(--ink-2); }
-.collab-button--quiet:hover { border-color: var(--line); color: var(--ink); }
-.collab-request-btn { min-height: 30px; font-size: 12.5px; }
 
 .collab-state {
   display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--paper-3); color: var(--ink-2);
@@ -41,37 +26,57 @@
 .collab-state[data-state="requested"] { background: var(--accent-soft); color: var(--accent-ink); }
 .collab-state[data-state="declined"], .collab-state[data-state="cancelled"] { color: var(--ink-3); }
 
-/* ---- share control (in the thought panel head and the hero) --------- */
-.collab-share-state { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 13.5px; color: var(--ink-2); }
-.collab-share-state .status-light { flex: none; }
-.collab-share-state[data-shared="false"] .status-light { background: var(--ink-3); }
+/* ---- share from this page: words in, structure back, explicit share ---- */
+.share-composer:empty { display: none; }
+.share-form { display: grid; gap: 12px; margin-top: 12px; }
+.share-form textarea {
+  width: 100%; min-height: 150px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; line-height: 1.55; resize: vertical;
+}
+.share-form textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent-line); }
+.share-form__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.share-form__trust { flex: 1 1 260px; margin: 0; color: var(--ink-3); font-size: 12.5px; line-height: 1.5; }
+.share-form__status:empty { display: none; }
+.share-form__status { color: var(--ink-2); font-size: 13.5px; }
+.share-form__status.is-error { color: var(--rust); }
+
+.share-preview { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--accent-line); border-radius: var(--radius-sm); background: var(--paper); }
+.share-preview__title { font-family: var(--serif); font-size: 20px; line-height: 1.2; }
+.share-preview__topic { font-size: 15px; color: var(--ink-2); }
+.share-preview .dna-relations { margin-top: 0; }
+.share-preview__note { color: var(--ink-3); font-size: 12.5px; line-height: 1.5; }
+
+/* Stop sharing asks once, inline, rather than in a browser dialog. */
+.stop-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border: 1px solid var(--rust-line); border-radius: var(--radius-sm); background: var(--rust-soft); font-size: 13.5px; }
+.stop-confirm p { flex: 1 1 220px; margin: 0; color: var(--ink); }
 
 /* ---- the introduction composer -------------------------------------- */
 .intro-composer { display: grid; gap: 8px; width: 100%; margin-top: 8px; padding: 12px; border: 1px solid var(--accent-line); border-radius: var(--radius-sm); background: var(--paper-2); }
-.intro-composer label { font-size: 13px; color: var(--ink-2); }
+.intro-composer label { font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
 .intro-composer textarea {
-  width: 100%; min-height: 72px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--paper); color: var(--ink); font: inherit; font-size: 13.5px; line-height: 1.45; resize: vertical;
+  width: 100%; min-height: 80px; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.45; resize: vertical;
 }
 .intro-composer-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.intro-composer-row .collab-muted { flex: 1 1 160px; margin: 0; font-size: 12px; }
+.intro-composer-row .collab-muted { flex: 1 1 160px; margin: 0; font-size: 12.5px; }
 
 /* ---- requests inbox -------------------------------------------------- */
 .collab-request {
   display: grid; gap: 4px 10px; grid-template-columns: minmax(0, 1fr) auto; align-items: start;
-  padding: 12px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
+  padding: 12px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px;
 }
 .collab-request:last-child { border-bottom: 0; }
 .collab-request__who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
 .collab-request__who strong { font-weight: 600; overflow-wrap: anywhere; }
 .collab-request__when { color: var(--ink-3); font-family: var(--mono); font-size: 11px; }
 .collab-request__message { grid-column: 1 / -1; margin: 2px 0; font-size: 13.5px; }
-.collab-request__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.collab-request__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .collab-request[data-state="declined"], .collab-request[data-state="cancelled"] { color: var(--ink-3); }
 .collab-closed { margin-top: 10px; }
 .collab-closed summary { cursor: pointer; color: var(--ink-3); font-size: 13px; }
 
 /* ---- roster: people open to an introduction without a card ---------- */
+.collab-subhead { margin: 12px 0 4px; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
 .collab-initiate-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 13.5px; }
 .collab-initiate-row:last-child { border-bottom: 0; }
 .collab-initiate-row .collab-grow { flex: 1 1 160px; min-width: 0; overflow-wrap: anywhere; }
@@ -82,15 +87,15 @@
 .collab-channel-head h3 { margin: 0; }
 .collab-thread { display: flex; flex-direction: column; gap: 6px; max-height: 60vh; overflow-y: auto; padding: 2px; }
 .collab-thread:empty::after { content: "No messages yet. Whatever you write here is passed on as text; nothing else is."; color: var(--ink-3); font-size: 13px; }
-.collab-message { display: grid; gap: 2px; max-width: 88%; padding: 8px 12px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--paper); font-size: 13.5px; overflow-wrap: anywhere; }
+.collab-message { display: grid; gap: 2px; max-width: 88%; padding: 8px 12px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--paper); font-size: 14px; overflow-wrap: anywhere; }
 .collab-message__meta { display: flex; gap: 8px; color: var(--ink-3); font-size: 11.5px; }
 .collab-message__meta strong { color: var(--ink-2); font-weight: 600; }
 .collab-message.is-mine { align-self: flex-end; background: var(--accent-soft); border-color: var(--accent-line); }
 .collab-message.is-theirs { border-left: 3px solid var(--line); }
 .collab-compose { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .collab-input {
-  flex: 1 1 200px; min-width: 0; min-height: 36px; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--paper); color: var(--ink); font: inherit; font-size: 13.5px;
+  flex: 1 1 200px; min-width: 0; min-height: 38px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--paper); color: var(--ink); font: inherit; font-size: 14px;
 }
 .collab-empty { padding: 14px; border: 1px dashed var(--line); border-radius: var(--radius-sm); color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
 
@@ -100,20 +105,8 @@
   background: var(--paper); color: var(--accent-ink); font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
   white-space: pre-wrap; overflow-wrap: anywhere; user-select: all;
 }
-.collab-advanced { margin-top: 16px; }
-.collab-advanced summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.collab-advanced { margin-top: 14px; }
+.collab-advanced summary { cursor: pointer; color: var(--ink-3); font-size: 13px; }
 .collab-advanced[open] summary { margin-bottom: 8px; }
 .collab-advanced .collab-code + .collab-code { margin-top: 8px; }
 .collab-compose-inline { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-
-/* ---- share from this page: words in, structure back, explicit share ---- */
-.share-composer:empty { display: none; }
-.share-form { display: grid; gap: 10px; margin: 14px 0 4px; padding: 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-sm); background: var(--paper); }
-.share-form__label { font-family: var(--serif); font-size: 18px; }
-.share-form textarea {
-  width: 100%; min-height: 140px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--paper-2); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.5; resize: vertical;
-}
-.share-form__status:empty { display: none; }
-.share-preview { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--paper-2); }
-.share-preview__topic { font-family: var(--serif); font-size: 20px; line-height: 1.2; }

@@ -46,6 +46,9 @@ STATIC_ASSETS = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
+    "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
+    "/shell.mjs": ("shell.mjs", "text/javascript; charset=utf-8"),
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
 }
 
 
