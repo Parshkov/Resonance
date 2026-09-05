@@ -30,7 +30,11 @@ from src.identity.models import AuthorizationError, IdentityValidationError  # n
 from src.persistence import LiveCorpusService  # noqa: E402
 from src.product import auth_mount  # noqa: E402
 from src.product.auth_mount import AuthMount, SignInStates, safe_next  # noqa: E402
-from src.product.server import build_runtime, serve  # noqa: E402
+from src.product.server import (  # noqa: E402
+    build_runtime,
+    serve,
+    startup_purge_unsigned,
+)
 from src.remote.oauth import GrantStore, OAuthCore  # noqa: E402
 
 GOOGLE_ENV = {
@@ -397,6 +401,76 @@ class HttpSurfaceTests(unittest.TestCase):
         with urlopen(request) as response:
             self.assertEqual(response.status, 200)
             self.assertIn("user_id", json.loads(response.read().decode("utf-8")))
+
+
+class RetiringAccountsNobodySignedIntoTests(unittest.TestCase):
+    """Applying the product's own rule to what came before it.
+
+    Resonance introduces people, so an account has to belong to someone who can
+    be reached. Leaving the thoughts of an account nobody signed into in the
+    pool is worse than an empty corpus: a real participant is shown a resonance
+    with someone who can never accept an introduction.
+    """
+
+    def setUp(self):
+        from src.product.server import build_runtime as _build
+        from tests.test_standing_search import ORIGIN as SHARE_ORIGIN
+        self.runtime = _build(":memory:",
+                              allowed_origins=frozenset({SHARE_ORIGIN}),
+                              seed=False)
+        self.product = self.runtime.product
+        self.identity = self.runtime.identity
+
+    def _share(self, creds):
+        from tests.test_standing_search import dna, share as _share_thought
+        return _share_thought(self.product, creds, dna("ses-aria-plasma-lens",
+                                                       f"th-{creds.user_id[-6:]}"))
+
+    def _signed_in(self, subject="sub-1"):
+        return self.identity.sign_in_federated(
+            provider="google", subject=subject, email=f"{subject}@example.test",
+            email_verified=True, display_label="Real person")
+
+    def test_unset_does_nothing_at_all(self):
+        self.assertIsNone(startup_purge_unsigned(self.runtime, {}))
+
+    def test_report_counts_without_changing_anything(self):
+        ghost = self.product.register("ghost")
+        session_id = self._share(ghost)
+        result = startup_purge_unsigned(self.runtime,
+                                        {"RESONANCE_PURGE_UNSIGNED": "report"})
+        self.assertTrue(result["dry_run"])
+        self.assertEqual(result["sessions_to_delete"], 1)
+        self.assertIsNotNone(self.runtime.live.get_session(session_id))
+
+    def test_it_removes_the_unsigned_and_spares_the_signed_in(self):
+        ghost = self.product.register("ghost")
+        ghost_session = self._share(ghost)
+        real = self._signed_in()
+        real_session = self._share(real)
+
+        result = startup_purge_unsigned(self.runtime, {"RESONANCE_PURGE_UNSIGNED": "1"})
+        self.assertFalse(result["dry_run"])
+        self.assertEqual(result["deleted"], 1)
+        self.assertIsNotNone(self.runtime.live.get_session(ghost_session).deleted_at)
+        self.assertIsNone(self.runtime.live.get_session(real_session).deleted_at)
+
+    def test_an_explicit_keep_list_is_honoured(self):
+        ghost = self.product.register("ghost")
+        session_id = self._share(ghost)
+        result = startup_purge_unsigned(self.runtime, {
+            "RESONANCE_PURGE_UNSIGNED": "1",
+            "RESONANCE_PURGE_KEEP": session_id,
+        })
+        self.assertEqual(result["sessions_to_delete"], 0)
+        self.assertIsNone(self.runtime.live.get_session(session_id).deleted_at)
+
+    def test_running_it_twice_finds_nothing_left_to_do(self):
+        ghost = self.product.register("ghost")
+        self._share(ghost)
+        startup_purge_unsigned(self.runtime, {"RESONANCE_PURGE_UNSIGNED": "1"})
+        again = startup_purge_unsigned(self.runtime, {"RESONANCE_PURGE_UNSIGNED": "1"})
+        self.assertEqual(again["sessions_to_delete"], 0)
 
 
 def _query_value(url: str, key: str) -> str:

@@ -213,14 +213,20 @@ class WebServerWebMCPTests(unittest.TestCase):
         with urlopen(self.base + "/", timeout=10) as response:
             html = response.read().decode()
         self.assertIn("Resonance also speaks WebMCP", html)
-        # The page used to claim the two surfaces could be one account via the
-        # consent screen's "Continue as your current account". That option cannot
-        # appear in the flow it exists for: the session cookie is SameSite=Strict,
-        # so a browser navigating from claude.ai to /oauth/authorize does not send
-        # it, and the consent page sees no current account. Until identity is
-        # fixed, the page must say what is true.
-        self.assertIn("today they are not the same", html)
-        self.assertNotIn("preselects it", html)
+        # This page once had to admit the surfaces were separate accounts, because
+        # the session cookie was SameSite=Strict and a browser navigating from
+        # claude.ai to /oauth/authorize did not send it — so the consent page saw
+        # no current account and every connection minted a new one. Real sign-in
+        # plus a Lax session cookie fixed the cause, so the page may now say the
+        # true thing. Both halves are pinned together: the promise on the page
+        # and the cookie policy that makes it true.
+        self.assertIn("the same account", html)
+        self.assertNotIn("today they are not the same", html)
+        from pathlib import Path as _Path
+        server_src = (_Path(__file__).resolve().parents[1]
+                      / "src" / "product" / "server.py").read_text(encoding="utf-8")
+        self.assertIn("SameSite=Lax", server_src)
+        self.assertNotIn("SameSite=Strict", server_src)
         with urlopen(self.base + "/app.mjs", timeout=10) as response:
             app = response.read().decode()
         # both branches describe the BROWSER, and neither denies the capability

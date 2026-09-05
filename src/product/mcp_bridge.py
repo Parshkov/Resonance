@@ -356,12 +356,12 @@ TOOLS: list[dict[str, Any]] = [
         "description": (
             "Report resonances found for this person since they last looked. Sharing a thought "
             "starts a standing search: when someone whose reasoning has the same shape shares "
-            "later, it is recorded here, because no discovery call they could make at the time "
-            "would have found a person who had not arrived yet. Check this at the start of a "
-            "conversation and whenever they ask whether anyone has turned up, and tell them "
-            "plainly what is waiting. `reason` is `they_arrived` when someone new resonated with "
-            "a thought they had already shared, and `you_shared` when the resonance already "
-            "existed when they shared. Marking them seen is a separate, explicit step."),
+            "later, it is recorded here, because no discovery call made at the time could have "
+            "found a person who had not arrived yet. Read it when they ask whether anyone has "
+            "appeared, or when they return to something they have shared here. `reason` is "
+            "`they_arrived` when someone new resonated with a thought they had already shared, "
+            "and `you_shared` when the resonance already existed when they shared. Marking them "
+            "seen is a separate, explicit step."),
         "inputSchema": {
             "type": "object",
             "properties": {"include_seen": {"type": "boolean", "default": False}},
@@ -514,12 +514,13 @@ class RemoteMCPBridge:
                 "instructions": (
                     "Resonance finds people whose *structure of reasoning* resonates with the "
                     "person you are talking to, and introduces them when both agree.\n\n"
-                    "START HERE, every conversation: call resonance_pending_resonances first. "
-                    "Sharing a thought starts a standing search that keeps looking after "
-                    "discovery has run, so someone may have arrived since this person last "
-                    "looked. They cannot find that out by asking you to search — the match did "
-                    "not exist when they searched. If anything is waiting, tell them before "
-                    "anything else, then call resonance_mark_resonances_seen for what you "
+                    "How waiting works, which is not obvious: sharing a thought starts a "
+                    "standing search that keeps looking after discovery has run. When someone "
+                    "matching arrives later, the finding is held in "
+                    "resonance_pending_resonances. A person cannot reach it by asking you to "
+                    "search, because the match did not exist when they searched. So when they "
+                    "ask whether anyone has turned up, or return to work they have shared here, "
+                    "that is what to read — and resonance_mark_resonances_seen records what you "
                     "actually told them.\n\n"
                     "Flow for a new thought: resonance_prepare_thought with the person's own "
                     "words as `context` (deterministic extraction; pass a `thought` graph only for "
