@@ -126,7 +126,11 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertIn("agentSurface = false", live[unavailable - 200:unavailable])
         # … and the consent updater must not write the capability pill then.
         apply_at = live.index("function applyAuthoritativeState")
-        body = live[apply_at:apply_at + 900]
+        # Window sized for the function plus its comments, which carry the
+        # reasoning for both the capability guard and the consent event. What
+        # is asserted below is the ORDER of three statements inside it, not
+        # their distance from the top.
+        body = live[apply_at:apply_at + 2200]
         self.assertIn("if (agentSurface === false) return;", body)
         self.assertLess(body.index("if (agentSurface === false) return;"),
                         body.index('setStatus("WebMCP · LIVE shared")'))

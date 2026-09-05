@@ -72,6 +72,13 @@ let agentSurface = null;
 
 function applyAuthoritativeState(state) {
   setConsentVisible(state.shared === true);
+  // The page's main view has an "you have shared nothing" state, and only this
+  // module knows when that stops being true. Announce the state we already
+  // have rather than making the page ask for it again — discovery and consent
+  // are rate-limited actions, and an extra read per write is enough to make an
+  // honest later tool call fail.
+  document.dispatchEvent(new CustomEvent("resonance:consent",
+    {detail: {shared: state.shared === true, draft_ready: state.draft_ready === true}}));
   // Two different pills carry two different facts: `#header-consent` says what
   // is discoverable, `#webmcp-status` says whether this browser has WebMCP at
   // all. Writing a consent word into the capability pill made a browser with

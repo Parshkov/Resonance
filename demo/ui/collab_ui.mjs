@@ -113,11 +113,14 @@ function panel() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && root.classList.contains("is-open")) setOpen(false);
   });
-  // The accepted R9 page ships a static "Introductions unavailable" placeholder;
-  // now that a working collaboration surface is on the same page, hide it so the
-  // judge does not see a contradictory label. The R9 file itself is untouched.
-  const stale = document.querySelector(".intro-unavailable");
-  if (stale) stale.hidden = true;
+  // There used to be a runtime patch here that hid the page's static
+  // "Introductions unavailable — not exposed by the accepted R8 MCP" chip,
+  // because that label had become false and contradicted this very drawer.
+  // Hiding a false statement is not the same as not making it: the chip now
+  // states the rule that IS true (an intro needs the other side to accept), so
+  // there is nothing left to hide. Worth noting that the patch did not even
+  // work until the global `[hidden]` rule landed — `.intro-unavailable` set
+  // `display: flex`, which beat the browser default for the hidden attribute.
   return root;
 }
 
@@ -188,6 +191,10 @@ async function refreshShare() {
     return;
   }
   const shared = owned.some((s) => s.share_state === "discoverable");
+  // Same announcement webmcp_live.mjs makes, for the human path: sharing from
+  // this panel must also take the page out of its onboarding state. Reuses the
+  // read we just did instead of adding one.
+  document.dispatchEvent(new CustomEvent("resonance:consent", {detail: {shared}}));
   const stateRow = el("p", {className: "collab-share-state"});
   const light = el("span", {className: "status-light"});
   light.setAttribute("aria-hidden", "true");
@@ -222,36 +229,59 @@ function codeBlock(text) {
 function renderConnect() {
   const host = document.getElementById("collab-connect");
   if (!host) return;
+  // This panel used to lead with "Create MCP key" and hand out
+  // `Authorization: Bearer <key>` plus a `…/mcp/<key>` capability URL "for
+  // clients that only take a URL". That is the developer fallback, documented
+  // in ops/CONNECT_MCP.md §2 as "debug only, not the normal path", and
+  // submission/HUMAN_TEST_CARDS.md tells a tester that being asked for a key
+  // is a FAIL. The canonical path is the URL alone: the origin answers with an
+  // RFC 9728 challenge and the client runs OAuth by itself. So the URL leads,
+  // and the key is behind a disclosure that says what it is.
+  const endpoint = `${window.location.origin}/mcp`;
   host.replaceChildren(
     el("h3", {textContent: "Connect your chat (MCP)"}),
     el("p", {className: "collab-muted", textContent:
-      "Give the assistant you already talk to (Claude, Cursor, any MCP client) access to " +
-      "this account. It extracts the structure of what you are working on, previews it, and " +
-      "shares only after you approve — then discovers people whose reasoning resonates."}),
-    el("div", {className: "collab-compose"}, [
-      actionButton("Create MCP key", async () => {
-        const creds = await apiFetch("POST", "/api/product/mcp_key", {});
-        const endpoint = creds.endpoint || `${window.location.origin}/mcp`;
-        const withKey = creds.endpoint_with_key || `${endpoint}/${creds.mcp_key}`;
-        const out = document.getElementById("collab-connect-out");
-        out.replaceChildren(
-          el("p", {className: "collab-muted", textContent:
-            "Shown once — anyone holding this key acts as you in Resonance. " +
-            `Expires ${creds.expires_at}.`}),
-          el("h4", {className: "collab-subhead", textContent: "Claude Code / Claude Desktop (CLI)"}),
-          codeBlock(`claude mcp add --transport http resonance ${endpoint} \\\n  --header "Authorization: Bearer ${creds.mcp_key}"`),
-          el("h4", {className: "collab-subhead", textContent: "Cursor / Windsurf / any mcp.json"}),
-          codeBlock(JSON.stringify({mcpServers: {resonance: {url: endpoint,
-            headers: {Authorization: `Bearer ${creds.mcp_key}`}}}}, null, 2)),
-          el("h4", {className: "collab-subhead", textContent: "Clients that only take a URL (claude.ai custom connector, ChatGPT)"}),
-          codeBlock(withKey),
-          el("p", {className: "collab-muted", textContent:
-            "Then, in your chat: “Connect me to Resonance: extract the structure of what I’m " +
-            "working on, show me the preview, and after I approve, share it and discover who resonates.”"}),
-        );
-      }, true),
+      "Give the assistant you already talk to (Claude, ChatGPT, Grok, Cursor, any MCP " +
+      "client) access to this account. It extracts the structure of what you are working " +
+      "on, previews it, and shares only after you approve — then discovers people whose " +
+      "reasoning resonates."}),
+    el("h4", {className: "collab-subhead", textContent: "Hand your client this one address"}),
+    codeBlock(endpoint),
+    el("p", {className: "collab-muted", textContent:
+      "That is all it needs. The client discovers OAuth on its own and opens a Resonance " +
+      "consent page; approve there and it is connected. You will not be asked to paste a " +
+      "key or a token anywhere in this flow."}),
+    el("p", {className: "collab-muted", textContent:
+      "claude.ai: Settings → Connectors → Add custom connector. ChatGPT: Settings → Apps & " +
+      "Connectors → Advanced → Developer mode → Create (Business / Enterprise / Edu). " +
+      "Grok: Connectors → New Connector → Custom. Claude Code: " +
+      `claude mcp add --transport http resonance ${endpoint}. ` +
+      "Cursor / Windsurf / any mcp.json: {\"url\": \"" + endpoint + "\"}."}),
+    el("p", {className: "collab-muted", textContent:
+      "Then, in your chat: “Extract the structure of what I’m working on, show me the " +
+      "preview, and after I approve it, find who resonates.”"}),
+    el("details", {className: "collab-advanced"}, [
+      el("summary", {textContent: "Advanced: mint a key (debug only)"}),
+      el("p", {className: "collab-muted", textContent:
+        "Only for a client that cannot run OAuth at all. A key is a second login for this " +
+        "account: anyone holding it acts as you. Prefer the URL above."}),
+      el("div", {className: "collab-compose"}, [
+        actionButton("Create MCP key", async () => {
+          const creds = await apiFetch("POST", "/api/product/mcp_key", {});
+          const url = creds.endpoint || endpoint;
+          const out = document.getElementById("collab-connect-out");
+          out.replaceChildren(
+            el("p", {className: "collab-muted", textContent:
+              "Shown once — anyone holding this key acts as you in Resonance. " +
+              `Expires ${creds.expires_at}.`}),
+            codeBlock(`claude mcp add --transport http resonance ${url} \\\n  --header "Authorization: Bearer ${creds.mcp_key}"`),
+            codeBlock(JSON.stringify({mcpServers: {resonance: {url,
+              headers: {Authorization: `Bearer ${creds.mcp_key}`}}}}, null, 2)),
+          );
+        }, false),
+      ]),
+      el("div", {id: "collab-connect-out"}),
     ]),
-    el("div", {id: "collab-connect-out"}),
   );
 }
 

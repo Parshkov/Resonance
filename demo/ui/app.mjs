@@ -657,6 +657,80 @@ async function copySnapshot() {
   }
 }
 
+// The onboarding panel is static markup; only three things about it depend on
+// the runtime: which origin is serving (the page is reachable on more than one
+// host, and the connector URL must be the one you actually opened), whether
+// this browser has an agent surface, and the two buttons.
+function wireOnboarding() {
+  const origin = window.location.origin;
+  const mcpUrl = `${origin}/mcp`;
+  const urlNode = document.getElementById("mcp-url");
+  if (urlNode) urlNode.textContent = mcpUrl;
+  for (const node of document.querySelectorAll(".onboarding-inline-code")) {
+    // Keep the copy-pasteable snippets honest about the host in the address bar.
+    node.textContent = node.textContent.replace(
+      /https:\/\/[a-z0-9.-]+\/mcp/gi, mcpUrl);
+  }
+
+  const copy = document.getElementById("copy-mcp-url");
+  copy?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(mcpUrl);
+      showToast("Connector URL copied");
+    } catch {
+      showToast(mcpUrl);
+    }
+  });
+
+  document.getElementById("onboarding-example")?.addEventListener("click", () => {
+    loadSource("replay");
+  });
+  document.getElementById("onboarding-connect")?.addEventListener("click", () => {
+    // Instant, not smooth, and not by preference: inside this nested scroll
+    // container Chrome silently ignores smooth scrolling. Measured on
+    // 152.0.7977.83 — with `behavior: "smooth"` scrollTop stayed 0 and the
+    // button looked dead; with the default it moves to the panel. Asking for
+    // it in CSS (`scroll-behavior: smooth` on the container) reproduces the
+    // same dead button, because the default then resolves to smooth. A button
+    // that works beats a button that glides.
+    document.getElementById("onboarding-connect-panel")
+      ?.scrollIntoView({block: "start"});
+  });
+
+  // Say what is true of THIS browser rather than describing WebMCP in general.
+  const webmcp = document.getElementById("onboarding-webmcp-copy");
+  if (webmcp && !(document.modelContext || navigator.modelContext)) {
+    webmcp.textContent =
+      "This browser does not expose document.modelContext, so there is nothing to "
+      + "register here. Use one of the connectors above, or open this page in a "
+      + "browser with WebMCP enabled.";
+  }
+}
+
+// Leave (or return to) the onboarding state when consent actually changes.
+//
+// This must cost ZERO extra requests. Two earlier versions did not, and both
+// broke Card A's revoke step with "rate limit exceeded": re-running discovery
+// on every write drains a rate-limited action outright, and even a cheap
+// consent read on every write is enough to push an already busy sequence over
+// the limit (30 tokens, refill 1/s). Verified against pristine `main` on the
+// same machine, where the same step passes.
+//
+// The state is already in hand: `webmcp_live.mjs` reads it after every tool
+// write and the collaboration panel reads it after every panel write. They
+// announce it on `resonance:consent`; this only listens, and only re-reads the
+// live view when the answer flipped.
+let lastShared = null;
+function onConsentState(shared) {
+  if (lastShared === null) {                 // first read: boot's loadSource already ran
+    lastShared = shared;
+    return;
+  }
+  if (shared === lastShared) return;
+  lastShared = shared;
+  if (state.source === "live") loadSource("live");
+}
+
 async function boot() {
   try {
     const [configResponse, contextResponse] = await Promise.all([
@@ -677,6 +751,18 @@ async function boot() {
       renderContext(context);
     }
 
+    wireOnboarding();
+    // The onboarding state is "this visitor has shared nothing", and that can
+    // stop being true without a reload: an agent shares through the WebMCP
+    // tools, or the visitor shares from the Collaboration panel. Both go
+    // through session.mjs, which announces every successful write.
+    //
+    // Both surfaces already hold the authoritative consent state after a write
+    // and announce it here, so this costs no additional request. See
+    // `onConsentState` for why that matters.
+    document.addEventListener("resonance:consent", (event) => {
+      onConsentState(event.detail?.shared === true);
+    });
     document.querySelectorAll(".source-option").forEach((button) => {
       button.addEventListener("click", () => loadSource(button.dataset.source));
     });

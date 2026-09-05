@@ -44,6 +44,117 @@
     </header>
 
     <main class="workspace" id="main-workspace">
+      <!-- Shown only while nothing has been shared. A visitor who has shared
+           nothing has no results to look at, and an empty results dashboard
+           tells them neither what this is nor how to start. -->
+      <section class="onboarding" id="onboarding" aria-labelledby="onboarding-heading">
+        <div class="onboarding-inner">
+          <div class="onboarding-lede">
+            <p class="eyebrow accent-text">Nothing shared yet</p>
+            <h1 id="onboarding-heading">Find the people whose <em>reasoning</em> matches yours.</h1>
+            <p class="onboarding-sub">
+              Resonance compares the causal structure of a thought — what causes what,
+              what prevents what — not the words it is made of. That is why it can put
+              <strong>“retry storm overloads a delivery queue”</strong> next to
+              <strong>“panic buying after a shortage rumour”</strong>: different fields,
+              same shape.
+            </p>
+            <div class="onboarding-actions">
+              <button class="onboarding-cta" id="onboarding-connect" type="button">Connect your chat</button>
+              <button class="onboarding-ghost" id="onboarding-example" type="button">
+                See a worked example
+              </button>
+            </div>
+            <p class="onboarding-note">
+              The example uses a labelled fixture with invented people, so you can see
+              what a result looks like without sharing anything.
+            </p>
+          </div>
+
+          <ol class="onboarding-steps">
+            <li>
+              <span class="onboarding-step-n" aria-hidden="true">01</span>
+              <h2>Your assistant extracts the structure</h2>
+              <p>
+                In the chat you already use, it turns what you are working on into nodes
+                and relations. The raw text is not retained.
+              </p>
+            </li>
+            <li>
+              <span class="onboarding-step-n" aria-hidden="true">02</span>
+              <h2>You see it before anyone else does</h2>
+              <p>
+                You read exactly what would become discoverable and approve it explicitly.
+                Until you do, nothing about you is discoverable and nothing is compared.
+              </p>
+            </li>
+            <li>
+              <span class="onboarding-step-n" aria-hidden="true">03</span>
+              <h2>Matches come back with their evidence</h2>
+              <p>
+                Every match shows the mapped nodes and preserved relations behind it. An
+                introduction opens only when both sides agree, and you can stop sharing at
+                any moment.
+              </p>
+            </li>
+          </ol>
+
+          <section class="onboarding-connect" id="onboarding-connect-panel" aria-labelledby="connect-heading">
+            <div class="onboarding-connect-head">
+              <div>
+                <p class="eyebrow accent-text">One address, no key</p>
+                <h2 id="connect-heading">Connect the chat you already use</h2>
+              </div>
+              <span class="onboarding-badge">OAuth is discovered automatically</span>
+            </div>
+
+            <div class="onboarding-url">
+              <code id="mcp-url">https://resonance.parshkov.com/mcp</code>
+              <button class="onboarding-copy" id="copy-mcp-url" type="button">Copy</button>
+            </div>
+            <p class="onboarding-note">
+              This is the only thing any client needs. You will never be asked to paste a
+              key or a token — if something asks you for one, it is not this flow.
+            </p>
+
+            <div class="onboarding-clients">
+              <div class="onboarding-client">
+                <h3>Claude</h3>
+                <p>Settings → Connectors → <strong>Add custom connector</strong> → paste the URL.</p>
+              </div>
+              <div class="onboarding-client">
+                <h3>ChatGPT</h3>
+                <p>Settings → Apps &amp; Connectors → Advanced → Developer mode → <strong>Create</strong> → paste the URL, auth <strong>OAuth</strong> → Scan tools. Needs a Business / Enterprise / Edu workspace.</p>
+              </div>
+              <div class="onboarding-client">
+                <h3>Grok</h3>
+                <p>Connectors → <strong>New Connector</strong> → <strong>Custom</strong> → paste the URL.</p>
+              </div>
+              <div class="onboarding-client">
+                <h3>Claude Code / CLI</h3>
+                <p><code class="onboarding-inline-code">claude mcp add --transport http resonance https://resonance.parshkov.com/mcp</code></p>
+              </div>
+              <div class="onboarding-client">
+                <h3>Cursor, Windsurf, any <code class="onboarding-inline-code">mcp.json</code></h3>
+                <p><code class="onboarding-inline-code">{"url": "https://resonance.parshkov.com/mcp"}</code></p>
+              </div>
+              <div class="onboarding-client">
+                <h3>This browser</h3>
+                <p id="onboarding-webmcp-copy">
+                  In a browser that exposes <code class="onboarding-inline-code">document.modelContext</code>,
+                  this page registers the same tools directly — no connector needed.
+                </p>
+              </div>
+            </div>
+
+            <p class="onboarding-then">
+              Then say, in your own words: <em>“Extract the structure of what I’m working
+              on, show me the preview, and after I approve it, find who resonates.”</em>
+            </p>
+          </section>
+        </div>
+      </section>
+
       <aside class="surface thought-surface" aria-labelledby="thought-heading">
         <div class="surface-heading">
           <div>
@@ -209,9 +320,14 @@
           <span class="rejected-count" id="rejected-count">0 rejected</span>
         </section>
 
-        <div class="intro-unavailable" aria-label="Introductions unavailable">
+        <!-- This used to read "Introductions unavailable — not exposed by the
+             accepted R8 MCP". That stopped being true at R13/R14: intros,
+             acceptance and relayed messages are live, and the acceptance suite
+             exercises the whole path. What is worth stating is the consent
+             rule, which has not changed. -->
+        <div class="intro-note" aria-label="How introductions work">
           <span class="lock-mark" aria-hidden="true"></span>
-          <div><strong>Introductions unavailable</strong><span>Not exposed by the accepted R8 MCP</span></div>
+          <div><strong>Introductions need both sides</strong><span>Ask through the Collaboration panel or your chat; the other person has to accept before any channel opens</span></div>
         </div>
       </aside>
     </main>
