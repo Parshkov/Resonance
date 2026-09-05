@@ -41,6 +41,7 @@ from src.product.mcp_bridge import (
 from src.identity.models import AuthenticationError
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
+from src.workspaces.topics import CONTRIBUTIONS_TABLE
 from src.product.server import (
     DEFAULT_HOST,
     DEFAULT_PORT,
@@ -58,7 +59,7 @@ from src.product.server import (
 
 WEBMCP_CONTRACT = "resonance-webmcp/0.1"
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
-WRITE_OPERATIONS = frozenset({"prepare", "share", "consent"})
+WRITE_OPERATIONS = frozenset({"prepare", "share", "consent", "contribute"})
 CANONICAL_K = 15
 CANONICAL_MODE = "analogical"
 
@@ -282,6 +283,195 @@ def _discovery_view(live: Mapping[str, Any]) -> dict[str, Any]:
         "matches": list(live.get("matches", [])),
         "rejected": list(live.get("rejected", [])),
     }
+
+
+# ---- shared topics on the page -------------------------------------------
+#
+# The topic service already does the real work — structure in, delta out, and
+# the engine's account of where the sides agree and contradict each other.
+# What the page needs on top is small, and all of it is translation: the
+# engine names nodes and relations by their ids, and an id is not something a
+# person should ever read. Everything below turns "r2" into "slack time
+# prevents rework" before it leaves the server, so the page cannot show an
+# identifier by forgetting to.
+
+MAX_TOPIC_TEXT_CHARS = MAX_CONTEXT_CHARS
+
+NO_STRUCTURE_MESSAGE = (
+    "No structure could be read from that text. Say what causes what, what "
+    "prevents what, or what requires what — the structure comes from those words.")
+
+
+def _display(product, user_id: str) -> str:
+    return product.workspaces._display(user_id)  # noqa: SLF001 - the one pseudonym rule
+
+
+def _label_maps(row: Mapping[str, Any]) -> dict[str, str]:
+    """Every id in one contribution's graph, as the words it stands for.
+
+    A node is its label; a relation is the sentence it makes, so "r2" reads
+    as "slack time prevents rework" — which is what a person disagreeing with
+    it would actually say.
+    """
+    try:
+        graph = json.loads(str(row.get("thought_dna_json") or "{}"))
+    except ValueError:
+        return {}
+    nodes = {str(n.get("id")): str(n.get("label") or "").strip()
+             for n in (graph.get("nodes") or []) if isinstance(n, Mapping)}
+    labels = {node_id: label for node_id, label in nodes.items() if label}
+    for relation in graph.get("relations") or []:
+        if not isinstance(relation, Mapping):
+            continue
+        head = nodes.get(str(relation.get("source")), "")
+        tail = nodes.get(str(relation.get("target")), "")
+        kind = str(relation.get("type") or "").replace("_", " ")
+        if head and tail and kind:
+            labels[str(relation.get("id"))] = f"{head} {kind} {tail}"
+    return labels
+
+
+def _latest_labels_by_author(product, workspace_id: str) -> dict[str, dict[str, str]]:
+    """The words behind each member's latest contribution, keyed by author.
+
+    The standing compares latest against latest, so these are the graphs its
+    ids refer to. Read from the same table the service writes, in the same
+    order, so the two cannot disagree about which contribution is latest.
+    """
+    rows = sorted(product.topics.repo.list_workspace_rows(CONTRIBUTIONS_TABLE, workspace_id),
+                  key=lambda r: (str(r.get("created_at") or ""), str(r.get("contribution_id") or "")))
+    latest: dict[str, dict[str, str]] = {}
+    for row in rows:
+        author = str(row.get("author_user_id") or "")
+        if author:
+            latest[author] = _label_maps(row)
+    return latest
+
+
+def _worded(labels: Mapping[str, str], item: Any) -> str:
+    """A label for an id; never the id itself when the label is missing."""
+    return labels.get(str(item), "") or "one of the points"
+
+
+def _readable_standing(product, workspace_id: str, viewer_id: str,
+                       standing: Mapping[str, Any]) -> dict[str, Any]:
+    """The standing with every id replaced by the words it stands for."""
+    if not standing.get("available"):
+        return {"available": False, "reason": str(standing.get("reason") or "")}
+    by_author = _latest_labels_by_author(product, workspace_id)
+    mine = by_author.get(viewer_id, {})
+    by_pseudonym = {_display(product, author): labels
+                    for author, labels in by_author.items() if author != viewer_id}
+    sides = []
+    for side in standing.get("sides") or []:
+        theirs = by_pseudonym.get(str(side.get("with_pseudonym") or ""), {})
+        sides.append({
+            "with_pseudonym": side.get("with_pseudonym"),
+            "agreed_nodes": [
+                {"yours": _worded(mine, pair.get("yours")),
+                 "theirs": _worded(theirs, pair.get("theirs"))}
+                for pair in side.get("agreed_nodes") or []],
+            "agreed_relations": int(side.get("agreed_relations") or 0),
+            "contested": [
+                {"kind": str(item.get("kind") or ""),
+                 "yours": _worded(mine, item.get("yours")),
+                 "theirs": _worded(theirs, item.get("theirs"))}
+                for item in side.get("contested") or []],
+            "yours_unanswered": [_worded(mine, i) for i in side.get("yours_unanswered") or []],
+            "theirs_unanswered": [_worded(theirs, i) for i in side.get("theirs_unanswered") or []],
+            "classification": side.get("classification"),
+            "confidence": side.get("confidence"),
+        })
+    return {"available": True, "sides": sides}
+
+
+def _topic_read(product, token: str, viewer_id: str, workspace_id: str,
+                *, advance: bool) -> dict[str, Any]:
+    """One topic as the page reads it: the service's answer, in words."""
+    answer = product.read_topic(token, workspace_id, advance=advance)
+    return {
+        "workspace_id": workspace_id,
+        "contributions_total": answer.get("contributions_total", 0),
+        "new_for_you": answer.get("new_for_you", 0),
+        "truncated": bool(answer.get("truncated")),
+        "delta": [
+            {"contribution_id": item.get("contribution_id"),
+             "author_pseudonym": item.get("author_pseudonym"),
+             "note": item.get("note") or "",
+             "untrusted": True,
+             "thought": {
+                 "nodes": [{"id": n.get("id"), "label": n.get("label"), "role": n.get("role")}
+                           for n in (item.get("thought") or {}).get("nodes") or []],
+                 "relations": [{"source": r.get("source"), "target": r.get("target"),
+                                "type": r.get("type")}
+                               for r in (item.get("thought") or {}).get("relations") or []],
+             },
+             "created_at": item.get("created_at")}
+            for item in answer.get("delta") or []],
+        "standing": _readable_standing(product, workspace_id, viewer_id,
+                                       answer.get("standing") or {}),
+        "note": answer.get("note", ""),
+    }
+
+
+def _topic_listing(product, token: str, viewer_id: str) -> dict[str, Any]:
+    """Every topic this person is in, and every one they are invited to.
+
+    Listing is a glance: nothing is marked read by it. An invitation shows
+    only the title and who asked, because nothing inside a topic is visible
+    until the person joins.
+    """
+    listed = product.list_my_workspaces(token)
+    topics, invitations = [], []
+    for row in listed.get("workspaces") or []:
+        workspace_id = str(row.get("workspace_id") or "")
+        entry: dict[str, Any] = {"workspace_id": workspace_id,
+                                 "title": row.get("title") or "",
+                                 "role": row.get("role"), "state": row.get("state")}
+        if row.get("state") == "invited":
+            member = product.workspaces.repo.get_member(workspace_id, viewer_id)
+            invited_by = getattr(member, "invited_by", None) if member else None
+            entry["invited_by_pseudonym"] = _display(product, invited_by) if invited_by else ""
+            invitations.append(entry)
+            continue
+        if row.get("state") != "active":
+            continue
+        try:
+            full = product.get_workspace(token, workspace_id)
+            glance = product.read_topic(token, workspace_id, advance=False)
+        except Exception:  # noqa: BLE001 - a topic still listed is better than none
+            full, glance = {}, {}
+        entry["brief"] = full.get("brief") or ""
+        entry["members"] = [
+            {"pseudonym": m.get("display") or "", "state": m.get("state"),
+             "you": m.get("user_id") == viewer_id}
+            for m in full.get("members") or []]
+        entry["new_for_you"] = int(glance.get("new_for_you") or 0)
+        entry["contributions_total"] = int(glance.get("contributions_total") or 0)
+        topics.append(entry)
+    return {"viewer_pseudonym": _display(product, viewer_id),
+            "topics": topics, "invitations": invitations}
+
+
+def _extracted_structure(product, subject: str, context: str) -> dict[str, Any]:
+    """The structure in a person's words, shown back before it goes anywhere.
+
+    The same extractor a share uses, but nothing is prepared or stored: this
+    is a look, not a draft, and a draft here would have become "the latest
+    prepared thought" the share composer then offers to share. The text is
+    not kept, and the graph comes back in the shape a contribution takes.
+    """
+    result = product.ingestion.core.extractor.extract(
+        context, source_id=f"{subject}:topic-preview")
+    graph = result.graph
+    thought = {
+        "nodes": [{"id": n.id, "label": n.label, "role": n.role} for n in graph.nodes],
+        "relations": [{"source": r.source, "target": r.target, "type": r.type}
+                      for r in graph.relations],
+    }
+    if not _has_usable_structure(_structure_summary(thought)):
+        raise ValueError(NO_STRUCTURE_MESSAGE)
+    return {"thought": thought, "warnings": list(result.warnings)}
 
 
 class WebHandler(ProductHandler):
@@ -528,9 +718,101 @@ class WebHandler(ProductHandler):
                              "match": result["match"]})
             return
 
+        # Shared topics, for the page. Reads authenticate by cookie like the
+        # other /api/product reads; a topic read that advances the cursor is
+        # still a read of this person's own record, not a change anyone else
+        # can see, so it needs no more than that.
+        if path == "/api/product/topics":
+            token = self._token()
+            self._send_json(_topic_listing(product, token, self._subject(token)))
+            return
+        if path == "/api/product/topic":
+            token = self._token()
+            workspace_id = (params.get("workspace_id") or [""])[0]
+            advance = (params.get("advance") or ["1"])[0] not in ("0", "false", "no")
+            self._send_json(_topic_read(product, token, self._subject(token),
+                                        workspace_id, advance=advance))
+            return
+
         super()._route_get(path, params)
 
+    def _route_topic_post(self, path: str) -> None:
+        """The writes a topic takes from the page.
+
+        Cookie plus CSRF, checked by the services underneath through the same
+        security kwargs every other /api/product write passes; nothing here
+        re-implements that. A contribution is the one write worth making
+        idempotent: it is the one a person retries after a flaky connection,
+        and two copies of the same understanding would read as emphasis.
+        """
+        product = self.runtime.product
+        token = self._token()
+        body = self._body()
+        security = self._security_kwargs()
+        # Cookie and CSRF before anything is looked up, so a cross-site POST
+        # learns nothing from which error it gets back. The services check the
+        # same thing again on the write; that costs nothing and keeps the rule
+        # in one place.
+        actor = product.workspaces._actor(  # noqa: SLF001 - the seam the services share
+            token, csrf_token=security["csrf_token"], origin=security["origin"],
+            cookie_authenticated=True)
+        subject = actor.user_id
+
+        if path == "/api/product/topic/preview":
+            # A look, not a write: the words go in a body because they are the
+            # person's own text and do not belong in a URL.
+            context = body.get("context")
+            if not isinstance(context, str) or not context.strip():
+                raise ValueError("write what you now understand, in your own words")
+            if len(context) > MAX_TOPIC_TEXT_CHARS:
+                raise ValueError(f"the text must be at most {MAX_TOPIC_TEXT_CHARS} characters")
+            self._send_json(_extracted_structure(product, subject, context))
+            return
+
+        if path == "/api/product/topic/contribute":
+            _, request_id, fingerprint, committed = self._operation_start(
+                token, "contribute", body)
+            if committed is not None:
+                self._send_json(committed)
+                return
+            workspace_id = str(body.get("workspace_id") or "")
+            result = product.contribute_to_topic(
+                token, workspace_id, thought=body.get("thought"),
+                note=str(body.get("note") or ""),
+                confirmed=body.get("confirmed") is True, **security)
+            wire = {"workspace_id": workspace_id,
+                    "contribution_id": result.get("contribution_id"),
+                    "created_at": result.get("created_at"),
+                    "note": result.get("note", ""),
+                    "nodes": result.get("nodes", 0),
+                    "relations": result.get("relations", 0)}
+            self._operation_finish(subject, "contribute", request_id, fingerprint,
+                                   {**wire, "say": phrasing.say("resonance_contribute_to_topic", wire)})
+            return
+
+        if path == "/api/product/topic/invite":
+            # The page names the person by the introduction, never by an
+            # account id: an introduction is the only way two people here know
+            # each other, and its id is the one thing the page already holds.
+            intro = product.collaboration._intro_for_participant(  # noqa: SLF001
+                subject, str(body.get("intro_id") or ""))
+            if intro.state != "accepted":
+                raise ValueError("only someone who accepted an introduction can be invited")
+            counterpart = intro.to_user_id if intro.from_user_id == subject else intro.from_user_id
+            workspace_id = str(body.get("workspace_id") or "")
+            invited = product.workspace_invite(token, workspace_id, counterpart, **security)
+            wire = {"workspace_id": workspace_id,
+                    "invited_pseudonym": _display(product, counterpart),
+                    "state": invited.get("state")}
+            self._send_json({**wire, "say": phrasing.say("resonance_invite_to_topic", wire)})
+            return
+
+        self._send_error_json(HTTPStatus.NOT_FOUND, "not_found", "unknown path")
+
     def _route_post(self, path: str) -> None:
+        if path.startswith("/api/product/topic/"):
+            self._route_topic_post(path)
+            return
         if path not in {"/api/webmcp/prepare", "/api/webmcp/share",
                         "/api/webmcp/consent"}:
             super()._route_post(path)
