@@ -503,6 +503,29 @@ class RetiringAccountsNobodySignedIntoTests(unittest.TestCase):
         self.assertEqual(result["sessions_to_delete"], 0)
         self.assertIsNone(self.runtime.live.get_session(session_id).deleted_at)
 
+    def test_an_account_with_no_sign_in_and_nothing_shared_is_retired(self):
+        """The first version removed sessions and their owners, and left behind
+        every account that had never shared anything. Production ended up with
+        260 "accounts" and an empty corpus — hundreds of empty shells from
+        acceptance runs, which is exactly what this action exists to remove."""
+        ghost = self.product.register_guest()
+        result = startup_purge_unsigned(self.runtime, {"RESONANCE_PURGE_UNSIGNED": "1"})
+        self.assertEqual(result["empty_accounts"], 1)
+        self.assertIsNotNone(
+            self.runtime.live.get_user(ghost.user_id).revoked_at)
+
+    def test_an_empty_account_that_signed_in_is_left_alone(self):
+        real = self._signed_in()
+        startup_purge_unsigned(self.runtime, {"RESONANCE_PURGE_UNSIGNED": "1"})
+        self.assertIsNone(self.runtime.live.get_user(real.user_id).revoked_at)
+
+    def test_an_account_whose_thought_survives_is_left_alone(self):
+        real = self._signed_in()
+        self._share(real)
+        result = startup_purge_unsigned(self.runtime, {"RESONANCE_PURGE_UNSIGNED": "1"})
+        self.assertEqual(result["accounts_to_revoke"], 0)
+        self.assertIsNone(self.runtime.live.get_user(real.user_id).revoked_at)
+
     def test_running_it_twice_finds_nothing_left_to_do(self):
         ghost = self.product.register("ghost")
         self._share(ghost)

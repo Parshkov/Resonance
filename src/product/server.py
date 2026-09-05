@@ -271,9 +271,14 @@ def startup_assign_pseudonyms(runtime: "ProductRuntime",
     users = list(runtime.live.repo.list_users())
     taken = {str(getattr(u, "display_label", "") or "") for u in users
              if is_pseudonym(getattr(u, "display_label", ""))}
-    needs = [u for u in users
-             if getattr(u, "revoked_at", None) is None
-             and not is_pseudonym(getattr(u, "display_label", ""))]
+    live = [u for u in users if getattr(u, "revoked_at", None) is None]
+    revoked = len(users) - len(live)
+    # Counted separately rather than as "everything we are not renaming". A
+    # single skipped-count conflated revoked accounts with accounts that
+    # already had a pseudonym, and an operator reads these numbers before
+    # deciding to change 160 people's names.
+    already_named = [u for u in live if is_pseudonym(getattr(u, "display_label", ""))]
+    needs = [u for u in live if not is_pseudonym(getattr(u, "display_label", ""))]
 
     assigned: list[str] = []
     for user in needs:
@@ -288,13 +293,14 @@ def startup_assign_pseudonyms(runtime: "ProductRuntime",
     result = {
         "dry_run": dry_run,
         "accounts": len(users),
-        "already_named": len(users) - len(needs),
+        "revoked_skipped": revoked,
+        "already_named": len(already_named),
         "assigned": len(assigned),
         "account_ids": assigned,
     }
     print(f"assign-pseudonyms: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
-          f"accounts={result['accounts']} already_named={result['already_named']} "
-          f"assigned={result['assigned']} "
+          f"accounts={result['accounts']} revoked_skipped={result['revoked_skipped']} "
+          f"already_named={result['already_named']} assigned={result['assigned']} "
           f"(RESONANCE_ASSIGN_PSEUDONYMS set; unset it after this deploy)")
     return result
 
@@ -348,15 +354,40 @@ def startup_purge_unsigned(runtime: "ProductRuntime",
         doomed_sessions.append(session_id)
         doomed_owners.add(owner)
 
+    # An account with no verified sign-in and nothing shared is an empty shell
+    # left by an acceptance run. Under the rule this action exists to apply it
+    # should not exist at all, and leaving it behind means the next operator
+    # reads a count of hundreds of "accounts" that are nobody.
+    owners_with_surviving_sessions = set()
+    for row in sessions:
+        session_id = str(getattr(row, "session_id", "") or "")
+        if session_id in doomed_sessions:
+            continue
+        owner = identity.policy_source.owner_of("session", session_id)
+        if owner:
+            owners_with_surviving_sessions.add(owner)
+    empty_accounts = []
+    for user in runtime.live.repo.list_users():
+        user_id = str(getattr(user, "user_id", "") or "")
+        if getattr(user, "revoked_at", None) is not None:
+            continue
+        if not user_id or user_id in signed_in or user_id in keep:
+            continue
+        if user_id in owners_with_surviving_sessions:
+            continue
+        empty_accounts.append(user_id)
+    doomed_owners.update(empty_accounts)
+
     result: dict[str, Any] = {
         "dry_run": dry_run,
         "sessions_considered": len(sessions),
         "accounts_signed_in": len(signed_in),
         "sessions_to_delete": len(doomed_sessions),
         "accounts_to_revoke": len(doomed_owners),
+        "empty_accounts": len(empty_accounts),
         "kept_by_request": sorted(keep),
     }
-    if not dry_run and doomed_sessions:
+    if not dry_run and (doomed_sessions or doomed_owners):
         for session_id in doomed_sessions:
             runtime.live.delete_session(session_id, rebuild=False)
         for user_id in sorted(doomed_owners):
@@ -365,14 +396,15 @@ def startup_purge_unsigned(runtime: "ProductRuntime",
             except Exception as exc:  # noqa: BLE001 - report, never abort the boot
                 print(f"purge-unsigned: could not revoke {user_id} "
                       f"({exc.__class__.__name__})")
-        runtime.live.rebuild_index()
+        if doomed_sessions:
+            runtime.live.rebuild_index()
         result["deleted"] = len(doomed_sessions)
     print(f"purge-unsigned: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
           f"sessions_considered={result['sessions_considered']} "
           f"accounts_signed_in={result['accounts_signed_in']} "
           f"sessions_to_delete={result['sessions_to_delete']} "
           f"accounts_to_revoke={result['accounts_to_revoke']} "
-          f"kept={len(keep)} "
+          f"(of which empty={result['empty_accounts']}) kept={len(keep)} "
           f"(RESONANCE_PURGE_UNSIGNED set; unset it after this deploy)")
     return result
 
