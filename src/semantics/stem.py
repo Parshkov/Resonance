@@ -1,7 +1,17 @@
-"""Porter stemmer (1980 algorithm), stdlib-only and deterministic.
+"""Stemmers, stdlib-only and deterministic. No external models.
 
-Used to make label comparison invariant to inflection ("accumulates",
-"accumulation", "accumulating" -> "accumul"). No external models.
+Label comparison has to be invariant to inflection, or "accumulates",
+"accumulation" and "accumulating" are three different ideas. Porter (1980)
+does that for English.
+
+Russian needs its own, and needs it more: English inflects lightly and a
+handful of surface forms in the lexicon would nearly cover it, while Russian
+inflects heavily enough that listing forms is hopeless — "накопление,
+накопления, накоплению, накоплений, накоплениями" and so on for every entry.
+`stem_ru` is the Snowball Russian algorithm, and `stem` dispatches on the
+script of the word, so a Cyrillic label is never fed to the English rules and
+an English label is never fed to the Russian ones. The two alphabets do not
+overlap, so adding one cannot change the other's result.
 """
 
 from __future__ import annotations
@@ -9,6 +19,118 @@ from __future__ import annotations
 from functools import lru_cache
 
 _VOWELS = frozenset("aeiou")
+RUSSIAN_VOWELS = frozenset("аеиоуыэюя")
+
+_PERFECTIVE_GERUND_1 = ("вшись", "вшийся", "вши", "вша", "в")          # after а/я
+_PERFECTIVE_GERUND_2 = ("ившись", "ывшись", "ивши", "ывши", "ив", "ыв")
+_ADJECTIVE = ("ее", "ие", "ые", "ое", "ими", "ыми", "ей", "ий", "ый", "ой",
+              "ем", "им", "ым", "ом", "его", "ого", "ему", "ому", "их", "ых",
+              "ую", "юю", "ая", "яя", "ою", "ею")
+_PARTICIPLE_1 = ("ем", "нн", "вш", "ющ", "щ")                          # after а/я
+_PARTICIPLE_2 = ("ивш", "ывш", "ующ")
+_REFLEXIVE = ("ся", "сь")
+_VERB_1 = ("ла", "на", "ете", "йте", "ли", "й", "л", "ем", "н", "ло", "но",
+           "ет", "ют", "ны", "ть", "ешь", "нно")                        # after а/я
+_VERB_2 = ("ила", "ыла", "ена", "ейте", "уйте", "ите", "или", "ыли", "ей",
+           "уй", "ил", "ыл", "им", "ым", "ен", "ило", "ыло", "ено", "ят",
+           "ует", "уют", "ит", "ыт", "ены", "ить", "ыть", "ишь", "ую", "ю")
+_NOUN = ("а", "ев", "ов", "ие", "ье", "е", "иями", "ями", "ами", "еи", "ии",
+         "и", "ией", "ей", "ой", "ий", "й", "иям", "ям", "ием", "ем", "ам",
+         "ом", "о", "у", "ах", "иях", "ях", "ы", "ь", "ию", "ью", "ю", "ия",
+         "ья", "я")
+_SUPERLATIVE = ("ейш", "ейше")
+_DERIVATIONAL = ("ост", "ость")
+
+
+def _regions(word: str) -> tuple[int, int, int]:
+    """RV, R1, R2 start indices, per the Snowball Russian definition."""
+    rv = len(word)
+    for index, letter in enumerate(word):
+        if letter in RUSSIAN_VOWELS:
+            rv = index + 1
+            break
+    r1 = len(word)
+    for index in range(1, len(word)):
+        if word[index] not in RUSSIAN_VOWELS and word[index - 1] in RUSSIAN_VOWELS:
+            r1 = index + 1
+            break
+    r2 = len(word)
+    for index in range(r1 + 1, len(word)):
+        if word[index] not in RUSSIAN_VOWELS and word[index - 1] in RUSSIAN_VOWELS:
+            r2 = index + 1
+            break
+    return rv, r1, r2
+
+
+def _cut(word: str, region: int, endings, *, preceded_by=()) -> tuple[str, bool]:
+    for ending in sorted(endings, key=len, reverse=True):
+        if not word.endswith(ending):
+            continue
+        cut_at = len(word) - len(ending)
+        if cut_at < region:
+            continue
+        if preceded_by:
+            if cut_at == 0 or word[cut_at - 1] not in preceded_by:
+                continue
+            return word[:cut_at - 1] + word[cut_at - 1], True  # keep the а/я
+        return word[:cut_at], True
+    return word, False
+
+
+def stem_ru(word: str) -> str:
+    w = word.lower().replace("ё", "е")
+    rv, _r1, r2 = _regions(w)
+    if rv >= len(w):
+        return w
+
+    # Step 1
+    w2, cut = _cut(w, rv, _PERFECTIVE_GERUND_2)
+    if not cut:
+        w2, cut = _cut(w, rv, _PERFECTIVE_GERUND_1, preceded_by="ая")
+    if cut:
+        w = w2
+    else:
+        w, _ = _cut(w, rv, _REFLEXIVE)
+        w2, cut = _cut(w, rv, _ADJECTIVE)
+        if cut:
+            w = w2
+            w3, participle = _cut(w, rv, _PARTICIPLE_2)
+            if not participle:
+                w3, participle = _cut(w, rv, _PARTICIPLE_1, preceded_by="ая")
+            if participle:
+                w = w3
+        else:
+            w2, cut = _cut(w, rv, _VERB_2)
+            if not cut:
+                w2, cut = _cut(w, rv, _VERB_1, preceded_by="ая")
+            if cut:
+                w = w2
+            else:
+                w, _ = _cut(w, rv, _NOUN)
+
+    # Step 2
+    rv, _r1, r2 = _regions(w)
+    if w.endswith("и") and len(w) - 1 >= rv:
+        w = w[:-1]
+
+    # Step 3
+    rv, _r1, r2 = _regions(w)
+    w, _ = _cut(w, r2, _DERIVATIONAL)
+
+    # Step 4
+    rv, _r1, _r2 = _regions(w)
+    if w.endswith("нн"):
+        w = w[:-1]
+    else:
+        w2, cut = _cut(w, rv, _SUPERLATIVE)
+        if cut:
+            w = w2
+            if w.endswith("нн"):
+                w = w[:-1]
+        elif w.endswith("ь"):
+            w = w[:-1]
+    return w
+
 
 
 def _is_consonant(word: str, i: int) -> bool:
@@ -64,8 +186,14 @@ def _replace(word: str, suffix: str, repl: str, condition) -> tuple[str, bool]:
     return word, True
 
 
+def _is_cyrillic(word: str) -> bool:
+    return any("\u0400" <= ch <= "\u04ff" for ch in word)
+
+
 @lru_cache(maxsize=65536)
 def stem(word: str) -> str:
+    if _is_cyrillic(word):
+        return stem_ru(word)
     w = word.lower()
     if len(w) <= 2:
         return w
