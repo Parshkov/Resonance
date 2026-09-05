@@ -1113,22 +1113,42 @@ function wireConnect() {
   }
 }
 
-// Leave (or return to) the unshared state when consent actually changes.
+// Re-read the live view when what is discoverable changes.
 //
 // This must cost ZERO extra requests: discovery is rate-limited, and a read
 // per write is enough to push a busy sequence over the limit. The modules
 // that write already hold the state and announce it on `resonance:consent`;
-// this only listens, and only re-reads the live view when the answer flipped.
-let lastShared = null;
-function onConsentState(shared) {
-  if (lastShared === null) {
-    lastShared = shared;
-    return;
-  }
-  if (shared === lastShared) return;
-  lastShared = shared;
-  loadResults();
+// this only listens, and only re-reads when the announcement differs from
+// the last one.
+//
+// "Differs" used to mean the yes/no of sharing flipped. With two thoughts
+// shared, withdrawing one flips nothing -- and the page kept drawing the
+// withdrawn thought under "What others can see", telling a person they were
+// still sharing the thing they had just taken back. So an announcement that
+// says WHICH thoughts are discoverable (collab_ui.mjs sends the list) is
+// compared as a set -- membership, not order: this module orders nothing --
+// and one that only says whether anything is (webmcp_live.mjs) is compared
+// as before, because that is all it knows. The identifiers are compared and
+// never shown.
+export function consentWatcher(reread) {
+  let last = null;
+  const sameSet = (a, b) => a.size === b.size && [...a].every((id) => b.has(id));
+  return (detail) => {
+    const shared = detail?.shared === true;
+    const which = Array.isArray(detail?.discoverable)
+      ? new Set(detail.discoverable.map(String)) : null;
+    if (last === null) {
+      last = {shared, which};
+      return;
+    }
+    const changed = which !== null && last.which !== null
+      ? !sameSet(which, last.which)
+      : shared !== last.shared;
+    last = {shared, which: which ?? last.which};
+    if (changed) reread();
+  };
 }
+const onConsentState = consentWatcher(() => { loadResults(); });
 
 let resizeTimer;
 function onResize() {
@@ -1161,7 +1181,7 @@ async function boot() {
 
     wireConnect();
     document.addEventListener("resonance:consent", (event) => {
-      onConsentState(event.detail?.shared === true);
+      onConsentState(event.detail);
     });
     // An agent can run a discovery through the WebMCP tools without touching
     // this page; the transport says when it has, and the page re-reads.

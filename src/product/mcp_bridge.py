@@ -39,6 +39,8 @@ from src.semantics import scrub as _scrub
 from src.collaboration import CollaborationError
 from src.graph.validation import NODE_ROLES, RELATION_TYPES
 from src.graph.versioning import SCHEMA_VERSION
+from src.identity.service import CONSENT_SET
+from src.ingestion.identity import INGESTION_SHARED
 from src.identity.models import (
     AuthenticationError,
     AuthorizationError,
@@ -694,6 +696,66 @@ def _in_state(sessions: Sequence[Mapping[str, Any]],
     return out
 
 
+def when_last_shared(product, user_id: str) -> dict[str, str]:
+    """When each of this person's thoughts last became discoverable.
+
+    The session record remembers when it was prepared and when it was
+    withdrawn, but not when it was shared: sharing is a consent decision, and
+    those live in the identity log. The last consent that said "discoverable"
+    is the moment a person means by "when I shared it".
+    """
+    moments: dict[str, str] = {}
+    for event in product.identity.backend.list_identity_events():
+        if event.user_id != user_id or not event.session_id:
+            continue
+        became_discoverable = event.event_type == INGESTION_SHARED or (
+            event.event_type == CONSENT_SET
+            and event.payload.get("share_thought_dna") is True)
+        if not became_discoverable:
+            continue
+        session_id = str(event.session_id)
+        if str(event.created_at) > moments.get(session_id, ""):
+            moments[session_id] = str(event.created_at)
+    return moments
+
+
+def current_shared_session(product, token: str) -> str | None:
+    """The one thought the page and the chat mean by "your thought".
+
+    A person can have more than one discoverable thought here, and both halves
+    of the product have places that speak about one of them: the page draws
+    one under "What others can see" and runs its discovery from it, and the
+    chat's `resonance_discover` without a `session_id` searches from one. Both
+    used to take the last row `owned_sessions` happened to return -- and the
+    store orders those by session id, which is random hex. With two thoughts
+    shared, which one the page called "yours" was a coin toss, and the page's
+    own "Stop sharing" withdrew whichever the coin said.
+
+    The thought this means is the discoverable one the person made
+    discoverable most recently: sharing is the act that changes what others
+    can see, so the thing they just shared is the thing they are asking about.
+    Ties (a seeded record with no consent event, two shares in one second)
+    fall back to when the thought was prepared, then to the id, so that the
+    same person gets the same answer on every read.
+
+    This is still one thought standing for a person who may have several. The
+    honest fix beyond this is for the page to let the person choose which
+    thought's matches they are looking at; until then, the rule is at least
+    stated, deterministic, and shared by both halves.
+    """
+    rows = [row for row in product.owned_sessions(token)
+            if row.get("share_state") in _SHARED]
+    if not rows:
+        return None
+    actor = product.identity.authenticate(token)
+    shared_at = when_last_shared(product, actor.user_id)
+
+    def moment(row: Mapping[str, Any]) -> tuple[str, str, str]:
+        session_id = str(row.get("session_id") or "")
+        return (shared_at.get(session_id, ""), str(row.get("created_at") or ""), session_id)
+
+    return str(max(rows, key=moment).get("session_id") or "") or None
+
 
 class RemoteMCPBridge:
     """Stateless JSON-RPC handler; one instance per product runtime."""
@@ -837,13 +899,15 @@ class RemoteMCPBridge:
         return list(self.product.owned_sessions(token))
 
     def _default_session(self, token: str) -> str:
-        owned = self._owned(token)
-        shared = [s for s in owned if s.get("share_state") == "discoverable"]
-        if not shared:
+        # The same thought the page means by "your thought": the one most
+        # recently made discoverable. See current_shared_session for why it
+        # is not "the last row the store returned".
+        session_id = current_shared_session(self.product, token)
+        if not session_id:
             raise BridgeError("share_required",
                               "no shared thought yet: run resonance_prepare_thought, show the preview, "
                               "then resonance_share_thought with the person's approval")
-        return str(shared[-1]["session_id"])
+        return session_id
 
     @staticmethod
     def _require_confirm(arguments: Mapping[str, Any]) -> None:
@@ -1191,7 +1255,13 @@ class RemoteMCPBridge:
         session_id = self._required_id(arguments, "session_id")
         self.product.revoke_session(token, session_id, confirmed=True, **self._security())
         return {"contract_version": BRIDGE_CONTRACT, "session_id": session_id,
-                "shared": False, "discoverable": False, "revoked": True}
+                "shared": False, "discoverable": False, "revoked": True,
+                # Withdrawing one thought says nothing about the person's
+                # others. The sentence built from this used to end "nothing of
+                # yours is discoverable any more" -- false whenever another
+                # thought was still out there. The count is the fact about the
+                # person; `discoverable` above is the fact about the thought.
+                "still_discoverable": len(_in_state(self._owned(token), _SHARED))}
 
 
 def _result(msg_id: Any, result: Mapping[str, Any]) -> dict[str, Any]:

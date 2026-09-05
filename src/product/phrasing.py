@@ -301,10 +301,21 @@ def _respond_topic_invite(r: Result) -> str:
 
 
 def _stop_sharing(r: Result) -> str:
-    if r.get("revoked") or not r.get("discoverable"):
-        return ("Withdrawn. Nothing of yours is discoverable any more, and it will not "
-                "be reported to anyone as a match.")
-    return "Nothing changed."
+    if not (r.get("revoked") or not r.get("discoverable")):
+        return "Nothing changed."
+    # Two facts, two sentences: what happened to this thought, then what is
+    # true of the person. It used to say "nothing of yours is discoverable
+    # any more" -- a claim about the person, made from a result about one
+    # thought, and false for anyone with a second thought still shared.
+    lines = ["Withdrawn. That thought is not discoverable any more, and it will not "
+             "be reported to anyone as a match."]
+    left = r.get("still_discoverable")
+    if left == 0:
+        lines.append("Nothing of yours is discoverable now.")
+    elif isinstance(left, int) and left > 0:
+        lines.append(f"{_count(left, 'other thought', 'other thoughts')} of yours "
+                     f"{'is' if left == 1 else 'are'} still discoverable.")
+    return " ".join(lines)
 
 
 PHRASINGS: dict[str, Callable[[Result], str]] = {
