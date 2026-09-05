@@ -183,6 +183,32 @@ function setShellState(value) {
 // Two decimals. Four is engineering precision that changes nothing a person
 // can act on, and 0.8306 next to a pseudonym reads as machine output rather
 // than as "these two are close". The exact number stays in the API.
+// The engine's own words for how two thoughts relate. They are precise and
+// they belong in the API, but "negative" printed beside a person's name reads
+// as a verdict on THEM, and "analogical" is not a word a stranger arrives
+// knowing. Say what each one means.
+const CLASSIFICATION_IN_WORDS = {
+  analogical: "same shape, different subject",
+  approximate: "close — some of it lines up",
+  literal: "the same thing, said the same way",
+  negative: "not called a resonance",
+};
+
+function classificationInWords(value) {
+  return CLASSIFICATION_IN_WORDS[String(value || "").toLowerCase()] || String(value || "");
+}
+
+// Cluster names arrive as slugs, because that is what they are inside the
+// engine: "retry-storms-after-a-partial-outage", and in the seeded corpus
+// even "unrelated-distractor". Nobody outside this repository should have to
+// read a slug off a map legend.
+function clusterInWords(value) {
+  return String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/^\s*(.)/, (_, first) => first.toUpperCase())
+    .trim();
+}
+
 function formatScore(value) {
   return Number(value).toFixed(2);
 }
@@ -363,7 +389,7 @@ function renderMatches(payload, primary) {
 
     const meta = el("div", "match-card__meta");
     meta.append(
-      el("span", "classification", match.mode_classification),
+      el("span", "classification", classificationInWords(match.mode_classification)),
       el("span", "confidence", match.confidence),
       el("span", "location", placeLabel(match.display.location)),
     );
@@ -405,7 +431,7 @@ function renderEvidence(match) {
   setText("evidence-kicker", "Why this resonates");
   setText("evidence-heading", `${match.person_pseudonym} · ${match.display.topic}`);
   setText("evidence-subtitle", `${match.display.domain || "field not shared"} · ${placeLabel(match.display.location)}`);
-  setText("metric-class", match.mode_classification);
+  setText("metric-class", classificationInWords(match.mode_classification));
   setText("metric-structural", formatScore(match.scores.structural));
   setText("metric-confidence", match.confidence);
 
@@ -495,13 +521,17 @@ function sectorLetter(index) {
   return SECTOR_LETTERS[index % SECTOR_LETTERS.length] + (index >= SECTOR_LETTERS.length ? String(Math.floor(index / SECTOR_LETTERS.length)) : "");
 }
 
+// The sector labels on the map were the slug itself, hyphens and all, broken
+// across lines at the hyphens -- so the legend read "retry-storms-after-a-
+// partial-outage" and, in a seeded corpus, "unrelated-distractor". A map
+// legend is read by whoever is looking at the map.
 function wrapSlug(slug, maxChars = 18) {
   const lines = [];
   let current = "";
-  for (const part of String(slug).split("-")) {
-    const candidate = current ? `${current}-${part}` : part;
+  for (const part of clusterInWords(slug).split(" ")) {
+    const candidate = current ? `${current} ${part}` : part;
     if (current && candidate.length > maxChars) {
-      lines.push(`${current}-`);
+      lines.push(current);
       current = part;
     } else {
       current = candidate;
@@ -571,7 +601,7 @@ function renderSectorKey(sectorArcs) {
     const item = el("li");
     item.append(
       el("span", "sector-key__letter", sectorLetter(index)),
-      el("code", "", arc.cluster),
+      el("span", "sector-key__name", clusterInWords(arc.cluster)),
       el("span", "sector-key__count", `${arc.count}`),
     );
     key.append(item);
@@ -703,7 +733,7 @@ function renderMap(context, payload, primary, others, rejected) {
         kind: "is-primary",
         ariaLabel: `${row.person_pseudonym}, structural ${formatScore(row.scores.structural)}, returned in position ${item.position}`,
         label: row.person_pseudonym,
-        sublabel: `${row.mode_classification} · ${formatScore(row.scores.structural)}`,
+        sublabel: `${classificationInWords(row.mode_classification)} · ${formatScore(row.scores.structural)}`,
         index: item.position,
         radius: 12,
         onSelect: () => selectMatch(row.session_id),
@@ -713,7 +743,7 @@ function renderMap(context, payload, primary, others, rejected) {
         kind: "is-other",
         ariaLabel: `Other returned match ${item.position}: ${row.person_pseudonym}, structural ${formatScore(row.scores.structural)}`,
         label: row.person_pseudonym,
-        sublabel: `${row.mode_classification} · ${formatScore(row.scores.structural)}`,
+        sublabel: `${classificationInWords(row.mode_classification)} · ${formatScore(row.scores.structural)}`,
         index: item.position,
         radius: 9,
         onSelect: () => openDrawerAt(row.session_id),
@@ -758,7 +788,8 @@ function drawerRow(payload, row, rejected = false) {
   item.append(el("span", "drawer-row__order", backendPosition(payload, row)));
   const copy = el("div");
   copy.append(el("strong", "", `${row.person_pseudonym} · ${row.display.topic}`));
-  copy.append(el("span", "", `${row.mode_classification} · ${row.confidence} · ${placeLabel(row.display.location)}`));
+  copy.append(el("span", "",
+    `${classificationInWords(row.mode_classification)} · ${row.confidence} confidence · ${placeLabel(row.display.location)}`));
   item.append(copy, el("span", "row-figure",
     rejected ? rejectionInWords(row.hard_rejection) : formatScore(row.scores.structural)));
   return item;
