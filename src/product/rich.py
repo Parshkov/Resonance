@@ -137,6 +137,23 @@ def _project(lat: float, lon: float) -> tuple[float, float]:
     return round(x, 1), round(y, 1)
 
 
+
+# The drawings use the product's own light palette (the tokens the site and
+# the consent page share). They were hard-coded dark, which read as a terminal
+# rather than as Resonance, and contradicted the theme a person had chosen.
+# An SVG sent into a chat cannot follow that choice -- there is no viewer to
+# ask -- so it carries its own ground and stays legible whatever the chat
+# around it is doing.
+
+def _short(value: Any) -> str:
+    """A score a person can read. 0.7071067811865476 printed inside a picture
+    is the same wall of digits as printing the JSON, only harder to skip."""
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def render_map_svg(rich: Mapping[str, Any]) -> str:
     """Equirectangular map of CONSENTED match locations + k-anonymous buckets.
 
@@ -149,9 +166,9 @@ def render_map_svg(rich: Mapping[str, Any]) -> str:
     parts: list[str] = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {_MAP_W} {_MAP_H}" '
         f'role="img" aria-label="Resonance coarse map (presentation only)">',
-        f'<rect width="{_MAP_W}" height="{_MAP_H}" fill="#0b1020"/>',
-        f'<rect width="{_MAP_W}" height="{_BAR_AREA_Y}" fill="#101a33"/>',
-        '<text x="12" y="18" fill="#8fa3c8" font-size="13" '
+        f'<rect width="{_MAP_W}" height="{_MAP_H}" fill="#f4f1eb"/>',
+        f'<rect width="{_MAP_W}" height="{_BAR_AREA_Y}" fill="#ece7de"/>',
+        '<text x="12" y="18" fill="#57524a" font-size="13" '
         'font-family="monospace">coarse locations are presentation-only and '
         'never influence matching</text>',
     ]
@@ -168,9 +185,9 @@ def render_map_svg(rich: Mapping[str, Any]) -> str:
                        float(lat), float(lon)))
     for pseudonym, lat, lon in sorted(points):
         x, y = _project(lat, lon)
-        parts.append(f'<circle cx="{x}" cy="{y}" r="6" fill="#5ad1a5" '
-                     f'stroke="#0b1020" stroke-width="1.5"/>')
-        parts.append(f'<text x="{x + 9}" y="{y + 4}" fill="#d7e3f8" '
+        parts.append(f'<circle cx="{x}" cy="{y}" r="6" fill="#8a5a2b" '
+                     f'stroke="#1d1a16" stroke-width="1.5"/>')
+        parts.append(f'<text x="{x + 9}" y="{y + 4}" fill="#1d1a16" '
                      f'font-size="12" font-family="monospace">{_esc(pseudonym)}</text>')
     buckets = sorted(
         (str(b.get("bucket_id", "")), int(b.get("count", 0)))
@@ -180,13 +197,13 @@ def render_map_svg(rich: Mapping[str, Any]) -> str:
     for bucket_id, count in buckets:
         width = 24 + count * 18
         parts.append(f'<rect x="{bar_x}" y="{_BAR_AREA_Y + 10}" width="{width}" '
-                     f'height="14" fill="#3b6ea5"/>')
-        parts.append(f'<text x="{bar_x + 4}" y="{_BAR_AREA_Y + 21}" fill="#eaf2ff" '
+                     f'height="14" fill="#8a5a2b"/>')
+        parts.append(f'<text x="{bar_x + 4}" y="{_BAR_AREA_Y + 21}" fill="#1d1a16" '
                      f'font-size="11" font-family="monospace">'
                      f'{_esc(bucket_id)}: {count}</text>')
         bar_x += width + 10
     if not buckets:
-        parts.append(f'<text x="12" y="{_BAR_AREA_Y + 21}" fill="#8fa3c8" '
+        parts.append(f'<text x="12" y="{_BAR_AREA_Y + 21}" fill="#57524a" '
                      f'font-size="11" font-family="monospace">no aggregate '
                      f'buckets above the anti-inference minimum</text>')
     parts.append("</svg>")
@@ -206,12 +223,12 @@ def render_structure_svg(match: Mapping[str, Any]) -> str:
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 {height}" '
         f'role="img" aria-label="Structural correspondence diagram">',
-        f'<rect width="900" height="{height}" fill="#0b1020"/>',
-        f'<text x="12" y="24" fill="#eaf2ff" font-size="15" '
+        f'<rect width="900" height="{height}" fill="#f4f1eb"/>',
+        f'<text x="12" y="24" fill="#1d1a16" font-size="15" '
         f'font-family="monospace">{_esc(match.get("person_pseudonym", "anonymous"))} '
         f'&#183; {_esc(match.get("mode_classification", ""))} &#183; structural '
-        f'{_esc(scores.get("structural", ""))}</text>',
-        '<text x="12" y="46" fill="#8fa3c8" font-size="12" font-family="monospace">'
+        f'{_esc(_short(scores.get("structural", "")))}</text>',
+        '<text x="12" y="46" fill="#57524a" font-size="12" font-family="monospace">'
         f'mapped nodes: {int(evidence.get("mapped_node_count", 0))} &#183; '
         f'preserved relations: {int(evidence.get("preserved_relation_count", 0))} '
         f'&#183; contradictions: {int(evidence.get("contradiction_count", 0))}</text>',
@@ -220,11 +237,11 @@ def render_structure_svg(match: Mapping[str, Any]) -> str:
     for pair in pairs:
         query_label = _esc(pair.get("query_label", ""))
         candidate_label = _esc(pair.get("candidate_label", ""))
-        parts.append(f'<text x="12" y="{y}" fill="#5ad1a5" font-size="13" '
+        parts.append(f'<text x="12" y="{y}" fill="#8a5a2b" font-size="13" '
                      f'font-family="monospace" text-anchor="start">{query_label}</text>')
         parts.append(f'<line x1="330" y1="{y - 5}" x2="560" y2="{y - 5}" '
-                     f'stroke="#3b6ea5" stroke-width="2"/>')
-        parts.append(f'<text x="570" y="{y}" fill="#d7e3f8" font-size="13" '
+                     f'stroke="#8a5a2b" stroke-width="2"/>')
+        parts.append(f'<text x="570" y="{y}" fill="#1d1a16" font-size="13" '
                      f'font-family="monospace">{candidate_label}</text>')
         y += 34
     parts.append("</svg>")

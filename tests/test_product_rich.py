@@ -30,7 +30,12 @@ from tests.test_product_live import (
 # Pinned by running the canonical seeded render at authoring time; the seed
 # corpus, engine, aggregation ordering, and renderer are all deterministic,
 # so any drift here is a real visual regression.
-CANONICAL_MAP_SHA256 = "2a90a8c737696e66f12e81a43821011e6be8284781e137a00f0bb6c494722291"
+#
+# Moved once, on 2026-09-05, and the pin is what caught it: the drawings were
+# hard-coded dark and were repainted in the product's own light palette. A
+# deliberate change to how the map looks is the only reason to touch this
+# line, and it should be uncomfortable to touch.
+CANONICAL_MAP_SHA256 = "6ce8418f1314cb79138e9ef1308bf2ac92bdd221788179419baac1dcdce3b2d3"
 
 
 def _order_key(rows):

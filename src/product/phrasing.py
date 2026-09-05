@@ -137,10 +137,49 @@ def _discover(r: Result) -> str:
             "ask for an introduction and they agree.")
 
 
+def _round(value: Any) -> str:
+    """Two decimals. 0.7071067811865476 is not a thing anyone says out loud, and
+    the extra fourteen digits carry no meaning a person can act on."""
+    try:
+        return f"{float(value):.2f}"
+    except (TypeError, ValueError):
+        return str(value)
+
+
 def _explain_match(r: Result) -> str:
-    return ("Here is the working behind that match: which of their ideas answers to "
-            "which of yours, and which links held. Say it in their own terms rather "
-            "than reading the numbers out.")
+    """The correspondence itself, in words.
+
+    The picture beside this is an SVG resource, and whether a given client
+    draws it is out of our hands — so the thing the person actually needs, the
+    node-for-node correspondence, has to survive in the text. It is the answer
+    to "why them?", and it must not depend on a renderer.
+    """
+    match = r.get("match") or r
+    evidence = match.get("evidence") or {}
+    pairs = list(evidence.get("top_correspondences") or [])
+    scores = match.get("scores") or {}
+    who = match.get("person_pseudonym") or "they"
+    lines = []
+    if pairs:
+        joined = "; ".join(
+            f"your \u201c{p.get('query_label','')}\u201d answers to their "
+            f"\u201c{p.get('candidate_label','')}\u201d" for p in pairs[:6])
+        lines.append(f"Where it lines up: {joined}.")
+    kept = int(evidence.get("preserved_relation_count", 0) or 0)
+    if kept:
+        lines.append(f"{_count(kept, 'link between them holds', 'links between them hold')} "
+                     "on both sides.")
+    contradictions = int(evidence.get("contradiction_count", 0) or 0)
+    if contradictions:
+        lines.append(f"They contradict you on {_count(contradictions, 'point', 'points')} "
+                     "— often the reason the introduction is worth making.")
+    if scores.get("structural") is not None:
+        lines.append(f"Structural agreement {_round(scores['structural'])} of 1, "
+                     "computed the same way every time.")
+    if not lines:
+        return f"No working to show for {who}."
+    lines.append("Say it in this person's own terms rather than reading the numbers out.")
+    return " ".join(lines)
 
 
 def _request_intro(r: Result) -> str:
