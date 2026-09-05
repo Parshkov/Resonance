@@ -35,10 +35,11 @@ from src.ingestion.service import ShareIntent
 from src.product import authorship as authorship_rule
 from src.product import phrasing
 from src.product.mcp_bridge import (
-    BridgeError, _has_usable_structure, _insufficient_structure_message, _slug,
-    _structure_summary, build_thought_dna,
+    BridgeError, _PRIVATE, _SHARED, _WITHDRAWN, _has_usable_structure, _in_state,
+    _insufficient_structure_message, _slug, _structure_summary, build_thought_dna,
 )
 from src.identity.models import AuthenticationError
+from src.identity.service import CONSENT_SET
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
 from src.product.server import (
@@ -272,6 +273,96 @@ def _live_context(product, token: str) -> dict[str, Any] | None:
     if consent.get("share_coarse_location") and location:
         context["location"] = location
     return context
+
+
+MINE_CONTRACT = "resonance-mine/0.1"
+
+
+def _when_last_shared(product, user_id: str) -> dict[str, str]:
+    """When each of this person's thoughts last became discoverable.
+
+    The session record remembers when it was prepared and when it was
+    withdrawn, but not when it was shared: sharing is a consent decision, and
+    those live in the identity log. The last consent that said "discoverable"
+    is the moment a person means by "when I shared it".
+    """
+    moments: dict[str, str] = {}
+    for event in product.identity.backend.list_identity_events():
+        if event.user_id != user_id or not event.session_id:
+            continue
+        became_discoverable = event.event_type == INGESTION_SHARED or (
+            event.event_type == CONSENT_SET
+            and event.payload.get("share_thought_dna") is True)
+        if not became_discoverable:
+            continue
+        session_id = str(event.session_id)
+        if str(event.created_at) > moments.get(session_id, ""):
+            moments[session_id] = str(event.created_at)
+    return moments
+
+
+def _everything_here(product, token: str) -> dict[str, Any]:
+    """Everything this person has here, each in one of three states.
+
+    The page used to show the one discoverable thought and nothing else, so a
+    person could not see what they had shared over time, what was still
+    private, or what they had taken back -- and "am I sharing anything?" is
+    the first thing this page owes them.
+
+    The three states are the chat's: `resonance_whoami` sorts the same rows
+    into discoverable, private and withdrawn with `_in_state`, and this uses
+    that function on those rows rather than restating the rule. The two halves
+    disagreed once already (a withdrawn thought reported as "kept private
+    here"); sharing the rule is how they stay agreed.
+
+    Withdrawn is not private, and private is not shared: a private thought was
+    prepared and never made discoverable, a withdrawn one was discoverable and
+    is not any more. A deleted thought is in neither list, because the record
+    it lived in is gone from `owned_sessions` -- the chat does not see it
+    either.
+    """
+    actor = product.identity.authenticate(token)
+    rows = list(product.owned_sessions(token))
+    state_of: dict[str, str] = {}
+    for word, bucket in (("discoverable", _SHARED), ("withdrawn", _WITHDRAWN),
+                         ("private", _PRIVATE)):
+        for session_id in _in_state(rows, bucket):
+            state_of.setdefault(str(session_id), word)
+    shared_at = _when_last_shared(product, actor.user_id)
+
+    thoughts: list[dict[str, Any]] = []
+    for row in rows:
+        session_id = str(row.get("session_id") or "")
+        dna = row.get("thought_dna") or {}
+        nodes = [n for n in (dna.get("nodes") or []) if isinstance(n, Mapping)]
+        labels = {str(n.get("id")): str(n.get("label") or "").strip() for n in nodes}
+        presentation = row.get("presentation") or {}
+        thoughts.append({
+            # The page needs this to say "stop sharing this one" and for
+            # nothing else. It is never shown: an identifier on screen reads
+            # as debug output to the person whose thought it is.
+            "session_id": session_id,
+            "state": state_of.get(session_id, "private"),
+            "topic": str(presentation.get("topic") or "").strip(),
+            "domain": str(presentation.get("domain") or "").strip(),
+            "nodes": [{"label": labels[str(n.get("id"))], "role": str(n.get("role") or "")}
+                      for n in nodes],
+            "relations": [
+                {"from": labels.get(str(r.get("source")), ""),
+                 "type": str(r.get("type") or ""),
+                 "to": labels.get(str(r.get("target")), "")}
+                for r in (dna.get("relations") or []) if isinstance(r, Mapping)
+            ],
+            "prepared_at": row.get("created_at"),
+            "shared_at": shared_at.get(session_id),
+            "withdrawn_at": row.get("revoked_at") or row.get("deleted_at"),
+        })
+    # Newest first: the thing a person did most recently is the thing they
+    # are most likely asking about.
+    thoughts.sort(key=lambda t: str(t.get("prepared_at") or ""), reverse=True)
+    counts = {word: sum(1 for t in thoughts if t["state"] == word)
+              for word in ("discoverable", "private", "withdrawn")}
+    return {"contract_version": MINE_CONTRACT, "thoughts": thoughts, "counts": counts}
 
 
 def _discovery_view(live: Mapping[str, Any]) -> dict[str, Any]:
@@ -526,6 +617,14 @@ class WebHandler(ProductHandler):
                              "result_id": result_id, "source": "live",
                              "freshness": result.get("freshness"),
                              "match": result["match"]})
+            return
+
+        if path == "/api/product/mine":
+            # A read of the person's own record: the session cookie is the
+            # whole authorisation, exactly as for /api/product/sessions, and a
+            # missing or unknown cookie is a 401 rather than an empty list --
+            # "nothing here" must never be said to someone we cannot identify.
+            self._send_json(_everything_here(product, self._token()))
             return
 
         super()._route_get(path, params)
