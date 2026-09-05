@@ -1,10 +1,10 @@
 /**
- * Competition LIVE WebMCP transport.
+ * The browser WebMCP transport served by the live product.
  *
- * Same accepted R10 tool names and concise schemas, but all reads/writes go to
- * the authenticated LiveProductService through src.product.competition_server.
- * session.mjs supplies the real cookie-bound CSRF proof; there is no browser
- * shadow corpus or matching logic here.
+ * Same tool names and concise schemas as the standalone demo transport in
+ * webmcp.mjs, but every read and write goes to the authenticated
+ * LiveProductService through src.product.web_server. session.mjs supplies the
+ * cookie-bound CSRF proof; no matching or ranking happens in the browser.
  */
 
 import { apiFetch, ensureSession } from "/session.mjs";
@@ -136,8 +136,10 @@ function selectVisibleMatch(sessionId) {
   document.querySelector(selector)?.click();
 }
 
-function activateLiveDiscovery() {
-  document.getElementById("source-live")?.click();
+// The page owns the results view; a discovery run through the tools has to
+// show up there too, or the visitor is looking at a stale answer.
+function announceDiscovery() {
+  document.dispatchEvent(new CustomEvent("resonance:discovered"));
 }
 
 const REQUEST_ID_PROPERTY = {
@@ -222,25 +224,20 @@ const tools = [
   {
     name: "resonance_discover",
     title: "Discover structural resonance",
-    description: "Run DB-backed structural discovery for the currently shared live session. Replay is explicitly labelled and never a silent fallback.",
-    inputSchema: {
-      type: "object",
-      properties: {source: {type: "string", enum: ["live", "replay"], default: "live"}},
-      additionalProperties: false,
-    },
+    description: "Run structural discovery against the thought this person has shared, and return the matches in the order the engine returned them.",
+    inputSchema: {type: "object", properties: {}, additionalProperties: false},
     annotations: {readOnlyHint: true, untrustedContentHint: true},
-    execute: async (input) => {
-      const source = input?.source === "replay" ? "replay" : "live";
-      const result = await readJson(`/api/webmcp/discover?source=${encodeURIComponent(source)}`);
-      if (source === "live") activateLiveDiscovery();
-      setStatus(`WebMCP · ${source === "live" ? "LIVE DB" : "REPLAY"} discovery`);
+    execute: async () => {
+      const result = await readJson("/api/webmcp/discover");
+      announceDiscovery();
+      setStatus("WebMCP · discovery run");
       return result;
     },
   },
   {
     name: "resonance_get_match",
     title: "Get evidence for a Resonance match",
-    description: "Read evidence bound to one exact discovery result_id and session_id; never silently switches sources.",
+    description: "Read the evidence bound to one exact discovery result_id and session_id.",
     inputSchema: {
       type: "object", required: ["result_id", "session_id"],
       properties: {
@@ -255,7 +252,7 @@ const tools = [
       });
       const result = await readJson(`/api/webmcp/match?${query}`);
       selectVisibleMatch(input?.session_id || "");
-      setStatus(`WebMCP · ${result.source} evidence opened`);
+      setStatus("WebMCP · evidence opened");
       return result;
     },
   },

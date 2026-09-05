@@ -12,8 +12,8 @@ point for a session whose job is to test and finish the product.
 | canonical MCP resource | `https://resonance-production-cfe3.up.railway.app/mcp` |
 | Railway project / service / environment | `resonance-live` `670bcce5-…` / `resonance` `172aa183-…` / `production` `da338ecd-…` |
 | deployed commit | `c66951b` (auto-deploy from `main`; deployment `357dd391`, SUCCESS 19:17 UTC) |
-| entrypoint | `python3 -m src.product.competition_server … --db $RESONANCE_DB --origin $PUBLIC_ORIGIN` |
-| startup log | `oauth: core attached; … grants durable` then `competition product … mode: LIVE+WebMCP` |
+| entrypoint | `python3 -m src.product.web_server … --db $RESONANCE_DB --origin $PUBLIC_ORIGIN` |
+| startup log | `oauth: core attached; … grants durable` then `resonance … mode: LIVE+WebMCP` |
 | engine | `resonance-engine/0.2`, scoring `resonance-score/0.2`, extractor `0.2.0` — confirm via `GET /api/product/health` → `engine.*` |
 
 `GET /api/product/health` also reports `corpus.demo_personas_present` and

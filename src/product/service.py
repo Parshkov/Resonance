@@ -254,7 +254,7 @@ class LiveProductService:
         return {
             "contract_version": LIVE_PRODUCT_CONTRACT,
             "mode": "live",
-            "mode_note": "DB-backed live product state; seed/replay demo is a separate, clearly labeled mode.",
+            "mode_note": "Live product state, read from the database.",
             "freshness": self.freshness(),
             "health_ok": health.ok,
             "users": health.users,

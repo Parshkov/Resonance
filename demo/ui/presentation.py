@@ -69,7 +69,7 @@ def primary_matches(
 
 
 def remaining_match_count(payload: Mapping[str, Any]) -> int:
-    """Count useful backend rows not emphasized in the competition frame."""
+    """Count useful backend rows not emphasized in the flagship frame."""
     visible = [
         match for match in payload["matches"]
         if isinstance(match, Mapping)

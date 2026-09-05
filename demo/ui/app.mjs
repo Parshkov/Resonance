@@ -9,7 +9,6 @@ const SHARE_REQUIRED = "share_required";
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const state = {
-  source: "replay",
   context: null,
   payload: null,
   primary: [],
@@ -170,10 +169,6 @@ function setText(id, value) {
 
 function formatScore(value) {
   return Number(value).toFixed(4);
-}
-
-function shortSnapshot(value) {
-  return `${value.slice(0, 8)}…${value.slice(-6)}`;
 }
 
 function placeLabel(location) {
@@ -764,29 +759,6 @@ function clearResults() {
   document.getElementById("drawer-matches")?.replaceChildren();
   document.getElementById("drawer-rejected")?.replaceChildren();
 
-  setText("snapshot-short", "—");
-  const snapshot = document.getElementById("snapshot-button");
-  if (snapshot) {
-    snapshot.disabled = true;
-    snapshot.title = "";
-  }
-  const banner = document.getElementById("source-banner");
-  if (banner) banner.hidden = true;
-}
-
-// Say what the rows on screen are, once, where the visitor reads them. The
-// replay cards are a genuine accepted capture of an engine response, but the
-// people in them are fixture personas, and a visitor must never mistake them
-// for participants in the live corpus.
-function renderSourceBanner() {
-  const banner = document.getElementById("source-banner");
-  if (!banner) return;
-  if (state.source === "replay") {
-    banner.textContent = "Worked example from the accepted replay fixture: the people shown are example personas, not real participants.";
-    banner.hidden = false;
-  } else {
-    banner.hidden = true;
-  }
 }
 
 // A discovery that returns candidates but none that clear the resonance bar is
@@ -804,26 +776,14 @@ function renderEmpty(payload) {
   const empty = document.getElementById("matches-empty");
   if (empty) empty.hidden = false;
   setText("response-summary", `${payload.matches.length} returned · 0 resonances · ${payload.rejected.length} rejected`);
-  setText("evidence-kicker", "No resonance in this corpus");
+  setText("evidence-kicker", "No resonance yet");
   setText("evidence-heading", "Nothing cleared the resonance bar");
   setText("evidence-subtitle",
     `${payload.matches.length} candidate${payload.matches.length === 1 ? "" : "s"} came back and every one was refused as a resonance. `
     + "Open “Other returned results” to inspect them.");
   setText("map-status-text", "0 resonances · every returned candidate was refused");
-
-  const snapshotValue = payload.query?.provenance?.corpus_snapshot;
-  if (snapshotValue) {
-    setText("snapshot-short", shortSnapshot(snapshotValue));
-    const button = document.getElementById("snapshot-button");
-    if (button) {
-      button.disabled = false;
-      button.title = snapshotValue;
-    }
-  }
-  setText("source-note", state.source === "live"
-    ? "LIVE · accepted discover_resonance MCP path · no match passed the threshold"
-    : "REPLAY · genuine accepted R8 fixture · no match passed the threshold");
-  renderSourceBanner();
+  setText("source-note",
+    "Live result for your shared thought · nobody cleared the resonance bar this time.");
   document.getElementById("app-shell").dataset.state = "empty";
 }
 
@@ -848,31 +808,14 @@ function renderDiscovery(payload) {
   setText("map-status-text",
     `${primary.length} resonance${primary.length === 1 ? "" : "s"} · ${others.length} other returned · ${rejected.length} rejected · engine order kept`);
 
-  const snapshot = payload.query.provenance.corpus_snapshot;
-  setText("snapshot-short", shortSnapshot(snapshot));
-  const button = document.getElementById("snapshot-button");
-  button.disabled = false;
-  button.title = snapshot;
-  setText("source-note", state.source === "live"
-    ? "LIVE · accepted discover_resonance MCP path · analogical / k=15"
-    // Say what the replay cards are. They are a genuine accepted capture of an
-    // engine response, but the people in them are fixture personas, and a
-    // visitor must never mistake them for participants in the live corpus.
-    : "REPLAY · accepted R8 fixture · example personas, not real participants · analogical / k=15");
-  renderSourceBanner();
+  setText("source-note",
+    "Live result for your shared thought · these are people who have shared one too.");
   document.getElementById("app-shell").dataset.state = "ready";
 }
 
-function setSourceControls(source, loading = false) {
-  document.querySelectorAll(".source-option").forEach((button) => {
-    const active = button.dataset.source === source;
-    button.classList.toggle("is-active", active);
-    button.classList.toggle("is-loading", active && loading);
-    button.setAttribute("aria-pressed", String(active));
-    button.disabled = loading;
-  });
+function setLoading(loading) {
   document.getElementById("map-status").classList.toggle("is-loading", loading);
-  if (loading) setText("map-status-text", source === "live" ? "Calling accepted discovery MCP…" : "Loading accepted replay fixture…");
+  if (loading) setText("map-status-text", "Finding people who resonate…");
 }
 
 // The visitor's own panel, emptied. `clearResults()` owns the discovery
@@ -905,9 +848,9 @@ function renderUnshared() {
     + "shared. Until you share one there is nothing to compare, so nothing is "
     + "shown. Connect an agent to this page or to the Resonance MCP connector, "
     + "prepare a thought, read the preview, and confirm the share.");
-  setText("source-note", "LIVE · nothing shared by this visitor · no discovery was run");
+  setText("source-note", "You have shared nothing, so nothing was searched for.");
   document.getElementById("app-shell").dataset.state = "unshared";
-  setSourceControls(state.source, false);
+  setLoading(false);
 }
 
 function showError(error) {
@@ -920,20 +863,16 @@ function showError(error) {
   setText("evidence-heading", "No resonance to show");
   setText("evidence-subtitle", error.message);
   setText("map-status-text", `Discovery unavailable: ${error.message}`);
-  setText("source-note", "No results rendered · accepted source validation failed closed");
-  setSourceControls(state.source, false);
+  setText("source-note", "Nothing is shown, because nothing could be read.");
+  setLoading(false);
 }
 
-async function loadSource(source) {
-  state.source = source;
-  setSourceControls(source, true);
-  const url = new URL(window.location.href);
-  url.searchParams.set("source", source);
-  window.history.replaceState({}, "", url);
+async function loadResults() {
+  setLoading(true);
   try {
     const [response, contextResponse] = await Promise.all([
-      fetch(`/api/discover?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
-      fetch(`/api/context?source=${encodeURIComponent(source)}`, {cache: "no-store"}),
+      fetch("/api/discover", {cache: "no-store"}),
+      fetch("/api/context", {cache: "no-store"}),
     ]);
     const payload = await response.json();
     if (response.status === 409 && payload?.error === SHARE_REQUIRED) {
@@ -942,8 +881,8 @@ async function loadSource(source) {
     }
     if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
     assertAcceptedDiscovery(payload);
-    // The thought panel follows the source: the visitor's own shared thought on
-    // the live product, the labelled fixture thought on replay.
+    // The thought panel shows the visitor's own shared thought, which is the
+    // only thought this page ever displays.
     if (contextResponse.ok) {
       const context = await contextResponse.json();
       assertAcceptedContext(context);
@@ -951,7 +890,7 @@ async function loadSource(source) {
       renderContext(context);
     }
     renderDiscovery(payload);
-    setSourceControls(source, false);
+    setLoading(false);
   } catch (error) {
     showError(error);
   }
@@ -978,21 +917,10 @@ function showToast(message) {
   toastTimer = setTimeout(() => { toast.hidden = true; }, 1800);
 }
 
-async function copySnapshot() {
-  const snapshot = state.payload?.query?.provenance?.corpus_snapshot;
-  if (!snapshot) return;
-  try {
-    await navigator.clipboard.writeText(snapshot);
-    showToast("Corpus snapshot copied");
-  } catch {
-    showToast(`Snapshot ${shortSnapshot(snapshot)}`);
-  }
-}
-
 // The onboarding panel is static markup; only three things about it depend on
 // the runtime: which origin is serving (the page is reachable on more than one
 // host, and the connector URL must be the one you actually opened), whether
-// this browser has an agent surface, and the two buttons.
+// this browser has an agent surface, and the connect button.
 function wireOnboarding() {
   const origin = window.location.origin;
   const mcpUrl = `${origin}/mcp`;
@@ -1014,9 +942,6 @@ function wireOnboarding() {
     }
   });
 
-  document.getElementById("onboarding-example")?.addEventListener("click", () => {
-    loadSource("replay");
-  });
   document.getElementById("onboarding-connect")?.addEventListener("click", () => {
     document.getElementById("onboarding-connect-panel")?.scrollIntoView({block: "start"});
   });
@@ -1053,13 +978,13 @@ function wireOnboarding() {
 // live view when the answer flipped.
 let lastShared = null;
 function onConsentState(shared) {
-  if (lastShared === null) {                 // first read: boot's loadSource already ran
+  if (lastShared === null) {                 // first read: boot's loadResults already ran
     lastShared = shared;
     return;
   }
   if (shared === lastShared) return;
   lastShared = shared;
-  if (state.source === "live") loadSource("live");
+  loadResults();
 }
 
 // The map is re-laid out from the state already in hand when the frame
@@ -1080,15 +1005,11 @@ function onResize() {
 
 async function boot() {
   try {
-    const [configResponse, contextResponse] = await Promise.all([
-      fetch("/api/config", {cache: "no-store"}),
-      fetch("/api/context", {cache: "no-store"}),
-    ]);
-    if (!configResponse.ok) throw new Error("Presentation context is unavailable");
-    const config = await configResponse.json();
+    const contextResponse = await fetch("/api/context", {cache: "no-store"});
     // A first-time visitor has no context of their own: /api/context answers
-    // 409 share_required rather than handing back the fixture thought. That is
-    // a state to render, not a boot failure — loadSource renders it below.
+    // 409 share_required rather than handing back somebody else's thought.
+    // That is a state to render, not a boot failure — loadResults renders it
+    // below.
     const context = await contextResponse.json().catch(() => null);
     const unshared = contextResponse.status === 409 && context?.error === SHARE_REQUIRED;
     if (!unshared) {
@@ -1110,21 +1031,19 @@ async function boot() {
     document.addEventListener("resonance:consent", (event) => {
       onConsentState(event.detail?.shared === true);
     });
-    document.querySelectorAll(".source-option").forEach((button) => {
-      button.addEventListener("click", () => loadSource(button.dataset.source));
-    });
+    // An agent can run a discovery through the WebMCP tools without touching
+    // this page. The results on screen would then be the previous answer, so
+    // the transport says when it has run one and the page re-reads.
+    document.addEventListener("resonance:discovered", () => { loadResults(); });
     document.getElementById("secondary-trigger").addEventListener("click", () => setDrawer(true));
     document.getElementById("drawer-close").addEventListener("click", () => setDrawer(false));
     document.getElementById("drawer-backdrop").addEventListener("click", () => setDrawer(false));
-    document.getElementById("snapshot-button").addEventListener("click", copySnapshot);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") setDrawer(false);
     });
     window.addEventListener("resize", onResize);
 
-    const requested = new URL(window.location.href).searchParams.get("source");
-    const source = requested === "live" || requested === "replay" ? requested : config.default_source;
-    await loadSource(source);
+    await loadResults();
   } catch (error) {
     showError(error);
   }

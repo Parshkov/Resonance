@@ -1,20 +1,20 @@
-"""Competition/live browser server: accepted WebMCP UX over LiveProductService.
+"""The production HTTP server: the live product plus the browser write path.
 
-This is a release adapter, not a second product state machine.  The authoritative
-identity, drafts, consent, discovery results, intro/channel state, and corpus all
-remain in the accepted R11-R14 services.  The bridge only translates the R10
-browser wire shape (whose tool schemas were frozen before R13 existed) onto the
-live authenticated product and keeps a tiny per-process operation receipt cache
-for AbortError reconciliation.
+`src/product/server.py` serves the product API and the page; this module adds
+the browser WebMCP tools on top of it — prepare, preview, share and consent —
+so a person can go from a thought to a discoverable share without leaving the
+page.  It is a transport adapter, not a second product state machine: identity,
+drafts, consent, discovery results and intro/channel state all live in the
+services underneath, and the only state kept here is a small per-process
+operation receipt cache so an aborted browser write can be reconciled.
 
-REPLAY remains available only as an explicitly labelled presentation fixture.
-LIVE always requires an authenticated, explicitly shared durable session.
+Every read and write requires an authenticated session, and discovery requires
+a thought the visitor has explicitly shared.
 """
 
 from __future__ import annotations
 
 import argparse
-import copy
 import hashlib
 import json
 import os
@@ -26,7 +26,6 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import parse_qs
 
-from demo.ui.server import _flagship_session, load_replay, load_replay_bytes, public_context
 from src.ingestion.identity import (
     INGESTION_DISCARDED,
     INGESTION_PREPARED,
@@ -67,40 +66,12 @@ def _fingerprint(body: Mapping[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _safe_replay_row(row: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "session_id": row.get("session_id"),
-        "person_pseudonym": row.get("person_pseudonym"),
-        "mode_classification": row.get("mode_classification"),
-        "hard_rejection": row.get("hard_rejection"),
-        "confidence": row.get("confidence"),
-        "scores": row.get("scores"),
-        "display": row.get("display"),
-        "evidence": row.get("evidence"),
-    }
-
-
-def _replay_rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
-    result: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for row in [*payload.get("matches", []), *payload.get("rejected", [])]:
-        sid = str(row.get("session_id", ""))
-        if not sid or sid in seen:
-            continue
-        if row.get("display", {}).get("share_state") != "discoverable":
-            continue
-        seen.add(sid)
-        result.append(_safe_replay_row(row))
-    return result
-
-
 class LiveWebMCPBridge:
     """Translation bookkeeping only; no authoritative product state lives here."""
 
     def __init__(self) -> None:
         self.lock = threading.RLock()
         self.operations: dict[tuple[str, str, str], dict[str, Any]] = {}
-        self.replay_results: dict[str, dict[str, Any]] = {}
 
     def operation(self, subject: str, operation: str,
                   request_id: str) -> dict[str, Any] | None:
@@ -114,20 +85,6 @@ class LiveWebMCPBridge:
                 "fingerprint": fingerprint,
                 "result": dict(result),
             }
-
-    def remember_replay(self, payload: Mapping[str, Any]) -> str:
-        raw = json.dumps(payload, sort_keys=True, separators=(",", ":"),
-                         ensure_ascii=False).encode("utf-8")
-        result_id = "result-" + hashlib.sha256(b"replay:" + raw).hexdigest()[:24]
-        with self.lock:
-            self.replay_results[result_id] = dict(payload)
-            while len(self.replay_results) > 8:
-                self.replay_results.pop(next(iter(self.replay_results)))
-        return result_id
-
-    def replay(self, result_id: str) -> dict[str, Any] | None:
-        with self.lock:
-            return self.replay_results.get(result_id)
 
 
 def _latest_prepared_draft(product, token: str) -> str | None:
@@ -176,21 +133,6 @@ def _presentation_for(thought: Any) -> dict[str, Any]:
             "cluster_id": (_slug(topic) or "shared")[:48]}
 
 
-def _candidate_for(subject: str, request_id: str) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Clone the page's clearly-labelled canonical replay thought for live share.
-
-    The R10 tool schema intentionally takes only request_id/note.  In the browser
-    its input is therefore the current thought already visible on the page.  The
-    live adapter clones that exact page thought with a subject/request-specific
-    thought_id so the live durable row cannot collide with the seeded corpus.
-    """
-    session = copy.deepcopy(_flagship_session())
-    thought = dict(session["thought_dna"])
-    suffix = hashlib.sha256(f"{subject}:{request_id}".encode()).hexdigest()[:16]
-    thought["thought_id"] = f"thought-webmcp-{suffix}"
-    return thought, session
-
-
 def _live_context(product, token: str) -> dict[str, Any] | None:
     session_id = _owned_live_session(product, token)
     if not session_id:
@@ -230,8 +172,8 @@ def _live_context(product, token: str) -> dict[str, Any] | None:
     return context
 
 
-def _legacy_discovery(live: Mapping[str, Any]) -> dict[str, Any]:
-    """R8 presentation shape; rank/score/evidence are not recomputed."""
+def _discovery_view(live: Mapping[str, Any]) -> dict[str, Any]:
+    """The shape the page reads; rank/score/evidence are not recomputed."""
     return {
         "contract_version": live.get("discovery_contract") or "resonance-discovery/0.1",
         "query": live.get("query", {}),
@@ -240,7 +182,7 @@ def _legacy_discovery(live: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-class CompetitionHandler(ProductHandler):
+class WebHandler(ProductHandler):
     bridge: LiveWebMCPBridge
 
     def _subject(self, token: str) -> str:
@@ -274,8 +216,8 @@ class CompetitionHandler(ProductHandler):
         # A visitor who has not shared a thought is a product state, not a
         # server fault: the WebMCP discover tool used to raise an unmapped
         # PermissionError here and surface as a 500 "unexpected product error"
-        # on the very first read a judge makes (release-blocker found during
-        # R17 acceptance; same mapping the R9 /api/discover view already uses).
+        # on the very first read anyone makes (same mapping the /api/discover
+        # view already uses).
         self._send_json(
             {"error": "share_required",
              "message": "discovery needs a shared thought first: run "
@@ -304,11 +246,8 @@ class CompetitionHandler(ProductHandler):
 
         A visitor with no session cookie has certainly shared nothing, which is
         the common case and costs no lookup at all. With a cookie, one indexed
-        read answers it. `?source=replay` is asking for the fixture explicitly,
-        so that keeps the neutral loading state and its skeletons.
+        read answers it.
         """
-        if (params.get("source") or [""])[0] == "replay":
-            return "loading"
         token = self._visitor_token()
         if token is None:
             return "unshared"
@@ -320,27 +259,9 @@ class CompetitionHandler(ProductHandler):
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 
-        # The accepted R9 app remains unchanged. These three routes translate
-        # its presentation contract to the live product without any shadow DB.
-        if path == "/api/config":
-            # The public product opens on the visitor's OWN state, never on the
-            # replay fixture. The fixture is four invented personas
-            # (`src/discovery/fixtures/example_response.json`); serving it as
-            # the default made every first load of the production origin show
-            # fabricated people, which contradicts `demo_personas_present:
-            # false` in /api/product/health. Replay stays reachable, labelled,
-            # on ?source=replay and the "Replay fixture" control.
-            self._send_json({"default_source": "live", "live_product": True})
-            return
+        # These two routes translate the page's presentation contract to the
+        # live product without any shadow DB.
         if path == "/api/context":
-            # ?source=replay -> the labelled public replay thought; ?source=live
-            # (or no source) -> the visitor's own shared thought.
-            source = (params.get("source") or ["auto"])[0]
-            if source not in {"auto", "replay", "live"}:
-                raise ValueError("source must be replay or live")
-            if source == "replay":
-                self._send_json(public_context())
-                return
             context = None
             token = self._visitor_token()
             if token is not None:
@@ -349,41 +270,35 @@ class CompetitionHandler(ProductHandler):
                 except Exception:
                     context = None
             if context is None:
-                # A visitor who has shared nothing has no active thought. This
-                # used to fall back to `public_context()`, i.e. the fixture
-                # thought was presented as if it were theirs. Fail closed with
-                # the same product state the discovery routes use.
+                # A visitor who has shared nothing has no active thought. Fail
+                # closed with the same product state the discovery routes use,
+                # rather than showing them somebody else's thought as if it
+                # were their own.
                 self._send_share_required()
                 return
             self._send_json(context)
             return
         if path == "/api/discover":
-            source = (params.get("source") or ["replay"])[0]
-            if source == "replay":
-                self._send_bytes(load_replay_bytes(), "application/json; charset=utf-8")
-                return
-            if source != "live":
-                raise ValueError("source must be replay or live")
             token = self._visitor_token()
             session_id = _owned_live_session(product, token) if token else None
             if not session_id:
                 # Not an error in the product: the visitor simply has not shared
                 # a thought yet. PermissionError was unmapped and surfaced as a
-                # 500 "unexpected product error" in the R9 view.
+                # 500 "unexpected product error" in the page's view.
                 self._send_json(
                     {"error": "share_required",
-                     "message": "LIVE discovery needs a shared thought first: run "
+                     "message": "discovery needs a shared thought first: run "
                                 "resonance_prepare_thought → resonance_get_share_preview → "
                                 "resonance_share_prepared_thought (or use the Collaboration "
-                                "panel), then choose Live MCP again."},
+                                "panel)."},
                     HTTPStatus.CONFLICT)
                 return
             live = product.discover(token, session_id, mode=CANONICAL_MODE, k=CANONICAL_K)
-            self._send_json(_legacy_discovery(live))
+            self._send_json(_discovery_view(live))
             return
 
-        # Serve a live implementation of the *same* accepted R10 tool names.
-        # Legacy demo server still serves demo/ui/webmcp.mjs unchanged.
+        # The browser tools are the live implementation of the same tool names
+        # the standalone demo server under demo/ui/ registers from webmcp.mjs.
         if path == "/webmcp.mjs":
             self._send_bytes((UI_DIR / "webmcp_live.mjs").read_bytes(),
                              "text/javascript; charset=utf-8")
@@ -458,24 +373,6 @@ class CompetitionHandler(ProductHandler):
 
         if path == "/api/webmcp/discover":
             token = self._token()
-            source = (params.get("source") or ["live"])[0]
-            if source == "replay":
-                if not _has_shared(product, token):
-                    self._send_share_required()
-                    return
-                payload = load_replay()
-                result_id = self.bridge.remember_replay(payload)
-                self._send_json({
-                    "contract_version": WEBMCP_CONTRACT,
-                    "result_id": result_id,
-                    "source": "replay",
-                    "discovery_contract": payload.get("contract_version"),
-                    "query": payload.get("query", {}),
-                    "matches_in_backend_order": _replay_rows(payload),
-                })
-                return
-            if source != "live":
-                raise ValueError("source must be replay or live")
             session_id = _owned_live_session(product, token)
             if not session_id:
                 self._send_share_required()
@@ -498,19 +395,6 @@ class CompetitionHandler(ProductHandler):
         if path == "/api/webmcp/match":
             result_id = (params.get("result_id") or [""])[0]
             session_id = (params.get("session_id") or [""])[0]
-            replay = self.bridge.replay(result_id)
-            if replay is not None:
-                row = next((row for row in _replay_rows(replay)
-                            if row.get("session_id") == session_id), None)
-                if row is None:
-                    self._send_json({"error": "not_found",
-                                     "message": "match not present in replay result"},
-                                    HTTPStatus.NOT_FOUND)
-                    return
-                self._send_json({"contract_version": WEBMCP_CONTRACT,
-                                 "result_id": result_id, "source": "replay",
-                                 "match": row})
-                return
             token = self._token()
             result = product.get_match(token, result_id, session_id)
             self._send_json({"contract_version": WEBMCP_CONTRACT,
@@ -531,10 +415,10 @@ class CompetitionHandler(ProductHandler):
         token = self._token()
         body = self._body()
         operation = path.rsplit("/", 1)[-1]
-        subject, request_id, fingerprint, replay = self._operation_start(
+        subject, request_id, fingerprint, committed = self._operation_start(
             token, operation, body)
-        if replay is not None:
-            self._send_json(replay)
+        if committed is not None:
+            self._send_json(committed)
             return
         security = self._security_kwargs()
         security["client_id"] = "live-browser-webmcp"
@@ -549,49 +433,43 @@ class CompetitionHandler(ProductHandler):
             context = body.get("context")
             if thought is not None and context:
                 raise ValueError("provide either thought or context, not both")
-            if thought is not None or context:
-                # The agent hands over the person's REAL reasoning: a labelled
-                # causal graph it extracted (preferred) or raw text for the
-                # cue extractor. Same contract as remote MCP; the text is never
-                # retained.
-                presentation = _presentation_for(thought)
-                if thought is not None:
-                    candidate = build_thought_dna(thought, human_id=subject)
-                    result = product.prepare_structured(
-                        token, candidate, presentation=presentation,
-                        coarse_location=None, intent=intent, **security)
-                else:
-                    if not isinstance(context, str) or len(context) > MAX_CONTEXT_CHARS:
-                        raise ValueError(f"context must be text of at most {MAX_CONTEXT_CHARS} characters")
-                    # Per-prepare namespace: the extracted id must not collide
-                    # with a reserved/revoked id for the same sentences.
-                    result = product.prepare_raw_text(
-                        token, context, source_id=f"{subject}:{request_id}",
-                        presentation=presentation, coarse_location=None,
-                        intent=intent, **security)
-                    preview = product.preview(token, str(result["draft_id"]),
-                                              client_id="live-browser-webmcp")
-                    structure = _structure_summary(preview.get("thought_dna"))
-                    if not _has_usable_structure(structure):
-                        # Empty graphs must not become shareable drafts (the
-                        # accepted extractor abstains on implicit prose).
-                        try:
-                            product.discard(token, str(result["draft_id"]), confirmed=True, **security)
-                        except Exception:  # noqa: BLE001 - best effort clean-up
-                            pass
-                        raise ValueError(_insufficient_structure_message(
-                            structure, result.get("abstentions", [])))
-            else:
-                # Legacy/demo input: clone the thought currently visible on the
-                # page (clearly labelled), so the tool still works without content.
-                candidate, source = _candidate_for(subject, request_id)
+            if thought is None and not context:
+                # There is no stand-in content to fall back on. A prepare with
+                # nothing in it used to clone a fixture thought, which made the
+                # visitor's first durable row a thought they never had.
+                raise ValueError("provide the person's own reasoning as either "
+                                 "thought (a labelled causal graph) or context (their text)")
+            # The agent hands over the person's REAL reasoning: a labelled
+            # causal graph it extracted (preferred) or raw text for the cue
+            # extractor. Same contract as remote MCP; the text is never
+            # retained.
+            presentation = _presentation_for(thought)
+            if thought is not None:
+                candidate = build_thought_dna(thought, human_id=subject)
                 result = product.prepare_structured(
-                    token, candidate,
-                    presentation=dict(source.get("presentation") or {}),
-                    coarse_location=None,
-                    intent=intent,
-                    **security,
-                )
+                    token, candidate, presentation=presentation,
+                    coarse_location=None, intent=intent, **security)
+            else:
+                if not isinstance(context, str) or len(context) > MAX_CONTEXT_CHARS:
+                    raise ValueError(f"context must be text of at most {MAX_CONTEXT_CHARS} characters")
+                # Per-prepare namespace: the extracted id must not collide
+                # with a reserved/revoked id for the same sentences.
+                result = product.prepare_raw_text(
+                    token, context, source_id=f"{subject}:{request_id}",
+                    presentation=presentation, coarse_location=None,
+                    intent=intent, **security)
+                preview = product.preview(token, str(result["draft_id"]),
+                                          client_id="live-browser-webmcp")
+                structure = _structure_summary(preview.get("thought_dna"))
+                if not _has_usable_structure(structure):
+                    # Empty graphs must not become shareable drafts (the
+                    # extractor abstains on implicit prose).
+                    try:
+                        product.discard(token, str(result["draft_id"]), confirmed=True, **security)
+                    except Exception:  # noqa: BLE001 - best effort clean-up
+                        pass
+                    raise ValueError(_insufficient_structure_message(
+                        structure, result.get("abstentions", [])))
             wire = {
                 "contract_version": WEBMCP_CONTRACT,
                 "draft_id": result["draft_id"],
@@ -625,7 +503,7 @@ class CompetitionHandler(ProductHandler):
             self._operation_finish(subject, operation, request_id, fingerprint, wire)
             return
 
-        # R10 consent tool is intentionally revoke-only unless already shared.
+        # The consent tool is intentionally revoke-only unless already shared.
         shared = body.get("shared") is True
         session_id = _owned_live_session(product, token)
         if shared:
@@ -646,14 +524,14 @@ class CompetitionHandler(ProductHandler):
 
 def serve(host: str, port: int, *, runtime: ProductRuntime) -> ThreadingHTTPServer:
     bridge = LiveWebMCPBridge()
-    handler = type("BoundCompetitionHandler", (CompetitionHandler,),
+    handler = type("BoundWebHandler", (WebHandler,),
                    {"runtime": runtime, "bridge": bridge})
     return ThreadingHTTPServer((host, port), handler)
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(
-        description="Resonance competition server: live product + browser WebMCP")
+        description="Resonance: live product + browser WebMCP")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--db", default="live-product.sqlite3")
@@ -685,7 +563,7 @@ def main(argv: list[str] | None = None) -> None:
     oauth_mount.attach_core(
         runtime, issuer=oauth_mount.canonical_origin(args.origin, origins))
     server = serve(args.host, args.port, runtime=runtime)
-    print(f"competition product on http://{args.host}:{args.port} "
+    print(f"resonance on http://{args.host}:{args.port} "
           f"(origins: {sorted(origins)}; db: {_redact_db(args.db)}; mode: LIVE+WebMCP)")
     try:
         server.serve_forever()

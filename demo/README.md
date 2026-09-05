@@ -60,7 +60,7 @@ retrieval, alignment, or scoring. See `demo/corpus/README.md`.
 
 ## R9 visual client
 
-`demo/ui/` is the presentation-only, competition-recordable discovery client.
+`demo/ui/` is the presentation-only discovery client.
 It supports deterministic REPLAY from the accepted R8 fixture and LIVE through
 the accepted `discover_resonance` MCP path, both pinned to `analogical / k=15`.
 See [`ui/README.md`](ui/README.md) for launch, recording, privacy, and
