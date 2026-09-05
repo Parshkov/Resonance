@@ -294,7 +294,10 @@ class CompetitionWebMCPTests(unittest.TestCase):
         # destructiveHint explicitly specified on every tool. "Explicitly"
         # means present, not merely defaulted.
         from src.product.mcp_bridge import TOOLS
-        self.assertEqual(len(TOOLS), 12)
+        # A deliberate canary: adding a tool must be a conscious act, because a
+        # tool that reaches a directory without these hints is a tool the host
+        # cannot reason about. It caught the two standing-search tools.
+        self.assertEqual(len(TOOLS), 14)
         writes_visible_to_others = {
             "resonance_share_thought", "resonance_request_intro",
             "resonance_respond_intro", "resonance_send_message",

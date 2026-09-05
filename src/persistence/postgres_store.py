@@ -343,6 +343,17 @@ class PostgresRepository:
                 self._conn.rollback()
                 raise
 
+    def list_grants_for_user(self, kind: str, user_id: str) -> Sequence[Mapping[str, Any]]:
+        """Every record of one kind belonging to one account, oldest first."""
+        with self._lock:
+            rows = self._fetchall_map(
+                "SELECT record_json FROM oauth_grants WHERE kind = ? AND user_id = ? "
+                "ORDER BY created_at, grant_key",
+                (kind, user_id),
+            )
+            self._conn.commit()
+            return [loads(row["record_json"]) for row in rows]
+
     def delete_grants_for_user(self, kind: str, user_id: str) -> int:
         with self._lock:
             try:

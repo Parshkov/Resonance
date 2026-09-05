@@ -725,6 +725,14 @@ class ProductHandler(BaseHTTPRequestHandler):
         if path == "/api/product/sessions":
             self._send_json({"sessions": product.owned_sessions(self._token())})
             return
+        if path == "/api/product/resonances":
+            # What the standing search found while this person was not looking.
+            # The half of the product that waits: read it and you learn who
+            # arrived after you shared, which no discovery call could tell you.
+            include_seen = (params.get("include_seen") or [""])[0] == "1"
+            self._send_json(product.pending_resonances(
+                self._token(), include_seen=include_seen))
+            return
         if path == "/api/product/intro/list":
             self._send_json(product.list_requests(self._token()))
             return
@@ -835,6 +843,17 @@ class ProductHandler(BaseHTTPRequestHandler):
                 {"user_id": creds.user_id, "csrf_token": creds.csrf_token,
                  "expires_at": creds.expires_at},
                 cookie=self._cookie_for(creds.access_token))
+            return
+        if path == "/api/product/resonances/seen":
+            body = self._body()
+            keys = body.get("alert_keys")
+            self._send_json(product.mark_resonances_seen(
+                self._token(), [str(k) for k in keys] if isinstance(keys, list) else []))
+            return
+        if path == "/api/product/resonances/dismiss":
+            body = self._body()
+            self._send_json(product.dismiss_resonance(
+                self._token(), str(body.get("alert_key", ""))))
             return
         if path == "/api/product/logout":
             product.logout(self._token())
