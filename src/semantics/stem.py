@@ -77,6 +77,24 @@ def _cut(word: str, region: int, endings, *, preceded_by=()) -> tuple[str, bool]
     return word, False
 
 
+MIN_RU_STEM = 3
+
+
+def _keep(candidate: str, previous: str) -> str:
+    """Refuse a reduction that leaves nothing to mean anything by.
+
+    Snowball is morphologically right to take "данные" down to "да" — данный is
+    a participle of дать — but "да" is also the word "yes", so every Russian
+    label containing it would fire whatever concept "данные" belongs to. Two
+    letters is not a root; it is a preposition, a pronoun or an interjection.
+    The same guard covers за-, на-, при-, ед- and the rest of that family.
+
+    A word that was already short stays exactly as it is: this only blocks a
+    step from creating a stub, never from leaving one alone.
+    """
+    return candidate if len(candidate) >= MIN_RU_STEM else previous
+
+
 def stem_ru(word: str) -> str:
     w = word.lower().replace("ё", "е")
     rv, _r1, r2 = _regions(w)
@@ -88,47 +106,47 @@ def stem_ru(word: str) -> str:
     if not cut:
         w2, cut = _cut(w, rv, _PERFECTIVE_GERUND_1, preceded_by="ая")
     if cut:
-        w = w2
+        w = _keep(w2, w)
     else:
-        w, _ = _cut(w, rv, _REFLEXIVE)
+        w = _keep(_cut(w, rv, _REFLEXIVE)[0], w)
         w2, cut = _cut(w, rv, _ADJECTIVE)
         if cut:
-            w = w2
+            w = _keep(w2, w)
             w3, participle = _cut(w, rv, _PARTICIPLE_2)
             if not participle:
                 w3, participle = _cut(w, rv, _PARTICIPLE_1, preceded_by="ая")
             if participle:
-                w = w3
+                w = _keep(w3, w)
         else:
             w2, cut = _cut(w, rv, _VERB_2)
             if not cut:
                 w2, cut = _cut(w, rv, _VERB_1, preceded_by="ая")
             if cut:
-                w = w2
+                w = _keep(w2, w)
             else:
-                w, _ = _cut(w, rv, _NOUN)
+                w = _keep(_cut(w, rv, _NOUN)[0], w)
 
     # Step 2
     rv, _r1, r2 = _regions(w)
     if w.endswith("и") and len(w) - 1 >= rv:
-        w = w[:-1]
+        w = _keep(w[:-1], w)
 
     # Step 3
     rv, _r1, r2 = _regions(w)
-    w, _ = _cut(w, r2, _DERIVATIONAL)
+    w = _keep(_cut(w, r2, _DERIVATIONAL)[0], w)
 
     # Step 4
     rv, _r1, _r2 = _regions(w)
     if w.endswith("нн"):
-        w = w[:-1]
+        w = _keep(w[:-1], w)
     else:
         w2, cut = _cut(w, rv, _SUPERLATIVE)
         if cut:
-            w = w2
+            w = _keep(w2, w)
             if w.endswith("нн"):
-                w = w[:-1]
+                w = _keep(w[:-1], w)
         elif w.endswith("ь"):
-            w = w[:-1]
+            w = _keep(w[:-1], w)
     return w
 
 
