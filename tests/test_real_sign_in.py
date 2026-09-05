@@ -283,6 +283,27 @@ class ConsentPageTests(unittest.TestCase):
         self.assertIn('value="approve"', page)
         self.assertIn('name="identity" value="current"', page)
 
+    def test_the_page_says_who_you_are_in_terms_you_can_check(self):
+        """Someone reaching this page may have just chosen between several
+        accounts at their provider. A bare `person-…` identifier gives them
+        nothing to check against, so the name and address they signed in with
+        are shown — and the identifier is labelled as what others see."""
+        creds = self.identity.sign_in_federated(
+            provider="google", subject="sub-1", email="ada@example.test",
+            email_verified=True, display_label="Ada Lovelace")
+        page = self._page(self._core(sign_in=True),
+                          {"Cookie": f"resonance_token={creds.access_token}"})
+        self.assertIn("Ada Lovelace", page)
+        self.assertIn("ada@example.test", page)
+        self.assertIn("never your name or address", page)
+
+    def test_an_account_with_no_provider_name_still_identifies_itself(self):
+        creds = self.identity.register("plain")
+        page = self._page(self._core(sign_in=True),
+                          {"Cookie": f"resonance_token={creds.access_token}"})
+        self.assertIn(creds.user_id, page)
+        self.assertIn("Signed in as", page)
+
     def test_the_way_back_to_this_consent_screen_survives_the_sign_in(self):
         """The consent URL carries its own query. Escaped as HTML but not as a
         URL, its `&` would split `next` into separate parameters of the sign-in

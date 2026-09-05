@@ -135,6 +135,7 @@ button:hover { border-color: var(--ink-3); }
 button.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
 .fine { margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 13px; color: var(--ink-3); }
 .who { margin: 10px 4px 4px; font-size: 14px; }
+.who-id { font-size: 12.5px; color: var(--ink-3); }
 a.primary-link { display: inline-flex; align-items: center; min-height: 42px; margin: 4px 4px 8px; padding: 0 22px; border-radius: 999px;
   background: var(--ink); color: var(--paper); border: 1px solid var(--ink); font: 500 15px var(--sans); text-decoration: none; }
 a.primary-link:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
@@ -290,6 +291,34 @@ CodeStore = GrantStore
 # ---------------------------------------------------------------------------
 # the core
 # ---------------------------------------------------------------------------
+
+def _account_line(account: Mapping[str, str] | str, e: Any) -> str:
+    """The "you are signed in as" line, in the plainest terms available.
+
+    A name the person recognises first, the address that proves which account
+    it is second, and the identifier last for the case where a provider gave
+    neither.
+    """
+    if not isinstance(account, Mapping):
+        return f'<p class="who">Signed in as <code>{e(account)}</code>.</p>'
+    label = (account.get("label") or "").strip()
+    email = (account.get("email") or "").strip()
+    user_id = account.get("user_id") or ""
+    if label and email:
+        headline = f"Signed in as <strong>{e(label)}</strong> ({e(email)})."
+    elif label:
+        headline = f"Signed in as <strong>{e(label)}</strong>."
+    elif email:
+        headline = f"Signed in as <strong>{e(email)}</strong>."
+    else:
+        headline = f"Signed in as <code>{e(user_id)}</code>."
+    lines = [f'<p class="who">{headline}</p>']
+    if label or email:
+        lines.append('<p class="who who-id">Account <code>'
+                     f'{e(user_id)}</code> — this is what other people see, '
+                     'never your name or address.</p>')
+    return "".join(lines)
+
 
 @dataclass
 class OAuthResult:
@@ -554,7 +583,7 @@ class OAuthCore:
                     params["redirect_uri"]):
                 return self._redirect_error(params["redirect_uri"], exc, params.get("state"))
             raise
-        current = self._cookie_subject(headers)
+        current = self._cookie_account(headers)
         html_page = self._consent_page(clean, current_account=current,
                                        return_to="/oauth/authorize?" + urlencode(
                                            {k: v for k, v in params.items() if v}))
@@ -629,6 +658,32 @@ class OAuthCore:
         # default: guest continuation (deployments with no sign-in provider)
         creds = identity.register_guest(actor_type="agent")
         return creds.access_token, creds
+
+    def _cookie_account(self, headers: Mapping[str, str]) -> dict[str, str] | None:
+        """Who the browser is signed in as, in terms a person can check.
+
+        This page asks someone to confirm that a client may act as them, and
+        they may have just chosen between several accounts at their provider.
+        An opaque `person-…` identifier gives them nothing to check against, so
+        the name and address they signed in with are shown, with the identifier
+        kept as the precise thing underneath. All three are the viewer's own —
+        nothing here is another participant's.
+        """
+        user_id = self._cookie_subject(headers)
+        if not user_id:
+            return None
+        account = {"user_id": user_id, "label": "", "email": ""}
+        try:
+            user = self.identity.backend.get_user(user_id)
+            account["label"] = str(getattr(user, "display_label", "") or "")
+        except Exception:  # noqa: BLE001 - the identifier alone still works
+            pass
+        try:
+            claims = self.identity.identity_claims(user_id) or {}
+            account["email"] = str(claims.get("email") or "")
+        except Exception:  # noqa: BLE001
+            pass
+        return account
 
     def _cookie_subject(self, headers: Mapping[str, str]) -> str | None:
         raw = headers.get("Cookie") or headers.get("cookie") or ""
@@ -781,7 +836,8 @@ class OAuthCore:
         return True
 
     # -- rendering / helpers --------------------------------------------
-    def _consent_page(self, clean: Mapping[str, str], *, current_account: str | None,
+    def _consent_page(self, clean: Mapping[str, str], *,
+                      current_account: Mapping[str, str] | str | None,
                       return_to: str = "/") -> str:
         e = html.escape
         hidden = "".join(
@@ -803,10 +859,11 @@ class OAuthCore:
         # stranger on every surface, so they are not offered.
         if self.sign_in_required():
             if current_account:
+                who_line = _account_line(current_account, e)
                 identity_block = (
                     '<input type="hidden" name="identity" value="current">'
                     '<fieldset><legend>Your Resonance account</legend>'
-                    f'<p class="who">Signed in as <code>{e(current_account)}</code>.</p>'
+                    f'{who_line}'
                     '</fieldset>')
                 actions = (
                     '<div class="actions">'
@@ -833,9 +890,11 @@ class OAuthCore:
         else:
             current_block = ""
             if current_account:
+                current_id = (current_account["user_id"]
+                              if isinstance(current_account, Mapping) else current_account)
                 current_block = (
                     '<label class="opt"><input type="radio" name="identity" value="current" checked> '
-                    f'Continue as your current account (<code>{e(current_account)}</code>)</label>')
+                    f'Continue as your current account (<code>{e(current_id)}</code>)</label>')
             guest_checked = "" if current_account else " checked"
             identity_block = (
                 '<fieldset><legend>Sign in to Resonance</legend>'
