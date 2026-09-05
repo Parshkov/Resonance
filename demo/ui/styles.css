@@ -267,10 +267,10 @@ button:focus-visible, a:focus-visible { outline: 1px solid var(--bright); outlin
 .contradiction-meta { display: flex; gap: 8px; color: var(--text-3); font-size: 8px; }
 .contradiction-meta code { font-family: var(--mono); color: rgba(182,109,88,.8); }
 .rejected-count { position: absolute; right: 10px; top: 9px; padding: 3px 6px; border: 1px solid rgba(182,109,88,.22); border-radius: 7px; color: var(--rust); font-size: 7px; text-transform: uppercase; }
-.intro-unavailable { display: flex; align-items: center; gap: 11px; margin-top: auto; padding: 12px 13px 5px; color: var(--text-3); }
-.intro-unavailable strong, .intro-unavailable span { display: block; }
-.intro-unavailable strong { color: var(--text-2); font-size: 10px; font-weight: 540; }
-.intro-unavailable span { margin-top: 2px; font-size: 8px; }
+.intro-note { display: flex; align-items: center; gap: 11px; margin-top: auto; padding: 12px 13px 5px; color: var(--text-3); }
+.intro-note strong, .intro-note span { display: block; }
+.intro-note strong { color: var(--text-2); font-size: 10px; font-weight: 540; }
+.intro-note span { margin-top: 2px; font-size: 8px; }
 .lock-mark { width: 15px; height: 16px; opacity: .65; }
 
 .footer-strip { display: flex; align-items: center; justify-content: space-between; padding: 0 5px; color: var(--text-3); font-size: 9px; }
@@ -326,4 +326,160 @@ button:focus-visible, a:focus-visible { outline: 1px solid var(--bright); outlin
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* ---------------------------------------------------------------------------
+   Onboarding — what a first-time visitor sees.
+
+   Before this, a visitor who had shared nothing landed on the results
+   dashboard with every panel empty: no statement of what Resonance is, no way
+   to connect a chat, and three blank surfaces implying something had gone
+   wrong. The results view is for people who have results. This is for everyone
+   else, and it replaces the three surfaces entirely while `data-state` is
+   `unshared` — the page never shows an empty dashboard again.
+--------------------------------------------------------------------------- */
+
+.onboarding { display: none; }
+
+.app-shell[data-state="unshared"] .onboarding { display: block; overflow-y: auto; min-height: 0; }
+.app-shell[data-state="unshared"] .workspace { grid-template-columns: minmax(0, 1fr); }
+.app-shell[data-state="unshared"] .workspace > .surface { display: none; }
+/* The source switch and corpus chip belong to a rendered result. */
+.app-shell[data-state="unshared"] .snapshot-button,
+.app-shell[data-state="unshared"] .source-switch { display: none; }
+
+/* Three tiers, three weights. The hero and the numbered steps share one row
+   and no chrome: they are the narrative. The connect panel below is the only
+   `.surface`-weight object on the page, so the eye lands on it, and inside it
+   the address row is the one lit element. Client notes are a reference table
+   of hairline rows, deliberately quieter than the steps. */
+.onboarding-inner {
+  display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 64px;
+  max-width: 1120px; margin: 0 auto; padding: 6px 24px 52px;
+}
+
+/* -- hero ------------------------------------------------------------------ */
+.onboarding-lede { padding: 30px 0 0; }
+.onboarding-lede h1 {
+  margin: 14px 0 0; max-width: 20ch; font-family: var(--serif); font-weight: 500;
+  font-size: clamp(36px, 3.9vw, 56px); line-height: 1.04; letter-spacing: -.03em;
+}
+.onboarding-lede h1 em { font-style: italic; color: var(--bright); }
+.onboarding-sub {
+  margin: 20px 0 0; max-width: 58ch; color: var(--text-2);
+  font-size: 15px; line-height: 1.62;
+}
+.onboarding-sub strong { color: var(--text); font-weight: 500; }
+
+.onboarding-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.onboarding-cta, .onboarding-ghost {
+  min-height: 44px; padding: 0 20px; border-radius: 13px; font-size: 13px; cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.onboarding-cta { border: 1px solid rgba(201,184,160,.5); background: var(--bright); color: #14120f; font-weight: 600; }
+.onboarding-cta:hover { background: #f3e3c8; }
+.onboarding-ghost { border: 1px solid var(--border); background: transparent; color: var(--text-2); }
+.onboarding-ghost:hover { color: var(--text); border-color: rgba(201,184,160,.34); background: rgba(255,255,255,.04); }
+.onboarding-note { margin: 12px 0 0; max-width: 58ch; color: var(--text-3); font-size: 11px; line-height: 1.55; }
+
+/* -- steps: a numbered rail, no boxes ------------------------------------- */
+.onboarding-steps { margin: 40px 0 0; padding: 0; list-style: none; }
+.onboarding-steps li { position: relative; max-width: 52ch; padding-left: 46px; }
+.onboarding-steps li + li { margin-top: 26px; }
+.onboarding-steps li:not(:last-child)::before {
+  content: ""; position: absolute; left: 15px; top: 34px; bottom: -26px;
+  border-left: 1px solid var(--border-soft);
+}
+.onboarding-step-n {
+  position: absolute; left: 0; top: -2px; display: grid; place-items: center; width: 30px; height: 30px;
+  border: 1px solid rgba(201,184,160,.35); border-radius: 50%; background: var(--canvas-raised);
+  color: var(--gold); font-family: var(--mono); font-size: 9px; letter-spacing: .08em;
+}
+.onboarding-steps h2 { margin: 0; font-family: var(--serif); font-size: 18px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; }
+.onboarding-steps p { margin: 6px 0 0; color: var(--text-2); font-size: 12.5px; line-height: 1.58; }
+
+/* -- connect: the one surface on the page --------------------------------- */
+.onboarding-connect {
+  position: relative; overflow: hidden; margin-top: 48px; padding: 26px 28px 26px; scroll-margin-top: 16px;
+  border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--panel-strong);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03), 0 24px 64px rgba(0,0,0,.18);
+}
+.onboarding-connect::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(145deg, rgba(255,255,255,.018), transparent 22%, transparent 74%, rgba(167,139,113,.015));
+}
+.onboarding-connect > * { position: relative; z-index: 1; }
+.onboarding-connect-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.onboarding-connect-head h2 { margin: 7px 0 0; font-family: var(--serif); font-size: 26px; font-weight: 500; line-height: 1.1; letter-spacing: -.02em; }
+.onboarding-badge {
+  padding: 6px 11px; border: 1px solid rgba(148,168,144,.3); border-radius: 999px;
+  background: rgba(148,168,144,.08); color: var(--sage); font-size: 10px; white-space: nowrap;
+}
+
+/* The address row is the point of the page. It borrows the selected-match
+   language (gold rule, glow) so it is lit rather than merely bordered. */
+.onboarding-url {
+  position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 22px; padding: 14px 14px 14px 22px; border: 1px solid rgba(201,184,160,.42);
+  border-radius: var(--radius-md); background: rgba(0,0,0,.42);
+  box-shadow: 0 0 0 5px rgba(201,184,160,.05), inset 0 1px 0 rgba(255,255,255,.04), 0 18px 44px rgba(0,0,0,.28);
+}
+.onboarding-url::before {
+  content: ""; position: absolute; left: 0; top: 22%; bottom: 22%; width: 2px; border-radius: 2px;
+  background: var(--gold); box-shadow: 0 0 12px rgba(201,184,160,.45);
+}
+.onboarding-url code {
+  flex: 1 1 320px; min-width: 0; overflow-wrap: anywhere;
+  color: var(--bright); font-family: var(--mono); font-size: 17px; line-height: 1.35;
+}
+.onboarding-copy {
+  min-height: 40px; padding: 0 18px; border: 1px solid rgba(201,184,160,.5); border-radius: 11px;
+  background: var(--bright); color: #14120f; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: background 160ms ease;
+}
+.onboarding-copy:hover { background: #f3e3c8; }
+.onboarding-connect > .onboarding-note { margin-top: 12px; max-width: 64ch; font-size: 11.5px; }
+
+/* -- clients: reference rows, not cards ----------------------------------- */
+.onboarding-clients {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 44px;
+  margin-top: 26px; border-top: 1px solid var(--border-soft);
+}
+.onboarding-client {
+  display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 16px; align-items: start;
+  padding: 13px 0 14px; border-bottom: 1px solid var(--border-soft);
+}
+.onboarding-client h3 { margin: 0; color: var(--gold); font-size: 12px; font-weight: 600; line-height: 1.5; letter-spacing: .02em; }
+.onboarding-client p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.onboarding-client strong { color: var(--text); font-weight: 550; }
+.onboarding-inline-code {
+  display: inline-block; padding: 1px 5px; border-radius: 6px; background: rgba(255,255,255,.06);
+  color: var(--text); font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere;
+}
+.onboarding-client h3 .onboarding-inline-code { color: var(--gold); font-size: 10.5px; }
+.onboarding-then { margin: 20px 0 0; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+.onboarding-then em { color: var(--bright); font-family: var(--serif); font-size: 15px; font-style: italic; }
+
+/* Wide: the steps ride alongside the hero instead of below it, which is what
+   fills the right half and puts the connect panel within the first screen. */
+@media (min-width: 960px) {
+  .onboarding-inner { grid-template-columns: minmax(0, 1.2fr) minmax(300px, .8fr); align-items: start; }
+  .onboarding-lede { grid-column: 1; }
+  .onboarding-steps { grid-column: 2; margin-top: 62px; }
+  .onboarding-connect { grid-column: 1 / -1; }
+}
+
+@media (max-width: 900px) {
+  .onboarding-clients { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+}
+
+@media (max-width: 760px) {
+  .onboarding-inner { padding: 4px 14px 36px; }
+  .onboarding-lede { padding-top: 16px; }
+  .onboarding-steps { margin-top: 34px; }
+  .onboarding-connect { margin-top: 36px; padding: 20px 16px 20px; border-radius: var(--radius-lg); }
+  .onboarding-url { padding: 14px 14px 14px 20px; }
+  .onboarding-url code { flex-basis: 100%; font-size: 14px; }
+  .onboarding-copy { flex: 1 1 100%; }
+  .onboarding-client { grid-template-columns: minmax(0, 1fr); gap: 5px; }
 }

@@ -509,15 +509,46 @@ class ProductHttpTests(unittest.TestCase):
             "presentation": dict(PRES)})
         self.assertEqual(prepared["status"], "prepared_private")
 
-    def test_collab_ui_has_intro_initiation_and_hides_stale_placeholder(self):
+    def test_collab_ui_has_intro_initiation_and_the_page_no_longer_lies(self):
         with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")
         # human intro initiation exists and drives the live discover+request path
         self.assertIn("Start an introduction", ui)
         self.assertIn("/api/product/rich_discover", ui)
         self.assertIn("querySession", ui)
-        # the stale R9 placeholder is hidden at runtime
-        self.assertIn("intro-unavailable", ui)
+        # The page used to carry a static "Introductions unavailable — not
+        # exposed by the accepted R8 MCP" chip, which stopped being true at
+        # R13/R14, and this module hid it at runtime. Hiding a false statement
+        # is not the same as not making it: the markup now states the rule that
+        # IS true, so both the claim and the workaround are gone.
+        with urlopen(Request(self.base + "/"), timeout=10) as response:
+            html = response.read().decode("utf-8")
+        # match the element, not the phrase: the phrase survives on purpose in
+        # the comment that records what the chip used to claim.
+        self.assertNotIn('class="intro-unavailable"', html)
+        self.assertIn("Introductions need both sides", html)
+        self.assertNotIn('querySelector(".intro-unavailable")', ui)
+
+    def test_connect_panel_leads_with_the_url_not_a_key(self):
+        # The panel used to lead with "Create MCP key" and hand out
+        # `Authorization: Bearer <key>` plus a `…/mcp/<key>` capability URL for
+        # "clients that only take a URL". ops/CONNECT_MCP.md calls the key a
+        # developer fallback, "debug only, not the normal path", and
+        # submission/HUMAN_TEST_CARDS.md tells a tester that being asked for a
+        # key is a FAIL. The product's own UI was teaching the failing path.
+        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+            ui = response.read().decode("utf-8")
+        # anchor on code, not prose: the phrase "Create MCP key" also appears in
+        # the comment explaining why it no longer leads.
+        url_block = ui.index("Hand your client this one address")
+        key_block = ui.index('actionButton("Create MCP key"')
+        self.assertLess(url_block, key_block, "the canonical URL must lead")
+        self.assertIn("collab-advanced", ui)
+        self.assertIn("Advanced: mint a key (debug only)", ui)
+        # kept inside one string literal: the source wraps this sentence
+        self.assertIn("You will not be asked to paste a", ui)
+        # the capability URL (a secret inside a path) is no longer advertised
+        self.assertNotIn("endpoint_with_key", ui)
         # R16 Chrome audit: the panel is a top-bar-toggled drawer (never a 4th
         # item of the 3-column workspace grid), refreshes after any successful
         # write made through session.mjs, and offers the human share path.
