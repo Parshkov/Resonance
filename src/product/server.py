@@ -242,6 +242,63 @@ def startup_purge_sessions(runtime: "ProductRuntime",
     return result
 
 
+def startup_assign_pseudonyms(runtime: "ProductRuntime",
+                              environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: give a human pseudonym to accounts that lack one.
+
+    ``RESONANCE_ASSIGN_PSEUDONYMS=report`` counts and prints; ``=1`` applies.
+
+    The display label is what other participants see. Two kinds of account have
+    the wrong thing there: the ones created before pseudonyms existed, whose
+    label is a `guest-…` identifier, and — far worse — the ones created by
+    federated sign-in before this was fixed, whose label is the person's real
+    name as their provider knows it. A structural match is not consent to learn
+    someone's name, so that is a disclosure, not an aesthetic problem.
+
+    An account already carrying a pseudonym from this service's own vocabulary
+    is left exactly as it is, so a second run changes nothing. Prints counts and
+    account ids only — never the label being replaced, because that label is the
+    very thing that should not be written down anywhere else.
+    """
+    environ = os.environ if environ is None else environ
+    mode = (environ.get("RESONANCE_ASSIGN_PSEUDONYMS") or "").strip().lower()
+    if mode not in {"1", "true", "yes", "report", "dry-run"}:
+        return None
+    dry_run = mode in {"report", "dry-run"}
+
+    from src.identity.pseudonyms import generate as _generate, is_pseudonym
+
+    users = list(runtime.live.repo.list_users())
+    taken = {str(getattr(u, "display_label", "") or "") for u in users
+             if is_pseudonym(getattr(u, "display_label", ""))}
+    needs = [u for u in users
+             if getattr(u, "revoked_at", None) is None
+             and not is_pseudonym(getattr(u, "display_label", ""))]
+
+    assigned: list[str] = []
+    for user in needs:
+        name = _generate(taken)
+        taken.add(name)
+        if not dry_run:
+            runtime.live.create_user(user.user_id, display_label=name, rebuild=False)
+        assigned.append(user.user_id)
+    if not dry_run and assigned:
+        runtime.live.rebuild_index()
+
+    result = {
+        "dry_run": dry_run,
+        "accounts": len(users),
+        "already_named": len(users) - len(needs),
+        "assigned": len(assigned),
+        "account_ids": assigned,
+    }
+    print(f"assign-pseudonyms: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
+          f"accounts={result['accounts']} already_named={result['already_named']} "
+          f"assigned={result['assigned']} "
+          f"(RESONANCE_ASSIGN_PSEUDONYMS set; unset it after this deploy)")
+    return result
+
+
 def startup_purge_unsigned(runtime: "ProductRuntime",
                            environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
     """One-shot operator action: retire every account nobody ever signed into.
@@ -1244,6 +1301,7 @@ def main(argv: list[str] | None = None) -> None:
     startup_purge_demo(runtime)
     startup_purge_sessions(runtime)
     startup_purge_unsigned(runtime)
+    startup_assign_pseudonyms(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     # The startup log names the FIRST declared --origin; per-request metadata
     # still follows the host actually addressed (see `_issuer`).

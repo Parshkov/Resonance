@@ -50,6 +50,7 @@ from src.product.server import (
     build_runtime,
     startup_purge_demo,
     startup_purge_sessions,
+    startup_assign_pseudonyms,
     startup_purge_unsigned,
 )
 
@@ -555,6 +556,7 @@ def main(argv: list[str] | None = None) -> None:
     startup_purge_demo(runtime)
     startup_purge_sessions(runtime)
     startup_purge_unsigned(runtime)
+    startup_assign_pseudonyms(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     # Per request the issuer is re-derived from the host actually addressed
     # (`ProductHandler._issuer`), so every allowed origin serves its own

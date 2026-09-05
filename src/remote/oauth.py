@@ -303,22 +303,27 @@ def _account_line(account: Mapping[str, str] | str, e: Any) -> str:
     """
     if not isinstance(account, Mapping):
         return f'<p class="who">Signed in as <code>{e(account)}</code>.</p>'
-    label = (account.get("label") or "").strip()
+    name = (account.get("name") or "").strip()
     email = (account.get("email") or "").strip()
+    pseudonym = (account.get("pseudonym") or "").strip()
     user_id = account.get("user_id") or ""
-    if label and email:
-        headline = f"Signed in as <strong>{e(label)}</strong> ({e(email)})."
-    elif label:
-        headline = f"Signed in as <strong>{e(label)}</strong>."
+    if name and email:
+        headline = f"Signed in as <strong>{e(name)}</strong> ({e(email)})."
+    elif name:
+        headline = f"Signed in as <strong>{e(name)}</strong>."
     elif email:
         headline = f"Signed in as <strong>{e(email)}</strong>."
+    elif pseudonym:
+        headline = f"Signed in as <strong>{e(pseudonym)}</strong>."
     else:
         headline = f"Signed in as <code>{e(user_id)}</code>."
     lines = [f'<p class="who">{headline}</p>']
-    if label or email:
-        lines.append('<p class="who who-id">Account <code>'
-                     f'{e(user_id)}</code> — this is what other people see, '
-                     'never your name or address.</p>')
+    if pseudonym and (name or email):
+        # The question the headline immediately raises is whether that name is
+        # about to be shown to strangers. Answer it in the same breath.
+        lines.append(f'<p class="who who-id">Other people see you as '
+                     f'<strong>{e(pseudonym)}</strong> — never your name or '
+                     'your address.</p>')
     return "".join(lines)
 
 
@@ -497,9 +502,15 @@ class OAuthCore:
             doc["email"] = claims["email"]
             doc["email_verified"] = bool(claims.get("email_verified"))
         user = self.identity.backend.get_user(actor.user_id)
-        label = getattr(user, "display_label", None) if user is not None else None
-        if label:
-            doc["name"] = str(label)
+        pseudonym = getattr(user, "display_label", None) if user is not None else None
+        if pseudonym:
+            # What other participants see. Named `preferred_username` because
+            # that is what it is: the handle, not the person.
+            doc["preferred_username"] = str(pseudonym)
+        if claims.get("name"):
+            doc["name"] = str(claims["name"])
+        elif pseudonym:
+            doc["name"] = str(pseudonym)
         return self._ok(doc)
 
     # -- dynamic client registration (RFC 7591) -------------------------
@@ -693,15 +704,16 @@ class OAuthCore:
         user_id = self._cookie_subject(headers)
         if not user_id:
             return None
-        account = {"user_id": user_id, "label": "", "email": ""}
+        account = {"user_id": user_id, "pseudonym": "", "name": "", "email": ""}
         try:
             user = self.identity.backend.get_user(user_id)
-            account["label"] = str(getattr(user, "display_label", "") or "")
+            account["pseudonym"] = str(getattr(user, "display_label", "") or "")
         except Exception:  # noqa: BLE001 - the identifier alone still works
             pass
         try:
             claims = self.identity.identity_claims(user_id) or {}
             account["email"] = str(claims.get("email") or "")
+            account["name"] = str(claims.get("name") or "")
         except Exception:  # noqa: BLE001
             pass
         return account

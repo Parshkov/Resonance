@@ -26,6 +26,7 @@ from src.security import (
 )
 
 from .backend import IdentityBackend
+from .pseudonyms import generate as generate_pseudonym
 from .models import (
     ActorContext,
     AuthenticationError,
@@ -160,7 +161,23 @@ class IdentityService:
         return self._issue_session(user_id, actor_type=actor_type)
 
     def register_guest(self, *, actor_type: str = "human") -> SessionCredentials:
-        return self.register(f"guest-{secrets.token_hex(3)}", actor_type=actor_type)
+        return self.register(self.fresh_pseudonym(), actor_type=actor_type)
+
+    def fresh_pseudonym(self) -> str:
+        """A display name nobody else is using.
+
+        The display label is what other participants see, so it must be a
+        pseudonym and it must be unique. Existing labels are read from the
+        backend rather than assumed, because two people meeting under the same
+        name in a service built for introductions would be worse than an ugly
+        name.
+        """
+        try:
+            taken = {str(_field(user, "display_label") or "")
+                     for user in self.backend.list_users()}
+        except Exception:  # noqa: BLE001 - a name is better than a failed sign-in
+            taken = set()
+        return generate_pseudonym(taken)
 
     # -- federated sign-in ----------------------------------------------
     def find_user_by_identity(self, provider: str, subject: str) -> str | None:
@@ -202,6 +219,10 @@ class IdentityService:
                 "provider": str(event.payload.get("provider") or ""),
                 "email": str(event.payload.get("email") or ""),
                 "email_verified": bool(event.payload.get("email_verified")),
+                # The name the provider knows them by. Shown back to the person
+                # so they can confirm which account they are on; never exposed
+                # to another participant.
+                "name": str(event.payload.get("name") or ""),
             }
         return claims
 
@@ -228,13 +249,19 @@ class IdentityService:
         existing = self.find_user_by_identity(provider, subject)
         if existing is not None:
             return self._issue_session(existing, actor_type=actor_type)
-        credentials = self.register(display_label, actor_type=actor_type)
+        # The provider's name is NOT the display label. The display label is
+        # what other participants see, and a structural match is not consent to
+        # learn someone's real name — so the account is given a pseudonym and
+        # the real name is kept beside the address, where only its owner and
+        # the clients they authorise can read it.
+        credentials = self.register(self.fresh_pseudonym(), actor_type=actor_type)
         self._link_identity(
             credentials.user_id,
             provider=provider,
             subject=subject,
             email=email,
             email_verified=email_verified,
+            name=display_label,
         )
         return credentials
 
@@ -276,6 +303,7 @@ class IdentityService:
         subject: str,
         email: str,
         email_verified: bool,
+        name: str = "",
     ) -> None:
         self._append(
             ACCOUNT_IDENTITY_LINKED,
@@ -286,6 +314,7 @@ class IdentityService:
                 "subject": subject,
                 "email": email,
                 "email_verified": bool(email_verified),
+                "name": str(name or ""),
             },
         )
 

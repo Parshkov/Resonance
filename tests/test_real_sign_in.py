@@ -277,31 +277,48 @@ class ConsentPageTests(unittest.TestCase):
         creds = self.identity.sign_in_federated(
             provider="google", subject="sub-1", email="a@example.test",
             email_verified=True, display_label="Ada")
+        pseudonym = self.identity.backend.get_user(creds.user_id).display_label
         page = self._page(self._core(sign_in=True),
                           {"Cookie": f"resonance_token={creds.access_token}"})
-        self.assertIn(creds.user_id, page)
+        self.assertIn(pseudonym, page)
         self.assertIn('value="approve"', page)
         self.assertIn('name="identity" value="current"', page)
 
-    def test_the_page_says_who_you_are_in_terms_you_can_check(self):
+    def test_the_page_says_who_you_are_and_who_others_see(self):
         """Someone reaching this page may have just chosen between several
-        accounts at their provider. A bare `person-…` identifier gives them
-        nothing to check against, so the name and address they signed in with
-        are shown — and the identifier is labelled as what others see."""
+        accounts at their provider, so it must show the name they know. It must
+        then answer the question that immediately raises — whether that name is
+        about to be shown to strangers. It is not."""
         creds = self.identity.sign_in_federated(
             provider="google", subject="sub-1", email="ada@example.test",
             email_verified=True, display_label="Ada Lovelace")
+        pseudonym = self.identity.backend.get_user(creds.user_id).display_label
         page = self._page(self._core(sign_in=True),
                           {"Cookie": f"resonance_token={creds.access_token}"})
         self.assertIn("Ada Lovelace", page)
         self.assertIn("ada@example.test", page)
-        self.assertIn("never your name or address", page)
+        self.assertIn(pseudonym, page)
+        self.assertIn("never your name or your address", page)
 
-    def test_an_account_with_no_provider_name_still_identifies_itself(self):
-        creds = self.identity.register("plain")
+    def test_the_provider_name_never_becomes_the_public_pseudonym(self):
+        """The display label is what other participants see. A structural match
+        is not consent to learn someone's real name, so the provider's name must
+        not end up there."""
+        from src.identity.pseudonyms import is_pseudonym
+        creds = self.identity.sign_in_federated(
+            provider="google", subject="sub-2", email="ada@example.test",
+            email_verified=True, display_label="Ada Lovelace")
+        label = self.identity.backend.get_user(creds.user_id).display_label
+        self.assertNotEqual(label, "Ada Lovelace")
+        self.assertTrue(is_pseudonym(label), label)
+        self.assertEqual(self.identity.identity_claims(creds.user_id)["name"],
+                         "Ada Lovelace")
+
+    def test_an_account_with_no_provider_behind_it_still_identifies_itself(self):
+        creds = self.identity.register("Quiet Lantern")
         page = self._page(self._core(sign_in=True),
                           {"Cookie": f"resonance_token={creds.access_token}"})
-        self.assertIn(creds.user_id, page)
+        self.assertIn("Quiet Lantern", page)
         self.assertIn("Signed in as", page)
 
     def test_the_way_back_to_this_consent_screen_survives_the_sign_in(self):
