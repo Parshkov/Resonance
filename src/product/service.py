@@ -598,6 +598,16 @@ class LiveProductService:
         candidate_session = str(row.get("session_id", ""))
         source = self.identity.policy_source
         owner = source.owner_of("session", candidate_session)
+        if owner and owner == viewer_id:
+            # Your own other thought is not somebody who turned up. Share two
+            # things here and discovery reported the second back to you as a
+            # person whose reasoning has the same shape as yours -- under your
+            # own pseudonym, in a service whose whole purpose is introducing
+            # you to someone else. You could then ask to be introduced to
+            # yourself. The standing search has always excluded this
+            # (standing.py: their_owner == owner); the two halves simply
+            # disagreed, and only the half that speaks to people was wrong.
+            return None
         if owner and source.is_blocked(viewer_id, owner):
             return None
         consent = source.session_consent(candidate_session)
