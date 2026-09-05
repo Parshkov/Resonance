@@ -108,6 +108,10 @@ STATIC = {
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
     "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
     "/account.mjs": ("account.mjs", "text/javascript; charset=utf-8"),
+    # The frame: colour scheme (applied before first paint), navigation built
+    # from the sections that are on the page, notices. Loaded by index.html.
+    "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
+    "/shell.mjs": ("shell.mjs", "text/javascript; charset=utf-8"),
     # What the standing search found while the person was away.
     "/resonances.mjs": ("resonances.mjs", "text/javascript; charset=utf-8"),
     # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe

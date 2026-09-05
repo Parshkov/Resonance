@@ -3,7 +3,7 @@
    CSP is `default-src 'self'` — system fonts only, no external anything. */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --paper: #faf8f5;
   --ink: #1a1815;
   --ink-2: #4a453e;
@@ -17,8 +17,10 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* Light is the default; theme.mjs sets data-theme="dark" from the viewer's
+   own choice (made on the main page), so this follows the same preference. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
     --paper: #0f0e0d;
     --ink: #f2eee8;
     --ink-2: #b6afa5;
@@ -27,7 +29,6 @@
     --line-soft: rgba(255, 255, 255, 0.07);
     --accent: #c9b8a0;
     --code-bg: rgba(255, 255, 255, 0.06);
-  }
 }
 
 * { box-sizing: border-box; }

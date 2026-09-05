@@ -59,8 +59,6 @@ function syncNewsVisibility() {
   const hasAlerts = (arrivals?.childElementCount || 0) + (existing?.childElementCount || 0) > 0;
   const hasRequests = requests && !requests.hidden;
   section.hidden = !(hasAlerts || hasRequests);
-  const nav = byId("nav-news");
-  if (nav) nav.hidden = section.hidden;
 }
 
 function describe(alert) {
@@ -98,11 +96,10 @@ function alertCard(alert, quiet) {
   const why = el("p", {className: "arrival-why"});
   const structural = alert.scores_at_detection?.structural;
   why.append(later
-    ? "Someone new shared a thought whose reasoning has the same shape as yours. "
-    : "Their reasoning had the same shape as yours when you shared. ");
+    ? "Someone shared this after you did, and its reasoning has the same shape as yours — no search of yours could have found them, because they were not here yet. "
+    : "Their reasoning had the same shape as yours the moment you shared. ");
   if (sub) why.append(`${sub[0].toUpperCase()}${sub.slice(1)}. `);
-  why.append("Structural ", el("code", {textContent: formatScore(structural)}),
-    alert.mode ? ` · ${alert.mode}` : "");
+  why.append("Structural match ", el("code", {textContent: formatScore(structural)}), ".");
   card.append(why);
 
   const actions = el("div", {className: "arrival-actions"});
@@ -113,7 +110,7 @@ function alertCard(alert, quiet) {
   actions.append(ask);
 
   const show = el("button", {type: "button", className: "collab-button collab-button--quiet",
-    textContent: "Show on the map"});
+    textContent: "See them on the map"});
   show.addEventListener("click", () => {
     document.dispatchEvent(new CustomEvent("resonance:focus-session",
       {detail: {sessionId: alert.their_session_id}}));
@@ -132,7 +129,7 @@ function alertCard(alert, quiet) {
       updateSummary(lastAlerts.filter((a) => a.alert_key !== alert.alert_key));
     } catch (error) {
       dismiss.disabled = false;
-      byId("collab-error") && (byId("collab-error").textContent = error.message);
+      document.dispatchEvent(new CustomEvent("resonance:notice", {detail: {message: error.message}}));
     }
   });
   actions.append(dismiss);
@@ -144,8 +141,12 @@ function updateSummary(alerts) {
   lastAlerts = alerts;
   const unseen = alerts.filter((a) => !a.seen_at || shownAsNew.has(a.alert_key)).length;
   const arrived = alerts.filter((a) => a.reason === "they_arrived").length;
-  const badge = byId("nav-news-count");
-  if (badge) { badge.textContent = String(unseen); badge.hidden = unseen === 0; }
+  // The navigation (shell.mjs) reads the count off the section itself.
+  const section = byId("news");
+  if (section) {
+    if (unseen > 0) section.dataset.navCount = String(unseen);
+    else delete section.dataset.navCount;
+  }
   const summary = byId("news-summary");
   if (summary) {
     const parts = [];
@@ -156,7 +157,8 @@ function updateSummary(alerts) {
   const heading = byId("news-heading");
   if (heading) {
     heading.textContent = arrived > 0
-      ? (arrived === 1 ? "Someone new resonates with your thought" : `${arrived} new people resonate with your thought`)
+      ? (arrived === 1 ? "Someone arrived whose reasoning has the same shape as yours"
+        : `${arrived} people arrived whose reasoning has the same shape as yours`)
       : "Your thought kept looking";
   }
 }

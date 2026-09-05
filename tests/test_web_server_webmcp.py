@@ -170,7 +170,7 @@ class WebServerWebMCPTests(unittest.TestCase):
             self.assertEqual(
                 json.loads(ctx.exception.read().decode())["error"], "share_required", path)
         # The page renders that as its own state, never through the error path.
-        self.assertIn('dataset.state = "unshared"', app)
+        self.assertIn('setShellState("unshared")', app)
         self.assertIn("function renderUnshared()", app)
         self.assertIn("clearActiveThought()", app)
         # There is no second source to fall back to any more: the fixture

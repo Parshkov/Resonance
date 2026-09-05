@@ -11,7 +11,10 @@
  * It used to be a right-hand drawer opened from a "Collaboration" button in
  * the masthead. Finding people is pointless if reaching them is hidden behind
  * an overlay, so the same surfaces now render into sections of the page:
- *   #share-control / #onboarding-share  — share or stop sharing
+ *   #share-state / #share-composer / #share-control
+ *                                        — what is discoverable, the composer
+ *                                          while nothing is, stop sharing once
+ *                                          something is
  *   .match-card .match-card__actions    — ask for an introduction
  *   #collab-initiate                     — people open to one, without a card
  *   #collab-requests, #collab-channel    — the Conversations section
@@ -58,10 +61,12 @@ function requestId(prefix) {
   return `ui-${prefix}-${requestCounter}-${getCsrf()?.slice(0, 6) || "anon"}`;
 }
 
+// Anything that went wrong is said once, in the page's one notice slot
+// (shell.mjs), whichever surface it came from. Signed-out is not an error
+// here: the account module already shows the way in.
 function showError(message) {
-  const node = byId("collab-error");
-  if (node) node.textContent = message || "";
-  if (message) byId("conversations")?.removeAttribute("hidden");
+  if (message && /^Sign in to Resonance/.test(message)) return;
+  document.dispatchEvent(new CustomEvent("resonance:notice", {detail: {message: message || ""}}));
 }
 
 function actionButton(label, handler, variant = "") {
@@ -107,22 +112,35 @@ function theirWords(text, from) {
 // is no stand-in thought — so the page has to ask for the words first.
 
 const SHARE_PLACEHOLDER =
-  "What are you working on, in your own words? Say what causes what, what prevents " +
-  "what, what requires what — the structure is extracted from those connectives.\n\n" +
+  "What are you working on, and what is hard about it? Say what causes what, what " +
+  "prevents what, what requires what — the structure comes from those words.\n\n" +
   "For example: “A partial outage causes synchronized client retries. The retries cause " +
   "request amplification, which leads to cascading saturation. Jittered backoff prevents " +
   "the amplification.”";
 
+const SHARE_TRUST =
+  "Your words are not kept. Only the structure — what causes what — is compared, " +
+  "and you will see exactly that before anyone else can.";
+
+function humanRelation(type) {
+  return String(type || "").replace(/_/g, " ");
+}
+
+// This is all anyone will ever see: the nodes and the typed relations.
 function previewStructure(preview) {
   const thought = preview?.will_become_discoverable?.thought || {};
   const presentation = preview?.will_become_discoverable?.presentation || {};
   const nodes = Array.isArray(thought.nodes) ? thought.nodes : [];
   const relations = Array.isArray(thought.relations) ? thought.relations : [];
   const labelOf = new Map(nodes.map((n) => [n.id, n.label]));
-  const box = el("div", {className: "share-preview"});
-  box.append(el("p", {className: "eyebrow", textContent: "This is what would become discoverable"}));
-  if (presentation.topic) box.append(el("p", {className: "share-preview__topic", textContent: presentation.topic}));
+  const box = el("section", {className: "share-preview"});
+  box.setAttribute("aria-label", "What would become visible");
+  box.append(el("h3", {className: "share-preview__title", textContent: "This is all anyone will ever see"}));
+  if (presentation.topic && presentation.topic !== "Shared thought") {
+    box.append(el("p", {className: "share-preview__topic", textContent: presentation.topic}));
+  }
   const chain = el("ol", {className: "dna-chain"});
+  chain.setAttribute("aria-label", "Nodes");
   for (const node of nodes) {
     const row = el("li", {className: "dna-node"});
     row.append(el("strong", {textContent: node.label || ""}), el("span", {textContent: node.role || ""}));
@@ -130,61 +148,64 @@ function previewStructure(preview) {
   }
   box.append(chain);
   const list = el("ol", {className: "dna-relations"});
+  list.setAttribute("aria-label", "Relations");
   for (const relation of relations) {
     const row = el("li", {className: "dna-relation"});
     row.append(
       el("span", {textContent: labelOf.get(relation.source) || relation.source || ""}),
-      el("span", {className: "relation-type", textContent: relation.type || ""}),
+      el("span", {className: "relation-type", textContent: humanRelation(relation.type)}),
       el("span", {textContent: labelOf.get(relation.target) || relation.target || ""}),
     );
     list.append(row);
   }
   box.append(list);
-  box.append(el("p", {className: "collab-muted", textContent:
+  box.append(el("p", {className: "share-preview__note", textContent:
     "Your text itself is not kept. Only these nodes and relations are compared, and only " +
-    "they can be seen by the people they resonate with."}));
+    "the people they resonate with can see them — under your pseudonym, with no way to reach you " +
+    "until you both agree."}));
   return box;
 }
 
+// The exposure moment. The textarea is on the page as soon as there is
+// nothing shared — it is the page's one action — and the promise that makes
+// it bearable sits next to it, not in a paragraph somewhere else.
 function openShareComposer() {
   const host = byId("share-composer");
   if (!host) return;
-  if (host.querySelector(".share-form")) { host.querySelector("textarea")?.focus(); return; }
+  if (host.querySelector(".share-form")) return;
   const form = el("form", {className: "share-form"});
   const id = "share-context";
-  form.append(el("label", {htmlFor: id, className: "share-form__label", textContent:
-    "Share a thought from this page"}));
+  form.append(el("label", {htmlFor: id, className: "visually-hidden", textContent: "Your thought, in your own words"}));
   const textarea = el("textarea", {id, name: "context", required: true, maxLength: 4000,
-    placeholder: SHARE_PLACEHOLDER});
-  const status = el("p", {className: "collab-muted share-form__status", role: "status"});
-  const row = el("div", {className: "intro-composer-row"});
+    placeholder: SHARE_PLACEHOLDER, rows: 6});
+  const status = el("p", {className: "share-form__status", role: "status"});
+  const row = el("div", {className: "share-form__row"});
   const extract = el("button", {type: "submit", className: "collab-button collab-button--primary",
-    textContent: "Show me the structure"});
-  const cancel = el("button", {type: "button", className: "collab-button collab-button--quiet", textContent: "Cancel"});
-  cancel.addEventListener("click", () => host.replaceChildren());
-  row.append(extract, cancel);
+    textContent: "Show me what would be shared"});
+  row.append(extract, el("p", {className: "share-form__trust", textContent: SHARE_TRUST}));
   form.append(textarea, row, status);
   host.replaceChildren(form);
-  queueMicrotask(() => textarea.focus());
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const context = textarea.value.trim();
     if (!context) { textarea.focus(); return; }
     extract.disabled = true;
-    status.textContent = "Extracting the structure…";
+    status.classList.remove("is-error");
+    status.textContent = "Reading the structure…";
     let preview;
     try {
       await apiFetch("POST", "/api/webmcp/prepare", {request_id: requestId("prep"), context});
       preview = await apiFetch("GET", "/api/webmcp/preview");
     } catch (error) {
+      status.classList.add("is-error");
       status.textContent = error.message;
       extract.disabled = false;
       return;
     }
     status.textContent = "";
-    // Step 2: the preview, and the explicit share.
-    const confirmRow = el("div", {className: "intro-composer-row"});
+    // Step 2: the preview, and the explicit share. Nothing is discoverable yet.
+    const confirmRow = el("div", {className: "share-form__row"});
     const share = el("button", {type: "button", className: "collab-button collab-button--primary",
       textContent: "Share this and start looking"});
     const back = el("button", {type: "button", className: "collab-button collab-button--quiet",
@@ -199,7 +220,9 @@ function openShareComposer() {
         });
         host.replaceChildren();
         await refreshAll();
+        byId("people")?.scrollIntoView({block: "start"});
       } catch (error) {
+        status.classList.add("is-error");
         status.textContent = error.message;
         share.disabled = false;
       }
@@ -209,44 +232,54 @@ function openShareComposer() {
       textarea.hidden = false; row.hidden = false; extract.disabled = false;
       textarea.focus();
     });
-    confirmRow.append(share, back, el("p", {className: "collab-muted", textContent:
-      "You can stop sharing at any moment."}));
+    confirmRow.append(share, back, el("p", {className: "share-form__trust", textContent:
+      "Nothing is visible until you press share, and you can stop at any moment."}));
     textarea.hidden = true; row.hidden = true;
     form.append(previewBox, confirmRow, status);
+    previewBox.setAttribute("tabindex", "-1");
+    previewBox.focus({preventScroll: false});
   });
 }
 
 async function stopSharing() {
-  if (!window.confirm("Stop sharing? Your thought is removed from discovery and stops looking.")) return;
   await apiFetch("POST", "/api/webmcp/consent", {
     request_id: requestId("revoke"), shared: false, confirm: true,
   });
 }
 
-function renderShareInto(host, shared, count, compact) {
-  if (!host) return;
-  host.replaceChildren();
-  if (!compact) {
-    const stateRow = el("p", {className: "collab-share-state"});
-    stateRow.dataset.shared = String(shared);
+// Stop sharing asks once, inline, where the person can read what it means.
+function stopSharingControl(host) {
+  const stop = el("button", {type: "button", className: "collab-button", textContent: "Stop sharing"});
+  stop.addEventListener("click", () => {
+    const box = el("div", {className: "stop-confirm", role: "group"});
+    box.setAttribute("aria-label", "Confirm stop sharing");
+    const yes = actionButton("Yes, stop", async () => { await stopSharing(); await refreshAll(); }, "primary");
+    const keep = el("button", {type: "button", className: "collab-button collab-button--quiet", textContent: "Keep sharing"});
+    keep.addEventListener("click", () => { box.replaceWith(stop); stop.focus(); });
+    box.append(el("p", {textContent: "Your thought leaves discovery now and stops looking. Anyone it matched stops seeing it."}), yes, keep);
+    stop.replaceWith(box);
+    yes.focus();
+  });
+  host.append(stop);
+}
+
+// One line, in one place, says what is discoverable. The control beside it
+// is the one thing that changes that.
+function renderShareState(shared, count) {
+  const line = byId("share-state");
+  if (line) {
     const light = el("span", {className: "status-light"});
     light.setAttribute("aria-hidden", "true");
-    stateRow.append(light, shared
-      ? `Shared · ${count} discoverable thought${count === 1 ? "" : "s"} · still looking`
-      : "Private · nothing is discoverable");
-    host.append(stateRow);
+    line.replaceChildren(light, shared
+      ? `Discoverable · ${count === 1 ? "1 thought" : `${count} thoughts`} · still looking`
+      : "Private · nothing of yours is discoverable");
+    line.dataset.shared = String(shared);
   }
-  if (shared) {
-    host.append(actionButton("Stop sharing", async () => { await stopSharing(); await refreshAll(); }));
-  } else {
-    const open = el("button", {type: "button", className: "collab-button collab-button--primary",
-      textContent: compact ? "Share a thought from this page" : "Share a thought"});
-    open.addEventListener("click", () => {
-      openShareComposer();
-      byId("thought")?.scrollIntoView({block: "start"});
-    });
-    host.append(open);
-  }
+  const control = byId("share-control");
+  if (!control) return;
+  if (control.querySelector(".stop-confirm")) return;   // mid-question: leave it
+  control.replaceChildren();
+  if (shared) stopSharingControl(control);
 }
 
 // One read of the person's own sessions serves both the share control and
@@ -268,20 +301,11 @@ async function refreshShare(owned) {
   // this page must also take it out of its onboarding state. Reuses the read
   // we just did instead of adding one.
   document.dispatchEvent(new CustomEvent("resonance:consent", {detail: {shared}}));
-  // The masthead pill is normally kept by webmcp_live.mjs after its own tool
-  // writes; a share made from this page is a write it never sees, and a pill
-  // reading "Private" over a thought that is looking is a lie. Same markup,
-  // same fact, no extra request.
-  const pill = byId("header-consent");
-  if (pill) {
-    const light = el("span", {className: "status-light"});
-    light.setAttribute("aria-hidden", "true");
-    pill.replaceChildren(light, el("span", {textContent:
-      shared ? "Shared with Resonance" : "Private · not discoverable"}));
-    pill.dataset.shared = String(shared);
-  }
-  renderShareInto(byId("share-control"), shared, discoverable.length, false);
-  renderShareInto(byId("onboarding-share"), shared, discoverable.length, true);
+  renderShareState(shared, discoverable.length);
+  // Nothing shared: the composer IS the page's action, so it is open. Once
+  // something is shared the panel shows the thought instead.
+  if (shared) byId("share-composer")?.replaceChildren();
+  else openShareComposer();
 }
 
 // ---- connect: the developer fallback, after the URL that is the real path --
@@ -512,18 +536,18 @@ async function refreshInitiate(owned) {
 // ---- requests -----------------------------------------------------------
 
 function setBadge(count) {
-  const badge = byId("nav-requests-count");
-  if (badge) {
-    badge.textContent = String(count);
-    badge.hidden = count === 0;
+  // The navigation (shell.mjs) reads the count off the section itself.
+  const section = byId("conversations");
+  if (section) {
+    if (count > 0) section.dataset.navCount = String(count);
+    else delete section.dataset.navCount;
   }
   const line = byId("news-requests");
   if (line) {
     line.replaceChildren();
     if (count > 0) {
-      const link = el("a", {href: "#conversations", textContent: count === 1
-        ? "Answer them" : "Answer them"});
-      line.append(count === 1 ? "1 person asked to be introduced to you. "
+      const link = el("a", {href: "#conversations", textContent: "Answer below"});
+      line.append(count === 1 ? "Someone asked to be introduced to you. "
         : `${count} people asked to be introduced to you. `, link);
     }
     line.hidden = count === 0;
@@ -612,7 +636,7 @@ async function refreshRequests() {
   ];
   if (!hasAny) {
     host.append(el("p", {className: "collab-empty", textContent:
-      "No introductions yet. Ask one of the people above; if they accept, the conversation opens here."}));
+      "Nobody has asked yet, and you have not asked anyone. When you do — or someone asks you — it appears here, and nothing opens until both of you agree."}));
   }
   if (waiting.length) {
     host.append(el("h4", {textContent: `Waiting for your answer · ${waiting.length}`}));
@@ -672,8 +696,8 @@ function renderNoChannel(connectedCount) {
   host.replaceChildren(
     el("h3", {textContent: "Conversation"}),
     el("p", {className: "collab-empty", textContent: connectedCount > 0
-      ? "Pick a connected introduction to open its conversation."
-      : "A conversation opens here once someone accepts — or once you accept someone."}),
+      ? "Open one of the connected introductions to read its conversation."
+      : "A conversation opens here once someone accepts — or once you accept someone. Only what is typed here is passed on."}),
   );
 }
 
@@ -804,6 +828,12 @@ function init() {
   // Older callers asked for the drawer to open; the section is the page now.
   document.addEventListener("resonance:collab-open", () => {
     byId("conversations")?.scrollIntoView({block: "start"});
+  });
+  // Signed out where a sign-in exists: there is no account to read for, so
+  // there is nothing to compose into. The gate is the page.
+  document.addEventListener("resonance:sign-in-required", () => {
+    byId("share-composer")?.replaceChildren();
+    byId("share-state")?.replaceChildren();
   });
   // Requests and messages from other people arrive without a local write:
   // poll slowly while the tab is visible.
