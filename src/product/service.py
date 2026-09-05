@@ -30,6 +30,12 @@ from src.graph import ThoughtGraph
 from src.identity import IdentityService
 from src.identity.models import AuthorizationError
 from src.ingestion import IdentityIngestionService
+from src.product.shapes import (
+    SAME_SHAPE_NOTE,
+    ShapeCensus,
+    census_of_repository,
+    shape_signature,
+)
 from src.product.standing import StandingSearch
 from src.security.guards import suppress_small_buckets
 
@@ -114,6 +120,11 @@ class LiveProductService:
         # for it. It keeps looking, and tells both sides when someone whose
         # reasoning has the same shape arrives later.
         self.standing = StandingSearch(self)
+        # How many unrelated accounts hold each exact shape, recomputed only
+        # when the corpus generation moves. Consent, revocation and deletion
+        # all move it, so a cached census is never older than the index the
+        # engine is searching with. See shapes.py for what it is for.
+        self._census: tuple[Any, ShapeCensus] | None = None
 
     # ------------------------------------------------------------------
     # thin delegations: one boundary, accepted semantics untouched
@@ -311,10 +322,16 @@ class LiveProductService:
         viewer_coords = None
         if viewer_consent.get("share_coarse_location"):
             viewer_coords = _coords(dict(getattr(session, "location", {}) or {}))
+        # The query's own label-free skeleton. A candidate with exactly this
+        # skeleton, when the census says the skeleton is one author's habit
+        # rather than anyone's reasoning, is set aside in _project_row.
+        query_shape = shape_signature(graph)
+        tally: dict[str, int] = {"same_shape": 0}
         matches: list[dict[str, Any]] = []
         dropped_blocked = 0
         for row in raw["matches"]:
-            projected = self._project_row(actor.user_id, row, viewer_coords)
+            projected = self._project_row(actor.user_id, row, viewer_coords,
+                                          query_shape=query_shape, tally=tally)
             if projected is None:
                 dropped_blocked += 1
                 continue
@@ -322,11 +339,17 @@ class LiveProductService:
         rejected: list[dict[str, Any]] = []
         for row in raw.get("rejected", []):
             projected = self._project_row(actor.user_id, row, viewer_coords,
-                                          allow_hard_rejected=True)
+                                          allow_hard_rejected=True,
+                                          query_shape=query_shape, tally=tally)
             if projected is None:
                 dropped_blocked += 1
                 continue
             rejected.append(projected)
+        # Rows set aside for their shape are not "blocked": nobody blocked
+        # anyone, and the count that field carries is already a small leak
+        # about other people's consent. The shape note is a sentence, not a
+        # number, for the same reason.
+        dropped_blocked -= tally["same_shape"]
 
         freshness = self.freshness()
         payload = {
@@ -339,6 +362,7 @@ class LiveProductService:
             "aggregation": self._aggregate(matches),
             "blocked_rows_removed": dropped_blocked,
             "location_note": LOCATION_NOTE,
+            "shape_note": SAME_SHAPE_NOTE if tally["same_shape"] else "",
             "freshness": freshness,
         }
         result_id = "result-" + hashlib.sha256(_canonical(payload)).hexdigest()[:24]
@@ -347,6 +371,7 @@ class LiveProductService:
             self._results[result_id] = {
                 "subject": actor.user_id,
                 "serving_generation": freshness["serving_generation"],
+                "query_shape": query_shape,
                 "payload": payload,
             }
             if result_id in self._result_order:
@@ -382,14 +407,19 @@ class LiveProductService:
             )
         payload = dict(record["payload"])
         payload["freshness"] = current
+        tally: dict[str, int] = {"same_shape": 0}
         for key, allow_rejected in (("matches", False), ("rejected", True)):
             refreshed = []
             for row in payload.get(key, []):
                 projected = self._project_row(actor.user_id, row, None,
-                                              allow_hard_rejected=allow_rejected)
+                                              allow_hard_rejected=allow_rejected,
+                                              query_shape=record.get("query_shape"),
+                                              tally=tally)
                 if projected is not None:
                     refreshed.append(projected)
             payload[key] = refreshed
+        if tally["same_shape"]:
+            payload["shape_note"] = SAME_SHAPE_NOTE
         return payload
 
     def get_match(
@@ -602,6 +632,8 @@ class LiveProductService:
         viewer_coords: tuple[float, float] | None,
         *,
         allow_hard_rejected: bool = False,
+        query_shape: str | None = None,
+        tally: dict[str, int] | None = None,
     ) -> dict[str, Any] | None:
         candidate_session = str(row.get("session_id", ""))
         source = self.identity.policy_source
@@ -624,6 +656,17 @@ class LiveProductService:
                 return None
             if not consent.get("share_thought_dna") and not allow_hard_rejected:
                 return None
+        if query_shape and self._same_habit_shape(query_shape, candidate_session):
+            # The candidate has exactly the viewer's skeleton, and that
+            # skeleton is held by so many unrelated accounts that it is the
+            # pipeline's habit rather than anybody's reasoning. A match that
+            # rests on it alone is not an introduction to anyone. Last of the
+            # drop rules on purpose: a row that was yours, blocked or withdrawn
+            # is dropped for that reason and never counted here, so the shape
+            # note is only ever shown when the shape was the reason.
+            if tally is not None:
+                tally["same_shape"] = tally.get("same_shape", 0) + 1
+            return None
         projected = dict(row)
         display = dict(projected.get("display", {}) or {})
         # Seeded demo personas (record_kind synthetic / manually_curated) are
@@ -651,6 +694,53 @@ class LiveProductService:
             }
         projected["display"] = display
         return projected
+
+    # ------------------------------------------------------------------
+    # one shape, many names (shapes.py)
+    # ------------------------------------------------------------------
+    def _current_census(self) -> ShapeCensus:
+        """The census for the corpus generation being served, built at most
+        once per generation. A runtime with no durable store gets an empty
+        census, which condemns nothing: where this cannot measure, it must
+        not delete."""
+        repo = getattr(self.live, "repo", None)
+        if repo is None:
+            return ShapeCensus(accounts=0, thoughts=0, counts={})
+        try:
+            generation = repo.get_corpus_generation()
+        except Exception:  # noqa: BLE001 - unknown generation: never cache
+            return census_of_repository(repo)
+        with self._lock:
+            cached = self._census
+            if cached is not None and cached[0] == generation:
+                return cached[1]
+        census = census_of_repository(repo)
+        with self._lock:
+            self._census = (generation, census)
+        return census
+
+    def _same_habit_shape(self, query_shape: str, candidate_session: str) -> bool:
+        census = self._current_census()
+        if not census.is_signature(query_shape):
+            return False
+        record = self.backend.get_session(candidate_session)
+        dna = getattr(record, "thought_dna", None)
+        if not dna:
+            return False
+        try:
+            return shape_signature(ThoughtGraph.from_dict(dict(dna))) == query_shape
+        except Exception:  # noqa: BLE001 - unparseable: not the same shape
+            return False
+
+    def shape_census(self) -> dict[str, Any]:
+        """The measurement behind the rule, for an operator or a test.
+
+        Counts only: how concentrated the corpus is on its most common exact
+        skeletons and what verdict each would get. No signature, session,
+        account or label appears in it, and shapes held by fewer accounts
+        than the heat-map minimum are folded into a count rather than listed.
+        """
+        return self._current_census().summary(minimum=self.aggregation_minimum)
 
     def _aggregate(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
         buckets: dict[str, int] = {}

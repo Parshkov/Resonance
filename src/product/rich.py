@@ -117,6 +117,7 @@ def build_rich_result(payload: Mapping[str, Any], *, policy_source: Any,
         "rejected": [enrich(row) for row in payload.get("rejected", [])],
         "aggregation": dict(payload.get("aggregation", {})),
         "location_note": str(payload.get("location_note", LOCATION_NOTE)),
+        "shape_note": str(payload.get("shape_note", "") or ""),
     }
 
 
