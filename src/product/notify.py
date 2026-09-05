@@ -134,6 +134,10 @@ class SmtpSender(Sender):
         return True
 
 
+# Who this is, for the provider's logs and for its CDN's bot rules.
+USER_AGENT = "Resonance/1.0 (+https://resonance.parshkov.com)"
+
+
 class HttpApiSender(Sender):
     """An email provider's HTTPS API, because SMTP does not leave this host.
 
@@ -172,7 +176,16 @@ class HttpApiSender(Sender):
         request = urllib.request.Request(
             self.url, data=json.dumps(payload).encode("utf-8"),
             headers={"Authorization": f"Bearer {self.api_key}",
-                     "Content-Type": "application/json"},
+                     "Content-Type": "application/json",
+                     # Named, because the default is not. urllib introduces
+                     # itself as "Python-urllib/3.x", and the CDN in front of
+                     # this API refuses that signature outright: every send
+                     # came back "403 error code: 1010", which is the CDN's
+                     # bot rule and not the provider's answer -- the key, the
+                     # payload and the address were all fine. Found by sending
+                     # one real message; the health endpoint said the mail
+                     # path was configured, and it was, and it did not work.
+                     "User-Agent": USER_AGENT},
             method="POST")
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
