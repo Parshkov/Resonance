@@ -594,3 +594,10 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .account-action-urgent {
   background: var(--ink); color: var(--paper); border-color: var(--ink);
 }
+
+/* The three questions someone actually arrives with. Listed rather than run
+   together, because each one is a different reason to be here: find the
+   like-minded, gather a group, or find the same shape in another field. */
+.onboarding-asks { margin: .5rem 0 1rem; padding-left: 1.1rem; display: grid; gap: .5rem; }
+.onboarding-asks li { color: var(--ink-2); }
+.onboarding-asks em { color: var(--ink); font-style: italic; }
