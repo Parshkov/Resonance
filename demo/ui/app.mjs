@@ -697,13 +697,20 @@ function wireOnboarding() {
       ?.scrollIntoView({block: "start"});
   });
 
-  // Say what is true of THIS browser rather than describing WebMCP in general.
+  // Say what is true of THIS browser — but say it about the browser, not about
+  // the product. The earlier wording ("there is nothing to register here")
+  // read as though Resonance had no WebMCP support, when what is missing is the
+  // browser's agent surface. The service speaks both transports either way.
   const webmcp = document.getElementById("onboarding-webmcp-copy");
-  if (webmcp && !(document.modelContext || navigator.modelContext)) {
-    webmcp.textContent =
-      "This browser does not expose document.modelContext, so there is nothing to "
-      + "register here. Use one of the connectors above, or open this page in a "
-      + "browser with WebMCP enabled.";
+  if (webmcp) {
+    webmcp.textContent = (document.modelContext || navigator.modelContext)
+      ? "Resonance also speaks WebMCP, and this browser has it: the tools on this "
+        + "page are registered through document.modelContext right now, with no "
+        + "connector at all."
+      : "Resonance also speaks WebMCP, but this browser does not expose "
+        + "document.modelContext, so there is nothing for it to register here. "
+        + "Chrome 152 exposes it when started with --enable-features=WebMCP. The "
+        + "connectors above need no such thing and reach the same product.";
   }
 }
 

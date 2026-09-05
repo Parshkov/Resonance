@@ -171,6 +171,62 @@ class CompetitionWebMCPTests(unittest.TestCase):
                          "thought-aria-plasma-lens")
         self.assertIn("example personas, not real participants", app)
 
+    def test_index_is_served_in_the_state_it_will_settle_in(self):
+        # Served at data-state="loading", the page painted the results dashboard
+        # first — skeleton cards, "Resonance map", "Useful matches" — and only
+        # then replaced it with the onboarding. A visitor saw the page change its
+        # mind. The server knows the answer before any JavaScript runs.
+        with urlopen(self.base + "/", timeout=10) as response:
+            html = response.read().decode()
+        self.assertIn('data-state="unshared"', html)      # no cookie: shared nothing
+        self.assertNotIn('data-state="loading"', html)
+        # asking for the fixture explicitly keeps the neutral loading state
+        with urlopen(self.base + "/?source=replay", timeout=10) as response:
+            self.assertIn('data-state="loading"', response.read().decode())
+
+        # once something IS shared, the dashboard is the right first paint
+        client = Client(self.base)
+        client.guest()
+        thought = {"topic": "Initial paint check", "domain": "distributed-systems",
+                   "nodes": [{"id": "n0", "label": "queue backlog", "role": "problem"},
+                             {"id": "n1", "label": "synchronized retries", "role": "mechanism"},
+                             {"id": "n2", "label": "amplified load", "role": "outcome"}],
+                   "relations": [{"source": "n0", "target": "n1", "type": "causes"},
+                                 {"source": "n1", "target": "n2", "type": "causes"}]}
+        client.request("POST", "/api/webmcp/prepare", {"request_id": "paint-1", "thought": thought})
+        _, preview, _ = client.request("GET", "/api/webmcp/preview")
+        client.request("POST", "/api/webmcp/share", {"request_id": "paint-2", "confirm": True,
+                                                     "confirmation_token": preview["confirmation_token"]})
+        request = Request(self.base + "/", headers={"Cookie": client.cookie})
+        with urlopen(request, timeout=10) as response:
+            self.assertIn('data-state="loading"', response.read().decode())
+
+    def test_the_page_says_the_product_speaks_both_transports(self):
+        # The "This browser" card used to read "there is nothing to register
+        # here", which describes the browser but sounds like the product has no
+        # WebMCP. Resonance speaks both, and the OAuth consent page already
+        # offers "Continue as your current account" so they can be one account —
+        # the page never said so.
+        with urlopen(self.base + "/", timeout=10) as response:
+            html = response.read().decode()
+        self.assertIn("Resonance also speaks WebMCP", html)
+        self.assertIn("Both routes are the same product", html)
+        self.assertIn("Continue as your current account", html)
+        with urlopen(self.base + "/app.mjs", timeout=10) as response:
+            app = response.read().decode()
+        # both branches describe the BROWSER, and neither denies the capability
+        self.assertIn("Resonance also speaks WebMCP, and this browser has it", app)
+        self.assertIn("but this browser does not expose", app)
+        self.assertNotIn("there is nothing to register here.", app)
+        # The page promises the consent screen offers that option; keep the two
+        # in step, so the promise cannot outlive the behaviour. (This runtime has
+        # no OAuth core attached, so assert against the core that serves it.)
+        from pathlib import Path
+        oauth_src = (Path(__file__).resolve().parents[1]
+                     / "src" / "remote" / "oauth.py").read_text(encoding="utf-8")
+        self.assertIn("Continue as your current account", oauth_src)
+        self.assertIn('value="current" checked', oauth_src)
+
     def test_webmcp_prepare_accepts_the_agents_real_thought(self):
         # Post-release product gap: the browser prepare used to clone the page's
         # flagship thought; an agent must be able to hand over the person's REAL

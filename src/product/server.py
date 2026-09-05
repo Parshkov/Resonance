@@ -558,11 +558,29 @@ class ProductHandler(BaseHTTPRequestHandler):
         self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "internal_error",
                               "unexpected product error")
 
+    def _initial_app_state(self, params: Mapping[str, list[str]]) -> str:
+        """`data-state` to serve in the HTML, before any JavaScript runs.
+
+        The API-only server has no live browser product, so it keeps the
+        neutral "loading". The competition server overrides this: it can tell
+        whether this visitor has anything shared, and serving the answer is
+        what stops the page rendering one view and then replacing it.
+        """
+        return "loading"
+
     # -- GET ---------------------------------------------------------------
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
         if path in {"/", "/index.html"}:
             html = (UI_DIR / "index.html").read_text(encoding="utf-8")
+            # Stamp the state the page will end up in, so the browser paints it
+            # once. Left at "loading", a first-time visitor saw the results
+            # dashboard — skeleton cards, "Resonance map", "Useful matches" —
+            # and only then the onboarding that replaces it, which reads as the
+            # page changing its mind. `_initial_app_state` knows the answer
+            # before any JavaScript runs.
+            html = html.replace('data-state="loading"',
+                                f'data-state="{self._initial_app_state(params)}"', 1)
             injected = html.replace("</head>", HEAD_INJECTION, 1).replace(
                 "</body>",
                 '  <script type="module" src="/webmcp.mjs"></script>\n'
