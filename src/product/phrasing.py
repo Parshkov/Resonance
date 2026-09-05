@@ -137,13 +137,21 @@ def _discover(r: Result) -> str:
     rows = list(r.get("matches_in_backend_order") or [])
     people = [row for row in rows if not row.get("hard_rejection")
               and str(row.get("mode_classification") or "").lower() not in {"", "negative"}]
+    # Said after whatever else is said: a person with no matches left needs
+    # to hear that something was set aside and why, and a person with matches
+    # needs it too, so they do not wonder where the rest went.
+    aside = str(r.get("shape_note") or "").strip()
     if not people:
         if rows:
-            return ("Nothing the engine calls a resonance. Some thoughts share a "
+            said = ("Nothing the engine calls a resonance. Some thoughts share a "
                     "skeleton with yours, but not enough meaning for it to say they "
                     "are the same reasoning — so nobody is being suggested to you.")
-        return ("Nobody yet. Your thought stays in the search, and everyone who "
-                "arrives later is compared with it.")
+        elif aside:
+            said = "Nobody is being suggested to you this time."
+        else:
+            said = ("Nobody yet. Your thought stays in the search, and everyone who "
+                    "arrives later is compared with it.")
+        return f"{said} {aside}".strip()
     first = people[0]
     who = first.get("person_pseudonym") or "someone"
     kind = str(first.get("mode_classification") or "").strip()
@@ -153,9 +161,10 @@ def _discover(r: Result) -> str:
     if kind == "analogical":
         lead += (" The subject is different; the structure is the same — that is what "
                  "this service is for.")
-    return (f"{lead} The match is computed, not judged: no language model decided it, "
+    said = (f"{lead} The match is computed, not judged: no language model decided it, "
             "and you can be shown the working. None of them knows about you unless you "
             "ask for an introduction and they agree.")
+    return f"{said} {aside}".strip()
 
 
 def _round(value: Any) -> str:

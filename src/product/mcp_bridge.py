@@ -1057,6 +1057,9 @@ class RemoteMCPBridge:
             "aggregation": response.get("aggregation", {}),
             "blocked_rows_removed": response.get("blocked_rows_removed", 0),
             "location_note": response.get("location_note", ""),
+            # Empty unless something was set aside because its shape is one
+            # this service sees from many unrelated people (shapes.py).
+            "shape_note": response.get("shape_note", ""),
             "freshness": response.get("freshness", {}),
             "next_step": "resonance_explain_match(result_id, session_id) for evidence; "
                          "resonance_request_intro only with the person's approval.",
