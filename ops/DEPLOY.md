@@ -13,9 +13,21 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 | confirmation secret | `RESONANCE_CONFIRMATION_SECRET` env (≥ 32 bytes) or `--secret-file` | **required** with a persistent DB — the server refuses to start without it so prepared private drafts survive restarts. Never put it on the command line or in the image. |
 | browser origin allowlist | `--origin https://your.host` (repeatable) | must be the **exact** `https://` origin browsers will use; this is the CSRF/Origin check. Add a second `--origin` for a platform default host alongside a custom domain. |
 | bind address / port | `--host 0.0.0.0 --port $PORT` | the image reads `PORT` from the platform |
+| retire unsigned accounts | `RESONANCE_PURGE_UNSIGNED=report` counts and prints; `=1` carries it out. Tombstones every session whose owning account has no verified sign-in behind it, and revokes those accounts. `RESONANCE_PURGE_KEEP=<id>[,<id>…]` spares named sessions or accounts. A signed-in account is never touched, and a second run finds nothing left to do. Run `report` first, read the counts in the deploy log, then `=1`, then unset. | one-shot operator action |
 | sign-in providers | `RESONANCE_AUTH_GOOGLE_CLIENT_ID` / `RESONANCE_AUTH_GOOGLE_CLIENT_SECRET`, and/or `RESONANCE_AUTH_GITHUB_CLIENT_ID` / `RESONANCE_AUTH_GITHUB_CLIENT_SECRET` | **required for a real deployment.** Setting either pair turns on sign-in, and sign-in then becomes the *only* way an account is created: `POST /api/product/guest` answers `403 sign_in_required`, and the OAuth consent page offers no anonymous option. With neither pair set the pseudonymous guest path stays on — that is the local-development and test configuration, not a production one. Callback URL to register with the provider: `https://<your origin>/auth/callback/google` (and `/auth/callback/github`). Scopes requested are only `openid email profile` / `read:user user:email`. |
 | demo purge | `RESONANCE_PURGE_DEMO=1` runs `purge-demo` once at process start (tombstones seeded demo sessions, revokes demo persona accounts, never touches `volunteer` rows; idempotent) and logs the counts. Set it, let the platform redeploy, confirm `purge-demo: sessions_deleted=…` in the deploy log and `corpus.demo_personas_present: false` in `/api/product/health`, then unset it. | one-shot operator action |
 | demo seed | **off by default** for any persistent database (real participants only). `--seed-demo` or `RESONANCE_SEED_DEMO=1` seeds the 25 labelled R7 demo personas (create-only, idempotent); `python3 -m src.persistence --db <DSN> purge-demo` tombstones seeded demo sessions and revokes the persona accounts. `:memory:` is always seeded (local dev/tests). | `purge-demo` ran on production 2026-09-04 19:13 UTC via `RESONANCE_PURGE_DEMO=1`: 0 sessions, 0 users (no demo rows were present) |
+
+> **The platform's start command wins over the Dockerfile.** Railway keeps a
+> per-service start command in its own settings, and it overrides `CMD`. Worse,
+> *redeploying* reuses the previous deployment's captured configuration, so
+> editing that setting and pressing redeploy changes nothing. After renaming or
+> moving the entrypoint module you must both update the platform's start command
+> **and** trigger a genuinely new deployment (a push, not a redeploy). Renaming
+> `competition_server` to `web_server` cost several failed deploys this way: the
+> container exited with `No module named src.product.competition_server`, the
+> health check failed, and the platform silently kept serving the previous
+> release — so the site looked merely stale rather than broken.
 
 Migrations under `ops/migrations/` are applied automatically at startup on both
 backends (`0005_oauth_grants` makes OAuth codes / refresh grants / client
