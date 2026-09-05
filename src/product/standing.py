@@ -72,11 +72,17 @@ class StandingSearch:
     rather than opening its own.
     """
 
-    def __init__(self, product: Any) -> None:
+    def __init__(self, product: Any, notifier: Any = None) -> None:
         self.product = product
         self.identity = product.identity
         self.live = product.live
         self._lock = threading.RLock()
+        # Whoever can reach a person who is not here. None on a runtime with
+        # no way to, which is stated rather than pretended.
+        self.notifier = notifier
+        # Who this sweep told something new, so each of them is reached once
+        # even when several arrivals land in the same pass.
+        self._newly_told: set[str] = set()
 
     # -- storage seam ---------------------------------------------------
     @property
@@ -121,9 +127,39 @@ class StandingSearch:
         graph = ThoughtGraph.from_dict(dict(session.thought_dna))
         raw = self.live.discover(graph, mode=mode, k=k)
         written = 0
+        told: set[str] = set()
         for row in raw.get("matches", []):
+            before = set(self._newly_told)
             written += self._record_pair(owner, session_id, row, mode=mode)
+            told |= set(self._newly_told) - before
+        # Recording the finding was only ever half of it. The promise is that
+        # this keeps looking after you leave, and someone who has left is
+        # reached where they are or not at all.
+        for user_id in sorted(told):
+            self._reach(user_id)
+        self._newly_told.clear()
         return {"available": True, "alerts_written": written}
+
+    def _reach(self, user_id: str) -> None:
+        """Tell one person, out there, that something arrived.
+
+        Best-effort in the same way the sweep is: the share has happened and is
+        theirs, and a mail server having a bad afternoon must never turn it
+        into an error they see. Never silent, though -- a swallow with no trace
+        once hid a plain import error here and killed this whole half of the
+        product while every share still looked perfect.
+        """
+        notifier = getattr(self, "notifier", None)
+        if notifier is None:
+            return
+        try:
+            outcome = notifier.tell(user_id)
+        except Exception as exc:  # noqa: BLE001
+            print(f"standing search: could not reach someone "
+                  f"({exc.__class__.__name__}: {exc})", flush=True)
+            return
+        if outcome not in ("sent", "already_told_today", "unsubscribed"):
+            print(f"standing search: nobody was told ({outcome})", flush=True)
 
     def _record_pair(self, owner: str, session_id: str, row: Mapping[str, Any],
                      *, mode: str) -> int:
@@ -199,6 +235,7 @@ class StandingSearch:
             existing = repo.list_grants_for_user(ALERT_KIND, user_id)
             if len(existing) >= MAX_ALERTS_PER_ACCOUNT:
                 return 0
+            self._newly_told.add(user_id)
             repo.put_grant(ALERT_KIND, key, {
                 "alert_key": key,
                 "user_id": user_id,

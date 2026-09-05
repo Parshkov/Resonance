@@ -58,6 +58,7 @@ from src.collaboration import CollaborationError
 from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product import authorship as authorship_rule
+from src.product.notify import Notifier, NoTransport, account_in_token
 from src.product.service import LiveProductService, ProductError, StaleResultError
 from src.product.mcp_bridge import (
     BridgeError,
@@ -455,8 +456,43 @@ def build_runtime(
             "silently fall back to a per-process value and orphan drafts"
         )
     product = LiveProductService(identity, confirmation_secret=confirmation_secret)
+    # Someone who has left is reached where they are, or not at all. The
+    # transport is configured by environment; without one, nothing is sent and
+    # the health endpoint says so rather than implying a promise being kept.
+    notifier = Notifier(
+        identity, getattr(live, "repo", None),
+        origin=next(iter(sorted(allowed_origins)), "https://resonance.parshkov.com"),
+        secret=confirmation_secret)
+    product.standing.notifier = notifier
+    product.notifier = notifier
     return ProductRuntime(live=live, identity=identity, product=product,
                           allowed_origins=allowed_origins)
+
+
+
+def _unsubscribe_page(stopped: bool) -> str:
+    """One sentence and a way back. Nothing to sign into, nothing to undo by
+    accident: someone who arrives here has already decided."""
+    said = ("You will not get any more email from Resonance.<br>"
+            "Your thought is untouched: it is still discoverable, still "
+            "looking, and whatever it finds is on the site when you visit."
+            if stopped else
+            "That link has expired or was not meant for this account, so "
+            "nothing was changed. The unsubscribe link at the bottom of any "
+            "Resonance email will work.")
+    return (
+        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        "<title>Resonance email</title>"
+        '<link rel="stylesheet" href="/oauth/consent.css">'
+        '<script src="/theme.mjs"></script></head><body>'
+        '<main class="consent"><p class="brand">'
+        '<span class="mark" aria-hidden="true"></span>Resonance</p>'
+        f"<h1>{'Email stopped' if stopped else 'Nothing changed'}</h1>"
+        f"<p>{said}</p>"
+        '<p><a class="primary-link" href="/">Back to Resonance</a></p>'
+        "</main></body></html>"
+    )
 
 
 class _DiscardWriter:
@@ -871,6 +907,23 @@ class ProductHandler(BaseHTTPRequestHandler):
     # -- GET ---------------------------------------------------------------
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
+        if path == "/notifications/stop":
+            # Deliberately reachable without signing in. "To stop these
+            # emails, log in first" is the sentence nobody follows; the
+            # alternative they choose is marking us as spam, and then nobody
+            # here is ever reachable again. The token is an HMAC over the
+            # account, so it stops that account's mail and can do nothing else
+            # -- it opens no session, reads no thought, and names no one.
+            token = (params.get("token") or [""])[0]
+            notifier = getattr(self.runtime.product, "notifier", None)
+            who = (account_in_token(token, notifier.secret)
+                   if notifier is not None else None)
+            stopped = who is not None
+            if stopped:
+                notifier.unsubscribe(who)
+            self._send_bytes(_unsubscribe_page(stopped).encode("utf-8"),
+                             "text/html; charset=utf-8")
+            return
         if path in {"/", "/index.html"}:
             html = (UI_DIR / "index.html").read_text(encoding="utf-8")
             # Stamp the state the page will end up in, so the browser paints it
@@ -929,10 +982,21 @@ class ProductHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/product/health":
             health = self.runtime.live.health()
+            # Whether anyone can actually be reached. A deployment with no
+            # mail server still works, but it does not keep the promise that
+            # this looks for you after you leave -- and that must be visible
+            # here rather than discovered by a person who waited for nothing.
+            notifier = getattr(product, "notifier", None)
+            reachable = notifier is not None and not isinstance(
+                notifier.sender, NoTransport)
             self._send_json({"ok": health.ok, "mode": "live",
                              "freshness": product.freshness(),
                              "engine": engine_identity(self.runtime),
-                             "corpus": corpus_summary(self.runtime)})
+                             "corpus": corpus_summary(self.runtime),
+                             "notifications": {
+                                 "can_reach_people": reachable,
+                                 "why_not": None if reachable else NoTransport.reason,
+                             }})
             return
         if path in {"/api/product/state", "/api/webmcp/state"}:
             token = None
