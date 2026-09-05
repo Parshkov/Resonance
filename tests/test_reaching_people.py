@@ -262,6 +262,43 @@ class WhichDoorTests(unittest.TestCase):
         from src.product import notify
         self.assertIn("RESONANCE_MAIL_API_KEY", notify.NoTransport.reason)
 
+    def test_it_introduces_itself_by_name(self):
+        """The first real send failed, and not for any reason the code could
+        see: every message came back "403 error code: 1010". That is not the
+        provider answering -- it is the CDN in front of it refusing the
+        request's signature, because urllib introduces itself as
+        "Python-urllib/3.12" and the bot rule drops that on sight. The key was
+        valid, the payload was valid, the address was valid, and nothing
+        arrived. Measured against the live endpoint: with urllib's default
+        agent, 403 and the CDN's page; with a name, 401 from the provider
+        itself, which is the API answering. So the header is not decoration,
+        and this test is here because the health endpoint cannot tell the
+        difference between "configured" and "works"."""
+        from src.product import notify
+        sent = {}
+
+        class Response:
+            status = 200
+            def __enter__(self): return self
+            def __exit__(self, *_): return False
+
+        def capture(request, timeout=None):
+            sent["headers"] = dict(request.headers)
+            return Response()
+
+        sender = notify.HttpApiSender("re_x", "pulse@example.test")
+        original = notify.urllib.request.urlopen
+        notify.urllib.request.urlopen = capture
+        try:
+            sender.send("someone@example.test", "subject", "body")
+        finally:
+            notify.urllib.request.urlopen = original
+
+        agent = sent["headers"].get("User-agent", "")
+        self.assertTrue(agent, "no User-Agent: the CDN will refuse this")
+        self.assertNotIn("urllib", agent.lower())
+        self.assertIn("Resonance", agent)
+
 
 class WhereTheLinkPointsTests(unittest.TestCase):
     """An email is useless if it sends someone to a host that no longer exists.
