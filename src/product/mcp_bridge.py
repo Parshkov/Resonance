@@ -231,6 +231,18 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 # Tool table
 # ---------------------------------------------------------------------------
 
+AUTHORSHIP = {
+    "type": "string",
+    "enum": ["their_own_words", "their_words_reorganised", "i_proposed_it"],
+    "description": (
+        "Where this reasoning came from. `their_own_words`: they said it, you copied it. "
+        "`their_words_reorganised`: their claims, put in order by you, nothing added. "
+        "`i_proposed_it`: you supplied the shape and they agreed — this is REFUSED, because "
+        "it would index your reasoning under their name. Ask them to say it in their own "
+        "words and start again with those. Whichever you choose is shown to the person "
+        "before they share, so they can correct you."),
+}
+
 _CONFIRM = {"type": "boolean",
             "description": "Must be true only after the person explicitly approved this action in the chat."}
 _REQUEST_ID = {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_.:-]+$",
@@ -291,7 +303,14 @@ TOOLS: list[dict[str, Any]] = [
         "name": "resonance_prepare_thought",
         "title": "Prepare the person's current thought for sharing",
         "description": (
-            "Step 1 of 2. Build a private draft from the REAL reasoning in this conversation. Prefer "
+            "Step 1 of 2. Build a private draft from what THE PERSON reasoned, not from what "
+            "you did. A chat is half your words, and the test is simple: could they have said "
+            "this without you? Their own account of what causes what — yes. Your summary, your "
+            "diagnosis, the framing you offered that they agreed with, a chain you completed for "
+            "them — no. Resonance introduces people to each other; a thought you authored would "
+            "match them to your habits, and since you are the same assistant for everyone, it "
+            "would match everyone to everyone. If the shape is really yours, ask them to say it "
+            "in their own words first, and use those. Prefer "
             "`context`: the person's own words (≤ 4000 chars) are turned into a Thought Graph by the "
             "deterministic cue extractor, with no model in the loop; contact details are scrubbed. Pass "
             "`thought` (a labelled causal graph you extracted) only when the text carries no explicit "
@@ -304,9 +323,11 @@ TOOLS: list[dict[str, Any]] = [
         "inputSchema": {
             "type": "object",
             "properties": {
+                "authorship": AUTHORSHIP,
                 "thought": THOUGHT_SCHEMA,
                 "context": {"type": "string", "maxLength": 4000,
-                            "description": "The person's own words; extracted deterministically (preferred)."},
+                            "description": "The person's own sentences, copied, not paraphrased — none of your own "
+                        "replies, summaries or suggested framings. Extracted deterministically."},
                 "topic": {"type": "string", "maxLength": 120,
                           "description": "Short human-readable name for this thought, shown to other people in "
                                          "discovery results (e.g. 'Retry storm overloads delivery queue'). "
@@ -327,6 +348,7 @@ TOOLS: list[dict[str, Any]] = [
                                    "lat": {"type": "number"}, "lon": {"type": "number"}},
                     "additionalProperties": False},
             },
+            "required": ["authorship"],
             "additionalProperties": False,
         },
         "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
@@ -661,6 +683,17 @@ class RemoteMCPBridge:
                     "ask whether anyone has turned up, or return to work they have shared here, "
                     "that is what to read — and resonance_mark_resonances_seen records what you "
                     "actually told them.\n\n"
+                    "WHOSE REASONING. A conversation is half your words, and you are the same "
+                    "assistant for everyone who uses this. Share only what the person reasoned. "
+                    "The test: could they have said it without you? Their account of what "
+                    "causes what — yes. Your summary, your diagnosis, the framing you offered "
+                    "that they agreed with, the chain you completed for them — no. A shape you "
+                    "authored would introduce them to people who match your habits rather than "
+                    "theirs, and because those habits are the same in every conversation you "
+                    "have, it would eventually match everyone to everyone. resonance_prepare_"
+                    "thought therefore requires you to state `authorship`, and refuses the value "
+                    "that admits the shape was yours. When it is yours, ask them to say it in "
+                    "their own words and use those.\n\n"
                     "Flow for a new thought: resonance_prepare_thought with the person's own "
                     "words as `context` (deterministic extraction; pass a `thought` graph only for "
                     "text without explicit connectives) -> show the preview and ask for "
@@ -787,8 +820,15 @@ class RemoteMCPBridge:
             "freshness": self.product.freshness(),
         }
 
+    AUTHORSHIP_ACCEPTED = {
+        "their_own_words": "You said this. Your assistant copied it, it did not write it.",
+        "their_words_reorganised":
+            "Your claims, put in order by your assistant. Nothing was added.",
+    }
+
     def tool_prepare_thought(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         actor = self._actor(token)
+        authorship = self._require_authorship(arguments)
         thought = arguments.get("thought")
         context = arguments.get("context")
         if (thought is None) == (context is None):
@@ -856,9 +896,49 @@ class RemoteMCPBridge:
             },
             "confirmation_token": preview["confirmation_token"],
             "requires_explicit_confirmation": True,
-            "next_step": "Show this preview to the person. Only if they approve, call "
-                         "resonance_share_thought with confirm=true and this confirmation_token.",
+            "authorship": authorship,
+            "authorship_note": self.AUTHORSHIP_ACCEPTED[authorship],
+            "next_step": "Show this preview to the person, together with authorship_note, and "
+                         "ask whether they recognise the reasoning as their own — not whether "
+                         "it is correct. If they say the shape was yours, discard it and ask "
+                         "them to put it in their own words. Only if they recognise it as "
+                         "theirs, call resonance_share_thought with confirm=true and this "
+                         "confirmation_token.",
         }
+
+    def _require_authorship(self, arguments: Mapping[str, Any]) -> str:
+        """Make the assistant say whose reasoning this is, and refuse its own.
+
+        A long chat is half the assistant's words, and the assistant is the same
+        one for everybody. Indexing a shape it authored would match this person
+        to its own habits — and, because those habits are shared across every
+        conversation it has, would eventually match everyone to everyone. The
+        signal the product depends on is that the reasoning is one person's.
+
+        Nothing here can verify whose words they were: the conversation is never
+        sent to this service, by design. What it can do is make the claim
+        explicit, refuse the one that admits the assistant supplied the shape,
+        and hand the accepted claim back so the person is shown it before they
+        share and can say "no, that was your idea".
+        """
+        stated = str(arguments.get("authorship") or "").strip()
+        if not stated:
+            raise BridgeError(
+                "validation_failed",
+                "state authorship: their_own_words, their_words_reorganised, or "
+                "i_proposed_it. A chat is half your words, and only theirs can be shared.")
+        if stated == "i_proposed_it":
+            raise BridgeError(
+                "validation_failed",
+                "A shape you proposed cannot be shared as theirs — it would introduce this "
+                "person to people who match your reasoning, not to people who match them. "
+                "Ask them to say it in their own words, then prepare again with those.")
+        if stated not in self.AUTHORSHIP_ACCEPTED:
+            raise BridgeError(
+                "validation_failed",
+                f"unknown authorship {stated!r}; use their_own_words or "
+                "their_words_reorganised")
+        return stated
 
     def tool_share_thought(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)

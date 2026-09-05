@@ -67,7 +67,7 @@ class TopicTests(unittest.TestCase):
     def _share(self, tag, thought):
         creds = self.runtime.product.register_guest()
         prepared = self.bridge.tool_prepare_thought(
-            creds.access_token, {"thought": thought, "request_id": f"{tag}-1"})
+            creds.access_token, {"authorship": "their_own_words", "thought": thought, "request_id": f"{tag}-1"})
         self.bridge.tool_share_thought(creds.access_token, {
             "confirm": True, "request_id": f"{tag}-2",
             "draft_id": prepared["draft_id"],

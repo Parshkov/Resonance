@@ -47,6 +47,7 @@ class VisualsTests(unittest.TestCase):
         creds = self.runtime.product.register_guest()
         nodes, relations = shape
         prepared = self.bridge.tool_prepare_thought(creds.access_token, {
+            "authorship": "their_own_words",
             "thought": {"topic": tag, "domain": "d", "nodes": nodes,
                         "relations": relations},
             "coarse_location": location, "request_id": f"{tag}-1"})

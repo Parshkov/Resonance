@@ -354,7 +354,7 @@ class OnboardingProbe:
                 f"prevents the pileup and supports steadier ships.")
         try:
             _, res, sc = self._call("resonance_prepare_thought",
-                                    {"context": chat,
+                                    {"authorship": "their_own_words", "context": chat,
                                      "presentation": {"domain": "engineering",
                                                       "topic": "process",
                                                       "cluster_id": "c1"},
