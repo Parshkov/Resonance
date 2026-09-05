@@ -94,12 +94,17 @@ def is_oauth_path(path: str) -> bool:
 
 
 class MountResponse:
-    __slots__ = ("status", "headers", "body")
+    __slots__ = ("status", "headers", "body", "cookies")
 
-    def __init__(self, status: int, headers: Mapping[str, str] | None, body: bytes) -> None:
+    def __init__(self, status: int, headers: Mapping[str, str] | None, body: bytes,
+                 cookies: Sequence[str] = ()) -> None:
         self.status = int(status)
         self.headers = dict(headers or {})
         self.body = body
+        # Several Set-Cookie headers can be needed in one response (a session
+        # cookie set while a sign-in state cookie is cleared), and a plain
+        # header mapping cannot hold two entries of the same name.
+        self.cookies = tuple(cookies)
 
 
 def dispatch(core: Any, *, method: str, path: str, query: Mapping[str, list[str]],
@@ -162,7 +167,13 @@ def attach_core(runtime: Any, *, issuer: str) -> Any | None:
     else:
         store = GrantStore()
         durability = "in-memory"
-    core = OAuthCore(runtime.identity, store)
+    # The core must know whether this deployment has a real sign-in, because
+    # that decides whether a connector may bind to a fresh anonymous account.
+    def _sign_in_required() -> bool:
+        from src.identity.federation import configured_providers
+        return bool(configured_providers())
+
+    core = OAuthCore(runtime.identity, store, sign_in_required=_sign_in_required)
     runtime.oauth_core = core
     print(f"oauth: core attached; issuer {issuer}; resource {resource_url(issuer)}; "
           f"grants {durability}")

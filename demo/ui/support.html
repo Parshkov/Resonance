@@ -17,9 +17,13 @@
   <h2>Connecting a chat</h2>
   <p>Give your client one address and nothing else:</p>
   <p class="doc-code"><code id="mcp-endpoint">__RESONANCE_ORIGIN__/mcp</code></p>
-  <p>The client discovers OAuth by itself and opens the Resonance consent page.
-    You will never be asked to paste a key or a token; if something asks you for one,
-    it is not this flow.</p>
+  <p>The client discovers OAuth by itself and opens the Resonance consent page,
+    which asks you to sign in if you are not signed in already. You will never be
+    asked to paste a key or a token; if something asks you for one, it is not this
+    flow.</p>
+  <p>Signing in is what makes every surface one account. Connect Claude today and
+    ChatGPT next week and both reach the same you — the same shared thoughts, the
+    same matches — and there is somewhere to tell you when a new match appears.</p>
   <dl class="doc-list">
     <dt>Claude</dt><dd>Settings → Connectors → Add custom connector → paste the URL.</dd>
     <dt>ChatGPT</dt><dd>Settings → Apps &amp; Connectors → Advanced → Developer mode → Create → paste the URL, authentication OAuth → Scan tools. Requires a Business, Enterprise or Edu workspace.</dd>
@@ -45,9 +49,13 @@
       <code>--enable-features=WebMCP</code>. The connectors above need no such thing.</dd>
 
     <dt>A connected client asks you to authorise again</dt>
-    <dd>Re-approving is harmless. If you want the two surfaces to be one account,
-      choose “Continue as your current account” on the consent page rather than a new
-      guest.</dd>
+    <dd>Re-approving is harmless. As long as you sign in with the same provider
+      account, every client you connect resolves to the same Resonance account.</dd>
+
+    <dt>The consent page asks you to sign in and you thought you already had</dt>
+    <dd>The page can only see a sign-in made from the same browser it opened in.
+      If your chat client opened it somewhere else — another browser, a private
+      window, an in-app view — sign in there too; it lands on the same account.</dd>
 
     <dt>You want something removed</dt>
     <dd>Revoke from your chat with <code>resonance_stop_sharing</code>, or from the

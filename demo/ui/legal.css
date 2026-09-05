@@ -115,3 +115,25 @@ a { color: var(--accent); text-underline-offset: 2px; }
 @media (max-width: 520px) {
   .doc { padding: 28px 16px 56px; }
 }
+
+/* Sign-in page. The account is what makes an introduction possible later, so
+   the choice of provider is the page's only real content. */
+.doc-narrow { max-width: 34rem; }
+.signin-providers { display: flex; flex-direction: column; gap: .625rem; margin: 1.75rem 0 1.5rem; }
+/* Filled, using only tokens this sheet defines: `--ink` on `--paper` inverts
+   correctly in both schemes. An invented `--paper-2` fell back to white and
+   put near-white dark-mode text on a white pill. */
+.signin-provider {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 3rem; padding: 0 1.25rem; border-radius: 999px;
+  border: 1px solid var(--ink); background: var(--ink);
+  color: var(--paper); font-weight: 500; text-decoration: none;
+}
+.signin-provider:hover { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+.signin-provider:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.doc-notice {
+  margin: 1.25rem 0; padding: .75rem 1rem; border-radius: .5rem;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  background: var(--code-bg); font-size: .9375rem; color: var(--ink);
+}
+.doc-fine { font-size: .875rem; color: var(--ink-3); }
