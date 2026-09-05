@@ -111,6 +111,23 @@ class WhatThePictureSaysTests(unittest.TestCase):
             self.assertIn(ord(character), bitmapfont.GLYPHS, character)
 
 
+    def test_both_drawings_show_every_relation(self):
+        """The PNG was fixed and the SVG was not, and the difference was
+        visible: the picture showed the "prevents" line, the markup beside it
+        did not. Two renderings of one thought that disagree are worse than
+        one -- whichever a client happens to use, it should be the same
+        drawing."""
+        import re
+        from src.product import rich
+        upward = {"nodes": [{"id": "a0", "label": "outage", "role": "problem"},
+                            {"id": "a1", "label": "amplification", "role": "state"},
+                            {"id": "a2", "label": "backoff", "role": "method"}],
+                  "relations": [{"source": "a0", "target": "a1", "type": "causes"},
+                                {"source": "a2", "target": "a1", "type": "prevents"}]}
+        svg = rich.render_thought_svg(upward, topic="Retry storm")
+        self.assertEqual(svg.count("<line"), len(upward["relations"]))
+        self.assertIn("prevents", re.findall(r">(causes|prevents)<", svg))
+
     def test_a_link_running_upwards_is_still_drawn(self):
         """A relation whose source sits below what it points at -- "backoff
         prevents amplification" -- was drawn as no line at all, leaving the

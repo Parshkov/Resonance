@@ -12,6 +12,7 @@ a drawing is never sent when there is nothing on it.
 
 from __future__ import annotations
 
+import base64
 import sys
 import unittest
 from pathlib import Path
@@ -69,10 +70,13 @@ class VisualsTests(unittest.TestCase):
         result = self._call(alice.access_token, "resonance_discover")
         kinds = [block["type"] for block in result["content"]]
         self.assertEqual(kinds[0], "text", "the text block must come first")
-        self.assertIn("resource", kinds)
-        drawing = next(b for b in result["content"] if b["type"] == "resource")
-        self.assertEqual(drawing["resource"]["mimeType"], "image/svg+xml")
-        self.assertTrue(drawing["resource"]["text"].startswith("<svg"))
+        self.assertIn("image", kinds)
+        drawing = next(b for b in result["content"] if b["type"] == "image")
+        # PNG, because that is what a chat client renders. It used to be an
+        # SVG resource, which no client drew and which Claude printed into the
+        # transcript as markup beside the picture.
+        self.assertEqual(drawing["mimeType"], "image/png")
+        self.assertTrue(base64.b64decode(drawing["data"]).startswith(b"\x89PNG"))
 
     def test_no_map_is_sent_when_there_is_nothing_on_it(self):
         """An empty map is worse than no map: it says "nobody is anywhere"
@@ -90,9 +94,9 @@ class VisualsTests(unittest.TestCase):
         result = self._call(alice.access_token, "resonance_explain_match",
                             {"result_id": found["result_id"],
                              "session_id": match["session_id"]})
-        drawing = next(b for b in result["content"] if b["type"] == "resource")
-        self.assertIn("resonance://visual/structure/", drawing["resource"]["uri"])
-        self.assertTrue(drawing["resource"]["text"].startswith("<svg"))
+        drawing = next(b for b in result["content"] if b["type"] == "image")
+        self.assertEqual(drawing["mimeType"], "image/png")
+        self.assertTrue(base64.b64decode(drawing["data"]).startswith(b"\x89PNG"))
 
     def test_the_json_is_unchanged_by_the_drawing(self):
         """A client that renders nothing must lose nothing."""
@@ -109,24 +113,28 @@ class VisualsTests(unittest.TestCase):
         alice, _ = self._share("alice", ALICE)
         bob, bob_session = self._share("bob", BOB, LOCATION)
         result = self._call(alice.access_token, "resonance_discover")
-        svg = next(b for b in result["content"]
-                   if b["type"] == "resource")["resource"]["text"]
-        self.assertNotIn(bob.user_id, svg)
-        self.assertNotIn(bob_session, svg)
+        # Nothing in the bytes, and nothing in the words beside them.
+        drawn = base64.b64decode(next(b for b in result["content"]
+                                      if b["type"] == "image")["data"])
+        said = result["content"][0]["text"]
+        for secret in (bob.user_id, bob_session):
+            self.assertNotIn(secret.encode(), drawn)
+            self.assertNotIn(secret, said)
 
     def test_a_failed_drawing_never_fails_the_search(self):
         alice, _ = self._share("alice", ALICE)
         self._share("bob", BOB, LOCATION)
-        broken = self.runtime.product.visual_map
+        from src.product import pictures
+        broken = pictures.render_map_png
 
         def explode(*_a, **_k):
             raise RuntimeError("renderer is down")
 
-        self.runtime.product.visual_map = explode
+        pictures.render_map_png = explode
         try:
             result = self._call(alice.access_token, "resonance_discover")
         finally:
-            self.runtime.product.visual_map = broken
+            pictures.render_map_png = broken
         self.assertFalse(result["isError"])
         self.assertTrue(result["structuredContent"]["matches_in_backend_order"])
         self.assertEqual([b["type"] for b in result["content"]], ["text"])

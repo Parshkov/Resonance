@@ -633,23 +633,18 @@ class ToolOutput:
         self.content = list(content)
 
 
-def _svg_resource(name: str, key: str, svg: str, label: str) -> dict[str, Any]:
-    """One drawing, as an MCP embedded resource.
-
-    Sent as a resource rather than an `image` block because these drawings are
-    SVG: they carry live text (pseudonyms, bucket labels) that would have to be
-    rasterised to become a PNG, and a picture of a name is worse than the name.
-    A client that cannot render it still has the text block and the JSON.
-    """
-    return {
-        "type": "resource",
-        "resource": {
-            "uri": f"resonance://visual/{name}/{key}",
-            "name": label,
-            "mimeType": "image/svg+xml",
-            "text": svg,
-        },
-    }
+# The SVG used to ride alongside the picture as an embedded resource, on the
+# reasoning that a client which could render it would get crisper text. None
+# of them does. What actually happened, once the PNG worked and the result was
+# opened in Claude, was that the person got a wall of
+# `<svg xmlns="http://www.w3.org/2000/svg" viewBox=...>` printed into the
+# transcript beside the picture -- markup dumped at someone who asked what
+# they had shared.
+#
+# So the drawing goes as one thing a client renders, and the words that say
+# the same thing for a client that renders nothing. src/product/rich.py still
+# renders the SVG: the page uses it, and it is the better medium there, where
+# there is a browser to draw it.
 
 
 def _png_image(png: bytes) -> dict[str, Any]:
@@ -1030,8 +1025,6 @@ class RemoteMCPBridge:
                 print(f"[bridge] could not draw a thought: "
                       f"{type(exc).__name__}: {exc}", flush=True)
                 continue
-            drawings.append(_svg_resource("thought", f"mine/{index}", svg,
-                                          "Your thought, as its causal spine"))
             drawings.extend(_drawing(
                 pictures.render_thought_png, dna,
                 topic=str((session.get("presentation") or {}).get("topic") or "")))
@@ -1079,35 +1072,23 @@ class RemoteMCPBridge:
         no map, so nothing is attached when nobody consented and no bucket
         survived suppression.
         """
-        result_id = str(response.get("result_id") or "")
-        if not result_id:
-            return []
-        try:
-            svg = self.product.visual_map(token, result_id)
-        except Exception:  # noqa: BLE001 - a drawing must never fail a search
+        if not str(response.get("result_id") or ""):
             return []
         located = any((row.get("display") or {}).get("location")
                       for row in response.get("matches") or [])
         buckets = (response.get("aggregation") or {}).get("buckets") or []
         if not located and not buckets:
             return []
-        return [_svg_resource("map", result_id, svg,
-                              "Where the matches are (coarse, consented, "
-                              "presentation only)"),
-                *_drawing(pictures.render_map_png, response)]
+        return _drawing(pictures.render_map_png, response)
 
     def tool_explain_match(self, token: str, arguments: dict[str, Any]) -> Any:
         result_id = self._required_id(arguments, "result_id")
         session_id = self._required_id(arguments, "session_id")
+        # get_match is the authorisation: it re-checks this viewer's current
+        # right to this exact row before anything is drawn from it.
         evidence = self.product.get_match(token, result_id, session_id)
-        try:
-            svg = self.product.visual_structure(token, result_id, session_id)
-        except Exception:  # noqa: BLE001 - the evidence matters more than the picture
-            return evidence
-        return ToolOutput(evidence, [
-            _svg_resource("structure", f"{result_id}/{session_id}", svg,
-                          "Which node answers which, and the relations both kept"),
-            *_drawing(pictures.render_structure_png, evidence.get("match") or evidence)])
+        return ToolOutput(evidence, _drawing(
+            pictures.render_structure_png, evidence.get("match") or evidence))
 
     def tool_request_intro(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)

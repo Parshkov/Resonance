@@ -281,11 +281,26 @@ def render_thought_svg(thought_dna: Mapping[str, Any], *, topic: str = "") -> st
                      f'described it</text>')
     # One label per line, in the order the person gave them, with the relation
     # that leads into each drawn beside the line above it.
+    # A relation is drawn once both of its ends have a place. Only the ones
+    # running downwards were, so "backoff PREVENTS amplification" -- whose
+    # source sits below what it points at -- left its node with no line to
+    # anything. Claude, ChatGPT and Grok each said so, unprompted, looking at
+    # the same drawing; the PNG was fixed first and this one was missed.
     incoming = {}
+    outgoing = {}
     for rel in relations:
         incoming.setdefault(str(rel.get("target")), []).append(rel)
+        outgoing.setdefault(str(rel.get("source")), []).append(rel)
     y = top + 26
     centres = {}
+
+    def link(rel, top_y, bottom_y):
+        parts.append(f'<line x1="34" y1="{top_y + 8}" x2="34" '
+                     f'y2="{bottom_y - 16}" stroke="#8a5a2b" stroke-width="2"/>')
+        parts.append(f'<text x="46" y="{bottom_y - 18}" fill="#8a5a2b" '
+                     f'font-size="12" font-family="monospace">'
+                     f'{_esc(str(rel.get("type", "")))}</text>')
+
     for node_id in order:
         node = by_id.get(node_id) or {}
         label = _esc(str(node.get("label", "")))
@@ -293,11 +308,12 @@ def render_thought_svg(thought_dna: Mapping[str, Any], *, topic: str = "") -> st
         for rel in incoming.get(node_id, []):
             source = str(rel.get("source"))
             if source in centres:
-                parts.append(f'<line x1="34" y1="{centres[source] + 8}" x2="34" '
-                             f'y2="{y - 16}" stroke="#8a5a2b" stroke-width="2"/>')
-                parts.append(f'<text x="46" y="{y - 18}" fill="#8a5a2b" '
-                             f'font-size="12" font-family="monospace">'
-                             f'{_esc(str(rel.get("type", "")))}</text>')
+                link(rel, centres[source], y)
+        for rel in outgoing.get(node_id, []):
+            target = str(rel.get("target"))
+            if target in centres:
+                # Runs upwards: draw it now that this end exists.
+                link(rel, centres[target], y)
         parts.append(f'<circle cx="34" cy="{y}" r="5" fill="#8a5a2b"/>')
         parts.append(f'<text x="52" y="{y + 5}" fill="#1d1a16" font-size="15" '
                      f'font-family="monospace">{label}</text>')
