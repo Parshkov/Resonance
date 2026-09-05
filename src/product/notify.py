@@ -198,6 +198,38 @@ SELF_TEST_BODY = (
 )
 
 
+def reachability(host: str, ports: tuple[int, ...] = (587, 465, 25)) -> str:
+    """Which of the mail server's addresses this host can actually open.
+
+    "Network is unreachable" has two very different causes and one message:
+    the platform blocks outbound SMTP, or the container has no IPv6 route and
+    the resolver offered an AAAA record first. The first needs a different
+    kind of transport; the second needs one line. Guessing between them costs
+    an afternoon, so this asks each address on each port and reports what each
+    one said.
+    """
+    import socket
+    lines: list[str] = []
+    for port in ports:
+        try:
+            candidates = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except Exception as exc:  # noqa: BLE001
+            lines.append(f"{port}: cannot resolve {host} ({exc})")
+            continue
+        for family, _type, _proto, _canon, sockaddr in candidates:
+            name = "IPv6" if family == socket.AF_INET6 else "IPv4"
+            probe = socket.socket(family, socket.SOCK_STREAM)
+            probe.settimeout(6)
+            try:
+                probe.connect(sockaddr)
+                lines.append(f"{port} {name} {sockaddr[0]}: open")
+            except Exception as exc:  # noqa: BLE001
+                lines.append(f"{port} {name} {sockaddr[0]}: {type(exc).__name__} {exc}")
+            finally:
+                probe.close()
+    return "; ".join(lines) or "nothing to try"
+
+
 def self_test(sender: Sender, address: str) -> str:
     """Send one message to a named address and say what happened.
 
@@ -217,7 +249,14 @@ def self_test(sender: Sender, address: str) -> str:
             return f"sent to {address}"
         return "not sent: the transport declined it"
     except Exception as exc:  # noqa: BLE001 - the whole point is to report this
-        return f"not sent: {type(exc).__name__}: {exc}"
+        detail = ""
+        host = getattr(sender, "host", "")
+        if host:
+            # A connection that never opened says nothing about credentials.
+            # Report which addresses answered, so the next step is obvious
+            # rather than a guess between "blocked" and "no route".
+            detail = f" | reachability: {reachability(host)}"
+        return f"not sent: {type(exc).__name__}: {exc}{detail}"
 
 
 class Notifier:
