@@ -30,6 +30,7 @@ from src.graph import ThoughtGraph
 from src.identity import IdentityService
 from src.identity.models import AuthorizationError
 from src.ingestion import IdentityIngestionService
+from src.product.standing import StandingSearch
 from src.security.guards import suppress_small_buckets
 
 LIVE_PRODUCT_CONTRACT = "resonance-live-product/0.1"
@@ -109,6 +110,10 @@ class LiveProductService:
         self._lock = threading.RLock()
         self._results: dict[str, dict[str, Any]] = {}
         self._result_order: list[str] = []
+        # A shared thought does not stop being a query once discovery has run
+        # for it. It keeps looking, and tells both sides when someone whose
+        # reasoning has the same shape arrives later.
+        self.standing = StandingSearch(self)
 
     # ------------------------------------------------------------------
     # thin delegations: one boundary, accepted semantics untouched
@@ -147,22 +152,61 @@ class LiveProductService:
         return self.ingestion.preview(access_token, draft_id, **kwargs)
 
     def share_prepared(self, access_token: str, draft_id: str, **kwargs: Any):
-        return self.ingestion.share_prepared(access_token, draft_id, **kwargs)
+        receipt = self.ingestion.share_prepared(access_token, draft_id, **kwargs)
+        self._sweep(receipt.get("session_id") if isinstance(receipt, Mapping) else None)
+        return receipt
+
+    def _sweep(self, session_id: str | None) -> None:
+        """Record who a newly discoverable thought resonates with, both ways.
+
+        Deliberately best-effort: the share has already happened and is the
+        person's, so a failure to look for resonances must not turn it into an
+        error they see. The next share, or their next discovery, looks again.
+        """
+        if not session_id:
+            return
+        try:
+            self.standing.sweep_for_session(str(session_id))
+        except Exception as exc:  # noqa: BLE001 - never fail a share on the sweep
+            # Swallowed, but never silently: a swallow with no trace once hid a
+            # plain import error, so the whole waiting half of the product was
+            # dead and every share still looked perfect. The class and message
+            # are enough to find it; no thought content is ever printed.
+            print(f"standing search: sweep failed ({exc.__class__.__name__}: {exc})")
 
     def discard(self, access_token: str, draft_id: str, **kwargs: Any):
         return self.ingestion.discard(access_token, draft_id, **kwargs)
 
     def set_consent(self, access_token: str, session_id: str, choices, **kwargs: Any):
-        return self.identity.set_consent(access_token, session_id, choices, **kwargs)
+        result = self.identity.set_consent(access_token, session_id, choices, **kwargs)
+        # Consent is the switch that puts a thought into the pool or takes it
+        # out, so it is also what starts and stops its standing search.
+        if bool(getattr(choices, "share_thought_dna", False)):
+            self._sweep(session_id)
+        else:
+            self._retract(session_id)
+        return result
+
+    def _retract(self, session_id: str | None) -> None:
+        if not session_id:
+            return
+        try:
+            self.standing.retract_for_session(str(session_id))
+        except Exception as exc:  # noqa: BLE001 - never fail a withdrawal on cleanup
+            print(f"standing search: retract failed ({exc.__class__.__name__}: {exc})")
 
     def update_metadata(self, access_token: str, session_id: str, **kwargs: Any):
         return self.identity.update_metadata(access_token, session_id, **kwargs)
 
     def revoke_session(self, access_token: str, session_id: str, **kwargs: Any):
-        return self.identity.revoke_thought_session(access_token, session_id, **kwargs)
+        result = self.identity.revoke_thought_session(access_token, session_id, **kwargs)
+        self._retract(session_id)
+        return result
 
     def delete_session(self, access_token: str, session_id: str, **kwargs: Any):
-        return self.identity.delete_thought_session(access_token, session_id, **kwargs)
+        result = self.identity.delete_thought_session(access_token, session_id, **kwargs)
+        self._retract(session_id)
+        return result
 
     # ------------------------------------------------------------------
     # freshness / mode
@@ -442,6 +486,18 @@ class LiveProductService:
     # ------------------------------------------------------------------
     # collaboration (R14) — one boundary, accepted semantics underneath
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # standing searches: what was found while you were not looking
+    # ------------------------------------------------------------------
+    def pending_resonances(self, access_token: str, **kwargs: Any) -> dict[str, Any]:
+        return self.standing.pending(access_token, **kwargs)
+
+    def mark_resonances_seen(self, access_token: str, alert_keys: list[str]) -> dict[str, Any]:
+        return self.standing.mark_seen(access_token, alert_keys)
+
+    def dismiss_resonance(self, access_token: str, alert_key: str) -> dict[str, Any]:
+        return self.standing.dismiss(access_token, alert_key)
+
     @property
     def collaboration(self):
         from src.collaboration import CollaborationService

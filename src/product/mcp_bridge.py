@@ -351,6 +351,40 @@ TOOLS: list[dict[str, Any]] = [
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True},
     },
     {
+        "name": "resonance_pending_resonances",
+        "title": "Check what was found while they were away",
+        "description": (
+            "Report resonances found for this person since they last looked. Sharing a thought "
+            "starts a standing search: when someone whose reasoning has the same shape shares "
+            "later, it is recorded here, because no discovery call they could make at the time "
+            "would have found a person who had not arrived yet. Check this at the start of a "
+            "conversation and whenever they ask whether anyone has turned up, and tell them "
+            "plainly what is waiting. `reason` is `they_arrived` when someone new resonated with "
+            "a thought they had already shared, and `you_shared` when the resonance already "
+            "existed when they shared. Marking them seen is a separate, explicit step."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"include_seen": {"type": "boolean", "default": False}},
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
+    },
+    {
+        "name": "resonance_mark_resonances_seen",
+        "title": "Mark found resonances as seen",
+        "description": (
+            "Record that these resonances were shown to the person, so they stop being reported "
+            "as news. Call it only after actually telling them. Nothing is deleted and the "
+            "resonances stay readable with include_seen."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"alert_keys": {"type": "array", "items": {"type": "string"}}},
+            "required": ["alert_keys"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True},
+    },
+    {
         "name": "resonance_discover",
         "title": "Discover people whose reasoning resonates",
         "description": (
@@ -479,12 +513,24 @@ class RemoteMCPBridge:
                 "serverInfo": {"name": self.server_name, "version": self.server_version},
                 "instructions": (
                     "Resonance finds people whose *structure of reasoning* resonates with the "
-                    "person you are talking to. Flow: resonance_prepare_thought with the person's own "
+                    "person you are talking to, and introduces them when both agree.\n\n"
+                    "START HERE, every conversation: call resonance_pending_resonances first. "
+                    "Sharing a thought starts a standing search that keeps looking after "
+                    "discovery has run, so someone may have arrived since this person last "
+                    "looked. They cannot find that out by asking you to search — the match did "
+                    "not exist when they searched. If anything is waiting, tell them before "
+                    "anything else, then call resonance_mark_resonances_seen for what you "
+                    "actually told them.\n\n"
+                    "Flow for a new thought: resonance_prepare_thought with the person's own "
                     "words as `context` (deterministic extraction; pass a `thought` graph only for "
                     "text without explicit connectives) -> show the preview and ask for "
                     "explicit approval -> resonance_share_thought(confirm=true) -> "
                     "resonance_discover -> resonance_explain_match -> resonance_request_intro "
-                    "(only with approval). Never invent content; never pass contact details."),
+                    "(only with approval).\n\n"
+                    "When discovery returns nothing, that is not a dead end and should not be "
+                    "reported as one: their shared thought stays in the pool and keeps looking, "
+                    "and you will see the result here when someone matching arrives. Say that.\n\n"
+                    "Never invent content; never pass contact details."),
             })
         if method == "ping":
             return _result(msg_id, {})
@@ -658,6 +704,17 @@ class RemoteMCPBridge:
 
     def tool_my_thoughts(self, token: str, _: dict[str, Any]) -> dict[str, Any]:
         return {"contract_version": BRIDGE_CONTRACT, "sessions": self._owned(token)}
+
+    def tool_pending_resonances(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        answer = self.product.pending_resonances(
+            token, include_seen=arguments.get("include_seen") is True)
+        return {"contract_version": BRIDGE_CONTRACT, **answer}
+
+    def tool_mark_resonances_seen(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        keys = arguments.get("alert_keys")
+        answer = self.product.mark_resonances_seen(
+            token, [str(k) for k in keys] if isinstance(keys, list) else [])
+        return {"contract_version": BRIDGE_CONTRACT, **answer}
 
     def tool_discover(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         session_id = str(arguments.get("session_id") or "") or self._default_session(token)
