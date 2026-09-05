@@ -503,6 +503,26 @@ function renderEvidence(match) {
 
 // ---- map ----------------------------------------------------------------
 
+// The map is drawn in its own coordinates and scaled to the column's width, so
+// a radius written in those coordinates is a different number of real pixels on
+// a phone than on a desktop. The hit discs are sized from the scale the map is
+// actually drawn at, and resized with it. (`non-scaling-stroke` says this in
+// CSS, but Chrome does not hit-test the scaled stroke.)
+const MIN_TARGET = 24;
+
+function sizeHitAreas(svg, viewBoxWidth) {
+  const apply = () => {
+    const width = svg.getBoundingClientRect().width;
+    if (!width) return;
+    const radius = (MIN_TARGET / 2) * (viewBoxWidth / width);
+    for (const hit of svg.querySelectorAll(".marker-hit")) {
+      hit.setAttribute("r", radius.toFixed(2));
+    }
+  };
+  apply();
+  if (typeof ResizeObserver === "function") new ResizeObserver(apply).observe(svg);
+}
+
 function mapGeometry() {
   const frame = document.getElementById("map-frame");
   const svg = document.getElementById("resonance-map");
@@ -644,6 +664,10 @@ function addMarker(layer, item, options) {
       }
     });
   }
+  // The ring a person sees is drawn to the map's scale; the target they press
+  // must not be, or it is 12px on a phone. An invisible disc carries it, sized
+  // by sizeHitAreas() from the width the map is actually drawn at.
+  if (options.onSelect) marker.append(svgEl("circle", {class: "marker-hit", r: 12}));
   if (options.kind === "is-query") {
     // The thought that is out there: a slow breath while it keeps looking.
     marker.append(svgEl("circle", {class: "marker-halo", r: options.radius + 10}));
@@ -770,6 +794,7 @@ function renderMap(context, payload, primary, others, rejected) {
   unlocated.hidden = !unlocatedPrimary;
   if (unlocatedPrimary) setText("unlocated-name", unlocatedPrimary.person_pseudonym);
   document.getElementById("map-status").classList.remove("is-loading");
+  sizeHitAreas(document.getElementById("resonance-map"), geometry.width);
 }
 
 function renderContradictions(rejected) {

@@ -59,27 +59,37 @@ function panelToggle(button, panel) {
   });
 }
 
+function settingsControl() {
+  const button = element("button", "settings-button");
+  button.type = "button";
+  button.title = "Display settings";
+  button.setAttribute("aria-label", "Display settings");
+  button.append(element("span", "settings-button__glyph", "Aa"));
+  const panel = element("div", "account-panel account-panel--compact");
+  panel.setAttribute("aria-label", "Display settings");
+  const colours = coloursRow();
+  if (colours) panel.append(colours);
+  panelToggle(button, panel);
+  return [button, panel];
+}
+
+function renderSettingsOnly() {
+  returnThemeHome();
+  slot.replaceChildren(...settingsControl());
+  rendered = null;
+  if (gate) gate.hidden = true;
+}
+
 function renderSignedOut(state, urgent = false) {
   returnThemeHome();
   const link = signInLink(state.sign_in_url, "account-action");
   if (urgent) link.classList.add("account-action-urgent");
 
   // Signing in is what this page is asking for, so it stays a button and is
-  // never buried in a menu. Preferences sit beside it, behind the same kind of
-  // control they sit behind once you have an account -- one place, both
-  // states, so nobody has to learn it twice.
-  const settings = element("button", "settings-button");
-  settings.type = "button";
-  settings.title = "Display settings";
-  settings.setAttribute("aria-label", "Display settings");
-  settings.append(element("span", "settings-button__glyph", "Aa"));
-  const panel = element("div", "account-panel account-panel--compact");
-  panel.setAttribute("aria-label", "Display settings");
-  const colours = coloursRow();
-  if (colours) panel.append(colours);
-  panelToggle(settings, panel);
-
-  slot.replaceChildren(link, settings, panel);
+  // never buried in a menu. Preferences sit beside it, behind the same control
+  // they sit behind once you have an account -- one place, every state, so
+  // nobody has to learn it twice.
+  slot.replaceChildren(link, ...settingsControl());
   rendered = null;
   if (gate && gateActions) {
     gateActions.replaceChildren(signInLink(state.sign_in_url, "button button-primary"));
@@ -217,7 +227,11 @@ export async function refreshAccount() {
     renderSignedOut(state);
     return;
   }
-  slot.replaceChildren();
+  // No account yet and no sign-in to offer: the masthead has nothing to say
+  // about identity, but whoever is looking still gets to choose the colours.
+  // Emptying the slot here is what made the control unreachable on a
+  // deployment without sign-in -- the parking place is invisible by design.
+  renderSettingsOnly();
   if (gate) gate.hidden = true;
 }
 

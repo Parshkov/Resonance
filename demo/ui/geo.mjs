@@ -314,6 +314,29 @@ function focusPerson(sessionId) {
   document.dispatchEvent(new CustomEvent("resonance:focus-session", {detail: {sessionId}}));
 }
 
+// The map is drawn in its own 1000x400 coordinates and then scaled to whatever
+// width the column happens to be, so a radius written in those coordinates is a
+// different number of real pixels on a phone than on a desktop -- which is how
+// a target that measures 24px in one place is 12px in another. The hit discs
+// are therefore sized from the scale the map is actually drawn at, and resized
+// with it. `non-scaling-stroke` would express this in CSS, but Chrome does not
+// hit-test the scaled stroke, so the target would be invisible AND unreachable.
+const MIN_TARGET = 24;
+
+export function sizeHitAreas(svg, viewBoxWidth = MAP_WIDTH) {
+  const apply = () => {
+    const width = svg.getBoundingClientRect().width;
+    if (!width) return;
+    const radius = (MIN_TARGET / 2) * (viewBoxWidth / width);
+    for (const hit of svg.querySelectorAll(".geo-hit")) {
+      hit.setAttribute("r", radius.toFixed(2));
+    }
+  };
+  apply();
+  if (typeof ResizeObserver === "function") new ResizeObserver(apply).observe(svg);
+  return svg;
+}
+
 function renderMapSvg(model) {
   const svg = svgEl("svg", {
     class: "geo-map", viewBox: `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`, role: "img",
@@ -358,7 +381,11 @@ function renderMapSvg(model) {
     });
     const hint = svgEl("title");
     hint.textContent = `${label} · ${where}`;
-    marker.append(hint, svgEl("circle", {class: "geo-dot", r: point.you ? 5 : 6}));
+    // A 6px dot is a 12px target, and a person picking someone off a map is
+    // usually doing it with a thumb. The dot stays the size the map needs; an
+    // invisible disc behind it carries the target, sized by sizeHitAreas().
+    marker.append(hint, svgEl("circle", {class: "geo-hit", r: 12}),
+                  svgEl("circle", {class: "geo-dot", r: point.you ? 5 : 6}));
     // Labels sit to the right of the point and flip to the left near the
     // edge, so no name runs off the map.
     const flip = point.x > MAP_WIDTH - 130;
@@ -426,7 +453,10 @@ export function render(payload) {
   panel.append(head);
 
   const frame = el("div", "geo-frame");
-  frame.append(renderMapSvg(model));
+  const map = renderMapSvg(model);
+  frame.append(map);
+  // After it is in the document: a detached node has no width to scale from.
+  requestAnimationFrame(() => sizeHitAreas(map));
   panel.append(frame, renderKey());
 
   const list = el("ol", "geo-list");
