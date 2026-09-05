@@ -8,14 +8,31 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#main-workspace">Skip to results</a>
+  <a class="skip-link" href="#main-workspace">Skip to content</a>
 
+  <!-- The page follows the product's loop, top to bottom:
+         1. who you are (masthead)
+         2. what happened while you were away (news)
+         3. the thought you shared
+         4. the people whose reasoning has the same shape, and the map of them
+         5. the introductions you asked for or were asked for, and the
+            conversation once both sides agreed
+         6. how to connect the chat you already use
+       Every section is a normal part of the document. Nothing that matters
+       is behind a drawer. -->
   <div class="app-shell" id="app-shell" data-state="loading">
     <header class="masthead">
       <div class="brand" aria-label="Resonance">
         <span class="brand-mark" aria-hidden="true"></span>
         <span class="wordmark">Resonance</span>
       </div>
+
+      <nav class="loop-nav" aria-label="Sections">
+        <a href="#news" id="nav-news" hidden>New <span class="nav-badge" id="nav-news-count">0</span></a>
+        <a href="#thought">Your thought</a>
+        <a href="#people" id="nav-people">People</a>
+        <a href="#conversations">Conversations <span class="nav-badge" id="nav-requests-count" hidden>0</span></a>
+      </nav>
 
       <div class="system-status">
         <div class="pill pill-consent" id="header-consent" role="status">
@@ -33,9 +50,39 @@
     </header>
 
     <main class="workspace" id="main-workspace">
-      <!-- Shown only while nothing has been shared. A visitor who has shared
-           nothing has no results to look at, and an empty results dashboard
-           tells them neither what this is nor how to start. -->
+
+      <!-- Step 1. Where a sign-in exists, this is the only way in. Filled by
+           account.mjs; stays hidden on a deployment with no provider. -->
+      <section class="panel gate" id="signin-gate" aria-labelledby="gate-heading" hidden>
+        <p class="eyebrow">Sign in</p>
+        <h2 id="gate-heading">Resonance needs to know who you are</h2>
+        <p class="gate-copy">
+          It introduces people to each other, and it keeps looking on your behalf
+          after you leave. Both need an account someone can come back to.
+        </p>
+        <div class="gate-actions" id="gate-actions"></div>
+      </section>
+
+      <!-- Step 3, the half that waits. A shared thought keeps looking after the
+           first search comes back empty. What it found while you were not
+           looking lands here, before anything else, because nothing you could
+           do yourself would have found it. Filled by resonances.mjs. -->
+      <section class="news" id="news" aria-labelledby="news-heading" hidden>
+        <div class="news-head">
+          <div>
+            <p class="eyebrow">While you were away</p>
+            <h2 id="news-heading">Your thought kept looking</h2>
+          </div>
+          <p class="news-count" id="news-summary" role="status"></p>
+        </div>
+        <p class="news-requests" id="news-requests" hidden></p>
+        <div class="news-arrivals" id="news-arrivals" aria-label="People who arrived after you shared"></div>
+        <div class="news-existing" id="news-existing"></div>
+      </section>
+
+      <!-- Shown only while nothing has been shared: what this is and how to
+           start. It sits above the thought panel, which in that state holds
+           the "share" control. -->
       <section class="onboarding" id="onboarding" aria-labelledby="onboarding-heading">
         <div class="onboarding-hero">
           <p class="eyebrow" id="onboarding-state">Nothing shared yet</p>
@@ -48,43 +95,250 @@
             same shape.
           </p>
           <div class="onboarding-actions">
-            <button class="button button-primary" id="onboarding-connect" type="button">Connect your chat</button>
+            <!-- The primary action is the share control, rendered here as well
+                 as in the thought panel by collab_ui.mjs. -->
+            <span class="onboarding-share" id="onboarding-share"></span>
+            <button class="button" id="onboarding-connect" type="button">Connect your chat instead</button>
           </div>
         </div>
 
         <ol class="onboarding-steps">
           <li>
             <span class="step-number" aria-hidden="true">1</span>
-            <h2>Your assistant extracts the structure</h2>
+            <h2>Share one thought</h2>
             <p>
-              In the chat you already use, it turns what you are working on into nodes
-              and relations. The raw text is not retained.
+              From this page, or from the chat you already use. Only the structure —
+              nodes and relations — becomes discoverable, and you read it before it does.
             </p>
           </li>
           <li>
             <span class="step-number" aria-hidden="true">2</span>
-            <h2>You see it before anyone else does</h2>
+            <h2>It keeps looking</h2>
             <p>
-              You read exactly what would become discoverable and approve it explicitly.
-              Until you do, nothing about you is discoverable and nothing is compared.
+              People whose reasoning has the same shape are found now, and later: when
+              someone new arrives after you shared, you are told here.
             </p>
           </li>
           <li>
             <span class="step-number" aria-hidden="true">3</span>
-            <h2>Matches come back with their evidence</h2>
+            <h2>Ask, agree, talk</h2>
             <p>
-              Every match shows the mapped nodes and preserved relations behind it. An
-              introduction opens only when both sides agree, and you can stop sharing at
+              You ask one of them for an introduction. If they accept, a private channel
+              opens. Nobody's contact details are exchanged, and you can stop sharing at
               any moment.
             </p>
           </li>
         </ol>
+      </section>
 
+      <!-- Step 2. Your thought: what is discoverable, and the one control
+           that changes that. The share control is filled by collab_ui.mjs
+           and works in both states — "share" while nothing is shared, "stop
+           sharing" once something is. -->
+      <section class="panel thought-panel" id="thought" aria-labelledby="thought-heading">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Your thought</p>
+            <p class="microcopy" id="thought-id">Loading your shared thought…</p>
+          </div>
+          <div class="share-control" id="share-control"></div>
+        </div>
+        <h2 class="thought-title" id="thought-heading">
+          <span class="loading-line wide"></span>
+        </h2>
+        <p class="thought-caption" id="thought-caption">Preparing the shared Thought DNA.</p>
+
+        <!-- Sharing from this page: your words in, the structure that would
+             become discoverable shown back, then an explicit share. Filled by
+             collab_ui.mjs when the share control is used. -->
+        <div class="share-composer" id="share-composer"></div>
+
+        <div class="thought-body">
+          <section class="thought-dna" aria-labelledby="dna-heading">
+            <h3 class="eyebrow" id="dna-heading">Thought DNA · nodes</h3>
+            <p class="microcopy">This is the structure that is discoverable. The raw text is not retained.</p>
+            <ol class="dna-chain" id="dna-chain" aria-live="polite"></ol>
+          </section>
+          <section class="thought-relations" aria-labelledby="relations-heading">
+            <h3 class="eyebrow" id="relations-heading">Thought DNA · relations</h3>
+            <ol class="dna-relations" id="dna-relations"></ol>
+          </section>
+        </div>
+
+        <dl class="declared-context" id="declared-context"></dl>
+
+        <dl class="request-summary" aria-label="Discovery request">
+          <div><dt>Mode</dt><dd id="request-mode">analogical</dd></div>
+          <div><dt>Requested</dt><dd id="request-k">k=15</dd></div>
+          <div><dt>Response</dt><dd id="response-summary">Loading…</dd></div>
+        </dl>
+      </section>
+
+      <!-- Step 3, the half that answers now. The people, then the map that
+           shows how they relate to your thought, then the evidence for the
+           one you selected. Asking for an introduction happens on the card. -->
+      <section class="people" id="people" aria-labelledby="people-heading">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Reasoning with the same shape</p>
+            <h2 id="people-heading">People</h2>
+          </div>
+          <div class="map-status" id="map-status" role="status">
+            <span class="status-light" aria-hidden="true"></span>
+            <span id="map-status-text">Awaiting discovery response</span>
+          </div>
+        </div>
+
+        <div class="people-grid">
+          <section class="panel matches-panel" aria-labelledby="matches-heading">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">In the order the engine returned them</p>
+                <h3 id="matches-heading">Resonances</h3>
+              </div>
+              <span class="shown-count" id="shown-count">00 shown</span>
+            </div>
+            <div class="match-list" id="match-list" aria-live="polite">
+              <div class="match-skeleton"></div>
+              <div class="match-skeleton"></div>
+              <div class="match-skeleton"></div>
+              <div class="match-skeleton"></div>
+            </div>
+            <p class="matches-empty" id="matches-empty" hidden>
+              Nobody yet. Your thought keeps looking while it is shared; when someone
+              whose reasoning has the same shape arrives, they appear at the top of
+              this page.
+            </p>
+
+            <!-- Everyone open to an introduction whose card is not above:
+                 filled by collab_ui.mjs from the same authorized result. -->
+            <div class="roster" id="collab-initiate"></div>
+
+            <button class="secondary-trigger" id="secondary-trigger" type="button" aria-expanded="false" aria-controls="secondary-drawer" disabled>
+              <span><strong id="secondary-count">0</strong> other returned results</span>
+              <span class="trigger-hint">View in engine order</span>
+            </button>
+
+            <section class="contradiction-card" id="contradiction-card" aria-labelledby="contradiction-heading">
+              <div class="contradiction-content">
+                <p class="eyebrow warning-text" id="contradiction-heading">Contradiction evidence</p>
+                <p class="contradiction-topic" id="contradiction-topic">Loading rejected results…</p>
+                <div class="contradiction-meta"><span id="contradiction-person">—</span><code id="contradiction-reason">—</code></div>
+              </div>
+              <span class="rejected-count" id="rejected-count">0 rejected</span>
+            </section>
+          </section>
+
+          <section class="panel map-panel" aria-labelledby="map-heading">
+            <div class="panel-head">
+              <div>
+                <p class="eyebrow">Structural relationship</p>
+                <h3 id="map-heading">Resonance map</h3>
+              </div>
+            </div>
+
+            <div class="map-frame" id="map-frame">
+              <svg class="resonance-map" id="resonance-map" viewBox="0 0 800 560" role="img" aria-labelledby="map-title map-description">
+                <title id="map-title">Map of structural relationship between your thought and each match</title>
+                <desc id="map-description">Your thought sits at the centre. Each match is placed at a distance given by its structural score, in a sector for its cluster. Line weight is the number of preserved relations. Coarse location is never used for position or ranking.</desc>
+                <g id="ring-layer" class="ring-layer" aria-hidden="true"></g>
+                <g id="connection-layer" class="connection-layer"></g>
+                <g id="marker-layer" class="marker-layer"></g>
+              </svg>
+              <div class="unlocated-anchor" id="unlocated-anchor" hidden>
+                <strong id="unlocated-name">Location protected</strong>
+                <span>Coarse location not shared</span>
+              </div>
+            </div>
+
+            <ol class="sector-key" id="sector-key" aria-label="Sectors, one per cluster_id, with the number of returned rows in each"></ol>
+
+            <details class="map-help">
+              <summary>How to read this map</summary>
+              <dl class="map-legend" aria-label="How to read the map">
+                <div><dt>Distance from centre</dt><dd>1 − structural score. The inner ring is 1.0, the rim is 0.</dd></div>
+                <div><dt>Sector</dt><dd>the <code>cluster_id</code> the engine assigned, lettered in the key above</dd></div>
+                <div><dt>Line weight</dt><dd>preserved relations</dd></div>
+                <div><dt><span class="legend-swatch legend-contradiction" aria-hidden="true"></span>Dashed</dt><dd>contradiction evidence or a hard rejection</dd></div>
+              </dl>
+              <p class="map-disclaimer">Positions are a view of the returned scores, never a reordering; the number on each marker is its place in the engine's returned list. Coarse location is presentation only and never used for ranking.</p>
+            </details>
+          </section>
+        </div>
+
+        <section class="panel evidence-panel" id="evidence-panel" aria-labelledby="evidence-heading" aria-live="polite">
+          <div class="panel-head evidence-head">
+            <div>
+              <p class="eyebrow" id="evidence-kicker">Why this match</p>
+              <h3 id="evidence-heading">Select a resonance</h3>
+              <p class="evidence-subtitle" id="evidence-subtitle">The evidence behind the selected match appears here.</p>
+            </div>
+            <dl class="evidence-metrics">
+              <div><dt>Class</dt><dd id="metric-class">—</dd></div>
+              <div><dt>Structural</dt><dd id="metric-structural">—</dd></div>
+              <div><dt>Verdict</dt><dd id="metric-confidence">—</dd></div>
+            </dl>
+          </div>
+
+          <div class="evidence-body">
+            <section class="mapping" aria-labelledby="mapping-heading">
+              <div class="mapping-columns" aria-hidden="true"><span>Your node</span><span></span><span>Their node</span></div>
+              <h4 class="visually-hidden" id="mapping-heading">Node-to-node correspondence</h4>
+              <div class="mapping-list" id="mapping-list"></div>
+            </section>
+            <section class="relation-proof" aria-labelledby="relations-proof-heading">
+              <h4 class="eyebrow" id="relations-proof-heading">Preserved relations</h4>
+              <div class="relation-chips" id="relation-chips"></div>
+              <p class="proof-note" id="proof-note">No frontend matching or score calculation.</p>
+              <details class="score-details" id="score-details">
+                <summary>All scores the engine returned</summary>
+                <dl class="score-list" id="score-list"></dl>
+              </details>
+            </section>
+          </div>
+        </section>
+      </section>
+
+      <!-- Steps 4 and 5. Introductions you asked for or were asked for, and
+           the private channel once both sides agreed. Filled by collab_ui.mjs;
+           hidden until that module has something to say, so the page never
+           shows an empty inbox to someone who cannot have one. -->
+      <section class="conversations" id="conversations" aria-labelledby="conversations-heading" hidden>
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Introductions and messages</p>
+            <h2 id="conversations-heading">Conversations</h2>
+          </div>
+          <p class="intro-note" aria-label="How introductions work">
+            <strong>Introductions need both sides.</strong>
+            The other person has to accept before any channel opens, and only
+            what you type here is passed on — never contact details.
+          </p>
+        </div>
+        <div class="collab-error" id="collab-error" role="alert"></div>
+        <div class="conversations-grid">
+          <section class="panel requests-panel" id="collab-requests" aria-label="Introduction requests"></section>
+          <section class="panel channel-panel" id="collab-channel" aria-label="Conversation"></section>
+        </div>
+      </section>
+
+      <!-- Step 2 from a chat instead of this page. Open while nothing is
+           shared; collapsed once something is, because by then it has done
+           its job. -->
+      <details class="connect-details" id="connect-details">
+        <summary>
+          <span class="eyebrow">One address, no key</span>
+          <span class="connect-summary-title">Connect the chat you already use</span>
+        </summary>
         <section class="onboarding-connect" id="onboarding-connect-panel" aria-labelledby="connect-heading">
           <div class="onboarding-connect-head">
             <div>
-              <p class="eyebrow">One address, no key</p>
-              <h2 id="connect-heading">Connect the chat you already use</h2>
+              <h2 id="connect-heading">Share from Claude, ChatGPT, Grok or any MCP client</h2>
+              <p class="onboarding-note">
+                Your assistant extracts the structure of what you are working on, shows
+                you the preview, and shares only after you approve — then it can ask for
+                introductions and read replies for you.
+              </p>
             </div>
             <span class="tag">OAuth is discovered automatically</span>
           </div>
@@ -142,155 +396,15 @@
             Then say, in your own words: <em>“Extract the structure of what I’m working
             on, show me the preview, and after I approve it, find who resonates.”</em>
           </p>
+
+          <!-- The developer fallback (a bearer key) lives behind a disclosure
+               rendered by collab_ui.mjs, after the URL that is the real path. -->
+          <div id="connect-advanced"></div>
         </section>
-      </section>
-
-      <!-- The results view. Reading order: your thought, the map of how the
-           matches relate to it, the matches in the engine's order, and the
-           evidence for the selected one. -->
-      <div class="dashboard" id="dashboard">
-        <section class="panel thought-panel" aria-labelledby="thought-heading">
-          <div class="panel-head">
-            <p class="eyebrow">Your thought</p>
-            <p class="microcopy" id="thought-id">Loading your shared thought…</p>
-          </div>
-          <h1 class="thought-title" id="thought-heading">
-            <span class="loading-line wide"></span>
-          </h1>
-          <p class="thought-caption" id="thought-caption">Preparing the shared Thought DNA.</p>
-
-          <div class="thought-body">
-            <section class="thought-dna" aria-labelledby="dna-heading">
-              <h2 class="eyebrow" id="dna-heading">Thought DNA · nodes</h2>
-              <p class="microcopy">This is the structure that is discoverable. The raw text is not retained.</p>
-              <ol class="dna-chain" id="dna-chain" aria-live="polite"></ol>
-            </section>
-            <section class="thought-relations" aria-labelledby="relations-heading">
-              <h2 class="eyebrow" id="relations-heading">Thought DNA · relations</h2>
-              <ol class="dna-relations" id="dna-relations"></ol>
-            </section>
-          </div>
-
-          <dl class="declared-context" id="declared-context"></dl>
-
-          <dl class="request-summary" aria-label="Discovery request">
-            <div><dt>Mode</dt><dd id="request-mode">analogical</dd></div>
-            <div><dt>Requested</dt><dd id="request-k">k=15</dd></div>
-            <div><dt>Response</dt><dd id="response-summary">Loading…</dd></div>
-          </dl>
-        </section>
-
-        <section class="panel map-panel" aria-labelledby="map-heading">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Structural relationship</p>
-              <h2 id="map-heading">Resonance map</h2>
-            </div>
-            <div class="map-status" id="map-status" role="status">
-              <span class="status-light" aria-hidden="true"></span>
-              <span id="map-status-text">Awaiting discovery response</span>
-            </div>
-          </div>
-
-          <div class="map-frame" id="map-frame">
-            <svg class="resonance-map" id="resonance-map" viewBox="0 0 800 560" role="img" aria-labelledby="map-title map-description">
-              <title id="map-title">Map of structural relationship between your thought and each match</title>
-              <desc id="map-description">Your thought sits at the centre. Each match is placed at a distance given by its structural score, in a sector for its cluster. Line weight is the number of preserved relations. Coarse location is never used for position or ranking.</desc>
-              <g id="ring-layer" class="ring-layer" aria-hidden="true"></g>
-              <g id="connection-layer" class="connection-layer"></g>
-              <g id="marker-layer" class="marker-layer"></g>
-            </svg>
-            <div class="unlocated-anchor" id="unlocated-anchor" hidden>
-              <strong id="unlocated-name">Location protected</strong>
-              <span>Coarse location not shared</span>
-            </div>
-          </div>
-
-          <ol class="sector-key" id="sector-key" aria-label="Sectors, one per cluster_id, with the number of returned rows in each"></ol>
-
-          <dl class="map-legend" aria-label="How to read the map">
-            <div><dt>Distance from centre</dt><dd>1 − structural score. The inner ring is 1.0, the rim is 0.</dd></div>
-            <div><dt>Sector</dt><dd>the <code>cluster_id</code> the engine assigned, lettered in the key above</dd></div>
-            <div><dt>Line weight</dt><dd>preserved relations</dd></div>
-            <div><dt><span class="legend-swatch legend-contradiction" aria-hidden="true"></span>Dashed</dt><dd>contradiction evidence or a hard rejection</dd></div>
-          </dl>
-          <p class="map-disclaimer">Positions are a view of the returned scores, never a reordering; the number on each marker is its place in the engine's returned list. Coarse/synthetic location · presentation only · never used for ranking.</p>
-        </section>
-
-        <section class="panel matches-panel" aria-labelledby="matches-heading">
-          <div class="panel-head">
-            <div>
-              <p class="eyebrow">Numbered by the order the engine returned them</p>
-              <h2 id="matches-heading">Resonances</h2>
-            </div>
-            <span class="shown-count" id="shown-count">00 shown</span>
-          </div>
-          <div class="match-list" id="match-list" aria-live="polite">
-            <div class="match-skeleton"></div>
-            <div class="match-skeleton"></div>
-            <div class="match-skeleton"></div>
-            <div class="match-skeleton"></div>
-          </div>
-          <p class="matches-empty" id="matches-empty" hidden>No returned candidate cleared the resonance bar.</p>
-
-          <button class="secondary-trigger" id="secondary-trigger" type="button" aria-expanded="false" aria-controls="secondary-drawer" disabled>
-            <span><strong id="secondary-count">0</strong> other returned results</span>
-            <span class="trigger-hint">View in engine order</span>
-          </button>
-
-          <section class="contradiction-card" id="contradiction-card" aria-labelledby="contradiction-heading">
-            <div class="contradiction-content">
-              <p class="eyebrow warning-text" id="contradiction-heading">Contradiction evidence</p>
-              <p class="contradiction-topic" id="contradiction-topic">Loading rejected results…</p>
-              <div class="contradiction-meta"><span id="contradiction-person">—</span><code id="contradiction-reason">—</code></div>
-            </div>
-            <span class="rejected-count" id="rejected-count">0 rejected</span>
-          </section>
-
-          <p class="intro-note" aria-label="How introductions work">
-            <strong>Introductions need both sides.</strong>
-            Ask through the Collaboration panel or your chat; the other person has to accept before any channel opens.
-          </p>
-        </section>
-
-        <section class="panel evidence-panel" id="evidence-panel" aria-labelledby="evidence-heading" aria-live="polite">
-          <div class="panel-head evidence-head">
-            <div>
-              <p class="eyebrow" id="evidence-kicker">Why this match</p>
-              <h2 id="evidence-heading">Select a resonance</h2>
-              <p class="evidence-subtitle" id="evidence-subtitle">Backend mapping evidence will appear here.</p>
-            </div>
-            <dl class="evidence-metrics">
-              <div><dt>Class</dt><dd id="metric-class">—</dd></div>
-              <div><dt>Structural</dt><dd id="metric-structural">—</dd></div>
-              <div><dt>Verdict</dt><dd id="metric-confidence">—</dd></div>
-            </dl>
-          </div>
-
-          <div class="evidence-body">
-            <section class="mapping" aria-labelledby="mapping-heading">
-              <div class="mapping-columns" aria-hidden="true"><span>Your node</span><span></span><span>Their node</span></div>
-              <h3 class="visually-hidden" id="mapping-heading">Node-to-node correspondence</h3>
-              <div class="mapping-list" id="mapping-list"></div>
-            </section>
-            <section class="relation-proof" aria-labelledby="relations-proof-heading">
-              <h3 class="eyebrow" id="relations-proof-heading">Preserved relations</h3>
-              <div class="relation-chips" id="relation-chips"></div>
-              <p class="proof-note" id="proof-note">No frontend matching or score calculation.</p>
-              <details class="score-details" id="score-details">
-                <summary>All scores the engine returned</summary>
-                <dl class="score-list" id="score-list"></dl>
-              </details>
-            </section>
-          </div>
-        </section>
-      </div>
+      </details>
     </main>
 
-    <!-- One line that says what the visitor is looking at. Everything on this
-         page is the visitor's own live result, and saying so is the point;
-         the hash of the searched set and the wire contract version were only
-         ever readable to the people who built it. -->
+    <!-- One line that says what the visitor is looking at. -->
     <footer class="provenance">
       <span id="source-note">Nothing has been discovered yet.</span>
     </footer>

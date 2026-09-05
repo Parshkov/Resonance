@@ -397,7 +397,17 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('src="/collab.mjs"', html)
         self.assertIn('src="/collab_ui.mjs"', html)
         self.assertIn('src="/workspaces.mjs"', html)
-        # R16 Chrome audit: the collaboration drawer is styled by a linked
+        # The half of the product that waits has a surface of its own: what the
+        # standing search found while the person was away is read by
+        # resonances.mjs and shown at the top of the page.
+        self.assertIn('src="/resonances.mjs"', html)
+        with urlopen(Request(self.base + "/resonances.mjs"), timeout=10) as response:
+            self.assertTrue(response.headers["Content-Type"].startswith("text/javascript"))
+            waiting = response.read().decode("utf-8")
+        self.assertIn("/api/product/resonances", waiting)
+        self.assertIn("they_arrived", waiting)
+        self.assertNotIn(".innerHTML", waiting)
+        # R16 Chrome audit: the collaboration surfaces are styled by a linked
         # stylesheet (CSP default-src 'self' forbids inline styles) and the page
         # ships a favicon, both injected into <head>; served with proper types.
         self.assertIn('href="/live_ui.css"', html)
@@ -407,8 +417,16 @@ class ProductHttpTests(unittest.TestCase):
         with urlopen(Request(self.base + "/live_ui.css"), timeout=10) as response:
             self.assertTrue(response.headers["Content-Type"].startswith("text/css"))
             css = response.read().decode("utf-8")
-        self.assertIn(".collab-drawer", css)
-        self.assertIn(".collab-toggle", css)
+        # Those surfaces used to be a right-hand "Collaboration" drawer. Finding
+        # people is pointless if reaching them is hidden behind an overlay, so
+        # the requests inbox, the thread and the introduction composer are now
+        # sections of the page, and the stylesheet styles their parts only.
+        self.assertIn(".intro-composer", css)
+        self.assertIn(".collab-thread", css)
+        self.assertNotIn(".collab-drawer", css)
+        self.assertNotIn(".collab-toggle", css)
+        self.assertIn('id="conversations"', html)
+        self.assertIn('id="news"', html)
         for icon in ("/favicon.svg", "/favicon.ico"):
             with urlopen(Request(self.base + icon), timeout=10) as response:
                 self.assertEqual(response.headers["Content-Type"], "image/svg+xml")
@@ -424,7 +442,9 @@ class ProductHttpTests(unittest.TestCase):
         # the human-UI collaboration module is committed and served
         with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")
-        self.assertIn("Request intro", ui)
+        # the control is worded as what it is; the old "Request intro" label
+        # went with the drawer it lived in
+        self.assertIn("Ask for an introduction", ui)
         self.assertIn("/api/product/intro/request", ui)
         self.assertIn("textContent", ui)  # UGC displayed, never assigned to innerHTML
         self.assertNotIn(".innerHTML =", ui)
@@ -504,10 +524,18 @@ class ProductHttpTests(unittest.TestCase):
     def test_collab_ui_has_intro_initiation_and_the_page_no_longer_lies(self):
         with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")
-        # human intro initiation exists and drives the live discover+request path
-        self.assertIn("Start an introduction", ui)
+        # human intro initiation exists and drives the live discover+request
+        # path. It is the action on every person shown — card, roster row or
+        # waiting resonance — not a separate "Start an introduction" list, and
+        # the message is composed inline, not in a window.prompt().
+        self.assertIn("Ask for an introduction", ui)
         self.assertIn("/api/product/rich_discover", ui)
         self.assertIn("querySession", ui)
+        self.assertIn("function introComposer(", ui)
+        self.assertNotIn("window.prompt(", ui)
+        # A seeded example cannot accept an introduction (the backend refuses),
+        # so the page must not offer one.
+        self.assertIn("demo_persona", ui)
         # The page used to carry a static "Introductions unavailable — not
         # exposed by the accepted R8 MCP" chip, which stopped being true at
         # R13/R14, and this module hid it at runtime. Hiding a false statement
@@ -530,24 +558,36 @@ class ProductHttpTests(unittest.TestCase):
         # key is a FAIL. The product's own UI was teaching the failing path.
         with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")
-        # anchor on code, not prose: the phrase "Create MCP key" also appears in
-        # the comment explaining why it no longer leads.
-        url_block = ui.index("Hand your client this one address")
-        key_block = ui.index('actionButton("Create MCP key"')
-        self.assertLess(url_block, key_block, "the canonical URL must lead")
+        with urlopen(Request(self.base + "/"), timeout=10) as response:
+            html = response.read().decode("utf-8")
+        # The connect instructions live once, in the page: the URL row leads,
+        # and the key sits in a disclosure that collab_ui.mjs renders into
+        # #connect-advanced AFTER it. Anchor on the markup and on code, not on
+        # prose: "Create MCP key" also appears in the comment explaining why it
+        # no longer leads.
+        url_block = html.index('id="mcp-url"')
+        key_slot = html.index('id="connect-advanced"')
+        self.assertLess(url_block, key_slot, "the canonical URL must lead")
+        self.assertIn('actionButton("Create MCP key"', ui)
+        self.assertIn('byId("connect-advanced")', ui)
         self.assertIn("collab-advanced", ui)
         self.assertIn("Advanced: mint a key (debug only)", ui)
         # kept inside one string literal: the source wraps this sentence
         self.assertIn("You will not be asked to paste a", ui)
+        self.assertIn("You will never be asked to paste a", html)
         # the capability URL (a secret inside a path) is no longer advertised
         self.assertNotIn("endpoint_with_key", ui)
-        # R16 Chrome audit: the panel is a top-bar-toggled drawer (never a 4th
-        # item of the 3-column workspace grid), refreshes after any successful
-        # write made through session.mjs, and offers the human share path.
-        self.assertIn("collab-toggle", ui)
-        self.assertIn("collab-drawer", ui)
+        # The collaboration surfaces render into named sections of the page
+        # (never a drawer, never a 4th item of the workspace grid), refresh
+        # after any successful write made through session.mjs, and offer the
+        # human share path: words in, the structure back, an explicit share.
+        self.assertNotIn("collab-toggle", ui)
+        self.assertNotIn("collab-drawer", ui)
         self.assertNotIn('getElementById("main-workspace")', ui)
+        self.assertIn('byId("collab-requests")', ui)
+        self.assertIn('byId("share-control")', ui)
         self.assertIn("resonance:write", ui)
+        self.assertIn("/api/webmcp/prepare", ui)
         self.assertIn("/api/webmcp/preview", ui)
         self.assertIn("/api/webmcp/share", ui)
         self.assertNotIn("style.cssText", ui)  # presentation lives in live_ui.css

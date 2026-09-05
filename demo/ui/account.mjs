@@ -3,10 +3,13 @@
 // Resonance introduces people whose reasoning has the same shape, so the
 // account is the product's subject, not an implementation detail: a visitor
 // should be able to see whether they are signed in, as whom, and how to leave.
-// Where a deployment offers no sign-in at all (a local run), the slot stays
-// empty rather than inventing an affordance that would go nowhere.
+// Where a deployment offers a sign-in, that is step 1 of the loop and the
+// page says so in the body, not only in the masthead. Where it offers none
+// (a local run), the pseudonymous account is named for what it is.
 
 const slot = document.getElementById("account-slot");
+const gate = document.getElementById("signin-gate");
+const gateActions = document.getElementById("gate-actions");
 
 function element(tag, className, text) {
   const node = document.createElement(tag);
@@ -34,16 +37,31 @@ function markConsentUnknown() {
   }
 }
 
-function renderSignedOut(state) {
+function signInLink(base, className) {
+  const link = element("a", className, "Sign in");
+  link.href = signInHref(base);
+  return link;
+}
+
+function renderSignedOut(state, urgent = false) {
   markConsentUnknown();
-  const link = element("a", "account-action", "Sign in");
-  link.href = signInHref(state.sign_in_url);
+  const link = signInLink(state.sign_in_url, "account-action");
+  if (urgent) link.classList.add("account-action-urgent");
   slot.replaceChildren(link);
+  if (gate && gateActions) {
+    gateActions.replaceChildren(signInLink(state.sign_in_url, "button button-primary"));
+    gate.hidden = false;
+  }
 }
 
 function renderSignedIn(account) {
   const label = (account.display_label || account.user_id || "").trim();
-  const who = element("span", "account-who", label);
+  const who = element("span", "account-who");
+  who.append(element("span", "", label));
+  // A pseudonymous account exists only on a deployment with no sign-in. Say
+  // so: nobody can come back to it from another device.
+  who.append(element("small", "", account.signed_in
+    ? "signed in" : "pseudonymous · this browser only"));
   who.title = account.user_id || "";
   // Sign-out changes state, so it is a POST form rather than a link that a
   // prefetch or a link scanner could follow on the person's behalf.
@@ -54,6 +72,7 @@ function renderSignedIn(account) {
   button.type = "submit";
   form.appendChild(button);
   slot.replaceChildren(who, form);
+  if (gate) gate.hidden = true;
 }
 
 export async function refreshAccount() {
@@ -77,6 +96,7 @@ export async function refreshAccount() {
     return;
   }
   slot.hidden = true;
+  if (gate) gate.hidden = true;
 }
 
 refreshAccount();
@@ -89,6 +109,6 @@ document.addEventListener("resonance:write", () => { refreshAccount(); });
 document.addEventListener("resonance:sign-in-required", (event) => {
   if (!slot) return;
   slot.hidden = false;
-  renderSignedOut({sign_in_url: event.detail?.signInUrl, sign_in_required: true});
-  slot.querySelector(".account-action")?.classList.add("account-action-urgent");
+  renderSignedOut({sign_in_url: event.detail?.signInUrl, sign_in_required: true}, true);
+  gate?.scrollIntoView({block: "nearest"});
 });

@@ -1,21 +1,29 @@
 /**
- * R14 human-UI collaboration controls (fixes the reviewer's "no visible UI"
- * blocker). Additive panel injected only by the live product server; the
- * accepted R9 page files are untouched. Every control drives the same
- * /api/product endpoints the WebMCP tools use, so manual UI and agent produce
- * identical authorized state.
+ * Contacting a person: the human UI for steps 4 and 5 of the product's loop.
  *
- * R16 Chrome audit: the panel is a right-hand drawer opened from a
- * "Collaboration" button in the top bar (it used to be appended into the
- * 3-column workspace grid, which wrapped and halved the accepted surfaces).
- * Presentation comes from /live_ui.css (CSP `default-src 'self'`), the panel
- * re-reads its state after every successful write made through session.mjs
- * (agent tools included) and polls slowly for requests from other people, and
- * a human without an agent can share the current thought from the panel via
- * the same prepare → preview → confirm → share path the WebMCP tools use.
+ * Share a thought → people are found → you ask one of them for an
+ * introduction → they accept or decline → a private channel opens. This
+ * module renders the share control, the "ask for an introduction" action on
+ * every match card, the requests inbox and the message thread. Every control
+ * drives the same /api/product endpoints the WebMCP tools use, so manual UI
+ * and agent produce identical authorized state.
+ *
+ * It used to be a right-hand drawer opened from a "Collaboration" button in
+ * the masthead. Finding people is pointless if reaching them is hidden behind
+ * an overlay, so the same surfaces now render into sections of the page:
+ *   #share-control / #onboarding-share  — share or stop sharing
+ *   .match-card .match-card__actions    — ask for an introduction
+ *   #collab-initiate                     — people open to one, without a card
+ *   #collab-requests, #collab-channel    — the Conversations section
+ *   #connect-advanced                    — the developer key, behind the URL
+ * Presentation comes from /live_ui.css (CSP `default-src 'self'`). The
+ * module re-reads its state after every successful write made through
+ * session.mjs (agent tools included) and polls slowly for requests and
+ * messages from other people.
  *
  * All returned intro/message text is user-generated: it is inserted via
- * textContent (never innerHTML), so it is displayed, never interpreted.
+ * textContent (never innerHTML), so it is displayed, never interpreted, and
+ * it is visibly marked as somebody else's words.
  */
 
 import { apiFetch, getCsrf } from "/session.mjs";
@@ -23,6 +31,16 @@ import { apiFetch, getCsrf } from "/session.mjs";
 let requestCounter = 0;
 let refreshTimer = null;
 let pollTimer = null;
+
+// What the last reads said. Cards and alerts render from these without a
+// request of their own.
+const state = {
+  introStates: new Map(),      // session_id -> {intro_state, person_pseudonym, demo_persona}
+  requests: {incoming: [], outgoing: []},
+  querySession: null,
+  openChannelId: null,
+  openCounterpart: "",
+};
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
@@ -33,105 +51,23 @@ function el(tag, props = {}, children = []) {
   return node;
 }
 
+function byId(id) { return document.getElementById(id); }
+
 function requestId(prefix) {
   requestCounter += 1;
   return `ui-${prefix}-${requestCounter}-${getCsrf()?.slice(0, 6) || "anon"}`;
 }
 
-function setOpen(open) {
-  const root = document.getElementById("collab-panel");
-  const backdrop = document.getElementById("collab-backdrop");
-  const toggle = document.getElementById("collab-toggle");
-  if (!root) return;
-  root.classList.toggle("is-open", open);
-  root.setAttribute("aria-hidden", String(!open));
-  root.inert = !open;
-  if (backdrop) backdrop.hidden = !open;
-  if (toggle) toggle.setAttribute("aria-expanded", String(open));
-  if (open) {
-    document.getElementById("collab-close")?.focus();
-    refreshAll();
-  } else {
-    toggle?.focus();
-  }
-}
-
-function toggleButton() {
-  let toggle = document.getElementById("collab-toggle");
-  if (toggle) return toggle;
-  toggle = el("button", {id: "collab-toggle", type: "button", className: "collab-toggle"});
-  toggle.setAttribute("aria-controls", "collab-panel");
-  toggle.setAttribute("aria-expanded", "false");
-  const badge = el("span", {id: "collab-badge", className: "collab-badge", textContent: "0"});
-  badge.hidden = true;
-  toggle.append("Collaboration", badge);
-  toggle.addEventListener("click", () => {
-    setOpen(!document.getElementById("collab-panel")?.classList.contains("is-open"));
-  });
-  const status = document.querySelector(".system-status");
-  const anchor = status?.querySelector(".source-switch");
-  if (status && anchor) anchor.insertAdjacentElement("afterend", toggle);
-  else (status || document.querySelector(".masthead") || document.body).append(toggle);
-  return toggle;
-}
-
-function panel() {
-  let root = document.getElementById("collab-panel");
-  if (root) return root;
-  toggleButton();
-  const backdrop = el("div", {id: "collab-backdrop", className: "collab-backdrop"});
-  backdrop.hidden = true;
-  backdrop.addEventListener("click", () => setOpen(false));
-  root = el("aside", {id: "collab-panel", className: "collab-drawer"});
-  root.setAttribute("aria-label", "Collaboration");
-  root.setAttribute("aria-hidden", "true");
-  root.inert = true;
-  const close = el("button", {id: "collab-close", type: "button", className: "icon-button",
-                              textContent: "×"});
-  close.setAttribute("aria-label", "Close collaboration panel");
-  close.addEventListener("click", () => setOpen(false));
-  root.append(
-    el("div", {className: "collab-header"}, [
-      el("div", {}, [
-        el("p", {className: "eyebrow", textContent: "Your account"}),
-        el("h2", {textContent: "Collaboration"}),
-      ]),
-      close,
-    ]),
-    el("p", {className: "collab-copy", textContent:
-      "Share the current thought, discover people whose reasoning resonates, " +
-      "and start consent-gated introductions. Agents drive the same state " +
-      "through the WebMCP tools; both surfaces read the same authorized record."}),
-    el("div", {id: "collab-error", className: "collab-error", role: "alert"}),
-    el("div", {id: "collab-share", className: "collab-section"}),
-    el("div", {id: "collab-connect", className: "collab-section"}),
-    el("div", {id: "collab-initiate", className: "collab-section"}),
-    el("div", {id: "collab-requests", className: "collab-section"}),
-    el("div", {id: "collab-channel", className: "collab-section"}),
-  );
-  document.body.append(backdrop, root);
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && root.classList.contains("is-open")) setOpen(false);
-  });
-  // There used to be a runtime patch here that hid the page's static
-  // "Introductions unavailable — not exposed by the accepted R8 MCP" chip,
-  // because that label had become false and contradicted this very drawer.
-  // Hiding a false statement is not the same as not making it: the chip now
-  // states the rule that IS true (an intro needs the other side to accept), so
-  // there is nothing left to hide. Worth noting that the patch did not even
-  // work until the global `[hidden]` rule landed — `.intro-unavailable` set
-  // `display: flex`, which beat the browser default for the hidden attribute.
-  return root;
-}
-
 function showError(message) {
-  const node = document.getElementById("collab-error");
+  const node = byId("collab-error");
   if (node) node.textContent = message || "";
+  if (message) byId("conversations")?.removeAttribute("hidden");
 }
 
-function actionButton(label, handler, primary = false) {
-  const button = el("button", {type: "button", textContent: label,
-    className: primary ? "collab-button collab-button--primary" : "collab-button"});
+function actionButton(label, handler, variant = "") {
+  const className = variant === "primary" ? "collab-button collab-button--primary"
+    : variant === "quiet" ? "collab-button collab-button--quiet" : "collab-button";
+  const button = el("button", {type: "button", textContent: label, className});
   button.addEventListener("click", async () => {
     button.disabled = true;
     showError("");
@@ -141,84 +77,214 @@ function actionButton(label, handler, primary = false) {
   return button;
 }
 
-function summariseThought(preview) {
-  const thought = preview?.will_become_discoverable?.thought;
-  if (!thought) return "the prepared Thought DNA (structure only, no raw text)";
-  const parts = [];
-  for (const key of ["problem", "mechanism", "state", "topic", "public_caption"]) {
-    const value = thought[key];
-    if (typeof value === "string" && value) parts.push(`${key}: ${value}`);
-  }
-  if (!parts.length) {
-    const chain = thought.causal_chain || thought.chain || thought.nodes;
-    if (Array.isArray(chain)) {
-      parts.push(chain.map((n) => (typeof n === "string" ? n : n?.label || n?.text || "")).filter(Boolean).join(" → "));
-    }
-  }
-  return parts.length ? parts.join("\n") : "the prepared Thought DNA (structure only, no raw text)";
+function relativeTime(iso) {
+  const then = Date.parse(iso || "");
+  if (!Number.isFinite(then)) return "";
+  const seconds = Math.max(0, (Date.now() - then) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = seconds / 60;
+  if (minutes < 60) return `${Math.floor(minutes)} min ago`;
+  const hours = minutes / 60;
+  if (hours < 48) return `${Math.floor(hours)} h ago`;
+  const days = hours / 24;
+  if (days < 14) return `${Math.floor(days)} d ago`;
+  return new Date(then).toLocaleDateString();
+}
+
+// Text someone else wrote: shown as text, marked as theirs.
+function theirWords(text, from) {
+  const node = el("p", {className: "their-words", textContent: text || ""});
+  if (from) node.dataset.from = from;
+  return node;
 }
 
 // ---- share state (human path for prepare → preview → confirm → share) ----
+//
+// The same three steps an agent takes over MCP, done by hand on the page:
+// the person's own words go in (never retained), the structure that would
+// become discoverable is shown back, and nothing is shared until they say so
+// having seen it. A prepare with no content is refused by the server — there
+// is no stand-in thought — so the page has to ask for the words first.
 
-async function shareCurrentThought() {
-  await apiFetch("POST", "/api/webmcp/prepare", {request_id: requestId("prep")});
-  const preview = await apiFetch("GET", "/api/webmcp/preview");
-  const approved = window.confirm(
-    "Share this with Resonance? Only the structural Thought DNA below becomes " +
-    "discoverable; the source text is not retained.\n\n" + summariseThought(preview));
-  if (!approved) return;
-  await apiFetch("POST", "/api/webmcp/share", {
-    request_id: requestId("share"), confirm: true,
-    confirmation_token: preview.confirmation_token,
+const SHARE_PLACEHOLDER =
+  "What are you working on, in your own words? Say what causes what, what prevents " +
+  "what, what requires what — the structure is extracted from those connectives.\n\n" +
+  "For example: “A partial outage causes synchronized client retries. The retries cause " +
+  "request amplification, which leads to cascading saturation. Jittered backoff prevents " +
+  "the amplification.”";
+
+function previewStructure(preview) {
+  const thought = preview?.will_become_discoverable?.thought || {};
+  const presentation = preview?.will_become_discoverable?.presentation || {};
+  const nodes = Array.isArray(thought.nodes) ? thought.nodes : [];
+  const relations = Array.isArray(thought.relations) ? thought.relations : [];
+  const labelOf = new Map(nodes.map((n) => [n.id, n.label]));
+  const box = el("div", {className: "share-preview"});
+  box.append(el("p", {className: "eyebrow", textContent: "This is what would become discoverable"}));
+  if (presentation.topic) box.append(el("p", {className: "share-preview__topic", textContent: presentation.topic}));
+  const chain = el("ol", {className: "dna-chain"});
+  for (const node of nodes) {
+    const row = el("li", {className: "dna-node"});
+    row.append(el("strong", {textContent: node.label || ""}), el("span", {textContent: node.role || ""}));
+    chain.append(row);
+  }
+  box.append(chain);
+  const list = el("ol", {className: "dna-relations"});
+  for (const relation of relations) {
+    const row = el("li", {className: "dna-relation"});
+    row.append(
+      el("span", {textContent: labelOf.get(relation.source) || relation.source || ""}),
+      el("span", {className: "relation-type", textContent: relation.type || ""}),
+      el("span", {textContent: labelOf.get(relation.target) || relation.target || ""}),
+    );
+    list.append(row);
+  }
+  box.append(list);
+  box.append(el("p", {className: "collab-muted", textContent:
+    "Your text itself is not kept. Only these nodes and relations are compared, and only " +
+    "they can be seen by the people they resonate with."}));
+  return box;
+}
+
+function openShareComposer() {
+  const host = byId("share-composer");
+  if (!host) return;
+  if (host.querySelector(".share-form")) { host.querySelector("textarea")?.focus(); return; }
+  const form = el("form", {className: "share-form"});
+  const id = "share-context";
+  form.append(el("label", {htmlFor: id, className: "share-form__label", textContent:
+    "Share a thought from this page"}));
+  const textarea = el("textarea", {id, name: "context", required: true, maxLength: 4000,
+    placeholder: SHARE_PLACEHOLDER});
+  const status = el("p", {className: "collab-muted share-form__status", role: "status"});
+  const row = el("div", {className: "intro-composer-row"});
+  const extract = el("button", {type: "submit", className: "collab-button collab-button--primary",
+    textContent: "Show me the structure"});
+  const cancel = el("button", {type: "button", className: "collab-button collab-button--quiet", textContent: "Cancel"});
+  cancel.addEventListener("click", () => host.replaceChildren());
+  row.append(extract, cancel);
+  form.append(textarea, row, status);
+  host.replaceChildren(form);
+  queueMicrotask(() => textarea.focus());
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const context = textarea.value.trim();
+    if (!context) { textarea.focus(); return; }
+    extract.disabled = true;
+    status.textContent = "Extracting the structure…";
+    let preview;
+    try {
+      await apiFetch("POST", "/api/webmcp/prepare", {request_id: requestId("prep"), context});
+      preview = await apiFetch("GET", "/api/webmcp/preview");
+    } catch (error) {
+      status.textContent = error.message;
+      extract.disabled = false;
+      return;
+    }
+    status.textContent = "";
+    // Step 2: the preview, and the explicit share.
+    const confirmRow = el("div", {className: "intro-composer-row"});
+    const share = el("button", {type: "button", className: "collab-button collab-button--primary",
+      textContent: "Share this and start looking"});
+    const back = el("button", {type: "button", className: "collab-button collab-button--quiet",
+      textContent: "Change the text"});
+    const previewBox = previewStructure(preview);
+    share.addEventListener("click", async () => {
+      share.disabled = true;
+      try {
+        await apiFetch("POST", "/api/webmcp/share", {
+          request_id: requestId("share"), confirm: true,
+          confirmation_token: preview.confirmation_token,
+        });
+        host.replaceChildren();
+        await refreshAll();
+      } catch (error) {
+        status.textContent = error.message;
+        share.disabled = false;
+      }
+    });
+    back.addEventListener("click", () => {
+      previewBox.remove(); confirmRow.remove();
+      textarea.hidden = false; row.hidden = false; extract.disabled = false;
+      textarea.focus();
+    });
+    confirmRow.append(share, back, el("p", {className: "collab-muted", textContent:
+      "You can stop sharing at any moment."}));
+    textarea.hidden = true; row.hidden = true;
+    form.append(previewBox, confirmRow, status);
   });
 }
 
 async function stopSharing() {
-  if (!window.confirm("Stop sharing? Your session is removed from discovery.")) return;
+  if (!window.confirm("Stop sharing? Your thought is removed from discovery and stops looking.")) return;
   await apiFetch("POST", "/api/webmcp/consent", {
     request_id: requestId("revoke"), shared: false, confirm: true,
   });
 }
 
-async function refreshShare() {
-  const host = document.getElementById("collab-share");
+function renderShareInto(host, shared, count, compact) {
   if (!host) return;
-  let owned;
+  host.replaceChildren();
+  if (!compact) {
+    const stateRow = el("p", {className: "collab-share-state"});
+    stateRow.dataset.shared = String(shared);
+    const light = el("span", {className: "status-light"});
+    light.setAttribute("aria-hidden", "true");
+    stateRow.append(light, shared
+      ? `Shared · ${count} discoverable thought${count === 1 ? "" : "s"} · still looking`
+      : "Private · nothing is discoverable");
+    host.append(stateRow);
+  }
+  if (shared) {
+    host.append(actionButton("Stop sharing", async () => { await stopSharing(); await refreshAll(); }));
+  } else {
+    const open = el("button", {type: "button", className: "collab-button collab-button--primary",
+      textContent: compact ? "Share a thought from this page" : "Share a thought"});
+    open.addEventListener("click", () => {
+      openShareComposer();
+      byId("thought")?.scrollIntoView({block: "start"});
+    });
+    host.append(open);
+  }
+}
+
+// One read of the person's own sessions serves both the share control and
+// the intro roster; the two used to read it separately.
+async function ownedSessions() {
+  return (await apiFetch("GET", "/api/product/sessions")).sessions || [];
+}
+
+async function refreshShare(owned) {
   try {
-    owned = (await apiFetch("GET", "/api/product/sessions")).sessions || [];
+    owned = owned || await ownedSessions();
   } catch (error) {
     showError(error.message);
     return;
   }
-  const shared = owned.some((s) => s.share_state === "discoverable");
+  const discoverable = owned.filter((s) => s.share_state === "discoverable");
+  const shared = discoverable.length > 0;
   // Same announcement webmcp_live.mjs makes, for the human path: sharing from
-  // this panel must also take the page out of its onboarding state. Reuses the
-  // read we just did instead of adding one.
+  // this page must also take it out of its onboarding state. Reuses the read
+  // we just did instead of adding one.
   document.dispatchEvent(new CustomEvent("resonance:consent", {detail: {shared}}));
-  const stateRow = el("p", {className: "collab-share-state"});
-  const light = el("span", {className: "status-light"});
-  light.setAttribute("aria-hidden", "true");
-  stateRow.append(light, shared
-    ? `Shared · ${owned.filter((s) => s.share_state === "discoverable").length} discoverable thought(s)`
-    : "Private · nothing is discoverable yet");
-  host.replaceChildren(el("h3", {textContent: "Your shared thought"}), stateRow);
-  if (shared) {
-    host.append(actionButton("Stop sharing", async () => { await stopSharing(); await refreshAll(); }));
-  } else {
-    host.append(
-      el("p", {className: "collab-muted", textContent:
-        "Sharing publishes only the structural Thought DNA after you review the preview."}),
-      el("div", {className: "collab-compose"}, [
-        actionButton("Share the current thought", async () => {
-          await shareCurrentThought();
-          await refreshAll();
-        }, true),
-      ]),
-    );
+  // The masthead pill is normally kept by webmcp_live.mjs after its own tool
+  // writes; a share made from this page is a write it never sees, and a pill
+  // reading "Private" over a thought that is looking is a lie. Same markup,
+  // same fact, no extra request.
+  const pill = byId("header-consent");
+  if (pill) {
+    const light = el("span", {className: "status-light"});
+    light.setAttribute("aria-hidden", "true");
+    pill.replaceChildren(light, el("span", {textContent:
+      shared ? "Shared with Resonance" : "Private · not discoverable"}));
+    pill.dataset.shared = String(shared);
   }
+  renderShareInto(byId("share-control"), shared, discoverable.length, false);
+  renderShareInto(byId("onboarding-share"), shared, discoverable.length, true);
 }
 
-// ---- connect a real chat (remote MCP key) ------------------------------
+// ---- connect: the developer fallback, after the URL that is the real path --
 
 function codeBlock(text) {
   const pre = el("pre", {className: "collab-code"});
@@ -226,67 +292,29 @@ function codeBlock(text) {
   return pre;
 }
 
-function clientList(entries) {
-  // One client per row. The words are the same as before; what changed is that
-  // a reader can find their client without parsing a paragraph.
-  const list = el("dl", {className: "collab-clients"});
-  for (const [name, how, code] of entries) {
-    const row = el("div", {className: "collab-client"});
-    row.append(el("dt", {textContent: name}));
-    const dd = el("dd");
-    if (how) dd.append(document.createTextNode(how));
-    if (code) dd.append(codeBlock(code));
-    row.append(dd);
-    list.append(row);
-  }
-  return list;
-}
-
 function renderConnect() {
-  const host = document.getElementById("collab-connect");
+  const host = byId("connect-advanced");
   if (!host) return;
-  // This panel used to lead with "Create MCP key" and hand out
-  // `Authorization: Bearer <key>` plus a `…/mcp/<key>` capability URL "for
-  // clients that only take a URL". That is the developer fallback, documented
-  // in ops/CONNECT_MCP.md §2 as "debug only, not the normal path", and
-  // submission/HUMAN_TEST_CARDS.md tells a tester that being asked for a key
-  // is a FAIL. The canonical path is the URL alone: the origin answers with an
-  // RFC 9728 challenge and the client runs OAuth by itself. So the URL leads,
-  // and the key is behind a disclosure that says what it is.
+  // The page's connect panel leads with the one address a client needs
+  // ("Hand your client this one address": the URL, OAuth discovered by the
+  // client itself). This module only adds the developer fallback behind a
+  // disclosure, after it. This panel used to lead with "Create MCP key" and
+  // hand out `Authorization: Bearer <key>`; ops/CONNECT_MCP.md §2 calls that
+  // "debug only, not the normal path", and submission/HUMAN_TEST_CARDS.md
+  // tells a tester that being asked for a key is a FAIL.
   const endpoint = `${window.location.origin}/mcp`;
   host.replaceChildren(
-    el("h3", {textContent: "Connect your chat (MCP)"}),
-    el("p", {className: "collab-muted", textContent:
-      "Give the assistant you already talk to (Claude, ChatGPT, Grok, Cursor, any MCP " +
-      "client) access to this account. It extracts the structure of what you are working " +
-      "on, previews it, and shares only after you approve — then discovers people whose " +
-      "reasoning resonates."}),
-    el("h4", {className: "collab-subhead", textContent: "Hand your client this one address"}),
-    codeBlock(endpoint),
-    el("p", {className: "collab-muted", textContent:
-      "That is all it needs. The client discovers OAuth on its own and opens a Resonance " +
-      "consent page; approve there and it is connected. You will not be asked to paste a " +
-      "key or a token anywhere in this flow."}),
-    clientList([
-      ["claude.ai", "Settings → Connectors → Add custom connector."],
-      ["ChatGPT", "Settings → Apps & Connectors → Advanced → Developer mode → Create (Business / Enterprise / Edu)."],
-      ["Grok", "Connectors → New Connector → Custom."],
-      ["Claude Code", "", `claude mcp add --transport http resonance ${endpoint}`],
-      ["Cursor / Windsurf / any mcp.json", "", `{"url": "${endpoint}"}`],
-    ]),
-    el("p", {className: "collab-muted", textContent:
-      "Then, in your chat: “Extract the structure of what I’m working on, show me the " +
-      "preview, and after I approve it, find who resonates.”"}),
     el("details", {className: "collab-advanced"}, [
       el("summary", {textContent: "Advanced: mint a key (debug only)"}),
       el("p", {className: "collab-muted", textContent:
         "Only for a client that cannot run OAuth at all. A key is a second login for this " +
-        "account: anyone holding it acts as you. Prefer the URL above."}),
-      el("div", {className: "collab-compose"}, [
+        "account: anyone holding it acts as you. Prefer the URL above. You will not be asked to paste a " +
+        "key anywhere in the normal flow."}),
+      el("div", {className: "collab-compose-inline"}, [
         actionButton("Create MCP key", async () => {
           const creds = await apiFetch("POST", "/api/product/mcp_key", {});
           const url = creds.endpoint || endpoint;
-          const out = document.getElementById("collab-connect-out");
+          const out = byId("collab-connect-out");
           out.replaceChildren(
             el("p", {className: "collab-muted", textContent:
               "Shown once — anyone holding this key acts as you in Resonance. " +
@@ -295,36 +323,154 @@ function renderConnect() {
             codeBlock(JSON.stringify({mcpServers: {resonance: {url,
               headers: {Authorization: `Bearer ${creds.mcp_key}`}}}}, null, 2)),
           );
-        }, false),
+        }),
       ]),
       el("div", {id: "collab-connect-out"}),
     ]),
   );
 }
 
+// ---- the introduction composer -----------------------------------------
+//
+// One inline form, used by the match cards, the roster and the waiting
+// resonances. It replaces a browser prompt dialog: the person sees what they are
+// sending, to whom, and what the other side will and will not receive.
+
+function introComposer({fromSessionId, targetSessionId, who, onSent, onCancel}) {
+  const form = el("form", {className: "intro-composer"});
+  const id = `intro-message-${targetSessionId.replace(/[^A-Za-z0-9_-]/g, "")}`;
+  const label = el("label", {htmlFor: id, textContent:
+    `A short message to ${who || "them"}. They see it with your pseudonym, nothing else.`});
+  const textarea = el("textarea", {id, name: "message", required: true, maxLength: 500,
+    placeholder: "What made you want to talk — and what you are working on."});
+  const row = el("div", {className: "intro-composer-row"});
+  const send = el("button", {type: "submit", className: "collab-button collab-button--primary",
+    textContent: "Send the request"});
+  const cancel = el("button", {type: "button", className: "collab-button collab-button--quiet",
+    textContent: "Cancel"});
+  cancel.addEventListener("click", () => { form.remove(); onCancel?.(); });
+  row.append(send, cancel, el("p", {className: "collab-muted", textContent:
+    "Nothing opens until they accept."}));
+  form.append(label, textarea, row);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = textarea.value.trim();
+    if (!message) { textarea.focus(); return; }
+    send.disabled = true;
+    showError("");
+    try {
+      await requestIntro(fromSessionId, targetSessionId, message);
+      form.remove();
+      await onSent?.();
+    } catch (error) {
+      showError(error.message);
+      send.disabled = false;
+    }
+  });
+  queueMicrotask(() => textarea.focus());
+  return form;
+}
+
 // ---- intro initiation -------------------------------------------------
 
-async function refreshInitiate() {
-  // Human intro initiation, independent of the R9 replay cards: list the
-  // viewer's own discoverable session, discover live matches, and offer a
-  // "Request intro" control per intro-accepting candidate.
-  const host = document.getElementById("collab-initiate");
-  if (!host) return;
-  let owned;
+function introStateFor(sessionId) {
+  return state.introStates.get(sessionId) || null;
+}
+
+function acceptedIntroFor(sessionId) {
+  // Outgoing rows name the target session; incoming ones deliberately do not
+  // name the other person's session, so a card can only find its own request.
+  return [...state.requests.outgoing, ...state.requests.incoming].find((row) =>
+    row.state === "accepted" && row.channel_id && row.to_session_id === sessionId) || null;
+}
+
+// The action that belongs on a person, wherever they are shown: a card, a
+// roster row, or an alert. Reads the latest authorized state and never offers
+// what the backend would refuse (a seeded example cannot accept).
+function actionsFor(sessionId, host, options = {}) {
+  host.replaceChildren();
+  const info = introStateFor(sessionId);
+  // An alert names the thought of yours that resonated; a card uses the
+  // discoverable thought the page is showing.
+  const fromSession = options.fromSessionId || state.querySession;
+  const who = options.who || info?.person_pseudonym || "";
+  if (options.demoPersona || info?.demo_persona) {
+    host.append(el("span", {className: "collab-muted", textContent:
+      "An example from the seeded corpus — not a person who can be introduced."}));
+    return;
+  }
+  if (!fromSession) {
+    host.append(el("span", {className: "collab-muted", textContent: "Share a thought to ask for an introduction."}));
+    return;
+  }
+  const connection = options.connectionState || info?.intro_state || null;
+  if (connection === "accepted") {
+    const row = acceptedIntroFor(sessionId);
+    host.append(el("span", {className: "collab-state", textContent: "connected"}));
+    host.querySelector(".collab-state").dataset.state = "accepted";
+    host.append(actionButton("Open conversation", async () => {
+      if (row) await openChannel(row);
+      else byId("conversations")?.scrollIntoView({block: "start"});
+    }, "primary"));
+    return;
+  }
+  if (connection === "requested") {
+    // The state has no direction. Outgoing rows name their target session;
+    // if none of ours points at this person, the open request is theirs.
+    const ours = state.requests.outgoing.some((row) =>
+      row.state === "requested" && row.to_session_id === sessionId);
+    const badge = el("span", {className: "collab-state", textContent:
+      ours ? "introduction requested" : "they asked you"});
+    badge.dataset.state = "requested";
+    host.append(badge);
+    if (ours) {
+      host.append(el("span", {className: "collab-muted", textContent: "Waiting for them to answer."}));
+    } else {
+      const answer = el("a", {href: "#conversations", className: "collab-muted", textContent:
+        "They asked to be introduced to you — answer below."});
+      host.append(answer);
+    }
+    return;
+  }
+  if (connection === "unavailable") {
+    host.append(el("span", {className: "collab-muted", textContent: "Not taking introductions right now."}));
+    return;
+  }
+  const ask = el("button", {type: "button", textContent: "Ask for an introduction",
+    className: "collab-button collab-button--primary collab-request-btn"});
+  ask.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (host.querySelector(".intro-composer")) return;
+    ask.hidden = true;
+    host.append(introComposer({
+      fromSessionId: fromSession, targetSessionId: sessionId, who,
+      onSent: async () => { await refreshAll(); },
+      onCancel: () => { ask.hidden = false; },
+    }));
+  });
+  host.append(ask);
+}
+
+async function refreshInitiate(owned) {
+  // People open to an introduction, from the same authorized discovery the
+  // page shows. Cards on the page get their action from this read; anyone
+  // available who has no card is listed here so they can still be reached.
+  const host = byId("collab-initiate");
   try {
-    owned = (await apiFetch("GET", "/api/product/sessions")).sessions || [];
+    owned = owned || await ownedSessions();
   } catch (error) {
     showError(error.message);
     return;
   }
-  const mine = owned.find(s => s.share_state === "discoverable") || owned[0];
-  host.replaceChildren(el("h3", {textContent: "Start an introduction"}));
+  const mine = owned.find((s) => s.share_state === "discoverable") || null;
+  state.introStates = new Map();
+  host?.replaceChildren();
   if (!mine) {
+    state.querySession = null;
     delete document.body.dataset.querySession;
-    host.append(el("p", {className: "collab-muted",
-                         textContent: "Share a thought first to discover people."}));
     return;
   }
+  state.querySession = mine.session_id;
   document.body.dataset.querySession = mine.session_id;
   let matches = [];
   try {
@@ -334,24 +480,31 @@ async function refreshInitiate() {
     showError(error.message);
     return;
   }
-  const available = matches.filter(m => m.intro_state === "available");
-  if (!available.length) {
-    host.append(el("p", {className: "collab-muted",
-                         textContent: "No one is currently open to introductions."}));
-    return;
+  for (const match of matches) {
+    state.introStates.set(match.session_id, {
+      intro_state: match.intro_state,
+      person_pseudonym: match.person_pseudonym,
+      demo_persona: match.display?.demo_persona === true,
+    });
   }
-  for (const match of available) {
+  if (!host) return;
+  const onPage = new Set([...document.querySelectorAll(".match-card[data-session-id]")]
+    .map((card) => card.dataset.sessionId));
+  const reachable = matches.filter((m) =>
+    m.intro_state === "available" && m.display?.demo_persona !== true && !onPage.has(m.session_id));
+  if (!reachable.length) return;
+  host.append(el("h4", {className: "collab-subhead", textContent: "Also open to an introduction"}));
+  for (const match of reachable) {
     const row = el("div", {className: "collab-row collab-initiate-row"});
     row.dataset.sessionId = match.session_id;
-    // person_pseudonym is untrusted UGC -> textContent.
-    row.append(el("span", {className: "collab-grow", textContent: match.person_pseudonym}));
-    row.append(actionButton("Request intro", async () => {
-      const message = window.prompt(
-        "Short message to send with your introduction request:");
-      if (!message) return;
-      await requestIntro(mine.session_id, match.session_id, message);
-      await refreshInitiate();
-    }));
+    // person_pseudonym and topic are untrusted UGC -> textContent.
+    row.append(el("span", {className: "collab-grow"}, [
+      el("strong", {textContent: match.person_pseudonym}),
+      match.display?.topic ? ` · ${match.display.topic}` : "",
+    ]));
+    const actions = el("div", {className: "match-card__actions"});
+    actionsFor(match.session_id, actions, {who: match.person_pseudonym});
+    row.append(actions);
     host.append(row);
   }
 }
@@ -359,15 +512,62 @@ async function refreshInitiate() {
 // ---- requests -----------------------------------------------------------
 
 function setBadge(count) {
-  const badge = document.getElementById("collab-badge");
-  if (!badge) return;
-  badge.textContent = String(count);
-  badge.hidden = count === 0;
+  const badge = byId("nav-requests-count");
+  if (badge) {
+    badge.textContent = String(count);
+    badge.hidden = count === 0;
+  }
+  const line = byId("news-requests");
+  if (line) {
+    line.replaceChildren();
+    if (count > 0) {
+      const link = el("a", {href: "#conversations", textContent: count === 1
+        ? "Answer them" : "Answer them"});
+      line.append(count === 1 ? "1 person asked to be introduced to you. "
+        : `${count} people asked to be introduced to you. `, link);
+    }
+    line.hidden = count === 0;
+    document.dispatchEvent(new CustomEvent("resonance:news-changed"));
+  }
+}
+
+function requestRow(row, kind) {
+  const line = el("div", {className: "collab-request"});
+  line.dataset.introId = row.intro_id;
+  line.dataset.state = row.state;
+  const who = el("div", {className: "collab-request__who"});
+  // counterpart_display and message are untrusted UGC -> textContent only.
+  who.append(
+    el("strong", {textContent: row.counterpart_display}),
+    el("span", {className: "collab-muted", textContent: kind === "incoming"
+      ? "asked to be introduced to you" : "you asked for an introduction"}),
+    el("span", {className: "collab-request__when", textContent: relativeTime(row.updated_at || row.created_at)}),
+  );
+  const badge = el("span", {className: "collab-state", textContent: row.state});
+  badge.dataset.state = row.state;
+  line.append(who, badge);
+  if (row.message) {
+    line.append(kind === "incoming"
+      ? theirWords(row.message, row.counterpart_display)
+      : el("p", {className: "collab-request__message collab-muted", textContent: `You wrote: ${row.message}`}));
+  }
+  const actions = el("div", {className: "collab-request__actions"});
+  if (kind === "incoming" && row.state === "requested") {
+    actions.append(actionButton("Accept", () => respond(row.intro_id, true), "primary"));
+    actions.append(actionButton("Decline", () => respond(row.intro_id, false)));
+  }
+  if (kind === "outgoing" && row.state === "requested") {
+    actions.append(actionButton("Cancel the request", () => cancel(row.intro_id), "quiet"));
+  }
+  if (row.state === "accepted") {
+    actions.append(actionButton("Open conversation", () => openChannel(row), "primary"));
+  }
+  if (actions.childElementCount) line.append(actions);
+  return line;
 }
 
 async function refreshRequests() {
-  const host = document.getElementById("collab-requests");
-  if (!host) return;
+  const host = byId("collab-requests");
   let data;
   try {
     data = await apiFetch("GET", "/api/product/intro/list");
@@ -375,39 +575,71 @@ async function refreshRequests() {
     showError(error.message);
     return;
   }
-  host.replaceChildren();
-  const render = (title, rows, kind) => {
-    host.append(el("h3", {textContent: title}));
-    if (!rows.length) {
-      host.append(el("p", {className: "collab-muted", textContent: "none"}));
-      return;
-    }
-    for (const row of rows) {
-      const line = el("div", {className: "collab-row collab-request"});
-      line.dataset.introId = row.intro_id;
-      line.dataset.state = row.state;
-      // counterpart_display and message are untrusted UGC -> textContent only.
-      line.append(el("strong", {textContent: row.counterpart_display}),
-                  el("span", {className: "collab-state", textContent: row.state}),
-                  el("span", {className: "collab-grow", textContent: row.message}));
-      if (kind === "incoming" && row.state === "requested") {
-        line.append(actionButton("Accept", () =>
-          respond(row.intro_id, true), true));
-        line.append(actionButton("Decline", () =>
-          respond(row.intro_id, false)));
-      }
-      if (kind === "outgoing" && row.state === "requested") {
-        line.append(actionButton("Cancel", () => cancel(row.intro_id)));
-      }
-      if (row.state === "accepted") {
-        line.append(actionButton("Open channel", () => openChannel(row)));
-      }
-      host.append(line);
-    }
-  };
-  render("Incoming", data.incoming, "incoming");
-  render("Outgoing", data.outgoing, "outgoing");
-  setBadge(data.incoming.filter((row) => row.state === "requested").length);
+  state.requests = {incoming: data.incoming || [], outgoing: data.outgoing || []};
+  // A request or an answer from someone else changes the state a card shows
+  // for that person. Re-read the discovery (a rate-limited action) only when
+  // the set of intros actually changed, never on every poll.
+  const signature = [...state.requests.incoming, ...state.requests.outgoing]
+    .map((row) => `${row.intro_id}:${row.state}`).sort().join(",");
+  const changed = state.requestSignature !== undefined && signature !== state.requestSignature;
+  state.requestSignature = signature;
+  if (changed) refreshInitiate().then(attachMatchCardButtons);
+  const incoming = state.requests.incoming;
+  const outgoing = state.requests.outgoing;
+  const waiting = incoming.filter((row) => row.state === "requested");
+  setBadge(waiting.length);
+
+  // The section is part of the loop, so it is on the page whenever the
+  // person has shared something or has ever been asked; it is not shown to a
+  // visitor who cannot have either.
+  const section = byId("conversations");
+  const hasAny = incoming.length + outgoing.length > 0;
+  if (section) section.hidden = !(hasAny || state.querySession);
+  if (!host) return;
+
+  host.replaceChildren(el("h3", {textContent: "Introductions"}));
+  const open = [
+    ...waiting.map((row) => ["incoming", row]),
+    ...outgoing.filter((row) => row.state === "requested").map((row) => ["outgoing", row]),
+  ];
+  const connected = [
+    ...incoming.filter((row) => row.state === "accepted").map((row) => ["incoming", row]),
+    ...outgoing.filter((row) => row.state === "accepted").map((row) => ["outgoing", row]),
+  ];
+  const closed = [
+    ...incoming.filter((row) => ["declined", "cancelled"].includes(row.state)).map((row) => ["incoming", row]),
+    ...outgoing.filter((row) => ["declined", "cancelled"].includes(row.state)).map((row) => ["outgoing", row]),
+  ];
+  if (!hasAny) {
+    host.append(el("p", {className: "collab-empty", textContent:
+      "No introductions yet. Ask one of the people above; if they accept, the conversation opens here."}));
+  }
+  if (waiting.length) {
+    host.append(el("h4", {textContent: `Waiting for your answer · ${waiting.length}`}));
+    for (const [kind, row] of open.filter(([k]) => k === "incoming")) host.append(requestRow(row, kind));
+  }
+  const sent = open.filter(([k]) => k === "outgoing");
+  if (sent.length) {
+    host.append(el("h4", {textContent: `Waiting for their answer · ${sent.length}`}));
+    for (const [kind, row] of sent) host.append(requestRow(row, kind));
+  }
+  if (connected.length) {
+    host.append(el("h4", {textContent: `Connected · ${connected.length}`}));
+    for (const [kind, row] of connected) host.append(requestRow(row, kind));
+  }
+  if (closed.length) {
+    const details = el("details", {className: "collab-closed"});
+    details.append(el("summary", {textContent: `Closed · ${closed.length}`}));
+    for (const [kind, row] of closed) details.append(requestRow(row, kind));
+    host.append(details);
+  }
+  // Step 5 without a click: when exactly one conversation is open and none
+  // is on screen, show it.
+  if (!state.openChannelId && connected.length === 1 && connected[0][1].channel_id) {
+    await openChannel(connected[0][1]);
+  } else if (!state.openChannelId) {
+    renderNoChannel(connected.length);
+  }
 }
 
 async function requestIntro(fromSessionId, targetSessionId, message) {
@@ -434,18 +666,38 @@ async function cancel(introId) {
 
 // ---- channel ------------------------------------------------------------
 
+function renderNoChannel(connectedCount) {
+  const host = byId("collab-channel");
+  if (!host) return;
+  host.replaceChildren(
+    el("h3", {textContent: "Conversation"}),
+    el("p", {className: "collab-empty", textContent: connectedCount > 0
+      ? "Pick a connected introduction to open its conversation."
+      : "A conversation opens here once someone accepts — or once you accept someone."}),
+  );
+}
+
 async function openChannel(introRow) {
-  const host = document.getElementById("collab-channel");
+  const host = byId("collab-channel");
   if (!host) return;
   // An accepted intro DTO already carries its channel id (no re-accept).
   const channelId = introRow.channel_id;
   if (!channelId) { showError("channel unavailable"); return; }
+  state.openChannelId = channelId;
+  state.openCounterpart = introRow.counterpart_display || "";
   host.dataset.channelId = channelId;
-  host.replaceChildren(el("h3", {textContent: `Channel · ${introRow.counterpart_display}`}));
-  const thread = el("div", {id: "collab-thread", className: "collab-thread"});
+  const head = el("div", {className: "collab-channel-head"});
+  head.append(
+    el("h3", {textContent: `Conversation with ${introRow.counterpart_display}`}),
+    el("span", {className: "collab-muted", textContent: "Relay only · no contact details are exchanged"}),
+  );
+  host.replaceChildren(head);
+  const thread = el("div", {id: "collab-thread", className: "collab-thread", role: "log"});
+  thread.setAttribute("aria-live", "polite");
   const input = el("input", {id: "collab-message-input", type: "text",
-    className: "collab-input",
-    placeholder: "Message (relay only, no contact details)"});
+    className: "collab-input", maxLength: 2000,
+    placeholder: "Write a message"});
+  input.setAttribute("aria-label", `Message to ${introRow.counterpart_display}`);
   const sendButton = actionButton("Send", async () => {
     if (!input.value.trim()) return;
     await apiFetch("POST", "/api/product/channel/send", {
@@ -454,31 +706,36 @@ async function openChannel(introRow) {
     });
     input.value = "";
     await renderThread(channelId, thread);
-  }, true);
+  }, "primary");
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); sendButton.click(); }
   });
   host.append(thread, el("div", {className: "collab-compose"}, [input, sendButton]));
   await renderThread(channelId, thread);
+  byId("conversations")?.removeAttribute("hidden");
 }
 
 async function renderThread(channelId, thread) {
   const data = await apiFetch(
     "GET", `/api/product/channel/messages?channel_id=${encodeURIComponent(channelId)}`);
+  const stickToEnd = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 40;
   thread.replaceChildren();
   for (const message of data.messages) {
+    const mine = message.author === "me";
     // message.body is untrusted UGC -> textContent, never innerHTML.
-    thread.append(el("div", {
-      className: message.author === "me" ? "collab-message is-mine" : "collab-message",
-      textContent: `${message.author_display}: ${message.body}`,
-    }));
+    const bubble = el("div", {className: mine ? "collab-message is-mine" : "collab-message is-theirs"});
+    const meta = el("div", {className: "collab-message__meta"});
+    meta.append(el("strong", {textContent: mine ? "You" : message.author_display}),
+                el("span", {textContent: relativeTime(message.created_at)}));
+    bubble.append(meta, el("p", {textContent: message.body}));
+    thread.append(bubble);
   }
+  if (stickToEnd) thread.scrollTop = thread.scrollHeight;
 }
 
 async function refreshOpenChannel() {
-  const host = document.getElementById("collab-channel");
-  const thread = document.getElementById("collab-thread");
-  const channelId = host?.dataset.channelId;
+  const thread = byId("collab-thread");
+  const channelId = state.openChannelId;
   if (!channelId || !thread) return;
   try { await renderThread(channelId, thread); } catch (error) { showError(error.message); }
 }
@@ -486,33 +743,42 @@ async function refreshOpenChannel() {
 // ---- match-card enhancement -------------------------------------------
 
 function attachMatchCardButtons() {
-  // Progressive enhancement: a "Request intro" control on discoverable cards
-  // whose owner accepts intros. The card exposes its session id; the query
-  // session is read from the page's discovery context.
+  // Progressive enhancement: the "ask for an introduction" action on every
+  // card, from the intro state the last authorized read returned. The card
+  // exposes its session id; the query session is the person's own
+  // discoverable thought.
   for (const card of document.querySelectorAll(".match-card[data-session-id]")) {
-    if (card.querySelector(".collab-request-btn")) continue;
-    const target = card.dataset.sessionId;
-    const fromSession = document.body.dataset.querySession || window.__query_session;
-    if (!fromSession) continue;
-    const button = el("button", {type: "button", textContent: "Request intro",
-      className: "collab-button collab-request-btn"});
-    button.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      const message = window.prompt(
-        "Short message to send with your introduction request:");
-      if (!message) return;
-      showError("");
-      try { await requestIntro(fromSession, target, message); }
-      catch (error) { showError(error.message); }
+    let host = card.querySelector(".match-card__actions");
+    if (!host) {
+      host = el("div", {className: "match-card__actions"});
+      card.append(host);
+    }
+    if (host.querySelector(".intro-composer")) continue;   // never wipe what someone is typing
+    actionsFor(card.dataset.sessionId, host, {
+      who: card.dataset.person || "",
+      demoPersona: card.dataset.demoPersona === "true",
     });
-    card.append(button);
+  }
+  // The roster lists people without a card. Cards can render after the
+  // roster did (the page's own discovery is a separate read), so anyone who
+  // now has a card leaves the roster.
+  const onPage = new Set([...document.querySelectorAll(".match-card[data-session-id]")]
+    .map((card) => card.dataset.sessionId));
+  const roster = byId("collab-initiate");
+  if (roster) {
+    for (const row of roster.querySelectorAll(".collab-initiate-row")) {
+      if (onPage.has(row.dataset.sessionId)) row.remove();
+    }
+    if (!roster.querySelector(".collab-initiate-row")) roster.replaceChildren();
   }
 }
 
 // ---- refresh orchestration ----------------------------------------------
 
 async function refreshAll() {
-  await Promise.all([refreshShare(), refreshInitiate(), refreshRequests(), refreshOpenChannel()]);
+  let owned = null;
+  try { owned = await ownedSessions(); } catch (error) { showError(error.message); }
+  await Promise.all([refreshShare(owned), refreshInitiate(owned), refreshRequests(), refreshOpenChannel()]);
   attachMatchCardButtons();
 }
 
@@ -523,23 +789,32 @@ function scheduleRefresh() {
 }
 
 function init() {
-  panel();
+  if (!byId("collab-requests") && !byId("share-control")) return;   // not this page
   renderConnect();
   refreshAll();
   // Any successful write through session.mjs (WebMCP tools, workspace tools,
-  // this panel) re-reads the authorized record so the panel never goes stale.
-  document.addEventListener("resonance:write", scheduleRefresh);
-  document.addEventListener("resonance:collab-open", () => setOpen(true));
-  // Requests from other people arrive without a local write: poll slowly while
-  // the tab is visible.
+  // this page) re-reads the authorized record so nothing here goes stale.
+  document.addEventListener("resonance:write", (event) => {
+    // The news band recording that its cards were seen is bookkeeping, not a
+    // change in anything this module shows; a re-read here would cost a
+    // rate-limited discovery for nothing.
+    if (event.detail?.path === "/api/product/resonances/seen") return;
+    scheduleRefresh();
+  });
+  // Older callers asked for the drawer to open; the section is the page now.
+  document.addEventListener("resonance:collab-open", () => {
+    byId("conversations")?.scrollIntoView({block: "start"});
+  });
+  // Requests and messages from other people arrive without a local write:
+  // poll slowly while the tab is visible.
   clearInterval(pollTimer);
   pollTimer = setInterval(() => {
     if (document.visibilityState === "visible") { refreshRequests(); refreshOpenChannel(); }
   }, 20000);
   // Re-attach when the match list re-renders.
   const observer = new MutationObserver(() => attachMatchCardButtons());
-  const list = document.getElementById("match-list");
-  if (list) observer.observe(list, {childList: true, subtree: true});
+  const list = byId("match-list");
+  if (list) observer.observe(list, {childList: true});
 }
 
 if (document.readyState === "loading") {
@@ -548,4 +823,7 @@ if (document.readyState === "loading") {
   init();
 }
 
-export { init, refreshAll, refreshRequests, requestIntro, respond, cancel, openChannel, setOpen };
+export {
+  init, refreshAll, refreshRequests, requestIntro, respond, cancel, openChannel,
+  introComposer, introStateFor, actionsFor, relativeTime,
+};

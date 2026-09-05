@@ -274,17 +274,25 @@ function renderMatches(payload, primary) {
   list.replaceChildren();
   primary.forEach((match) => {
     const position = backendPosition(payload, match);
-    const button = el("button", "match-card");
-    button.type = "button";
-    button.dataset.sessionId = match.session_id;
-    button.dataset.backendScore = String(match.scores.structural);
-    button.dataset.backendClassification = match.mode_classification;
-    button.dataset.backendPosition = position;
-    button.setAttribute("aria-pressed", String(match.session_id === state.selectedSessionId));
-    button.setAttribute("aria-label",
-      `Open evidence for ${match.person_pseudonym}: ${match.display.topic} (returned in position ${position})`);
+    // A card is a person: the summary is one button that opens their
+    // evidence, and below it sits the action that reaches them (rendered by
+    // collab_ui.mjs into .match-card__actions). A button inside a button is
+    // not valid HTML, which is why the card itself is an article.
+    const card = el("article", "match-card");
+    card.dataset.sessionId = match.session_id;
+    card.dataset.backendScore = String(match.scores.structural);
+    card.dataset.backendClassification = match.mode_classification;
+    card.dataset.backendPosition = position;
+    card.dataset.person = match.person_pseudonym;
+    card.dataset.demoPersona = String(match.display.demo_persona === true);
+    card.classList.toggle("is-selected", match.session_id === state.selectedSessionId);
 
     const number = el("span", "match-card__index", position);
+    const open = el("button", "match-card__open");
+    open.type = "button";
+    open.setAttribute("aria-pressed", String(match.session_id === state.selectedSessionId));
+    open.setAttribute("aria-label",
+      `Open evidence for ${match.person_pseudonym}: ${match.display.topic} (returned in position ${position})`);
     const top = el("div", "match-card__top");
     top.append(
       el("span", "match-card__person", match.person_pseudonym),
@@ -302,9 +310,21 @@ function renderMatches(payload, primary) {
       meta.append(el("span", "contradictions",
         `${match.evidence.contradiction_count} contradiction${match.evidence.contradiction_count === 1 ? "" : "s"}`));
     }
-    button.append(number, top, topic, why, meta);
-    button.addEventListener("click", () => selectMatch(match.session_id));
-    list.append(button);
+    open.append(top, topic, why, meta);
+    // Seeded rows are labelled so a real participant never mistakes them for
+    // people who can accept an introduction.
+    if (match.display.demo_persona === true) {
+      open.append(el("span", "match-card__example", "example from the seeded corpus"));
+    }
+    card.append(number, open, el("div", "match-card__actions"));
+    // The article takes the click so that programmatic `.click()` on the card
+    // (deep links, the WebMCP evidence tool) selects it; clicks inside the
+    // action row are the collaboration module's and are not selection.
+    card.addEventListener("click", (event) => {
+      if (event.target.closest(".match-card__actions")) return;
+      selectMatch(match.session_id);
+    });
+    list.append(card);
   });
   setText("shown-count", `${String(primary.length).padStart(2, "0")} shown`);
   setText("response-summary", `${payload.matches.length} matches · ${payload.rejected.length} rejected`);
@@ -696,8 +716,28 @@ function updateSelection() {
     if (node.classList.contains("match-card") || node.classList.contains("marker") || node.classList.contains("connection-line")) {
       node.classList.toggle("is-selected", selected);
     }
-    if (node.classList.contains("match-card")) node.setAttribute("aria-pressed", String(selected));
+    if (node.classList.contains("match-card")) {
+      node.querySelector(".match-card__open")?.setAttribute("aria-pressed", String(selected));
+    }
   });
+}
+
+// Somebody else on the page — an alert about a person who arrived after the
+// share — wants a session shown. It is a primary card, a row in the other
+// results, or not in the current answer at all; say which.
+function focusSession(sessionId) {
+  if (!sessionId || !state.payload) { showToast("Not in the current result"); return; }
+  if (state.primary.some((match) => match.session_id === sessionId)) {
+    selectMatch(sessionId);
+    document.querySelector(`.match-card[data-session-id="${CSS.escape(sessionId)}"]`)
+      ?.scrollIntoView({block: "center"});
+    return;
+  }
+  if (document.querySelector(`.drawer-row[data-session-id="${CSS.escape(sessionId)}"]`)) {
+    openDrawerAt(sessionId);
+    return;
+  }
+  showToast("Not in the current result — it may rank below the returned list");
 }
 
 function selectMatch(sessionId) {
@@ -811,6 +851,17 @@ function renderDiscovery(payload) {
   setText("source-note",
     "Live result for your shared thought · these are people who have shared one too.");
   document.getElementById("app-shell").dataset.state = "ready";
+  setConnectOpen(false);
+}
+
+// The connect panel is open while there is nothing shared — it is one of the
+// two ways to start — and folded once something is, because by then it has
+// done its job. A reader who opened it themselves keeps it open.
+let connectTouched = false;
+function setConnectOpen(open) {
+  const details = document.getElementById("connect-details");
+  if (!details || connectTouched) return;
+  details.open = open;
 }
 
 function setLoading(loading) {
@@ -825,8 +876,9 @@ function clearActiveThought() {
   state.context = null;
   setText("thought-id", "No thought shared yet");
   const title = document.getElementById("thought-heading");
-  title.replaceChildren(document.createTextNode("Nothing shared with Resonance"));
-  setText("thought-caption", "Resonance holds no thought for this visitor.");
+  title.replaceChildren(document.createTextNode("Nothing shared yet"));
+  setText("thought-caption",
+    "Share one thought and it starts looking — now, and after you leave. Only its structure is compared; you see that structure before anyone else does.");
   document.getElementById("dna-chain")?.replaceChildren();
   document.getElementById("dna-relations")?.replaceChildren();
   document.getElementById("declared-context")?.replaceChildren();
@@ -846,11 +898,12 @@ function renderUnshared() {
   setText("evidence-subtitle",
     "Resonance compares the causal structure of a thought you have explicitly "
     + "shared. Until you share one there is nothing to compare, so nothing is "
-    + "shown. Connect an agent to this page or to the Resonance MCP connector, "
-    + "prepare a thought, read the preview, and confirm the share.");
+    + "shown. Share one from this page, or from the chat you connect below: "
+    + "you read the preview and confirm before anything becomes discoverable.");
   setText("source-note", "You have shared nothing, so nothing was searched for.");
   document.getElementById("app-shell").dataset.state = "unshared";
   setLoading(false);
+  setConnectOpen(true);
 }
 
 function showError(error) {
@@ -943,7 +996,12 @@ function wireOnboarding() {
   });
 
   document.getElementById("onboarding-connect")?.addEventListener("click", () => {
-    document.getElementById("onboarding-connect-panel")?.scrollIntoView({block: "start"});
+    const details = document.getElementById("connect-details");
+    if (details) { details.open = true; connectTouched = true; }
+    document.getElementById("connect-details")?.scrollIntoView({block: "start"});
+  });
+  document.getElementById("connect-details")?.addEventListener("toggle", (event) => {
+    if (event.isTrusted) connectTouched = true;
   });
 
   // Say what is true of THIS browser — but say it about the browser, not about
@@ -1022,7 +1080,7 @@ async function boot() {
     wireOnboarding();
     // The onboarding state is "this visitor has shared nothing", and that can
     // stop being true without a reload: an agent shares through the WebMCP
-    // tools, or the visitor shares from the Collaboration panel. Both go
+    // tools, or the visitor shares from the page itself. Both go
     // through session.mjs, which announces every successful write.
     //
     // Both surfaces already hold the authoritative consent state after a write
@@ -1035,6 +1093,12 @@ async function boot() {
     // this page. The results on screen would then be the previous answer, so
     // the transport says when it has run one and the page re-reads.
     document.addEventListener("resonance:discovered", () => { loadResults(); });
+    // An alert about a person who arrived after the share asks for them to be
+    // shown on the map and in the evidence.
+    document.addEventListener("resonance:focus-session", (event) => {
+      focusSession(event.detail?.sessionId);
+      document.getElementById("people")?.scrollIntoView({block: "start"});
+    });
     document.getElementById("secondary-trigger").addEventListener("click", () => setDrawer(true));
     document.getElementById("drawer-close").addEventListener("click", () => setDrawer(false));
     document.getElementById("drawer-backdrop").addEventListener("click", () => setDrawer(false));

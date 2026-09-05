@@ -108,6 +108,8 @@ STATIC = {
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
     "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
     "/account.mjs": ("account.mjs", "text/javascript; charset=utf-8"),
+    # What the standing search found while the person was away.
+    "/resonances.mjs": ("resonances.mjs", "text/javascript; charset=utf-8"),
     # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
     # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
     "/live_ui.css": ("live_ui.css", "text/css; charset=utf-8"),
@@ -758,7 +760,8 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/collab.mjs"></script>\n'
                 '  <script type="module" src="/collab_ui.mjs"></script>\n'
                 '  <script type="module" src="/workspaces.mjs"></script>\n'
-                '  <script type="module" src="/account.mjs"></script>\n</body>',
+                '  <script type="module" src="/account.mjs"></script>\n'
+                '  <script type="module" src="/resonances.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
