@@ -416,6 +416,10 @@ function renderMatches(payload, primary) {
   setText("shown-count", primary.length === 1 ? "1 person" : `${primary.length} people`);
   setText("response-summary",
           `${payload.matches.length} with the same shape · ${payload.rejected.length} close but not the same`);
+  // When something was set aside because its shape is one many unrelated
+  // people carry, say so. Watching matches be fewer than the engine found,
+  // with nothing to read, is how a person concludes the product is broken.
+  setText("shape-note", payload.shape_note || "");
   const empty = document.getElementById("matches-empty");
   if (empty) empty.hidden = primary.length > 0;
 }

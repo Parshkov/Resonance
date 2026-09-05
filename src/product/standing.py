@@ -158,7 +158,12 @@ class StandingSearch:
             print(f"standing search: could not reach someone "
                   f"({exc.__class__.__name__}: {exc})", flush=True)
             return
-        if outcome not in ("sent", "already_told_today", "unsubscribed"):
+        # Expected outcomes are silent: someone unsubscribed, someone already
+        # heard today, or this deployment has no mail server -- a standing
+        # condition said once at startup, not a hundred and forty times in one
+        # sweep. Anything else is a surprise and says so.
+        if outcome not in ("sent", "already_told_today", "unsubscribed",
+                           "no_transport", "no_verified_address"):
             print(f"standing search: nobody was told ({outcome})", flush=True)
 
     def _record_pair(self, owner: str, session_id: str, row: Mapping[str, Any],
@@ -167,6 +172,8 @@ class StandingSearch:
         if not theirs or theirs == session_id:
             return 0
         if not self._is_a_resonance(row):
+            return 0
+        if self._is_one_authors_habit(session_id, theirs):
             return 0
         source = self.identity.policy_source
         their_owner = source.owner_of("session", theirs)
@@ -190,6 +197,34 @@ class StandingSearch:
             written += self._put(their_owner, theirs, session_id, scores=scores,
                                  mode=mode, reason="they_arrived")
         return written
+
+    def _is_one_authors_habit(self, mine: str, theirs: str) -> bool:
+        """Whether this pair rests on a shape many unrelated people carry.
+
+        Discovery sets those aside; without this, the waiting half would still
+        write the alert, and someone would be told at their next visit -- or by
+        email -- about a person discovery declines to show them. These two have
+        now disagreed five times, over rejected rows, over your own other
+        thought, over what "private" means, over what is discoverable, and each
+        time the half that speaks to people was the wrong one. Asking the same
+        question in both places is cheaper than finding out again.
+        """
+        decide = getattr(self.product, "_same_habit_shape", None)
+        if decide is None:
+            return False
+        try:
+            from src.graph import ThoughtGraph
+            from src.product.shapes import shape_signature
+            record = self.identity.backend.get_session(mine)
+            dna = getattr(record, "thought_dna", None)
+            if not dna:
+                return False
+            signature = shape_signature(ThoughtGraph.from_dict(dict(dna)))
+            return bool(decide(signature, theirs))
+        except Exception as exc:  # noqa: BLE001 - cannot judge: do not condemn
+            print(f"standing search: could not weigh the shape "
+                  f"({exc.__class__.__name__}: {exc})", flush=True)
+            return False
 
     @staticmethod
     def _is_a_resonance(row: Mapping[str, Any]) -> bool:
@@ -255,9 +290,11 @@ class StandingSearch:
 
         Every alert is re-checked against the present: the other thought must
         still be discoverable by a real participant, neither side may have
-        blocked the other, and the viewer must still own their own side. An
-        alert that fails any of those is dropped from the answer and from the
-        store, because it describes something that is no longer true.
+        blocked the other, the viewer must still own their own side, and the
+        pair must not rest on a shape the corpus has since decided many
+        unrelated people carry. An alert that fails any of those is dropped
+        from the answer and from the store, because it describes something
+        that is no longer true.
         """
         actor = self.identity.authenticate(access_token)
         repo = self._repo
@@ -280,6 +317,17 @@ class StandingSearch:
                 continue
             if source.is_blocked(actor.user_id, their_owner) or \
                     source.is_blocked(their_owner, actor.user_id):
+                stale.append(str(row.get("alert_key", "")))
+                continue
+            if self._is_one_authors_habit(mine, theirs):
+                # Checked again here, not only when the alert was written. A
+                # shape becomes a habit gradually: the first few people to
+                # carry it are a coincidence, and their alerts were recorded
+                # while that was still true. By the time the fifteenth arrives
+                # the corpus says otherwise, and an alert that describes
+                # something no longer true is dropped exactly like one whose
+                # subject withdrew -- which is what the rest of this loop
+                # already does.
                 stale.append(str(row.get("alert_key", "")))
                 continue
             if row.get("seen_at") and not include_seen:

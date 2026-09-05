@@ -26,7 +26,7 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from urllib.parse import parse_qs, urlparse
 
 from src.identity import IdentityService, R11IdentityBackend
@@ -430,6 +430,11 @@ def build_runtime(
     allowed_origins: frozenset[str],
     confirmation_secret: bytes | None = None,
     seed: bool | None = None,
+    # The order the operator declared origins in is the only thing that says
+    # which host is canonical: a set cannot. Links in an email must point at
+    # the host people actually use -- picking alphabetically sent them to a
+    # platform host that had been deleted.
+    declared_origins: Sequence[str] | None = None,
 ) -> ProductRuntime:
     """``seed=None`` seeds the R7 demo corpus only for an ephemeral ``:memory:``
     database (local development, tests). A persistent database is never seeded
@@ -461,10 +466,15 @@ def build_runtime(
     # the health endpoint says so rather than implying a promise being kept.
     notifier = Notifier(
         identity, getattr(live, "repo", None),
-        origin=next(iter(sorted(allowed_origins)), "https://resonance.parshkov.com"),
+        origin=oauth_mount.canonical_origin(declared_origins, allowed_origins),
         secret=confirmation_secret)
     product.standing.notifier = notifier
     product.notifier = notifier
+    if isinstance(notifier.sender, NoTransport):
+        # Once, here, rather than on every finding: a deployment that cannot
+        # reach anyone should be impossible to miss and impossible to drown in.
+        print(f"notifications: nobody can be reached — {NoTransport.reason}",
+              flush=True)
     return ProductRuntime(live=live, identity=identity, product=product,
                           allowed_origins=allowed_origins)
 
@@ -1453,7 +1463,7 @@ def main(argv: list[str] | None = None) -> None:
         secret = _resolve_secret(args.secret_file, os.environ, args.db)
     except ValueError as exc:
         parser.error(str(exc))
-    runtime = build_runtime(args.db, allowed_origins=origins,
+    runtime = build_runtime(args.db, allowed_origins=origins, declared_origins=(args.origin or []),
                             confirmation_secret=secret,
                             seed=seed)
     startup_purge_demo(runtime)

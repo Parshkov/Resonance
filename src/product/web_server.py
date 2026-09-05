@@ -349,12 +349,20 @@ def _everything_here(product, token: str) -> dict[str, Any]:
 
 def _discovery_view(live: Mapping[str, Any]) -> dict[str, Any]:
     """The shape the page reads; rank/score/evidence are not recomputed."""
-    return {
+    view = {
         "contract_version": live.get("discovery_contract") or "resonance-discovery/0.1",
         "query": live.get("query", {}),
         "matches": list(live.get("matches", [])),
         "rejected": list(live.get("rejected", [])),
     }
+    # When something was set aside because its shape is one many unrelated
+    # people carry, the browser was handed the shortened list and not the
+    # sentence explaining it -- so a person watching matches disappear had
+    # nothing to read. The chat surface has carried it since it existed.
+    note = str(live.get("shape_note") or "")
+    if note:
+        view["shape_note"] = note
+    return view
 
 
 GEO_CONTRACT = "resonance-geo-view/0.1"
@@ -1153,7 +1161,7 @@ def main(argv: list[str] | None = None) -> None:
         secret = _resolve_secret(args.secret_file, os.environ, args.db)
     except ValueError as exc:
         parser.error(str(exc))
-    runtime = build_runtime(args.db, allowed_origins=origins,
+    runtime = build_runtime(args.db, allowed_origins=origins, declared_origins=(args.origin or []),
                             confirmation_secret=secret,
                             seed=seed)
     startup_purge_demo(runtime)

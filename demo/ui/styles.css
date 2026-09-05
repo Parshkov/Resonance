@@ -681,3 +681,7 @@ body[data-signed-in="false"] .thought-panel { display: none; }
 /* Replaces a <code> box that held either a score or a raw engine rejection.
    A person reads a phrase here, not a token, so it is set as text. */
 .row-figure { flex: none; font-size: 12px; line-height: 1.35; color: var(--ink-2); text-align: right; max-width: 22ch; }
+
+/* The offer to share a second thought, once the first is on the page. Quiet:
+   it is an invitation, not the page's main action any more. */
+.share-again { margin: 4px 0 6px; }

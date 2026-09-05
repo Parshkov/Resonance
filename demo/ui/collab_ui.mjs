@@ -374,10 +374,33 @@ async function refreshShare() {
     .filter((t) => t.state === "discoverable").map((t) => t.session_id);
   document.dispatchEvent(new CustomEvent("resonance:consent", {detail: {shared, discoverable}}));
   renderShareState(counts);
-  // Nothing shared: the composer IS the page's action, so it is open. Once
-  // something is shared the panel shows the thought instead.
-  if (shared) byId("share-composer")?.replaceChildren();
+  // Nothing shared: the composer IS the page's action, so it is open.
+  //
+  // Once something is shared it used to be emptied, which quietly made one
+  // thought a limit: the page counts several, lists several and names each
+  // one's state, and offered no way to have a second. Nobody is working on
+  // exactly one thing. So the panel shows the thought, and the way to add
+  // another is a quiet offer rather than a composer sitting open beneath
+  // something already shared.
+  if (shared) offerAnotherThought();
   else openShareComposer();
+}
+
+function offerAnotherThought() {
+  const host = byId("share-composer");
+  if (!host || host.querySelector(".share-form")) return;
+  host.replaceChildren();
+  const invite = el("button", {type: "button", className: "collab-button share-again",
+                               textContent: "Share another thought"});
+  invite.addEventListener("click", () => {
+    host.replaceChildren();
+    openShareComposer();
+    host.querySelector("textarea")?.focus();
+  });
+  host.append(invite);
+  host.append(el("p", {className: "microcopy", textContent:
+    "Each one is searched on its own, and you can withdraw any of them "
+    + "without touching the others."}));
 }
 
 // ---- connect: the developer fallback, after the URL that is the real path --

@@ -164,5 +164,40 @@ class WhatAnEmailSaysTests(unittest.TestCase):
         self.assertTrue(shared.get("shared"))
 
 
+
+class WhereTheLinkPointsTests(unittest.TestCase):
+    """An email is useless if it sends someone to a host that no longer exists.
+
+    Production serves two origins: the custom domain people use, and the
+    platform host it was first deployed to. `allowed_origins` is a set, so it
+    cannot say which is canonical, and picking the alphabetically first https
+    one chose the platform host -- which had already been deleted. Every link
+    in every notification would have led nowhere.
+
+    The order the operator declared them in is the only thing that says it.
+    """
+
+    ORIGINS = frozenset({"https://resonance-production-cfe3.up.railway.app",
+                         "https://resonance.parshkov.com"})
+
+    def test_links_use_the_host_people_actually_visit(self):
+        runtime = build_runtime(
+            ":memory:", allowed_origins=self.ORIGINS, seed=False,
+            declared_origins=["https://resonance.parshkov.com",
+                              "https://resonance-production-cfe3.up.railway.app"])
+        self.assertEqual(runtime.product.notifier.origin,
+                         "https://resonance.parshkov.com")
+
+    def test_the_unsubscribe_link_goes_to_the_same_place(self):
+        runtime = build_runtime(
+            ":memory:", allowed_origins=self.ORIGINS, seed=False,
+            declared_origins=["https://resonance.parshkov.com",
+                              "https://resonance-production-cfe3.up.railway.app"])
+        url = runtime.product.notifier.unsubscribe_url("person-abc")
+        self.assertTrue(url.startswith("https://resonance.parshkov.com/notifications/stop"),
+                        url)
+        self.assertNotIn("person-abc", url,
+                         "the account id must travel inside the signed token")
+
 if __name__ == "__main__":
     unittest.main()
