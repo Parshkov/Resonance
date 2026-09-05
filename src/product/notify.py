@@ -68,7 +68,8 @@ def _body(origin: str, unsubscribe: str) -> str:
 class Sender:
     """Somewhere to hand an email. Absent by default, and honest about it."""
 
-    def send(self, to: str, subject: str, body: str) -> bool:
+    def send(self, to: str, subject: str, body: str,
+             unsubscribe: str = "") -> bool:
         raise NotImplementedError
 
 
@@ -78,7 +79,8 @@ class NoTransport(Sender):
     reason = ("no mail server configured (set RESONANCE_SMTP_HOST, "
               "RESONANCE_SMTP_USER, RESONANCE_SMTP_PASSWORD, RESONANCE_MAIL_FROM)")
 
-    def send(self, to: str, subject: str, body: str) -> bool:
+    def send(self, to: str, subject: str, body: str,
+             unsubscribe: str = "") -> bool:
         return False
 
 
@@ -86,19 +88,32 @@ class SmtpSender(Sender):
     """A real SMTP server, over TLS, with the credentials from the environment."""
 
     def __init__(self, host: str, port: int, user: str, password: str,
-                 sender: str, timeout: float = 20.0) -> None:
+                 sender: str, reply_to: str = "", timeout: float = 20.0) -> None:
         self.host, self.port = host, port
         self.user, self.password = user, password
         self.sender, self.timeout = sender, timeout
+        # Sent from a technical mailbox, answered by a person. Somebody who
+        # replies to say "how did you get my address" or "please stop" is
+        # asking the most important question this service can be asked, and an
+        # address nobody reads is the wrong place for it to land.
+        self.reply_to = reply_to
 
-    def send(self, to: str, subject: str, body: str) -> bool:
+    def send(self, to: str, subject: str, body: str,
+             unsubscribe: str = "") -> bool:
         message = EmailMessage()
         message["From"] = self.sender
         message["To"] = to
         message["Subject"] = subject
-        # RFC 8058: an unsubscribe that the mail client itself can offer, so
-        # the way out is never harder to find than the way in.
-        message["List-Unsubscribe"] = f"<{body.rsplit(chr(10), 2)[-2].strip()}>"
+        if self.reply_to:
+            message["Reply-To"] = self.reply_to
+        # RFC 8058: an unsubscribe the mail client itself can offer, so the way
+        # out is never harder to find than the way in. Passed in rather than
+        # parsed back out of the body -- reading the last line of prose to find
+        # a URL breaks the moment anyone edits a sentence, and it would break
+        # by throwing, which loses the email rather than the header.
+        if unsubscribe:
+            message["List-Unsubscribe"] = f"<{unsubscribe}>"
+            message["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
         message.set_content(body)
         context = ssl.create_default_context()
         if self.port == 465:
@@ -126,7 +141,11 @@ def sender_from_env(environ: Mapping[str, str] | None = None) -> Sender:
         port = int(str(env.get("RESONANCE_SMTP_PORT") or "587"))
     except ValueError:
         port = 587
-    return SmtpSender(host, port, user, password, sender)
+    # Falls back to the address the site already publishes as its contact, so
+    # a reply reaches a person even when nobody set this.
+    reply_to = str(env.get("RESONANCE_MAIL_REPLY_TO")
+                   or env.get("RESONANCE_CONTACT") or "").strip()
+    return SmtpSender(host, port, user, password, sender, reply_to)
 
 
 def unsubscribe_token(user_id: str, secret: bytes) -> str:
@@ -234,9 +253,10 @@ class Notifier:
         address = self.address_for(user_id)
         if not address:
             return "no_verified_address"
-        body = _body(self.origin, self.unsubscribe_url(user_id))
+        stop = self.unsubscribe_url(user_id)
+        body = _body(self.origin, stop)
         try:
-            if not self.sender.send(address, SUBJECT, body):
+            if not self.sender.send(address, SUBJECT, body, stop):
                 return "transport_declined"
         except Exception as exc:  # noqa: BLE001 - a share must never fail on mail
             print(f"[notify] could not send: {type(exc).__name__}: {exc}", flush=True)

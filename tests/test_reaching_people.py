@@ -45,8 +45,9 @@ class Remembering(notify.Sender):
     def __init__(self):
         self.sent = []
 
-    def send(self, to, subject, body):
-        self.sent.append({"to": to, "subject": subject, "body": body})
+    def send(self, to, subject, body, unsubscribe=""):
+        self.sent.append({"to": to, "subject": subject, "body": body,
+                          "unsubscribe": unsubscribe})
         return True
 
 
@@ -153,7 +154,7 @@ class WhatAnEmailSaysTests(unittest.TestCase):
 
     def test_a_mail_server_having_a_bad_afternoon_never_breaks_a_share(self):
         class Broken(notify.Sender):
-            def send(self, to, subject, body):
+            def send(self, to, subject, body, unsubscribe=""):
                 raise RuntimeError("connection refused")
 
         self.notifier.sender = Broken()
@@ -163,6 +164,32 @@ class WhatAnEmailSaysTests(unittest.TestCase):
         shared = self.share(arriving.access_token, THEIRS, "theirs")
         self.assertTrue(shared.get("shared"))
 
+
+    def test_the_mail_client_is_given_the_way_out_too(self):
+        """RFC 8058, so the unsubscribe is a button in the mail client and not
+        a link someone has to find at the bottom of the text. Handed over
+        rather than parsed back out of the prose: reading the last line to find
+        a URL breaks the moment a sentence is edited, and it breaks by
+        throwing, which loses the email rather than the header."""
+        waiting = self.signed_in("s1", "waiting@example.test")
+        self.notifier.tell(waiting.user_id)
+        message = self.sender.sent[0]
+        self.assertTrue(message["unsubscribe"].startswith("http"))
+        self.assertIn(message["unsubscribe"], message["body"])
+
+    def test_a_reply_reaches_a_person(self):
+        """Sent from a technical mailbox, answered by a human. Someone who
+        replies to ask "how did you get my address" or to say "stop" is asking
+        the most important question this service can be asked, and a noreply
+        box is the wrong place for it to land."""
+        from src.product import notify
+        sender = notify.sender_from_env({
+            "RESONANCE_SMTP_HOST": "smtp.example.test",
+            "RESONANCE_SMTP_USER": "pulse@example.test",
+            "RESONANCE_SMTP_PASSWORD": "x" * 16,
+            "RESONANCE_MAIL_FROM": "pulse@example.test",
+            "RESONANCE_CONTACT": "someone@example.test"})
+        self.assertEqual(sender.reply_to, "someone@example.test")
 
 
 class WhereTheLinkPointsTests(unittest.TestCase):
