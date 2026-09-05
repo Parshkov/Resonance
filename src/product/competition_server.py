@@ -299,6 +299,24 @@ class CompetitionHandler(ProductHandler):
         except AuthenticationError:
             return None
 
+    def _initial_app_state(self, params: Mapping[str, list[str]]) -> str:
+        """Serve the state the page will settle in, so it is painted once.
+
+        A visitor with no session cookie has certainly shared nothing, which is
+        the common case and costs no lookup at all. With a cookie, one indexed
+        read answers it. `?source=replay` is asking for the fixture explicitly,
+        so that keeps the neutral loading state and its skeletons.
+        """
+        if (params.get("source") or [""])[0] == "replay":
+            return "loading"
+        token = self._visitor_token()
+        if token is None:
+            return "unshared"
+        try:
+            return "loading" if _owned_live_session(self.runtime.product, token) else "unshared"
+        except Exception:                      # never fail a page load over this
+            return "loading"
+
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 
