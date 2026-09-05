@@ -52,16 +52,34 @@ def render_thought_png(thought_dna: Mapping[str, Any], *, topic: str = "") -> by
     canvas = Canvas(width, height)
     y = _heading(canvas, topic or "Your thought", "what causes what, as you described it")
 
+    # A relation is drawn once both of its ends have a place on the page. Only
+    # the ones running downwards were drawn before, so a link like "jittered
+    # backoff PREVENTS request amplification" -- whose source sits below what
+    # it points at -- left its node floating with no line to anything. Claude,
+    # looking at the picture, said so: "separated by a gap with no connecting
+    # line, a fourth node".
+    outgoing: dict[str, list[Mapping[str, Any]]] = {}
+    for relation in relations:
+        outgoing.setdefault(str(relation.get("source")), []).append(relation)
+
     placed: dict[str, int] = {}
+
+    def draw_link(relation: Mapping[str, Any], top: int, bottom: int) -> None:
+        canvas.line(_MARGIN + 6, top + 10, _MARGIN + 6, bottom + 2, ACCENT, 2)
+        canvas.text(_MARGIN + 18, min(top, bottom) + 22,
+                    fit(str(relation.get("type", "")), 18), ACCENT, 1)
+
     for node in nodes:
         node_id = str(node.get("id"))
         for relation in incoming.get(node_id, []):
             source = str(relation.get("source"))
             if source in placed:
-                canvas.line(_MARGIN + 6, placed[source] + 10, _MARGIN + 6, y + 2,
-                            ACCENT, 2)
-                canvas.text(_MARGIN + 18, y - 12,
-                            fit(str(relation.get("type", "")), 18), ACCENT, 1)
+                draw_link(relation, placed[source], y)
+        for relation in outgoing.get(node_id, []):
+            target = str(relation.get("target"))
+            if target in placed:
+                # Runs upwards: draw it now that this end exists.
+                draw_link(relation, placed[target], y)
         canvas.disc(_MARGIN + 6, y + 12, 5, ACCENT)
         canvas.text(_MARGIN + 22, y + 5, fit(str(node.get("label", "")), _CHARS),
                     INK, 1)

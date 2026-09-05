@@ -111,6 +111,23 @@ class WhatThePictureSaysTests(unittest.TestCase):
             self.assertIn(ord(character), bitmapfont.GLYPHS, character)
 
 
+    def test_a_link_running_upwards_is_still_drawn(self):
+        """A relation whose source sits below what it points at -- "backoff
+        prevents amplification" -- was drawn as no line at all, leaving the
+        node floating. Claude, looking at the picture, said so.
+        """
+        upward = {"nodes": [{"id": "a0", "label": "outage", "role": "problem"},
+                            {"id": "a1", "label": "amplification", "role": "state"},
+                            {"id": "a2", "label": "backoff", "role": "method"}],
+                  "relations": [{"source": "a0", "target": "a1", "type": "causes"},
+                                {"source": "a2", "target": "a1", "type": "prevents"}]}
+        without = {"nodes": upward["nodes"], "relations": upward["relations"][:1]}
+        _, _, drawn = decode(pictures.render_thought_png(upward))
+        _, _, fewer = decode(pictures.render_thought_png(without))
+        accent = bytes((0x8A, 0x5A, 0x2B))
+        self.assertGreater(drawn.count(accent), fewer.count(accent),
+                           "the upward link left no mark on the picture")
+
 class ItReachesTheChatTests(unittest.TestCase):
     def setUp(self):
         self.runtime = build_runtime(":memory:",

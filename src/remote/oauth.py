@@ -840,6 +840,16 @@ class OAuthCore:
                 # the access token issued with it; keep it reachable for that.
                 "access_token": access_token,
             })
+            # And the way back, so revoking the access token can reach exactly
+            # the grant it was issued with -- and nothing else.
+            if hasattr(self.store, "put_access"):
+                try:
+                    record = self.store.get_access(access_token) or {}
+                    self.store.put_access(access_token,
+                                          {**record, "refresh_token": refresh})
+                except Exception as exc:  # noqa: BLE001 - the token still works
+                    print(f"[oauth] could not link the refresh grant to its "
+                          f"access token: {type(exc).__name__}: {exc}", flush=True)
             body["refresh_token"] = refresh
         return OAuthResult(200, {"Content-Type": "application/json",
                                  "Cache-Control": "no-store"}, _json_body(body))
@@ -875,17 +885,40 @@ class OAuthCore:
         return True
 
     def _revoke_access(self, token: str) -> bool:
+        """Revoke this token and the grant it was issued with. Only that one.
+
+        This used to revoke every refresh grant the person had, with any
+        client: `revoke_refresh_for_subject`. So disconnecting Resonance in one
+        chat silently signed them out of every other one, and the next thing
+        they saw somewhere else was "login expired" with no explanation. Found
+        by doing it: a throwaway client was revoked after an acceptance run and
+        two unrelated chats asked to reconnect.
+
+        RFC 7009 §2.1 asks for tokens based on the SAME authorization grant,
+        which is the sibling recorded when the pair was issued -- not the
+        person's other clients, which are other grants they gave separately and
+        have not withdrawn.
+        """
+        sibling = None
+        if hasattr(self.store, "get_access"):
+            try:
+                sibling = (self.store.get_access(token) or {}).get("refresh_token")
+            except Exception:  # noqa: BLE001 - revocation must still happen
+                sibling = None
         try:
-            actor = self.identity.authenticate(token)
+            self.identity.authenticate(token)
         except Exception:  # noqa: BLE001
             return False
         try:
             self.identity.logout(token)
         except Exception:  # noqa: BLE001
             pass
-        # Revoking an access token also revokes the subject's refresh grants:
-        # a client that lost its access token must re-authorize.
-        self.store.revoke_refresh_for_subject(actor.user_id)
+        if sibling:
+            try:
+                self.store.revoke_refresh(sibling)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[oauth] could not revoke the sibling refresh grant: "
+                      f"{type(exc).__name__}: {exc}", flush=True)
         return True
 
     # -- rendering / helpers --------------------------------------------
