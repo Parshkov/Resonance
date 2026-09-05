@@ -15,8 +15,18 @@ Then open the origin in a browser, share a thought, and the other people are
 already there to match. `act.py`-style follow-ups (accepting an introduction,
 replying) run through `act()` below with the saved credentials.
 
+The base URL must match the server's --origin exactly: the Origin header it
+sends is the base you give it, and 127.0.0.1 is a different origin from
+localhost however identical they look. A mismatch fails every share with
+csrf_rejected, which reads like a bug in sharing and is not one.
+
 LOCAL ONLY. It creates pseudonymous guest accounts, which a deployment with
 sign-in refuses outright -- as it should. Never point this at production.
+
+One local hazard worth knowing, because it wastes an hour: cookies are scoped
+per host, not per port. Two instances on 127.0.0.1 in one browser overwrite
+each other's session, and the second reads as "you are signed out" or as an
+empty account.
 """
 from __future__ import annotations
 

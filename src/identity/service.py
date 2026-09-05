@@ -750,17 +750,33 @@ class IdentityService:
     ) -> list[dict[str, Any]]:
         actor = self.authenticate(access_token, actor_type=actor_type)
         result: list[dict[str, Any]] = []
+        authorized = False
         for session in self.backend.list_sessions():
             if _field(session, "user_id") != actor.user_id:
                 continue
-            self._authorize(
-                actor,
-                "session:read_private",
-                ResourceRef("session", str(_field(session, "session_id"))),
-                confirmed=True,
-                client_id=client_id,
-                protocol_session_id=protocol_session_id,
-            )
+            if not authorized:
+                # Once, for the act of reading your own record -- not once per
+                # thought you have.
+                #
+                # session:read_private is an owner action, so the policy check
+                # for each row asks exactly what the filter above has already
+                # answered: is this yours. What it also does is spend a
+                # rate-limit token, and the limiter holds ten with one back per
+                # second. A page load makes several of these calls, so someone
+                # with five thoughts hit "rate limit exceeded" on an ordinary
+                # load and was shown an empty map and "discovery could not be
+                # read" -- punished for using the product. The limiter is there
+                # to make enumerating OTHER people expensive; this list can
+                # only ever contain your own.
+                self._authorize(
+                    actor,
+                    "session:read_private",
+                    ResourceRef("session", str(_field(session, "session_id"))),
+                    confirmed=True,
+                    client_id=client_id,
+                    protocol_session_id=protocol_session_id,
+                )
+                authorized = True
             raw = _mapping(session)
             raw["consent_choices"] = self._consent_choices(session).to_corpus_consent() | {
                 "allow_intro_requests": self._consent_choices(session).allow_intro_requests
