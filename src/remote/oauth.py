@@ -95,35 +95,45 @@ class OAuthError(Exception):
 # ---------------------------------------------------------------------------
 
 CONSENT_CSS = """
-:root { color-scheme: dark; --canvas: #0a0a0a; --panel: rgba(255,255,255,.045); --border: rgba(255,255,255,.12);
-  --text: #f2eee8; --text-2: #aaa49b; --gold: #c9b8a0; --bright: #e8d5b7; --rust: #b66d58;
+:root { color-scheme: light dark;
+  --paper: #f4f1eb; --paper-2: #fbfaf7; --paper-3: #ece7de; --ink: #1d1a16; --ink-2: #57524a; --ink-3: #857f75;
+  --line: rgba(29,26,22,.14); --line-soft: rgba(29,26,22,.08);
+  --accent: #8a5a2b; --accent-ink: #6f4620; --accent-soft: rgba(138,90,43,.10); --accent-line: rgba(138,90,43,.35);
   --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
-  --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+@media (prefers-color-scheme: dark) { :root {
+  --paper: #16140f; --paper-2: #1e1b16; --paper-3: #26221c; --ink: #ede8df; --ink-2: #b7b0a4; --ink-3: #8c8579;
+  --line: rgba(237,232,223,.16); --line-soft: rgba(237,232,223,.09);
+  --accent: #d3a66f; --accent-ink: #e2bc8a; --accent-soft: rgba(211,166,111,.12); --accent-line: rgba(211,166,111,.4); } }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(1200px 600px at 20% -10%, rgba(201,184,160,.12), transparent 60%), var(--canvas);
-  color: var(--text); font: 16px/1.55 var(--sans); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; }
-main.consent { width: min(640px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 32px 34px 28px; }
-.brand { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; font: 600 12px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--text-2); }
-.mark { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--gold); box-shadow: inset 0 0 0 4px var(--canvas), inset 0 0 0 6px var(--gold); }
-h1 { font: 500 30px/1.15 var(--serif); margin: 0 0 14px; color: var(--bright); }
-p { margin: 0 0 12px; color: var(--text-2); }
-p strong, p em { color: var(--text); }
-code { font: 13px var(--mono); color: var(--gold); word-break: break-all; }
-fieldset { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px 6px; margin: 18px 0 20px; }
-legend { padding: 0 8px; font: 600 12px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
-label.opt { display: block; margin: 6px 0 10px; color: var(--text); cursor: pointer; }
-fieldset p { margin: 8px 0; }
-fieldset p label { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 14px; }
-input[type=text], input[type=password] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-  background: rgba(0,0,0,.35); color: var(--text); font: 15px var(--mono); }
-input[type=text]:focus, input[type=password]:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
-.actions { display: flex; gap: 12px; flex-wrap: wrap; }
-button { cursor: pointer; border-radius: 999px; padding: 12px 22px; font: 600 15px var(--sans); border: 1px solid var(--border);
-  background: transparent; color: var(--text); }
-button.primary { background: var(--bright); color: #14120f; border-color: var(--bright); }
-button:hover { filter: brightness(1.08); }
-.fine { margin: 18px 0 0; font-size: 13px; color: var(--text-2); }
+body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans);
+  display: flex; align-items: flex-start; justify-content: center; padding: clamp(16px, 6vh, 64px) 16px; }
+main.consent { width: min(600px, 100%); background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; padding: clamp(20px, 4vw, 34px); }
+.brand { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; font: 500 20px/1 var(--serif); color: var(--ink); }
+.mark { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--accent); box-shadow: inset 0 0 0 4px var(--paper-2), inset 0 0 0 6px var(--accent); }
+h1 { font: 500 clamp(26px, 4vw, 32px)/1.15 var(--serif); letter-spacing: -.01em; margin: 0 0 14px; }
+p { margin: 0 0 12px; color: var(--ink-2); }
+p strong { color: var(--ink); font-weight: 600; }
+p em { color: var(--ink); font-style: italic; }
+code { font: 13px var(--mono); color: var(--accent-ink); overflow-wrap: anywhere; }
+fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px 12px; margin: 22px 0 18px; }
+legend { padding: 0 8px; font: 600 11px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+label.opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft); color: var(--ink); cursor: pointer; }
+label.opt:last-of-type { border-bottom: 0; }
+label.opt input { margin: 4px 0 0; accent-color: var(--accent); }
+fieldset p { margin: 6px 0 0 30px; }
+fieldset p label { display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); font-size: 13.5px; }
+input[type=text], input[type=password] { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); font: 14px var(--mono); }
+input[type=text]:focus, input[type=password]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+button { cursor: pointer; min-height: 42px; border-radius: 999px; padding: 0 22px; font: 500 15px var(--sans); border: 1px solid var(--line);
+  background: var(--paper-2); color: var(--ink); }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button:hover { border-color: var(--ink-3); }
+button.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+.fine { margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 13px; color: var(--ink-3); }
 """
 
 

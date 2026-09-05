@@ -3,43 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0a0a">
-  <title>Resonance — Visual Discovery</title>
+  <meta name="color-scheme" content="light dark">
+  <title>Resonance</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#main-workspace">Skip to discovery</a>
-  <div class="ambient ambient-one" aria-hidden="true"></div>
-  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <a class="skip-link" href="#main-workspace">Skip to results</a>
 
   <div class="app-shell" id="app-shell" data-state="loading">
-    <header class="topbar">
-      <div class="identity" aria-label="Resonance visual discovery">
-        <span class="identity-orbit" aria-hidden="true"><i></i></span>
-        <div>
-          <p class="wordmark">Resonance</p>
-          <p class="eyebrow">Visual discovery · R9</p>
-        </div>
+    <header class="masthead">
+      <div class="brand" aria-label="Resonance">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="wordmark">Resonance</span>
       </div>
 
       <div class="system-status">
-        <div class="consent-status" id="header-consent" role="status">
+        <div class="pill pill-consent" id="header-consent" role="status">
           <span class="status-light" aria-hidden="true"></span>
           <span>Checking consent</span>
         </div>
-        <button class="snapshot-button" id="snapshot-button" type="button" aria-label="Copy corpus snapshot" disabled>
-          <span class="eyebrow">Corpus</span>
-          <code id="snapshot-short">────────</code>
-        </button>
-        <div class="source-switch" aria-label="Discovery source">
-          <button class="source-option is-active" id="source-replay" type="button" data-source="replay" aria-pressed="true">
-            <span class="source-dot"></span>Replay fixture
-          </button>
-          <button class="source-option" id="source-live" type="button" data-source="live" aria-pressed="false">
-            <span class="source-dot"></span>Live MCP
-          </button>
+        <div class="source-switch" role="group" aria-label="Discovery source">
+          <button class="source-option is-active" id="source-replay" type="button" data-source="replay" aria-pressed="true">Replay fixture</button>
+          <button class="source-option" id="source-live" type="button" data-source="live" aria-pressed="false">Live MCP</button>
         </div>
-        <span class="offline-badge" id="runtime-badge">Deterministic · offline</span>
+        <!-- Live-only modules append their status chips here (WebMCP capability,
+             collaboration and workspace tool registration). -->
+        <div class="tool-status" id="tool-status" aria-label="Tool status"></div>
       </div>
     </header>
 
@@ -48,238 +37,233 @@
            nothing has no results to look at, and an empty results dashboard
            tells them neither what this is nor how to start. -->
       <section class="onboarding" id="onboarding" aria-labelledby="onboarding-heading">
-        <div class="onboarding-inner">
-          <div class="onboarding-lede">
-            <p class="eyebrow accent-text">Nothing shared yet</p>
-            <h1 id="onboarding-heading">Find the people whose <em>reasoning</em> matches yours.</h1>
-            <p class="onboarding-sub">
-              Resonance compares the causal structure of a thought — what causes what,
-              what prevents what — not the words it is made of. That is why it can put
-              <strong>“retry storm overloads a delivery queue”</strong> next to
-              <strong>“panic buying after a shortage rumour”</strong>: different fields,
-              same shape.
+        <div class="onboarding-hero">
+          <p class="eyebrow" id="onboarding-state">Nothing shared yet</p>
+          <h1 id="onboarding-heading">Find the people whose <em>reasoning</em> matches yours.</h1>
+          <p class="onboarding-sub">
+            Resonance compares the causal structure of a thought — what causes what,
+            what prevents what — not the words it is made of. That is why it can put
+            <strong>“retry storm overloads a delivery queue”</strong> next to
+            <strong>“panic buying after a shortage rumour”</strong>: different fields,
+            same shape.
+          </p>
+          <div class="onboarding-actions">
+            <button class="button button-primary" id="onboarding-connect" type="button">Connect your chat</button>
+            <button class="button" id="onboarding-example" type="button">See a worked example</button>
+          </div>
+          <p class="onboarding-note">
+            The example uses a labelled fixture with invented people, so you can see
+            what a result looks like without sharing anything.
+          </p>
+        </div>
+
+        <ol class="onboarding-steps">
+          <li>
+            <span class="step-number" aria-hidden="true">1</span>
+            <h2>Your assistant extracts the structure</h2>
+            <p>
+              In the chat you already use, it turns what you are working on into nodes
+              and relations. The raw text is not retained.
             </p>
-            <div class="onboarding-actions">
-              <button class="onboarding-cta" id="onboarding-connect" type="button">Connect your chat</button>
-              <button class="onboarding-ghost" id="onboarding-example" type="button">
-                See a worked example
-              </button>
+          </li>
+          <li>
+            <span class="step-number" aria-hidden="true">2</span>
+            <h2>You see it before anyone else does</h2>
+            <p>
+              You read exactly what would become discoverable and approve it explicitly.
+              Until you do, nothing about you is discoverable and nothing is compared.
+            </p>
+          </li>
+          <li>
+            <span class="step-number" aria-hidden="true">3</span>
+            <h2>Matches come back with their evidence</h2>
+            <p>
+              Every match shows the mapped nodes and preserved relations behind it. An
+              introduction opens only when both sides agree, and you can stop sharing at
+              any moment.
+            </p>
+          </li>
+        </ol>
+
+        <section class="onboarding-connect" id="onboarding-connect-panel" aria-labelledby="connect-heading">
+          <div class="onboarding-connect-head">
+            <div>
+              <p class="eyebrow">One address, no key</p>
+              <h2 id="connect-heading">Connect the chat you already use</h2>
             </div>
-            <p class="onboarding-note">
-              The example uses a labelled fixture with invented people, so you can see
-              what a result looks like without sharing anything.
-            </p>
+            <span class="tag">OAuth is discovered automatically</span>
           </div>
 
-          <ol class="onboarding-steps">
-            <li>
-              <span class="onboarding-step-n" aria-hidden="true">01</span>
-              <h2>Your assistant extracts the structure</h2>
-              <p>
-                In the chat you already use, it turns what you are working on into nodes
-                and relations. The raw text is not retained.
-              </p>
-            </li>
-            <li>
-              <span class="onboarding-step-n" aria-hidden="true">02</span>
-              <h2>You see it before anyone else does</h2>
-              <p>
-                You read exactly what would become discoverable and approve it explicitly.
-                Until you do, nothing about you is discoverable and nothing is compared.
-              </p>
-            </li>
-            <li>
-              <span class="onboarding-step-n" aria-hidden="true">03</span>
-              <h2>Matches come back with their evidence</h2>
-              <p>
-                Every match shows the mapped nodes and preserved relations behind it. An
-                introduction opens only when both sides agree, and you can stop sharing at
-                any moment.
-              </p>
-            </li>
-          </ol>
+          <div class="url-row">
+            <code id="mcp-url">https://resonance.parshkov.com/mcp</code>
+            <button class="button button-small" id="copy-mcp-url" type="button">Copy</button>
+          </div>
+          <p class="onboarding-note">
+            This is the only thing any client needs. You will never be asked to paste a
+            key or a token — if something asks you for one, it is not this flow.
+          </p>
 
-          <section class="onboarding-connect" id="onboarding-connect-panel" aria-labelledby="connect-heading">
-            <div class="onboarding-connect-head">
-              <div>
-                <p class="eyebrow accent-text">One address, no key</p>
-                <h2 id="connect-heading">Connect the chat you already use</h2>
-              </div>
-              <span class="onboarding-badge">OAuth is discovered automatically</span>
+          <dl class="client-list">
+            <div class="client">
+              <dt>Claude</dt>
+              <dd>Settings → Connectors → <strong>Add custom connector</strong> → paste the URL.</dd>
             </div>
-
-            <div class="onboarding-url">
-              <code id="mcp-url">https://resonance.parshkov.com/mcp</code>
-              <button class="onboarding-copy" id="copy-mcp-url" type="button">Copy</button>
+            <div class="client">
+              <dt>ChatGPT</dt>
+              <dd>Settings → Apps &amp; Connectors → Advanced → Developer mode → <strong>Create</strong> → paste the URL, auth <strong>OAuth</strong> → Scan tools. Needs a Business / Enterprise / Edu workspace.</dd>
             </div>
-            <p class="onboarding-note">
-              This is the only thing any client needs. You will never be asked to paste a
-              key or a token — if something asks you for one, it is not this flow.
-            </p>
-
-            <div class="onboarding-clients">
-              <div class="onboarding-client">
-                <h3>Claude</h3>
-                <p>Settings → Connectors → <strong>Add custom connector</strong> → paste the URL.</p>
-              </div>
-              <div class="onboarding-client">
-                <h3>ChatGPT</h3>
-                <p>Settings → Apps &amp; Connectors → Advanced → Developer mode → <strong>Create</strong> → paste the URL, auth <strong>OAuth</strong> → Scan tools. Needs a Business / Enterprise / Edu workspace.</p>
-              </div>
-              <div class="onboarding-client">
-                <h3>Grok</h3>
-                <p>Connectors → <strong>New Connector</strong> → <strong>Custom</strong> → paste the URL.</p>
-              </div>
-              <div class="onboarding-client">
-                <h3>Claude Code / CLI</h3>
-                <p><code class="onboarding-inline-code">claude mcp add --transport http resonance https://resonance.parshkov.com/mcp</code></p>
-              </div>
-              <div class="onboarding-client">
-                <h3>Cursor, Windsurf, any <code class="onboarding-inline-code">mcp.json</code></h3>
-                <p><code class="onboarding-inline-code">{"url": "https://resonance.parshkov.com/mcp"}</code></p>
-              </div>
-              <div class="onboarding-client">
-                <h3>This browser (WebMCP)</h3>
-                <p id="onboarding-webmcp-copy">
-                  Resonance also speaks WebMCP: in a browser that exposes
-                  <code class="onboarding-inline-code">document.modelContext</code> this page
-                  registers the same tools directly, with no connector at all.
-                </p>
-              </div>
+            <div class="client">
+              <dt>Grok</dt>
+              <dd>Connectors → <strong>New Connector</strong> → <strong>Custom</strong> → paste the URL.</dd>
             </div>
+            <div class="client">
+              <dt>Claude Code / CLI</dt>
+              <dd><code class="onboarding-inline-code">claude mcp add --transport http resonance https://resonance.parshkov.com/mcp</code></dd>
+            </div>
+            <div class="client">
+              <dt>Cursor, Windsurf, any <code class="onboarding-inline-code">mcp.json</code></dt>
+              <dd><code class="onboarding-inline-code">{"url": "https://resonance.parshkov.com/mcp"}</code></dd>
+            </div>
+            <div class="client">
+              <dt>This browser (WebMCP)</dt>
+              <dd id="onboarding-webmcp-copy">
+                Resonance also speaks WebMCP: in a browser that exposes
+                <code class="onboarding-inline-code">document.modelContext</code> this page
+                registers the same tools directly, with no connector at all.
+              </dd>
+            </div>
+          </dl>
 
-            <p class="onboarding-note">
-              Both routes are the same product and can be the same account. When you authorise
-              a connector from this browser, the Resonance consent page offers
-              <strong>“Continue as your current account”</strong> and preselects it — so what
-              your chat shares shows up on this page, and what you share here is what your chat
-              discovers. Choose a pseudonymous guest instead and the two stay separate on
-              purpose.
-            </p>
+          <p class="onboarding-note">
+            Both routes are the same product and can be the same account. When you authorise
+            a connector from this browser, the Resonance consent page offers
+            <strong>“Continue as your current account”</strong> and preselects it — so what
+            your chat shares shows up on this page, and what you share here is what your chat
+            discovers. Choose a pseudonymous guest instead and the two stay separate on
+            purpose.
+          </p>
 
-            <p class="onboarding-then">
-              Then say, in your own words: <em>“Extract the structure of what I’m working
-              on, show me the preview, and after I approve it, find who resonates.”</em>
-            </p>
-          </section>
-        </div>
+          <p class="onboarding-then">
+            Then say, in your own words: <em>“Extract the structure of what I’m working
+            on, show me the preview, and after I approve it, find who resonates.”</em>
+          </p>
+        </section>
       </section>
 
-      <aside class="surface thought-surface" aria-labelledby="thought-heading">
-        <div class="surface-heading">
-          <div>
-            <p class="eyebrow accent-text">Active thought</p>
+      <!-- The results view. Reading order: your thought, the map of how the
+           matches relate to it, the matches in the engine's order, and the
+           evidence for the selected one. -->
+      <div class="dashboard" id="dashboard">
+        <p class="source-banner" id="source-banner" hidden></p>
+
+        <section class="panel thought-panel" aria-labelledby="thought-heading">
+          <div class="panel-head">
+            <p class="eyebrow">Your thought</p>
             <p class="microcopy" id="thought-id">Loading accepted context…</p>
           </div>
-          <span class="thought-index">01 / 01</span>
-        </div>
+          <h1 class="thought-title" id="thought-heading">
+            <span class="loading-line wide"></span>
+          </h1>
+          <p class="thought-caption" id="thought-caption">Preparing the shared Thought DNA.</p>
 
-        <h1 class="thought-title" id="thought-heading">
-          <span class="loading-line wide"></span>
-          <span class="loading-line medium"></span>
-        </h1>
-        <p class="thought-caption" id="thought-caption">Preparing the shared Thought DNA.</p>
+          <div class="thought-body">
+            <section class="thought-dna" aria-labelledby="dna-heading">
+              <h2 class="eyebrow" id="dna-heading">Thought DNA · nodes</h2>
+              <p class="microcopy">This is the structure that is discoverable. The raw text is not retained.</p>
+              <ol class="dna-chain" id="dna-chain" aria-live="polite"></ol>
+            </section>
+            <section class="thought-relations" aria-labelledby="relations-heading">
+              <h2 class="eyebrow" id="relations-heading">Thought DNA · relations</h2>
+              <ol class="dna-relations" id="dna-relations"></ol>
+            </section>
+          </div>
 
-        <section class="conversation" aria-labelledby="conversation-heading">
-          <div class="section-title-row">
-            <h2 class="eyebrow" id="conversation-heading">Live conversation</h2>
-            <span class="conversation-state"><i></i>Active now</span>
-          </div>
-          <div class="message user-message">
-            <span class="message-author">Shared thinker</span>
-            <p id="user-message">Loading the current reasoning chain…</p>
-          </div>
-          <div class="message agent-message">
-            <span class="agent-mark" aria-hidden="true">R</span>
-            <div>
-              <span class="message-author">AI agent</span>
-              <p id="agent-message">Waiting for consent state.</p>
-            </div>
-          </div>
-        </section>
+          <dl class="declared-context" id="declared-context"></dl>
 
-        <section class="thought-dna" aria-labelledby="dna-heading">
-          <div class="section-title-row">
-            <h2 class="eyebrow" id="dna-heading">Thought DNA · causal chain</h2>
-            <span class="verified-copy">Accepted context</span>
-          </div>
-          <div class="dna-chain" id="dna-chain" aria-live="polite"></div>
-          <div class="declared-context" id="declared-context"></div>
-        </section>
-
-        <section class="request-summary" aria-labelledby="request-heading">
-          <h2 class="eyebrow" id="request-heading">Discovery request</h2>
-          <dl>
+          <dl class="request-summary" aria-label="Discovery request">
             <div><dt>Mode</dt><dd id="request-mode">analogical</dd></div>
             <div><dt>Requested</dt><dd id="request-k">k=15</dd></div>
             <div><dt>Response</dt><dd id="response-summary">Loading…</dd></div>
           </dl>
         </section>
-      </aside>
 
-      <section class="surface discovery-surface" aria-labelledby="map-heading">
-        <div class="map-header">
-          <div>
-            <p class="eyebrow">Offline structural field</p>
-            <h2 id="map-heading">Resonance map</h2>
-          </div>
-          <div class="map-legend" aria-label="Map legend">
-            <span><i class="legend-dot query-dot"></i>Active thought</span>
-            <span><i class="legend-dot resonance-dot"></i>Resonance</span>
-            <span><i class="legend-dot contradiction-dot"></i>Contradiction</span>
-          </div>
-        </div>
-
-        <div class="map-frame" id="map-frame">
-          <svg class="world-map" id="world-map" viewBox="0 0 1000 500" role="img" aria-labelledby="map-title map-description">
-            <title id="map-title">Coarse synthetic resonance locations</title>
-            <desc id="map-description">An offline deterministic map. Location is used only for presentation and never for matching.</desc>
-            <defs>
-              <pattern id="dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
-                <circle cx="2" cy="2" r="1" class="grid-dot"></circle>
-              </pattern>
-              <radialGradient id="query-aura" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#e8d5b7" stop-opacity=".24"></stop>
-                <stop offset="100%" stop-color="#e8d5b7" stop-opacity="0"></stop>
-              </radialGradient>
-              <filter id="soft-glow" x="-100%" y="-100%" width="300%" height="300%">
-                <feGaussianBlur stdDeviation="6" result="blur"></feGaussianBlur>
-                <feMerge><feMergeNode in="blur"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
-              </filter>
-            </defs>
-            <rect width="1000" height="500" class="map-grid"></rect>
-            <g class="graticule" aria-hidden="true">
-              <path d="M0 125H1000M0 250H1000M0 375H1000"></path>
-              <path d="M125 0V500M250 0V500M375 0V500M500 0V500M625 0V500M750 0V500M875 0V500"></path>
-            </g>
-            <g class="landmasses" aria-hidden="true">
-              <path d="M60 116L102 76 180 54 255 69 307 101 284 133 238 144 210 173 170 180 146 214 113 204 105 169 72 152Z"></path>
-              <path d="M245 51L280 30 319 38 332 60 298 73Z"></path>
-              <path d="M208 215L245 230 268 275 260 322 238 370 216 418 194 389 184 330 165 277 177 239Z"></path>
-              <path d="M438 116L469 94 510 99 531 119 554 119 582 97 635 88 688 102 725 94 780 115 836 113 900 151 916 186 875 201 826 185 784 205 741 198 699 218 656 199 622 164 587 157 560 174 528 157 498 165 474 145 443 146Z"></path>
-              <path d="M493 169L543 169 586 199 606 251 582 316 542 371 511 354 494 300 461 253 466 205Z"></path>
-              <path d="M765 328L807 309 858 320 890 352 870 380 820 386 779 369Z"></path>
-              <path d="M601 165L622 158 631 183 615 203Z"></path>
-              <path d="M912 273L925 289 914 309 902 291Z"></path>
-            </g>
-            <g id="connection-layer" class="connection-layer"></g>
-            <g id="marker-layer" class="marker-layer"></g>
-          </svg>
-          <div class="map-status" id="map-status" role="status">
-            <span class="map-status-pulse"></span>
-            <span id="map-status-text">Awaiting discovery response</span>
-          </div>
-          <div class="unlocated-anchor" id="unlocated-anchor" hidden>
-            <span class="shield-icon" aria-hidden="true"></span>
-            <div><strong id="unlocated-name">Location protected</strong><span>Coarse location not shared</span></div>
-          </div>
-          <p class="map-disclaimer">Coarse/synthetic location · presentation only · never used for ranking</p>
-        </div>
-
-        <section class="evidence-panel" id="evidence-panel" aria-labelledby="evidence-heading" aria-live="polite">
-          <div class="evidence-topline">
+        <section class="panel map-panel" aria-labelledby="map-heading">
+          <div class="panel-head">
             <div>
-              <p class="eyebrow accent-text" id="evidence-kicker">Why this match</p>
+              <p class="eyebrow">Structural relationship</p>
+              <h2 id="map-heading">Resonance map</h2>
+            </div>
+            <div class="map-status" id="map-status" role="status">
+              <span class="status-light" aria-hidden="true"></span>
+              <span id="map-status-text">Awaiting discovery response</span>
+            </div>
+          </div>
+
+          <div class="map-frame" id="map-frame">
+            <svg class="resonance-map" id="resonance-map" viewBox="0 0 800 560" role="img" aria-labelledby="map-title map-description">
+              <title id="map-title">Map of structural relationship between your thought and each match</title>
+              <desc id="map-description">Your thought sits at the centre. Each match is placed at a distance given by its structural score, in a sector for its cluster. Line weight is the number of preserved relations. Coarse location is never used for position or ranking.</desc>
+              <g id="ring-layer" class="ring-layer" aria-hidden="true"></g>
+              <g id="connection-layer" class="connection-layer"></g>
+              <g id="marker-layer" class="marker-layer"></g>
+            </svg>
+            <div class="unlocated-anchor" id="unlocated-anchor" hidden>
+              <strong id="unlocated-name">Location protected</strong>
+              <span>Coarse location not shared</span>
+            </div>
+          </div>
+
+          <ol class="sector-key" id="sector-key" aria-label="Sectors, one per cluster_id, with the number of returned rows in each"></ol>
+
+          <dl class="map-legend" aria-label="How to read the map">
+            <div><dt>Distance from centre</dt><dd>1 − structural score. The inner ring is 1.0, the rim is 0.</dd></div>
+            <div><dt>Sector</dt><dd>the <code>cluster_id</code> the engine assigned, lettered in the key above</dd></div>
+            <div><dt>Line weight</dt><dd>preserved relations</dd></div>
+            <div><dt><span class="legend-swatch legend-contradiction" aria-hidden="true"></span>Dashed</dt><dd>contradiction evidence or a hard rejection</dd></div>
+          </dl>
+          <p class="map-disclaimer">Positions are a view of the returned scores, never a reordering; the number on each marker is its place in the engine's returned list. Coarse/synthetic location · presentation only · never used for ranking.</p>
+        </section>
+
+        <section class="panel matches-panel" aria-labelledby="matches-heading">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Numbered by the order the engine returned them</p>
+              <h2 id="matches-heading">Resonances</h2>
+            </div>
+            <span class="shown-count" id="shown-count">00 shown</span>
+          </div>
+          <div class="match-list" id="match-list" aria-live="polite">
+            <div class="match-skeleton"></div>
+            <div class="match-skeleton"></div>
+            <div class="match-skeleton"></div>
+            <div class="match-skeleton"></div>
+          </div>
+          <p class="matches-empty" id="matches-empty" hidden>No returned candidate cleared the resonance bar.</p>
+
+          <button class="secondary-trigger" id="secondary-trigger" type="button" aria-expanded="false" aria-controls="secondary-drawer" disabled>
+            <span><strong id="secondary-count">0</strong> other returned results</span>
+            <span class="trigger-hint">View in engine order</span>
+          </button>
+
+          <section class="contradiction-card" id="contradiction-card" aria-labelledby="contradiction-heading">
+            <div class="contradiction-content">
+              <p class="eyebrow warning-text" id="contradiction-heading">Contradiction evidence</p>
+              <p class="contradiction-topic" id="contradiction-topic">Loading rejected results…</p>
+              <div class="contradiction-meta"><span id="contradiction-person">—</span><code id="contradiction-reason">—</code></div>
+            </div>
+            <span class="rejected-count" id="rejected-count">0 rejected</span>
+          </section>
+
+          <p class="intro-note" aria-label="How introductions work">
+            <strong>Introductions need both sides.</strong>
+            Ask through the Collaboration panel or your chat; the other person has to accept before any channel opens.
+          </p>
+        </section>
+
+        <section class="panel evidence-panel" id="evidence-panel" aria-labelledby="evidence-heading" aria-live="polite">
+          <div class="panel-head evidence-head">
+            <div>
+              <p class="eyebrow" id="evidence-kicker">Why this match</p>
               <h2 id="evidence-heading">Select a resonance</h2>
               <p class="evidence-subtitle" id="evidence-subtitle">Backend mapping evidence will appear here.</p>
             </div>
@@ -289,66 +273,39 @@
               <div><dt>Verdict</dt><dd id="metric-confidence">—</dd></div>
             </dl>
           </div>
+
           <div class="evidence-body">
-            <div class="mapping-list" id="mapping-list"></div>
-            <div class="relation-proof">
-              <p class="eyebrow">Preserved relations</p>
+            <section class="mapping" aria-labelledby="mapping-heading">
+              <div class="mapping-columns" aria-hidden="true"><span>Your node</span><span></span><span>Their node</span></div>
+              <h3 class="visually-hidden" id="mapping-heading">Node-to-node correspondence</h3>
+              <div class="mapping-list" id="mapping-list"></div>
+            </section>
+            <section class="relation-proof" aria-labelledby="relations-proof-heading">
+              <h3 class="eyebrow" id="relations-proof-heading">Preserved relations</h3>
               <div class="relation-chips" id="relation-chips"></div>
               <p class="proof-note" id="proof-note">No frontend matching or score calculation.</p>
-            </div>
+              <details class="score-details" id="score-details">
+                <summary>All scores the engine returned</summary>
+                <dl class="score-list" id="score-list"></dl>
+              </details>
+            </section>
           </div>
         </section>
-      </section>
-
-      <aside class="surface matches-surface" aria-labelledby="matches-heading">
-        <div class="matches-header">
-          <div>
-            <p class="eyebrow">Backend order preserved</p>
-            <h2 id="matches-heading">Useful matches</h2>
-          </div>
-          <span class="shown-count" id="shown-count">00 shown</span>
-        </div>
-        <div class="match-list" id="match-list" aria-live="polite">
-          <div class="match-skeleton"></div>
-          <div class="match-skeleton"></div>
-          <div class="match-skeleton"></div>
-          <div class="match-skeleton"></div>
-        </div>
-
-        <button class="secondary-trigger" id="secondary-trigger" type="button" aria-expanded="false" aria-controls="secondary-drawer" disabled>
-          <span><strong id="secondary-count">0</strong> other backend results</span>
-          <span class="trigger-hint">View without reranking <i aria-hidden="true">↗</i></span>
-        </button>
-
-        <section class="contradiction-card" id="contradiction-card" aria-labelledby="contradiction-heading">
-          <div class="contradiction-icon" aria-hidden="true">×</div>
-          <div class="contradiction-content">
-            <p class="eyebrow warning-text" id="contradiction-heading">Contradiction evidence</p>
-            <p class="contradiction-topic" id="contradiction-topic">Loading rejected results…</p>
-            <div class="contradiction-meta"><span id="contradiction-person">—</span><code id="contradiction-reason">—</code></div>
-          </div>
-          <span class="rejected-count" id="rejected-count">0 rejected</span>
-        </section>
-
-        <!-- This used to read "Introductions unavailable — not exposed by the
-             accepted R8 MCP". That stopped being true at R13/R14: intros,
-             acceptance and relayed messages are live, and the acceptance suite
-             exercises the whole path. What is worth stating is the consent
-             rule, which has not changed. -->
-        <div class="intro-note" aria-label="How introductions work">
-          <span class="lock-mark" aria-hidden="true"></span>
-          <div><strong>Introductions need both sides</strong><span>Ask through the Collaboration panel or your chat; the other person has to accept before any channel opens</span></div>
-        </div>
-      </aside>
+      </div>
     </main>
 
-    <footer class="footer-strip">
+    <footer class="provenance">
       <span id="source-note">Loading accepted R8 discovery contract…</span>
-      <span class="contract-chip">resonance-discovery/0.1</span>
+      <span class="provenance-detail">
+        <button class="snapshot-button" id="snapshot-button" type="button" aria-label="Copy corpus snapshot" disabled>
+          corpus <code id="snapshot-short">────────</code>
+        </button>
+        <span class="contract-note">contract <code id="contract-note">resonance-discovery/0.1</code></span>
+      </span>
     </footer>
 
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-    <aside class="secondary-drawer" id="secondary-drawer" aria-labelledby="drawer-heading" aria-hidden="true" inert>
+    <aside class="drawer secondary-drawer" id="secondary-drawer" aria-labelledby="drawer-heading" aria-hidden="true" inert>
       <div class="drawer-header">
         <div><p class="eyebrow">Complete backend response</p><h2 id="drawer-heading">Other returned results</h2></div>
         <button class="icon-button" id="drawer-close" type="button" aria-label="Close other results">×</button>

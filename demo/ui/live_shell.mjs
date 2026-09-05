@@ -26,6 +26,11 @@ function markLiveShell() {
   document.body.dataset.resonanceMode = "live";
   setText("thought-id", "Live product · your shared thoughts live in your account");
   setText("thought-caption", LIVE_HINT);
+  // With no demo context the page settles in its error state, which shows the
+  // evidence panel alone; the hint has to be where the visitor is looking.
+  setText("evidence-kicker", "Live product");
+  setText("evidence-heading", "Your shared thoughts live in your account");
+  setText("evidence-subtitle", LIVE_HINT);
   setText("contradiction-topic", "Evidence appears here after a discovery through your agent.");
   setText("source-note", "Live product · discovery runs on your authenticated session");
   const consent = document.getElementById("header-consent");

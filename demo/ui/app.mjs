@@ -79,11 +79,75 @@ export function visibleRejected(payload) {
   });
 }
 
-export function mapPoint(location) {
-  return {
-    x: ((location.lon + 180) / 360) * 1000,
-    y: ((90 - location.lat) / 180) * 500,
-  };
+// ---- backend order ------------------------------------------------------
+//
+// Every number shown next to a match is its position in the engine's returned
+// list: `01`…`NN` for `matches[]`, `R1`…`RN` for `rejected[]`. The page never
+// renumbers, so the order is recoverable from any surface (card, marker,
+// drawer row) without trusting the layout.
+function backendPosition(payload, row) {
+  const matchIndex = payload.matches.indexOf(row);
+  if (matchIndex >= 0) return String(matchIndex + 1).padStart(2, "0");
+  const rejectedIndex = payload.rejected.indexOf(row);
+  if (rejectedIndex >= 0) return `R${rejectedIndex + 1}`;
+  return "—";
+}
+
+// ---- structural map layout --------------------------------------------
+//
+// The map is a view of numbers the engine returned, nothing more:
+//   distance from centre = 1 − scores.structural   (inner ring 1.0, rim 0)
+//   sector               = display.cluster_id     (in order of first appearance)
+//   angle inside sector  = backend order
+//   line weight          = evidence.preserved_relation_count
+//   dashed               = evidence.contradiction_count > 0, or a hard rejection
+// Nothing here ranks, scores or moves a row ahead of another.
+const INNER_RADIUS_RATIO = 0.46;
+const SECTOR_GAP_DEG = 10;
+
+function clamp01(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.min(1, Math.max(0, number));
+}
+
+export function structuralRadius(structural, radiusMax, radiusMin) {
+  return radiusMin + (radiusMax - radiusMin) * (1 - clamp01(structural));
+}
+
+export function layoutMap(items, geometry) {
+  // items: [{sessionId, cluster, structural, ...}] already in backend order.
+  const {cx, cy, R} = geometry;
+  const r0 = R * INNER_RADIUS_RATIO;
+  const sectors = new Map();
+  for (const item of items) {
+    const key = item.cluster || "unclustered";
+    if (!sectors.has(key)) sectors.set(key, []);
+    sectors.get(key).push(item);
+  }
+  const sectorCount = sectors.size;
+  const usable = 360 - SECTOR_GAP_DEG * sectorCount;
+  const total = items.length || 1;
+  const placed = [];
+  const sectorArcs = [];
+  let angle = -90;
+  for (const [cluster, members] of sectors) {
+    const span = sectorCount === 1 ? 360 : usable * (members.length / total);
+    const start = angle;
+    members.forEach((item, index) => {
+      const theta = ((start + span * ((index + 0.5) / members.length)) * Math.PI) / 180;
+      const radius = structuralRadius(item.structural, R, r0);
+      placed.push({
+        ...item,
+        x: cx + radius * Math.cos(theta),
+        y: cy + radius * Math.sin(theta),
+        angle: theta,
+      });
+    });
+    sectorArcs.push({cluster, start, end: start + span, count: members.length});
+    angle = start + span + SECTOR_GAP_DEG;
+  }
+  return {placed, sectorArcs, r0};
 }
 
 function el(tagName, className, text) {
@@ -100,7 +164,8 @@ function svgEl(tagName, attributes = {}) {
 }
 
 function setText(id, value) {
-  document.getElementById(id).textContent = value;
+  const node = document.getElementById(id);
+  if (node) node.textContent = value;
 }
 
 function formatScore(value) {
@@ -116,13 +181,31 @@ function placeLabel(location) {
   return `${location.city} · ${location.region}`;
 }
 
+// ---- your thought ---------------------------------------------------------
+
+function nodeIndex(context) {
+  const byId = new Map();
+  for (const node of context?.active_thought?.nodes || []) byId.set(node.id, node);
+  return byId;
+}
+
+function relationIndex(context) {
+  const byId = new Map();
+  for (const relation of context?.active_thought?.relations || []) byId.set(relation.id, relation);
+  return byId;
+}
+
+function relationSentence(relation, nodes) {
+  const source = nodes.get(relation.source)?.label || relation.source;
+  const target = nodes.get(relation.target)?.label || relation.target;
+  return {source, type: relation.type, target};
+}
+
 function renderContext(context) {
   const thought = context.active_thought;
   const nodes = thought.nodes;
   const topic = context.presentation?.topic || nodes[0]?.label || "Shared thought";
   const mechanism = nodes.find((node) => node.role === "mechanism")?.label || nodes[1]?.label;
-  const outcome = nodes.find((node) => node.role === "outcome")?.label || nodes[2]?.label;
-  const method = nodes.find((node) => node.role === "method")?.label;
 
   setText("thought-id", thought.thought_id);
   const title = document.getElementById("thought-heading");
@@ -132,9 +215,10 @@ function renderContext(context) {
     title.append(el("span", "chain-arrow", " → "));
     title.append(document.createTextNode(mechanism));
   }
-  setText("thought-caption", thought.source?.text || "Accepted shared context.");
-  setText("user-message", `I keep seeing ${nodes[0]?.label} trigger ${mechanism}, until ${outcome || "the system destabilizes"}. Could ${method || "a control loop"} interrupt it?`);
-  setText("agent-message", "Shared with Resonance. I’ll compare only the consented structural trace and coarse synthetic location.");
+  // The fixture thought carries a public caption in `source.text`; a live share
+  // carries an empty string there (the raw text is never retained). Nothing is
+  // composed on the person's behalf: what is shown is the field, or nothing.
+  setText("thought-caption", thought.source?.text || "");
 
   // On the live product the header pill reflects the visitor's real consent
   // state (owned by webmcp_live.mjs); the replay narrative must not label a
@@ -146,13 +230,26 @@ function renderContext(context) {
 
   const chain = document.getElementById("dna-chain");
   chain.replaceChildren();
-  const chainNodes = nodes.slice(0, 5);
-  chainNodes.forEach((node, index) => {
-    const row = el("div", "dna-node");
-    row.append(el("strong", "", node.label), el("span", "", node.role));
+  for (const node of nodes) {
+    const row = el("li", "dna-node");
+    row.append(el("code", "", node.id), el("strong", "", node.label), el("span", "", node.role));
     chain.append(row);
-    if (index < chainNodes.length - 1) chain.append(el("div", "dna-arrow"));
-  });
+  }
+
+  const byId = nodeIndex(context);
+  const relations = document.getElementById("dna-relations");
+  relations.replaceChildren();
+  for (const relation of thought.relations || []) {
+    const sentence = relationSentence(relation, byId);
+    const row = el("li", "dna-relation");
+    row.append(
+      el("code", "", relation.id),
+      el("span", "", sentence.source),
+      el("span", "relation-type", sentence.type),
+      el("span", "", sentence.target),
+    );
+    relations.append(row);
+  }
 
   const declared = document.getElementById("declared-context");
   declared.replaceChildren();
@@ -161,13 +258,15 @@ function renderContext(context) {
     ["Coarse location", context.location ? `${context.location.city} · ${context.location.region}` : "Not shared"],
   ];
   for (const [label, value] of contextValues) {
-    const item = el("div", "context-item");
-    item.append(el("span", "", label), el("strong", "", value));
+    const item = el("div");
+    item.append(el("dt", "", label), el("dd", "", value));
     declared.append(item);
   }
   setText("request-mode", context.pinned_request.mode);
   setText("request-k", `k=${context.pinned_request.k}`);
 }
+
+// ---- matches ------------------------------------------------------------
 
 function firstCorrespondence(match) {
   const correspondence = match.evidence.top_correspondences[0];
@@ -178,17 +277,19 @@ function firstCorrespondence(match) {
 function renderMatches(payload, primary) {
   const list = document.getElementById("match-list");
   list.replaceChildren();
-  primary.forEach((match, index) => {
+  primary.forEach((match) => {
+    const position = backendPosition(payload, match);
     const button = el("button", "match-card");
     button.type = "button";
     button.dataset.sessionId = match.session_id;
     button.dataset.backendScore = String(match.scores.structural);
     button.dataset.backendClassification = match.mode_classification;
+    button.dataset.backendPosition = position;
     button.setAttribute("aria-pressed", String(match.session_id === state.selectedSessionId));
-    button.setAttribute("aria-label", `Open evidence for ${match.person_pseudonym}: ${match.display.topic}`);
+    button.setAttribute("aria-label",
+      `Open evidence for ${match.person_pseudonym}: ${match.display.topic} (returned in position ${position})`);
 
-    const number = el("span", "match-card__index", String(index + 1).padStart(2, "0"));
-    const body = el("div", "match-card__body");
+    const number = el("span", "match-card__index", position);
     const top = el("div", "match-card__top");
     top.append(
       el("span", "match-card__person", match.person_pseudonym),
@@ -199,16 +300,29 @@ function renderMatches(payload, primary) {
     const meta = el("div", "match-card__meta");
     meta.append(
       el("span", "classification", match.mode_classification),
+      el("span", "confidence", `confidence ${match.confidence}`),
       el("span", "location", placeLabel(match.display.location)),
     );
-    body.append(top, topic, why, meta);
-    button.append(number, body);
+    if (match.evidence.contradiction_count > 0) {
+      meta.append(el("span", "contradictions",
+        `${match.evidence.contradiction_count} contradiction${match.evidence.contradiction_count === 1 ? "" : "s"}`));
+    }
+    button.append(number, top, topic, why, meta);
     button.addEventListener("click", () => selectMatch(match.session_id));
     list.append(button);
   });
   setText("shown-count", `${String(primary.length).padStart(2, "0")} shown`);
   setText("response-summary", `${payload.matches.length} matches · ${payload.rejected.length} rejected`);
+  const empty = document.getElementById("matches-empty");
+  if (empty) empty.hidden = primary.length > 0;
 }
+
+// ---- evidence -----------------------------------------------------------
+
+const SCORE_FIELDS = [
+  "structural", "semantic", "r_direct", "y_systematicity", "coverage_containment",
+  "contradiction", "h_sign_conflict",
+];
 
 function renderEvidence(match) {
   setText("evidence-kicker", `Why ${match.person_pseudonym} resonates`);
@@ -218,78 +332,267 @@ function renderEvidence(match) {
   setText("metric-structural", formatScore(match.scores.structural));
   setText("metric-confidence", match.confidence);
 
+  const queryNodes = nodeIndex(state.context);
   const mappings = document.getElementById("mapping-list");
   mappings.replaceChildren();
-  match.evidence.top_correspondences.slice(0, 4).forEach((mapping) => {
+  match.evidence.top_correspondences.forEach((mapping) => {
     const row = el("div", "mapping-row");
     const query = el("div", "mapping-side");
-    query.append(el("small", "", mapping.query_node), el("strong", "", mapping.query_label));
+    const role = queryNodes.get(mapping.query_node)?.role;
+    query.append(
+      el("small", "", role ? `${mapping.query_node} · ${role}` : mapping.query_node),
+      el("strong", "", mapping.query_label),
+    );
     const candidate = el("div", "mapping-side");
     candidate.append(el("small", "", mapping.candidate_node), el("strong", "", mapping.candidate_label));
     row.append(query, el("div", "mapping-arrow", "↔"), candidate);
     mappings.append(row);
   });
 
+  const queryRelations = relationIndex(state.context);
   const relations = document.getElementById("relation-chips");
   relations.replaceChildren();
-  match.evidence.preserved_relations.slice(0, 5).forEach((relation) => {
-    relations.append(el("span", "relation-chip", `${relation.query_relation} ↔ ${relation.candidate_relation}`));
+  match.evidence.preserved_relations.forEach((relation) => {
+    const chip = el("span", "relation-chip");
+    chip.append(el("span", "relation-chip__pair", `${relation.query_relation} ↔ ${relation.candidate_relation}`));
+    const known = queryRelations.get(relation.query_relation);
+    if (known) {
+      // The query side of a preserved relation is resolvable from the visitor's
+      // own Thought DNA. The candidate side is only an id: the other person's
+      // relations are not in the response, so nothing is invented for them.
+      const sentence = relationSentence(known, queryNodes);
+      const line = el("span", "relation-chip__query");
+      line.append(
+        document.createTextNode(`${sentence.source} `),
+        el("span", "relation-type", sentence.type),
+        document.createTextNode(` ${sentence.target}`),
+      );
+      chip.append(line);
+    }
+    relations.append(chip);
   });
   setText(
     "proof-note",
     `${match.evidence.mapped_node_count} mapped nodes · ${match.evidence.preserved_relation_count} preserved · ${match.evidence.contradiction_count} contradictions. Backend evidence, presented unchanged.`,
   );
+
+  const scores = document.getElementById("score-list");
+  if (scores) {
+    scores.replaceChildren();
+    for (const field of SCORE_FIELDS) {
+      if (!(field in match.scores)) continue;
+      const value = match.scores[field];
+      const item = el("div");
+      item.append(el("dt", "", field), el("dd", "", typeof value === "number" ? formatScore(value) : String(value)));
+      scores.append(item);
+    }
+  }
 }
 
-function connectionPath(from, to, rejected = false) {
-  const bend = rejected ? 28 : -34;
-  const middleX = (from.x + to.x) / 2;
-  const middleY = (from.y + to.y) / 2 + bend;
-  return `M${from.x.toFixed(1)} ${from.y.toFixed(1)} Q${middleX.toFixed(1)} ${middleY.toFixed(1)} ${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+// ---- map ----------------------------------------------------------------
+
+function mapGeometry() {
+  const frame = document.getElementById("map-frame");
+  const svg = document.getElementById("resonance-map");
+  const narrow = (frame?.clientWidth || 800) < 600;
+  const width = narrow ? 560 : 900;
+  const height = narrow ? 560 : 620;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  if (frame) frame.dataset.shape = narrow ? "square" : "wide";
+  // Room outside the rim for the sector letters and, in the wide layout, the
+  // cluster names beside them.
+  const R = Math.min(width, height) / 2 - (narrow ? 40 : 52);
+  return {width, height, cx: width / 2, cy: height / 2, R, narrow};
 }
 
-function addConnection(layer, from, to, sessionId, rejected = false) {
-  const path = svgEl("path", {
-    d: connectionPath(from, to, rejected),
-    class: `connection-line${rejected ? " is-rejected" : ""}`,
-    "data-session-id": sessionId,
+function radialPath(from, to) {
+  return `M${from.x.toFixed(1)} ${from.y.toFixed(1)} L${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+}
+
+const SECTOR_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function sectorLetter(index) {
+  return SECTOR_LETTERS[index % SECTOR_LETTERS.length] + (index >= SECTOR_LETTERS.length ? String(Math.floor(index / SECTOR_LETTERS.length)) : "");
+}
+
+// Cluster ids are hyphenated slugs; break them at hyphens into short lines so
+// a name fits beside the rim instead of running off the drawing.
+function wrapSlug(slug, maxChars = 18) {
+  const lines = [];
+  let current = "";
+  for (const part of String(slug).split("-")) {
+    const candidate = current ? `${current}-${part}` : part;
+    if (current && candidate.length > maxChars) {
+      lines.push(`${current}-`);
+      current = part;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function renderRings(geometry, r0, sectorArcs) {
+  const rings = document.getElementById("ring-layer");
+  rings.replaceChildren();
+  const {cx, cy, R, narrow} = geometry;
+  const stops = [1, 0.75, 0.5, 0.25, 0];
+  for (const structural of stops) {
+    const radius = structuralRadius(structural, R, r0);
+    rings.append(svgEl("circle", {
+      class: `ring${structural === 1 ? " is-inner" : ""}`, cx, cy, r: radius.toFixed(1),
+    }));
+    // Ring values sit along the lower-left diagonal, away from the sector
+    // names, which live outside the rim.
+    const theta = (135 * Math.PI) / 180;
+    const label = svgEl("text", {
+      class: "ring-label",
+      x: (cx + (radius + 3) * Math.cos(theta)).toFixed(1),
+      y: (cy + (radius + 3) * Math.sin(theta)).toFixed(1),
+      "text-anchor": "end",
+    });
+    label.textContent = structural.toFixed(2);
+    rings.append(label);
+  }
+  if (sectorArcs.length > 1) {
+    for (const arc of sectorArcs) {
+      const theta = ((arc.start - SECTOR_GAP_DEG / 2) * Math.PI) / 180;
+      rings.append(svgEl("line", {
+        class: "sector-line",
+        x1: (cx + r0 * 0.5 * Math.cos(theta)).toFixed(1), y1: (cy + r0 * 0.5 * Math.sin(theta)).toFixed(1),
+        x2: (cx + (R + 10) * Math.cos(theta)).toFixed(1), y2: (cy + (R + 10) * Math.sin(theta)).toFixed(1),
+      }));
+    }
+  }
+  sectorArcs.forEach((arc, index) => {
+    const mid = (((arc.start + arc.end) / 2) * Math.PI) / 180;
+    const cos = Math.cos(mid);
+    const lx = cx + (R + 24) * cos;
+    const ly = cy + (R + 24) * Math.sin(mid);
+    const anchor = cos > 0.3 ? "start" : cos < -0.3 ? "end" : "middle";
+    const label = svgEl("text", {class: "sector-label", x: lx.toFixed(1), y: ly.toFixed(1), "text-anchor": anchor});
+    const letter = svgEl("tspan", {class: "sector-letter"});
+    letter.textContent = sectorLetter(index);
+    label.append(letter);
+    if (!narrow) {
+      const lines = wrapSlug(arc.cluster);
+      lines.forEach((line, lineIndex) => {
+        const span = lineIndex === 0 ? svgEl("tspan") : svgEl("tspan", {x: lx.toFixed(1), dy: 13});
+        span.textContent = lineIndex === 0 ? ` ${line}` : line;
+        label.append(span);
+      });
+    }
+    rings.append(label);
   });
-  layer.append(path);
 }
 
-function addMarker(layer, location, options) {
-  const point = mapPoint(location);
+function renderSectorKey(sectorArcs) {
+  const key = document.getElementById("sector-key");
+  if (!key) return;
+  key.replaceChildren();
+  sectorArcs.forEach((arc, index) => {
+    const item = el("li");
+    item.append(
+      el("span", "sector-key__letter", sectorLetter(index)),
+      el("code", "", arc.cluster),
+      el("span", "sector-key__count", `${arc.count}`),
+    );
+    key.append(item);
+  });
+}
+
+function addConnection(layer, from, to, item) {
+  const width = item.kind === "primary" ? 1 + 0.4 * Number(item.weight || 0) : 1;
+  const classes = ["connection-line"];
+  if (item.kind === "other") classes.push("is-other");
+  if (item.kind === "rejected") classes.push("is-rejected");
+  else if (item.contradiction) classes.push("is-contradiction");
+  layer.append(svgEl("path", {
+    d: radialPath(from, to),
+    class: classes.join(" "),
+    "stroke-width": width.toFixed(1),
+    "data-session-id": item.sessionId,
+  }));
+}
+
+function addMarker(layer, item, options) {
   const marker = svgEl("g", {
-    class: `marker ${options.kind}`,
-    transform: `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`,
-    "data-session-id": options.sessionId,
+    class: `marker ${options.kind}${item.contradiction ? " is-contradiction" : ""}`,
+    transform: `translate(${item.x.toFixed(1)} ${item.y.toFixed(1)})`,
+    "data-session-id": item.sessionId,
     "aria-label": options.ariaLabel,
   });
-  if (options.selectable) {
+  if (options.onSelect) {
     marker.setAttribute("role", "button");
     marker.setAttribute("tabindex", "0");
-    marker.addEventListener("click", () => selectMatch(options.sessionId));
+    marker.addEventListener("click", options.onSelect);
     marker.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        selectMatch(options.sessionId);
+        options.onSelect();
       }
     });
   }
-  marker.append(
-    svgEl("circle", {class: "marker-halo", r: options.radius + 7}),
-    svgEl("circle", {class: "marker-ring", r: options.radius}),
-    svgEl("circle", {class: "marker-core", r: 2.4}),
-  );
-  if (options.index) {
-    const index = svgEl("text", {class: "marker-index", y: -0.5});
+  if (item.contradiction) marker.append(svgEl("circle", {class: "marker-outline", r: options.radius + 5}));
+  marker.append(svgEl("circle", {class: "marker-ring", r: options.radius}));
+  if (options.kind === "is-query") marker.append(svgEl("circle", {class: "marker-core", r: 3}));
+  if (options.kind === "is-rejected") {
+    const s = options.radius * 0.45;
+    marker.append(svgEl("path", {class: "marker-cross", d: `M${-s} ${-s}L${s} ${s}M${s} ${-s}L${-s} ${s}`}));
+  } else if (options.index) {
+    const index = svgEl("text", {class: "marker-index"});
     index.textContent = options.index;
     marker.append(index);
   }
-  const label = svgEl("text", {class: "marker-label", y: options.radius + 16});
-  label.textContent = options.label;
-  marker.append(label);
+  if (options.label) {
+    // Labels sit on the far side of the marker from the centre, so neighbours
+    // on the same ring do not stack on top of each other. The centre marker
+    // has no angle: its label goes above.
+    const angle = item.angle;
+    const distance = options.radius + 8;
+    const cos = angle === undefined ? 0 : Math.cos(angle);
+    const sin = angle === undefined ? -1 : Math.sin(angle);
+    const anchor = cos > 0.35 ? "start" : cos < -0.35 ? "end" : "middle";
+    const lx = (distance * cos).toFixed(1);
+    const ly = (distance * sin + (sin > 0.35 ? 12 : sin < -0.35 ? -4 : 4)).toFixed(1);
+    const label = svgEl("text", {class: "marker-label", x: lx, y: ly, "text-anchor": anchor});
+    label.textContent = options.label;
+    marker.append(label);
+    if (options.sublabel) {
+      const sublabel = svgEl("text", {class: "marker-sublabel", x: lx, y: (Number(ly) + 13).toFixed(1), "text-anchor": anchor});
+      sublabel.textContent = options.sublabel;
+      marker.append(sublabel);
+    }
+  }
   layer.append(marker);
+}
+
+function mapItems(payload, primary, others, rejected) {
+  const primaryIds = new Set(primary.map((match) => match.session_id));
+  const otherIds = new Set(others.map((match) => match.session_id));
+  const rejectedIds = new Set(rejected.map((row) => row.session_id));
+  const items = [];
+  // Backend order across the whole response: matches[] then rejected[].
+  for (const row of [...payload.matches, ...payload.rejected]) {
+    let kind = null;
+    if (primaryIds.has(row.session_id)) kind = "primary";
+    else if (otherIds.has(row.session_id)) kind = "other";
+    else if (rejectedIds.has(row.session_id)) kind = "rejected";
+    if (!kind) continue;
+    if (items.some((item) => item.sessionId === row.session_id)) continue;
+    items.push({
+      sessionId: row.session_id,
+      row,
+      kind,
+      cluster: row.display?.cluster_id || "",
+      structural: row.scores?.structural ?? 0,
+      weight: row.evidence?.preserved_relation_count ?? 0,
+      contradiction: (row.evidence?.contradiction_count ?? 0) > 0,
+      position: backendPosition(payload, row),
+    });
+  }
+  return items;
 }
 
 function renderMap(context, payload, primary, others, rejected) {
@@ -298,68 +601,62 @@ function renderMap(context, payload, primary, others, rejected) {
   connections.replaceChildren();
   markers.replaceChildren();
 
-  const queryLocation = context.location;
-  const queryPoint = queryLocation ? mapPoint(queryLocation) : null;
-  if (queryLocation) {
-    addMarker(markers, queryLocation, {
-      kind: "is-query",
-      sessionId: "active-thought",
-      ariaLabel: `Active thought at ${placeLabel(queryLocation)}`,
-      label: "Active thought",
-      radius: 13,
-      selectable: false,
-    });
-  }
+  const geometry = mapGeometry();
+  const items = mapItems(payload, primary, others, rejected);
+  const {placed, sectorArcs, r0} = layoutMap(items, geometry);
+  renderRings(geometry, r0, sectorArcs);
+  renderSectorKey(sectorArcs);
+
+  const centre = {x: geometry.cx, y: geometry.cy};
+  const topic = context?.presentation?.topic || context?.active_thought?.nodes?.[0]?.label || "Your thought";
+  addMarker(markers, {...centre, sessionId: "active-thought", contradiction: false}, {
+    kind: "is-query",
+    ariaLabel: `Your thought: ${topic}`,
+    label: "Your thought",
+    radius: 11,
+  });
+
+  for (const item of placed) addConnection(connections, centre, item, item);
 
   let unlocatedPrimary = null;
-  primary.forEach((match, index) => {
-    if (!match.display.location) {
-      unlocatedPrimary ||= match;
-      return;
+  for (const item of placed) {
+    const row = item.row;
+    if (item.kind === "primary") {
+      if (!row.display.location) unlocatedPrimary ||= row;
+      addMarker(markers, item, {
+        kind: "is-primary",
+        ariaLabel: `${row.person_pseudonym}, structural ${formatScore(row.scores.structural)}, returned in position ${item.position}`,
+        label: row.person_pseudonym,
+        sublabel: `${row.mode_classification} · ${formatScore(row.scores.structural)}`,
+        index: item.position,
+        radius: 12,
+        onSelect: () => selectMatch(row.session_id),
+      });
+    } else if (item.kind === "other") {
+      addMarker(markers, item, {
+        kind: "is-other",
+        ariaLabel: `Other returned match ${item.position}: ${row.person_pseudonym}, structural ${formatScore(row.scores.structural)}`,
+        label: row.person_pseudonym,
+        sublabel: `${row.mode_classification} · ${formatScore(row.scores.structural)}`,
+        index: item.position,
+        radius: 9,
+        onSelect: () => openDrawerAt(row.session_id),
+      });
+    } else {
+      addMarker(markers, item, {
+        kind: "is-rejected",
+        ariaLabel: `Hard-rejected ${item.position}: ${row.person_pseudonym}, ${row.hard_rejection}`,
+        label: row.person_pseudonym,
+        sublabel: row.hard_rejection,
+        radius: 8,
+        onSelect: () => openDrawerAt(row.session_id),
+      });
     }
-    const point = mapPoint(match.display.location);
-    if (queryPoint) addConnection(connections, queryPoint, point, match.session_id);
-    addMarker(markers, match.display.location, {
-      kind: "is-primary",
-      sessionId: match.session_id,
-      ariaLabel: `${match.person_pseudonym}, ${placeLabel(match.display.location)}`,
-      label: match.person_pseudonym,
-      index: String(index + 1),
-      radius: 11,
-      selectable: true,
-    });
-  });
-
-  others.forEach((match) => {
-    if (!match.display.location) return;
-    addMarker(markers, match.display.location, {
-      kind: "is-other",
-      sessionId: match.session_id,
-      ariaLabel: `Other returned match: ${match.person_pseudonym}`,
-      label: "",
-      radius: 6,
-      selectable: false,
-    });
-  });
-
-  rejected.forEach((match) => {
-    if (!match.display.location) return;
-    const point = mapPoint(match.display.location);
-    if (queryPoint) addConnection(connections, queryPoint, point, match.session_id, true);
-    addMarker(markers, match.display.location, {
-      kind: "is-rejected",
-      sessionId: match.session_id,
-      ariaLabel: `Rejected contradiction: ${match.person_pseudonym}`,
-      label: "",
-      radius: 7,
-      selectable: false,
-    });
-  });
+  }
 
   const unlocated = document.getElementById("unlocated-anchor");
   unlocated.hidden = !unlocatedPrimary;
   if (unlocatedPrimary) setText("unlocated-name", unlocatedPrimary.person_pseudonym);
-  setText("map-status-text", `${primary.length} resonances · backend order intact`);
   document.getElementById("map-status").classList.remove("is-loading");
 }
 
@@ -374,18 +671,18 @@ function renderContradictions(rejected) {
   setText("rejected-count", `${rejected.length} rejected`);
 }
 
-function drawerRow(row, order, rejected = false) {
+function drawerRow(payload, row, rejected = false) {
   const item = el("div", "drawer-row");
   item.dataset.sessionId = row.session_id;
-  item.append(el("span", "drawer-row__order", String(order).padStart(2, "0")));
+  item.append(el("span", "drawer-row__order", backendPosition(payload, row)));
   const copy = el("div");
   copy.append(el("strong", "", `${row.person_pseudonym} · ${row.display.topic}`));
-  copy.append(el("span", "", `${row.mode_classification} · ${placeLabel(row.display.location)}`));
+  copy.append(el("span", "", `${row.mode_classification} · ${row.confidence} · ${placeLabel(row.display.location)}`));
   item.append(copy, el("code", "", rejected ? row.hard_rejection : formatScore(row.scores.structural)));
   return item;
 }
 
-function renderDrawer(others, rejected) {
+function renderDrawer(payload, others, rejected) {
   setText("secondary-count", String(others.length + rejected.length));
   const trigger = document.getElementById("secondary-trigger");
   trigger.disabled = others.length + rejected.length === 0;
@@ -394,8 +691,8 @@ function renderDrawer(others, rejected) {
   const rejectedList = document.getElementById("drawer-rejected");
   matches.replaceChildren();
   rejectedList.replaceChildren();
-  others.forEach((match, index) => matches.append(drawerRow(match, index + 1)));
-  rejected.forEach((match, index) => rejectedList.append(drawerRow(match, index + 1, true)));
+  others.forEach((match) => matches.append(drawerRow(payload, match)));
+  rejected.forEach((match) => rejectedList.append(drawerRow(payload, match, true)));
 }
 
 function updateSelection() {
@@ -416,6 +713,15 @@ function selectMatch(sessionId) {
   renderEvidence(match);
 }
 
+function openDrawerAt(sessionId) {
+  setDrawer(true);
+  document.querySelectorAll(".drawer-row").forEach((row) => {
+    row.classList.toggle("is-highlighted", row.dataset.sessionId === sessionId);
+  });
+  document.querySelector(`.drawer-row[data-session-id="${CSS.escape(sessionId)}"]`)
+    ?.scrollIntoView({block: "center"});
+}
+
 // Everything below is owned by a rendered discovery result. Whenever a result
 // stops being on screen — a failure, or a successful discovery in which nothing
 // cleared the resonance bar — ALL of it has to go. Clearing only the match list
@@ -429,6 +735,8 @@ function clearResults() {
 
   document.getElementById("match-list")?.replaceChildren();
   setText("shown-count", "00 shown");
+  const empty = document.getElementById("matches-empty");
+  if (empty) empty.hidden = true;
 
   setText("evidence-kicker", "Evidence");
   setText("metric-class", "—");
@@ -436,8 +744,11 @@ function clearResults() {
   setText("metric-confidence", "—");
   document.getElementById("mapping-list")?.replaceChildren();
   document.getElementById("relation-chips")?.replaceChildren();
+  document.getElementById("score-list")?.replaceChildren();
   setText("proof-note", "No frontend matching or score calculation.");
 
+  document.getElementById("ring-layer")?.replaceChildren();
+  document.getElementById("sector-key")?.replaceChildren();
   document.getElementById("connection-layer")?.replaceChildren();
   document.getElementById("marker-layer")?.replaceChildren();
   const unlocated = document.getElementById("unlocated-anchor");
@@ -459,6 +770,23 @@ function clearResults() {
     snapshot.disabled = true;
     snapshot.title = "";
   }
+  const banner = document.getElementById("source-banner");
+  if (banner) banner.hidden = true;
+}
+
+// Say what the rows on screen are, once, where the visitor reads them. The
+// replay cards are a genuine accepted capture of an engine response, but the
+// people in them are fixture personas, and a visitor must never mistake them
+// for participants in the live corpus.
+function renderSourceBanner() {
+  const banner = document.getElementById("source-banner");
+  if (!banner) return;
+  if (state.source === "replay") {
+    banner.textContent = "Worked example from the accepted replay fixture: the people shown are example personas, not real participants.";
+    banner.hidden = false;
+  } else {
+    banner.hidden = true;
+  }
 }
 
 // A discovery that returns candidates but none that clear the resonance bar is
@@ -469,14 +797,18 @@ function renderEmpty(payload) {
   clearResults();
   state.payload = payload;
   const rejected = visibleRejected(payload);
+  const others = visibleOtherMatches(payload, []);
   renderContradictions(rejected);
-  renderDrawer(visibleOtherMatches(payload, []), rejected);
+  renderDrawer(payload, others, rejected);
+  renderMap(state.context, payload, [], others, rejected);
+  const empty = document.getElementById("matches-empty");
+  if (empty) empty.hidden = false;
   setText("response-summary", `${payload.matches.length} returned · 0 resonances · ${payload.rejected.length} rejected`);
   setText("evidence-kicker", "No resonance in this corpus");
   setText("evidence-heading", "Nothing cleared the resonance bar");
   setText("evidence-subtitle",
     `${payload.matches.length} candidate${payload.matches.length === 1 ? "" : "s"} came back and every one was refused as a resonance. `
-    + "Open \u201cOther returned results\u201d to inspect them.");
+    + "Open “Other returned results” to inspect them.");
   setText("map-status-text", "0 resonances · every returned candidate was refused");
 
   const snapshotValue = payload.query?.provenance?.corpus_snapshot;
@@ -491,7 +823,7 @@ function renderEmpty(payload) {
   setText("source-note", state.source === "live"
     ? "LIVE · accepted discover_resonance MCP path · no match passed the threshold"
     : "REPLAY · genuine accepted R8 fixture · no match passed the threshold");
-  setText("runtime-badge", state.source === "live" ? "Accepted MCP · local" : "Deterministic · offline");
+  renderSourceBanner();
   document.getElementById("app-shell").dataset.state = "empty";
 }
 
@@ -510,9 +842,11 @@ function renderDiscovery(payload) {
   renderMatches(payload, primary);
   renderMap(state.context, payload, primary, others, rejected);
   renderContradictions(rejected);
-  renderDrawer(others, rejected);
+  renderDrawer(payload, others, rejected);
   renderEvidence(primary[0]);
   updateSelection();
+  setText("map-status-text",
+    `${primary.length} resonance${primary.length === 1 ? "" : "s"} · ${others.length} other returned · ${rejected.length} rejected · engine order kept`);
 
   const snapshot = payload.query.provenance.corpus_snapshot;
   setText("snapshot-short", shortSnapshot(snapshot));
@@ -525,7 +859,7 @@ function renderDiscovery(payload) {
     // engine response, but the people in them are fixture personas, and a
     // visitor must never mistake them for participants in the live corpus.
     : "REPLAY · accepted R8 fixture · example personas, not real participants · analogical / k=15");
-  setText("runtime-badge", state.source === "live" ? "Accepted MCP · local" : "Deterministic · offline");
+  renderSourceBanner();
   document.getElementById("app-shell").dataset.state = "ready";
 }
 
@@ -542,7 +876,7 @@ function setSourceControls(source, loading = false) {
 }
 
 // The visitor's own panel, emptied. `clearResults()` owns the discovery
-// surfaces; this owns the "Active thought" column, which is the surface that
+// surfaces; this owns the "Your thought" panel, which is the surface that
 // used to show the fixture thought to somebody who had shared nothing.
 function clearActiveThought() {
   state.context = null;
@@ -550,11 +884,8 @@ function clearActiveThought() {
   const title = document.getElementById("thought-heading");
   title.replaceChildren(document.createTextNode("Nothing shared with Resonance"));
   setText("thought-caption", "Resonance holds no thought for this visitor.");
-  setText("user-message", "You have not shared a thought yet.");
-  setText("agent-message",
-    "Nothing about you is discoverable, and nothing is compared. Share a thought "
-    + "explicitly and this panel will show exactly what became discoverable.");
   document.getElementById("dna-chain")?.replaceChildren();
+  document.getElementById("dna-relations")?.replaceChildren();
   document.getElementById("declared-context")?.replaceChildren();
   setText("request-mode", CANONICAL_MODE);
   setText("request-k", `k=${CANONICAL_K}`);
@@ -575,7 +906,6 @@ function renderUnshared() {
     + "shown. Connect an agent to this page or to the Resonance MCP connector, "
     + "prepare a thought, read the preview, and confirm the share.");
   setText("source-note", "LIVE · nothing shared by this visitor · no discovery was run");
-  setText("runtime-badge", "Live · nothing shared");
   document.getElementById("app-shell").dataset.state = "unshared";
   setSourceControls(state.source, false);
 }
@@ -586,6 +916,7 @@ function showError(error) {
   // screen next to an error for the current one.
   clearResults();
   setText("response-summary", "—");
+  setText("evidence-kicker", "Discovery unavailable");
   setText("evidence-heading", "No resonance to show");
   setText("evidence-subtitle", error.message);
   setText("map-status-text", `Discovery unavailable: ${error.message}`);
@@ -611,8 +942,8 @@ async function loadSource(source) {
     }
     if (!response.ok) throw new Error(payload.message || payload.error || `HTTP ${response.status}`);
     assertAcceptedDiscovery(payload);
-    // The active-thought panel follows the source: the visitor's own shared
-    // thought on the live product, the labelled fixture thought on replay.
+    // The thought panel follows the source: the visitor's own shared thought on
+    // the live product, the labelled fixture thought on replay.
     if (contextResponse.ok) {
       const context = await contextResponse.json();
       assertAcceptedContext(context);
@@ -635,6 +966,7 @@ function setDrawer(open) {
   backdrop.hidden = !open;
   document.getElementById("secondary-trigger").setAttribute("aria-expanded", String(open));
   if (open) document.getElementById("drawer-close").focus();
+  else document.querySelectorAll(".drawer-row.is-highlighted").forEach((row) => row.classList.remove("is-highlighted"));
 }
 
 let toastTimer;
@@ -686,15 +1018,7 @@ function wireOnboarding() {
     loadSource("replay");
   });
   document.getElementById("onboarding-connect")?.addEventListener("click", () => {
-    // Instant, not smooth, and not by preference: inside this nested scroll
-    // container Chrome silently ignores smooth scrolling. Measured on
-    // 152.0.7977.83 — with `behavior: "smooth"` scrollTop stayed 0 and the
-    // button looked dead; with the default it moves to the panel. Asking for
-    // it in CSS (`scroll-behavior: smooth` on the container) reproduces the
-    // same dead button, because the default then resolves to smooth. A button
-    // that works beats a button that glides.
-    document.getElementById("onboarding-connect-panel")
-      ?.scrollIntoView({block: "start"});
+    document.getElementById("onboarding-connect-panel")?.scrollIntoView({block: "start"});
   });
 
   // Say what is true of THIS browser — but say it about the browser, not about
@@ -736,6 +1060,22 @@ function onConsentState(shared) {
   if (shared === lastShared) return;
   lastShared = shared;
   if (state.source === "live") loadSource("live");
+}
+
+// The map is re-laid out from the state already in hand when the frame
+// changes width (the viewBox switches between wide and square). No request.
+let resizeTimer;
+function onResize() {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (!state.payload) return;
+    const shell = document.getElementById("app-shell").dataset.state;
+    if (shell !== "ready" && shell !== "empty") return;
+    const primary = state.primary;
+    renderMap(state.context, state.payload, primary,
+      visibleOtherMatches(state.payload, primary), visibleRejected(state.payload));
+    updateSelection();
+  }, 120);
 }
 
 async function boot() {
@@ -780,6 +1120,7 @@ async function boot() {
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") setDrawer(false);
     });
+    window.addEventListener("resize", onResize);
 
     const requested = new URL(window.location.href).searchParams.get("source");
     const source = requested === "live" || requested === "replay" ? requested : config.default_source;

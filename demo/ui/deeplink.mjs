@@ -52,7 +52,24 @@ function renderMatch(payload) {
     for (const pair of evidence.top_correspondences || []) {
       const row = document.createElement("div");
       row.className = "mapping-row";
-      row.textContent = `${pair.query_label} ⇄ ${pair.candidate_label}`;
+      const query = document.createElement("div");
+      query.className = "mapping-side";
+      const queryId = document.createElement("small");
+      queryId.textContent = pair.query_node || "";
+      const queryLabel = document.createElement("strong");
+      queryLabel.textContent = pair.query_label || "";
+      query.append(queryId, queryLabel);
+      const arrow = document.createElement("div");
+      arrow.className = "mapping-arrow";
+      arrow.textContent = "↔";
+      const candidate = document.createElement("div");
+      candidate.className = "mapping-side";
+      const candidateId = document.createElement("small");
+      candidateId.textContent = pair.candidate_node || "";
+      const candidateLabel = document.createElement("strong");
+      candidateLabel.textContent = pair.candidate_label || "";
+      candidate.append(candidateId, candidateLabel);
+      row.append(query, arrow, candidate);
       list.appendChild(row);
     }
   }

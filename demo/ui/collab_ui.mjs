@@ -71,7 +71,7 @@ function toggleButton() {
   const status = document.querySelector(".system-status");
   const anchor = status?.querySelector(".source-switch");
   if (status && anchor) anchor.insertAdjacentElement("afterend", toggle);
-  else (status || document.querySelector(".topbar") || document.body).append(toggle);
+  else (status || document.querySelector(".masthead") || document.body).append(toggle);
   return toggle;
 }
 
@@ -93,7 +93,7 @@ function panel() {
   root.append(
     el("div", {className: "collab-header"}, [
       el("div", {}, [
-        el("p", {className: "eyebrow", textContent: "Live product · your account"}),
+        el("p", {className: "eyebrow", textContent: "Your account"}),
         el("h2", {textContent: "Collaboration"}),
       ]),
       close,
@@ -226,6 +226,22 @@ function codeBlock(text) {
   return pre;
 }
 
+function clientList(entries) {
+  // One client per row. The words are the same as before; what changed is that
+  // a reader can find their client without parsing a paragraph.
+  const list = el("dl", {className: "collab-clients"});
+  for (const [name, how, code] of entries) {
+    const row = el("div", {className: "collab-client"});
+    row.append(el("dt", {textContent: name}));
+    const dd = el("dd");
+    if (how) dd.append(document.createTextNode(how));
+    if (code) dd.append(codeBlock(code));
+    row.append(dd);
+    list.append(row);
+  }
+  return list;
+}
+
 function renderConnect() {
   const host = document.getElementById("collab-connect");
   if (!host) return;
@@ -251,12 +267,13 @@ function renderConnect() {
       "That is all it needs. The client discovers OAuth on its own and opens a Resonance " +
       "consent page; approve there and it is connected. You will not be asked to paste a " +
       "key or a token anywhere in this flow."}),
-    el("p", {className: "collab-muted", textContent:
-      "claude.ai: Settings → Connectors → Add custom connector. ChatGPT: Settings → Apps & " +
-      "Connectors → Advanced → Developer mode → Create (Business / Enterprise / Edu). " +
-      "Grok: Connectors → New Connector → Custom. Claude Code: " +
-      `claude mcp add --transport http resonance ${endpoint}. ` +
-      "Cursor / Windsurf / any mcp.json: {\"url\": \"" + endpoint + "\"}."}),
+    clientList([
+      ["claude.ai", "Settings → Connectors → Add custom connector."],
+      ["ChatGPT", "Settings → Apps & Connectors → Advanced → Developer mode → Create (Business / Enterprise / Edu)."],
+      ["Grok", "Connectors → New Connector → Custom."],
+      ["Claude Code", "", `claude mcp add --transport http resonance ${endpoint}`],
+      ["Cursor / Windsurf / any mcp.json", "", `{"url": "${endpoint}"}`],
+    ]),
     el("p", {className: "collab-muted", textContent:
       "Then, in your chat: “Extract the structure of what I’m working on, show me the " +
       "preview, and after I approve it, find who resonates.”"}),

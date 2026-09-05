@@ -14,12 +14,17 @@ import { apiFetch } from "/session.mjs";
 const WORKSPACE_CONTRACT = "resonance-workspace/0.1";
 
 function setStatus(text) {
+  // Whether this browser has WebMCP at all is stated once, by the capability
+  // pill (#webmcp-status); repeating it per module is noise, not information.
+  if (/WebMCP unavailable$/.test(text)) return;
   let node = document.getElementById("workspace-status");
   if (!node) {
     node = document.createElement("span");
     node.id = "workspace-status";
-    node.style.marginLeft = "0.75em";
-    (document.getElementById("header-consent") || document.body).appendChild(node);
+    node.className = "tool-chip";
+    node.setAttribute("role", "status");
+    (document.getElementById("tool-status")
+      || document.querySelector(".system-status") || document.body).appendChild(node);
   }
   node.textContent = text;
 }
