@@ -110,6 +110,7 @@ STATIC = {
     # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
     # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
     "/live_ui.css": ("live_ui.css", "text/css; charset=utf-8"),
+    "/legal.css": ("legal.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/favicon.ico": ("favicon.svg", "image/svg+xml"),
 }
@@ -558,6 +559,29 @@ class ProductHandler(BaseHTTPRequestHandler):
         self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "internal_error",
                               "unexpected product error")
 
+    # Documentation pages a connector directory requires before it will list a
+    # server: Claude rejects a submission outright without a privacy policy, and
+    # OpenAI's form asks for website, support, privacy and terms URLs that
+    # "match the publisher and disclose relevant data handling". They are served
+    # from this origin so the URL a reviewer checks is the URL the tools run on.
+    DOC_PAGES = {
+        "/privacy": "privacy.html",
+        "/terms": "terms.html",
+        "/support": "support.html",
+    }
+
+    def _send_doc_page(self, filename: str) -> None:
+        html = (UI_DIR / filename).read_text(encoding="utf-8")
+        # The contact address is deliberately NOT baked into the repository: it
+        # is the operator's, and publishing someone's address is their decision.
+        # Unset, the page says so plainly rather than showing a plausible
+        # address that nobody reads.
+        contact = (os.environ.get("RESONANCE_CONTACT") or "").strip()
+        html = html.replace("__RESONANCE_CONTACT__", contact
+                            or "not configured on this deployment")
+        html = html.replace("__RESONANCE_ORIGIN__", self._issuer())
+        self._send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
+
     def _initial_app_state(self, params: Mapping[str, list[str]]) -> str:
         """`data-state` to serve in the HTML, before any JavaScript runs.
 
@@ -592,6 +616,22 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/live_shell.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
+            return
+        if path in self.DOC_PAGES:
+            self._send_doc_page(self.DOC_PAGES[path])
+            return
+        if path == "/.well-known/openai-apps-challenge":
+            # OpenAI's app submission proves control of the hosting domain by
+            # serving a token it hands the publisher. The spec is explicit: the
+            # response is ONLY the token — not JSON, not a list. Unset, this is
+            # a 404 rather than an empty 200, so a half-configured deployment
+            # cannot look verified.
+            token = (os.environ.get("RESONANCE_OPENAI_CHALLENGE") or "").strip()
+            if not token:
+                self._send_error_json(HTTPStatus.NOT_FOUND, "not_found",
+                                      "no OpenAI apps challenge token is configured")
+                return
+            self._send_bytes(token.encode("utf-8"), "text/plain; charset=utf-8")
             return
         if path in STATIC:
             filename, content_type = STATIC[path]

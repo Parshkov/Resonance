@@ -227,6 +227,90 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertIn("Continue as your current account", oauth_src)
         self.assertIn('value="current" checked', oauth_src)
 
+    def test_directory_listing_prerequisites_are_served(self):
+        # A connector directory will not list a server without these. Anthropic
+        # rejects a submission outright when the privacy policy is missing, and
+        # OpenAI's form requires website, support, privacy and terms URLs that
+        # "match the publisher and disclose relevant data handling". Serving
+        # them from this origin means the URL a reviewer checks is the URL the
+        # tools actually run on.
+        for path in ("/privacy", "/terms", "/support"):
+            with urlopen(self.base + path, timeout=10) as response:
+                self.assertEqual(response.status, 200, path)
+                self.assertTrue(response.headers.get("Content-Type", "").startswith("text/html"), path)
+                body = response.read().decode()
+            self.assertIn("/legal.css", body, path)
+            self.assertNotIn("__RESONANCE_", body, f"{path} left a placeholder unsubstituted")
+        with urlopen(self.base + "/legal.css", timeout=10) as response:
+            self.assertEqual(response.status, 200)
+
+        # The privacy page has to state the things the policy is judged on.
+        with urlopen(self.base + "/privacy", timeout=10) as response:
+            privacy = response.read().decode()
+        for claim in ("What is stored", "What is not stored", "Retention and removal",
+                      "Who can see what", "Contact"):
+            self.assertIn(claim, privacy)
+        # …and the load-bearing factual claim, which the code must keep true.
+        self.assertIn("not stored", privacy)
+
+        # Unconfigured, the contact says so rather than showing a plausible
+        # address nobody reads.
+        self.assertIn("not configured on this deployment", privacy)
+
+    def test_openai_domain_challenge_is_a_bare_token_or_absent(self):
+        # OpenAI verifies control of the hosting domain by fetching a token it
+        # hands the publisher. Its spec is explicit: return ONLY the token — not
+        # JSON, not a list. Unconfigured it must 404, so a half-configured
+        # deployment cannot look verified.
+        with self.assertRaises(HTTPError) as ctx:
+            urlopen(self.base + "/.well-known/openai-apps-challenge", timeout=10)
+        self.assertEqual(ctx.exception.code, 404)
+
+        import os as _os
+        from src.product import server as product_server
+        previous = _os.environ.get("RESONANCE_OPENAI_CHALLENGE")
+        _os.environ["RESONANCE_OPENAI_CHALLENGE"] = "tok-en_value.123"
+        try:
+            with urlopen(self.base + "/.well-known/openai-apps-challenge", timeout=10) as response:
+                self.assertEqual(response.status, 200)
+                self.assertTrue(response.headers.get("Content-Type", "").startswith("text/plain"))
+                self.assertEqual(response.read(), b"tok-en_value.123")   # bare, no newline
+        finally:
+            if previous is None:
+                _os.environ.pop("RESONANCE_OPENAI_CHALLENGE", None)
+            else:
+                _os.environ["RESONANCE_OPENAI_CHALLENGE"] = previous
+        self.assertIsNotNone(product_server)
+
+    def test_every_remote_tool_carries_the_annotations_directories_require(self):
+        # Anthropic requires a `title` plus the applicable readOnlyHint /
+        # destructiveHint. OpenAI requires readOnlyHint, openWorldHint AND
+        # destructiveHint explicitly specified on every tool. "Explicitly"
+        # means present, not merely defaulted.
+        from src.product.mcp_bridge import TOOLS
+        self.assertEqual(len(TOOLS), 12)
+        writes_visible_to_others = {
+            "resonance_share_thought", "resonance_request_intro",
+            "resonance_respond_intro", "resonance_send_message",
+            "resonance_stop_sharing",
+        }
+        for tool in TOOLS:
+            name = tool["name"]
+            self.assertTrue(tool.get("title"), name)
+            ann = tool["annotations"]
+            for hint in ("readOnlyHint", "destructiveHint", "openWorldHint"):
+                self.assertIn(hint, ann, f"{name} is missing {hint}")
+                self.assertIsInstance(ann[hint], bool, f"{name}.{hint}")
+            # a read-only tool cannot be destructive or change what others see
+            if ann["readOnlyHint"]:
+                self.assertFalse(ann["destructiveHint"], name)
+                self.assertFalse(ann["openWorldHint"], name)
+            # openWorldHint means "changes state other people can see"
+            self.assertEqual(ann["openWorldHint"], name in writes_visible_to_others, name)
+        # only stop_sharing revokes something
+        destructive = {t["name"] for t in TOOLS if t["annotations"]["destructiveHint"]}
+        self.assertEqual(destructive, {"resonance_stop_sharing"})
+
     def test_webmcp_prepare_accepts_the_agents_real_thought(self):
         # Post-release product gap: the browser prepare used to clone the page's
         # flagship thought; an agent must be able to hand over the person's REAL
