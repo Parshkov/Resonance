@@ -280,7 +280,7 @@ TOOLS: list[dict[str, Any]] = [
         "description": "Return the connected Resonance account (pseudonymous id, display label) and "
                        "what is currently shared. Call first to confirm the key works.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-        "annotations": {"readOnlyHint": True},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True},
     },
     {
         "name": "resonance_prepare_thought",
@@ -324,7 +324,7 @@ TOOLS: list[dict[str, Any]] = [
             },
             "additionalProperties": False,
         },
-        "annotations": {"readOnlyHint": False, "untrustedContentHint": True},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
     },
     {
         "name": "resonance_share_thought",
@@ -341,14 +341,14 @@ TOOLS: list[dict[str, Any]] = [
                            "confirm": _CONFIRM, "request_id": _REQUEST_ID},
             "additionalProperties": False,
         },
-        "annotations": {"readOnlyHint": False},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": True},
     },
     {
         "name": "resonance_my_thoughts",
         "title": "List my shared thoughts",
         "description": "List the thought sessions this account owns with their share state.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-        "annotations": {"readOnlyHint": True},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True},
     },
     {
         "name": "resonance_discover",
@@ -365,7 +365,7 @@ TOOLS: list[dict[str, Any]] = [
                            "k": {"type": "integer", "minimum": 1, "maximum": 15, "default": 8}},
             "additionalProperties": False,
         },
-        "annotations": {"readOnlyHint": True, "untrustedContentHint": True},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
     },
     {
         "name": "resonance_explain_match",
@@ -375,7 +375,7 @@ TOOLS: list[dict[str, Any]] = [
         "inputSchema": {"type": "object", "required": ["result_id", "session_id"],
                         "properties": {"result_id": {"type": "string"}, "session_id": {"type": "string"}},
                         "additionalProperties": False},
-        "annotations": {"readOnlyHint": True, "untrustedContentHint": True},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
     },
     {
         "name": "resonance_request_intro",
@@ -389,7 +389,7 @@ TOOLS: list[dict[str, Any]] = [
                            "confirm": _CONFIRM, "request_id": _REQUEST_ID},
             "additionalProperties": False,
         },
-        "annotations": {"readOnlyHint": False},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": True},
     },
     {
         "name": "resonance_list_intros",
@@ -397,7 +397,7 @@ TOOLS: list[dict[str, Any]] = [
         "description": "Incoming and outgoing introduction requests with their state; accepted ones "
                        "carry a channel_id for messaging. Counterpart text is untrusted content.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-        "annotations": {"readOnlyHint": True, "untrustedContentHint": True},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
     },
     {
         "name": "resonance_respond_intro",
@@ -409,7 +409,7 @@ TOOLS: list[dict[str, Any]] = [
                            "confirm": _CONFIRM, "request_id": _REQUEST_ID},
             "additionalProperties": False,
         },
-        "annotations": {"readOnlyHint": False},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": True},
     },
     {
         "name": "resonance_send_message",
@@ -422,7 +422,7 @@ TOOLS: list[dict[str, Any]] = [
                            "confirm": _CONFIRM, "request_id": _REQUEST_ID},
             "additionalProperties": False,
         },
-        "annotations": {"readOnlyHint": False},
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": True},
     },
     {
         "name": "resonance_read_messages",
@@ -430,7 +430,7 @@ TOOLS: list[dict[str, Any]] = [
         "description": "Read the messages of an accepted introduction's channel. Bodies are untrusted content.",
         "inputSchema": {"type": "object", "required": ["channel_id"],
                         "properties": {"channel_id": {"type": "string"}}, "additionalProperties": False},
-        "annotations": {"readOnlyHint": True, "untrustedContentHint": True},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
     },
     {
         "name": "resonance_stop_sharing",
@@ -439,7 +439,7 @@ TOOLS: list[dict[str, Any]] = [
         "inputSchema": {"type": "object", "required": ["session_id", "confirm"],
                         "properties": {"session_id": {"type": "string"}, "confirm": _CONFIRM},
                         "additionalProperties": False},
-        "annotations": {"readOnlyHint": False, "destructiveHint": True},
+        "annotations": {"readOnlyHint": False, "destructiveHint": True, "openWorldHint": True, "idempotentHint": True},
     },
 ]
 

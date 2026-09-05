@@ -1,0 +1,117 @@
+/* Documentation pages (privacy, terms, support). Same token vocabulary as the
+   product page, but a reading layout: one column, generous measure, no chrome.
+   CSP is `default-src 'self'` — system fonts only, no external anything. */
+
+:root {
+  color-scheme: light dark;
+  --paper: #faf8f5;
+  --ink: #1a1815;
+  --ink-2: #4a453e;
+  --ink-3: #7a736a;
+  --line: rgba(26, 24, 21, 0.13);
+  --line-soft: rgba(26, 24, 21, 0.07);
+  --accent: #8a6a45;
+  --code-bg: rgba(26, 24, 21, 0.05);
+  --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0f0e0d;
+    --ink: #f2eee8;
+    --ink-2: #b6afa5;
+    --ink-3: #8b857d;
+    --line: rgba(255, 255, 255, 0.13);
+    --line-soft: rgba(255, 255, 255, 0.07);
+    --accent: #c9b8a0;
+    --code-bg: rgba(255, 255, 255, 0.06);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; background: var(--paper); }
+
+body {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.doc { max-width: 68ch; margin: 0 auto; padding: 40px 22px 72px; }
+
+.doc-brand { margin: 0 0 30px; font-family: var(--serif); font-size: 19px; letter-spacing: -.01em; }
+.doc-brand a { color: var(--ink); text-decoration: none; }
+.doc-brand a:hover { color: var(--accent); }
+
+h1 {
+  margin: 0 0 14px;
+  font-family: var(--serif);
+  font-size: clamp(30px, 4.4vw, 40px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+}
+
+.doc-lede { margin: 0 0 34px; color: var(--ink-2); font-size: 16px; line-height: 1.6; }
+
+h2 {
+  margin: 38px 0 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -.015em;
+}
+
+h3 { margin: 22px 0 6px; font-size: 14px; font-weight: 650; letter-spacing: .01em; color: var(--ink); }
+
+p { margin: 0 0 12px; color: var(--ink-2); }
+p strong, li strong { color: var(--ink); font-weight: 600; }
+em { color: var(--ink); }
+
+ul { margin: 0 0 12px; padding-left: 20px; color: var(--ink-2); }
+li { margin: 0 0 7px; }
+
+.doc-list { margin: 14px 0 0; }
+.doc-list dt { margin-top: 15px; font-weight: 650; color: var(--ink); font-size: 14px; }
+.doc-list dd { margin: 5px 0 0; color: var(--ink-2); }
+
+code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: .88em;
+  overflow-wrap: anywhere;
+}
+
+.doc-code {
+  margin: 12px 0 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--code-bg);
+}
+.doc-code code { padding: 0; background: none; font-size: 14px; }
+
+.contact-value { font-family: var(--mono); font-size: .92em; overflow-wrap: anywhere; }
+
+a { color: var(--accent); text-underline-offset: 2px; }
+
+.doc-foot {
+  margin: 44px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+@media (max-width: 520px) {
+  .doc { padding: 28px 16px 56px; }
+}

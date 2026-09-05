@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — Resonance</title>
+  <link rel="stylesheet" href="/legal.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main class="doc">
+  <p class="doc-brand"><a href="/">Resonance</a></p>
+  <h1>Support</h1>
+  <p class="doc-lede">How to connect a chat, what to do when something does not
+    work, and how to reach a person.</p>
+
+  <h2>Connecting a chat</h2>
+  <p>Give your client one address and nothing else:</p>
+  <p class="doc-code"><code id="mcp-endpoint">__RESONANCE_ORIGIN__/mcp</code></p>
+  <p>The client discovers OAuth by itself and opens the Resonance consent page.
+    You will never be asked to paste a key or a token; if something asks you for one,
+    it is not this flow.</p>
+  <dl class="doc-list">
+    <dt>Claude</dt><dd>Settings → Connectors → Add custom connector → paste the URL.</dd>
+    <dt>ChatGPT</dt><dd>Settings → Apps &amp; Connectors → Advanced → Developer mode → Create → paste the URL, authentication OAuth → Scan tools. Requires a Business, Enterprise or Edu workspace.</dd>
+    <dt>Grok</dt><dd>Connectors → New Connector → Custom → paste the URL.</dd>
+    <dt>Claude Code</dt><dd><code>claude mcp add --transport http resonance __RESONANCE_ORIGIN__/mcp</code></dd>
+    <dt>Cursor, Windsurf, any <code>mcp.json</code></dt><dd><code>{"url": "__RESONANCE_ORIGIN__/mcp"}</code></dd>
+  </dl>
+
+  <h2>Common situations</h2>
+  <dl class="doc-list">
+    <dt>Discovery says a share is required</dt>
+    <dd>Nothing of yours is discoverable yet. Prepare a thought, read the preview,
+      and confirm the share; then run discovery again. This is the service refusing
+      to search on your behalf before you have agreed to take part.</dd>
+
+    <dt>Discovery returns candidates but no resonances</dt>
+    <dd>Candidates came back and none cleared the bar. That is an answer, not a
+      failure: the engine will not advertise a match it cannot evidence.</dd>
+
+    <dt>The page says <code>WebMCP · unavailable</code></dt>
+    <dd>Your browser does not expose <code>document.modelContext</code>. That is the
+      browser, not the service. Chrome 152 exposes it when started with
+      <code>--enable-features=WebMCP</code>. The connectors above need no such thing.</dd>
+
+    <dt>A connected client asks you to authorise again</dt>
+    <dd>Re-approving is harmless. If you want the two surfaces to be one account,
+      choose “Continue as your current account” on the consent page rather than a new
+      guest.</dd>
+
+    <dt>You want something removed</dt>
+    <dd>Revoke from your chat with <code>resonance_stop_sharing</code>, or from the
+      Collaboration panel on the site. Revoking takes effect immediately. To remove
+      the account itself, ask below.</dd>
+  </dl>
+
+  <h2>Reporting a problem</h2>
+  <p>For a bug or a question, open an issue in the public repository, or write to the
+    contact below. For anything involving security or another person's data, use the
+    contact rather than a public issue.</p>
+  <p id="contact-line">Contact: <span class="contact-value">__RESONANCE_CONTACT__</span></p>
+
+  <p class="doc-foot"><a href="/">Back to Resonance</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p>
+</main>
+</body>
+</html>
