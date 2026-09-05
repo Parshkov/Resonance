@@ -29,6 +29,7 @@ from typing import Any, Mapping
 from urllib.parse import parse_qs, urlparse
 
 from src.identity import IdentityService, R11IdentityBackend
+from src.identity.service import ACCOUNT_IDENTITY_LINKED
 from src.identity.models import (
     AuthenticationError,
     AuthorizationError,
@@ -239,6 +240,84 @@ def startup_purge_sessions(runtime: "ProductRuntime",
     return result
 
 
+def startup_purge_unsigned(runtime: "ProductRuntime",
+                           environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: retire every account nobody ever signed into.
+
+    ``RESONANCE_PURGE_UNSIGNED=report`` counts and prints; ``=1`` carries it out.
+
+    This applies the product's own rule to what came before it. Resonance
+    introduces people to each other, so an account has to belong to someone who
+    can be recognised on return and reached when a match appears. An account
+    with no verified sign-in behind it can be neither. Leaving its thoughts
+    discoverable is worse than an empty corpus: a real participant is shown a
+    resonance with someone who can never accept an introduction — the service
+    inventing a person.
+
+    `purge-demo` cannot help here, because it selects on `record_kind` and these
+    are genuine `volunteer` rows left by acceptance runs. The distinction that
+    matters is not what kind of row it is, but whether a person stands behind it.
+
+    An account is spared when the identity log carries a linked provider
+    identity for it, and when its id is listed in ``RESONANCE_PURGE_KEEP``.
+    Prints ids and counts only — never a topic, a label or any thought content.
+    Idempotent: a second run finds nothing left to do.
+    """
+    environ = os.environ if environ is None else environ
+    mode = (environ.get("RESONANCE_PURGE_UNSIGNED") or "").strip().lower()
+    if mode not in {"1", "true", "yes", "report", "dry-run"}:
+        return None
+    dry_run = mode in {"report", "dry-run"}
+    keep = {token for token in
+            (environ.get("RESONANCE_PURGE_KEEP") or "").replace(",", " ").split()
+            if token}
+
+    identity = runtime.identity
+    signed_in = {
+        event.user_id for event in identity.backend.list_identity_events()
+        if event.event_type == ACCOUNT_IDENTITY_LINKED and event.user_id
+    }
+    sessions = [row for row in runtime.live.repo.list_sessions()
+                if getattr(row, "deleted_at", None) is None]
+    doomed_sessions: list[str] = []
+    doomed_owners: set[str] = set()
+    for row in sessions:
+        session_id = str(getattr(row, "session_id", "") or "")
+        owner = identity.policy_source.owner_of("session", session_id)
+        if not owner or owner in signed_in or owner in keep or session_id in keep:
+            continue
+        doomed_sessions.append(session_id)
+        doomed_owners.add(owner)
+
+    result: dict[str, Any] = {
+        "dry_run": dry_run,
+        "sessions_considered": len(sessions),
+        "accounts_signed_in": len(signed_in),
+        "sessions_to_delete": len(doomed_sessions),
+        "accounts_to_revoke": len(doomed_owners),
+        "kept_by_request": sorted(keep),
+    }
+    if not dry_run and doomed_sessions:
+        for session_id in doomed_sessions:
+            runtime.live.delete_session(session_id, rebuild=False)
+        for user_id in sorted(doomed_owners):
+            try:
+                runtime.live.revoke_user(user_id)
+            except Exception as exc:  # noqa: BLE001 - report, never abort the boot
+                print(f"purge-unsigned: could not revoke {user_id} "
+                      f"({exc.__class__.__name__})")
+        runtime.live.rebuild_index()
+        result["deleted"] = len(doomed_sessions)
+    print(f"purge-unsigned: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
+          f"sessions_considered={result['sessions_considered']} "
+          f"accounts_signed_in={result['accounts_signed_in']} "
+          f"sessions_to_delete={result['sessions_to_delete']} "
+          f"accounts_to_revoke={result['accounts_to_revoke']} "
+          f"kept={len(keep)} "
+          f"(RESONANCE_PURGE_UNSIGNED set; unset it after this deploy)")
+    return result
+
+
 def build_runtime(
     db_path: str = ":memory:",
     *,
@@ -368,7 +447,19 @@ class ProductHandler(BaseHTTPRequestHandler):
         # allowed browser origin is https://, the cookie must never travel over
         # http. Local http://127.0.0.1 runs and tests keep the plain form.
         secure = "; Secure" if self._secure_cookies() else ""
-        return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Strict; Path=/{secure}")
+        # Lax, not Strict. Resonance is reached through cross-site top-level
+        # navigations by design: a chat client sends the browser from claude.ai
+        # or chatgpt.com to /oauth/authorize. Under Strict the session cookie
+        # was not sent on that navigation, so the consent page could not see
+        # that this browser was already signed in, and every client connection
+        # bound to a separate account — the same person split across surfaces,
+        # which is precisely what this product cannot afford.
+        #
+        # Lax is safe here because the cookie is not what authorises writes.
+        # Every state-changing request is a POST carrying an X-Resonance-CSRF
+        # token checked against the session, with the Origin checked against
+        # the allowlist; Lax withholds the cookie from cross-site POSTs anyway.
+        return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Lax; Path=/{secure}")
 
     def _security_kwargs(self) -> dict[str, Any]:
         return {
@@ -1149,6 +1240,7 @@ def main(argv: list[str] | None = None) -> None:
                             seed=seed)
     startup_purge_demo(runtime)
     startup_purge_sessions(runtime)
+    startup_purge_unsigned(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     # The startup log names the FIRST declared --origin; per-request metadata
     # still follows the host actually addressed (see `_issuer`).

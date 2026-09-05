@@ -284,4 +284,4 @@ class AuthMount:
 
     def _cleared_session_cookie(self) -> str:
         flag = "; Secure" if self.secure_cookies else ""
-        return f"resonance_token=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0{flag}"
+        return f"resonance_token=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0{flag}"
