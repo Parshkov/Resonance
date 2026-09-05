@@ -56,6 +56,7 @@ from src.persistence.seed import seed_r7
 from src.collaboration import CollaborationError
 from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
+from src.product import authorship as authorship_rule
 from src.product.service import LiveProductService, ProductError, StaleResultError
 from src.product.mcp_bridge import (
     BridgeError,
@@ -1081,6 +1082,15 @@ class ProductHandler(BaseHTTPRequestHandler):
         security = self._security_kwargs()
 
         if path in {"/api/product/prepare", "/api/webmcp/prepare"}:
+            if path == "/api/webmcp/prepare":
+                # An assistant is driving the page here, exactly as it drives
+                # the MCP bridge, so it owes the same answer: whose reasoning
+                # is this? /api/product/prepare is the person's own click on
+                # their own page, and has nobody to declare.
+                try:
+                    authorship_rule.require(body)
+                except authorship_rule.AuthorshipError as exc:
+                    raise IngestionError(str(exc)) from exc
             intent_raw = body.get("share_intent") or {}
             intent = ShareIntent(
                 share_display_profile=bool(intent_raw.get("share_display_profile", True)),

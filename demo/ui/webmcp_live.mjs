@@ -154,9 +154,14 @@ const tools = [
     title: "Prepare the person's thought for sharing",
     description: "Create a private durable draft of the person's REAL reasoning: pass `thought` (a labelled causal graph you extracted from the conversation — preferred) or `context` (raw text, ≤ 4000 chars, for the deterministic cue extractor). Without either, the thought currently visible on the page is used. The text is never retained; nothing becomes discoverable yet.",
     inputSchema: {
-      type: "object", required: ["request_id"],
+      type: "object", required: ["request_id", "authorship"],
       properties: {
         request_id: REQUEST_ID_PROPERTY,
+        authorship: {
+          type: "string",
+          enum: ["their_own_words", "their_words_reorganised", "i_proposed_it"],
+          description: "Where this reasoning came from. `their_own_words`: they said it, you copied it. `their_words_reorganised`: their claims, put in order by you, nothing added. `i_proposed_it`: you supplied the shape and they agreed — this is REFUSED, because it would index your reasoning under their name. Ask them to say it in their own words and start again with those.",
+        },
         note: {type: "string", maxLength: 500, description: "Optional private preparation note."},
         thought: {
           type: "object", required: ["nodes", "relations"],
@@ -188,7 +193,8 @@ const tools = [
     },
     annotations: {readOnlyHint: false, untrustedContentHint: true},
     execute: async (input) => {
-      const payload = {request_id: input?.request_id || "", note: input?.note || ""};
+      const payload = {request_id: input?.request_id || "", note: input?.note || "",
+                       authorship: input?.authorship || ""};
       if (input?.thought !== undefined) payload.thought = input.thought;
       if (input?.context) payload.context = input.context;
       return executeWrite("prepare", "/api/webmcp/prepare", payload);

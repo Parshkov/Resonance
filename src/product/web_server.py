@@ -32,6 +32,7 @@ from src.ingestion.identity import (
     INGESTION_SHARED,
 )
 from src.ingestion.service import ShareIntent
+from src.product import authorship as authorship_rule
 from src.product.mcp_bridge import (
     BridgeError, _has_usable_structure, _insufficient_structure_message, _slug,
     _structure_summary, build_thought_dna,
@@ -496,6 +497,13 @@ class WebHandler(ProductHandler):
         security["client_id"] = "live-browser-webmcp"
 
         if operation == "prepare":
+            # An assistant drives this surface through the browser, so it owes
+            # the same answer the MCP bridge asks for: whose reasoning is this?
+            # Enforcing it in one place and not the other is not enforcing it.
+            try:
+                authorship_rule.require(body)
+            except authorship_rule.AuthorshipError as exc:
+                raise ValueError(str(exc)) from exc
             intent = ShareIntent(
                 share_display_profile=True,
                 share_coarse_location=False,

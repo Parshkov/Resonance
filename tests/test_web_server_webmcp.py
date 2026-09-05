@@ -196,7 +196,7 @@ class WebServerWebMCPTests(unittest.TestCase):
                              {"id": "n2", "label": "amplified load", "role": "outcome"}],
                    "relations": [{"source": "n0", "target": "n1", "type": "causes"},
                                  {"source": "n1", "target": "n2", "type": "causes"}]}
-        client.request("POST", "/api/webmcp/prepare", {"request_id": "paint-1", "thought": thought})
+        client.request("POST", "/api/webmcp/prepare", {"authorship": "their_own_words", "request_id": "paint-1", "thought": thought})
         _, preview, _ = client.request("GET", "/api/webmcp/preview")
         client.request("POST", "/api/webmcp/share", {"request_id": "paint-2", "confirm": True,
                                                      "confirmation_token": preview["confirmation_token"]})
@@ -305,6 +305,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         client = Client(self.base)
         client.guest()
         client.request("POST", "/api/webmcp/prepare", {
+            "authorship": "their_own_words",
             "request_id": "name-1",
             "context": ("Delivery pressure causes shortcuts. Shortcuts cause rework. "
                         "A protected slack week prevents shortcuts.")})
@@ -372,6 +373,46 @@ class WebServerWebMCPTests(unittest.TestCase):
         destructive = {t["name"] for t in TOOLS if t["annotations"]["destructiveHint"]}
         self.assertEqual(destructive, {"resonance_stop_sharing"})
 
+    def test_the_browser_surface_must_also_say_whose_reasoning_this_is(self):
+        """The rule is not a rule if only one way in enforces it.
+
+        An assistant driving the page through WebMCP is the same assistant that
+        drives the MCP bridge, and it owes the same answer. It was asked on the
+        bridge and not here, so anything the assistant framed itself could
+        still be indexed under a person's name by going through the browser.
+        """
+        client = Client(self.base)
+        client.guest()
+        thought = {
+            "topic": "Queue depth hides a slow consumer", "domain": "distributed-systems",
+            "nodes": [
+                {"id": "b0", "label": "slow consumer", "role": "problem"},
+                {"id": "b1", "label": "growing queue depth", "role": "state"},
+                {"id": "b2", "label": "delayed alerting", "role": "outcome"},
+            ],
+            "relations": [
+                {"source": "b0", "target": "b1", "type": "causes"},
+                {"source": "b1", "target": "b2", "type": "causes"},
+            ],
+        }
+        for payload, why in (
+            ({"request_id": "who-1", "thought": thought}, "authorship omitted"),
+            ({"request_id": "who-2", "thought": thought,
+              "authorship": "i_proposed_it"}, "the assistant's own framing"),
+            ({"request_id": "who-3", "thought": thought,
+              "authorship": "probably_theirs"}, "an invented value"),
+        ):
+            with self.subTest(why):
+                with self.assertRaises(HTTPError) as caught:
+                    client.request("POST", "/api/webmcp/prepare", payload)
+                self.assertEqual(caught.exception.code, 400)
+
+        _, prepared, _ = client.request(
+            "POST", "/api/webmcp/prepare",
+            {"request_id": "who-4", "thought": thought,
+             "authorship": "their_words_reorganised"})
+        self.assertFalse(prepared["discoverable"])
+
     def test_webmcp_prepare_accepts_the_agents_real_thought(self):
         # Post-release product gap: the browser prepare used to clone the page's
         # flagship thought; an agent must be able to hand over the person's REAL
@@ -393,7 +434,7 @@ class WebServerWebMCPTests(unittest.TestCase):
             ],
         }
         _, prepared, _ = client.request("POST", "/api/webmcp/prepare",
-                                        {"request_id": "real-1", "thought": thought})
+                                        {"authorship": "their_own_words", "request_id": "real-1", "thought": thought})
         self.assertFalse(prepared["discoverable"])
         self.assertEqual(prepared["input_kind"], "agent_structured")
         self.assertEqual(prepared["source_retention"], "not_retained")
@@ -406,10 +447,10 @@ class WebServerWebMCPTests(unittest.TestCase):
                          "distributed-systems")
         # same request_id + same input replays; different input conflicts
         _, again, _ = client.request("POST", "/api/webmcp/prepare",
-                                     {"request_id": "real-1", "thought": thought})
+                                     {"authorship": "their_own_words", "request_id": "real-1", "thought": thought})
         self.assertEqual(again["draft_id"], prepared["draft_id"])
         with self.assertRaises(HTTPError) as ctx:
-            client.request("POST", "/api/webmcp/prepare", {"request_id": "real-1", "context": "x"})
+            client.request("POST", "/api/webmcp/prepare", {"authorship": "their_own_words", "request_id": "real-1", "context": "x"})
         self.assertEqual(ctx.exception.code, 409)
 
     def test_context_follows_the_source_after_a_real_share(self):
@@ -434,7 +475,7 @@ class WebServerWebMCPTests(unittest.TestCase):
                              {"id": "b2", "label": "empty shelves", "role": "outcome"}],
                    "relations": [{"source": "b0", "target": "b1", "type": "causes"},
                                  {"source": "b1", "target": "b2", "type": "causes"}]}
-        client.request("POST", "/api/webmcp/prepare", {"request_id": "ctx-1", "thought": thought})
+        client.request("POST", "/api/webmcp/prepare", {"authorship": "their_own_words", "request_id": "ctx-1", "thought": thought})
         _, preview, _ = client.request("GET", "/api/webmcp/preview")
         client.request("POST", "/api/webmcp/share", {"request_id": "ctx-2", "confirm": True,
                                                      "confirmation_token": preview["confirmation_token"]})
@@ -451,6 +492,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         client = Client(self.base)
         client.guest()
         _, prepared, _ = client.request("POST", "/api/webmcp/prepare", {
+            "authorship": "their_own_words",
             "request_id": "raw-1",
             "context": "A partial outage causes synchronized client retries. The retries cause "
                        "request amplification, which leads to cascading saturation. Jittered "
@@ -460,6 +502,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         self.assertEqual(prepared["source_retention"], "not_retained")
         with self.assertRaises(HTTPError) as ctx:
             client.request("POST", "/api/webmcp/prepare", {
+                "authorship": "their_own_words",
                 "request_id": "bad-1",
                 "thought": {"nodes": [{"label": "a", "role": "vibe"}, {"label": "b", "role": "state"}],
                             "relations": []}})
@@ -469,7 +512,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         self.assertIn("role must be one of", payload["message"])
         with self.assertRaises(HTTPError) as ctx:
             client.request("POST", "/api/webmcp/prepare",
-                           {"request_id": "both-1", "context": "x", "thought": {"nodes": [], "relations": []}})
+                           {"authorship": "their_own_words", "request_id": "both-1", "context": "x", "thought": {"nodes": [], "relations": []}})
         self.assertEqual(ctx.exception.code, 400)
         # implicit prose: the accepted extractor abstains; the product must not
         # leave an empty shareable draft behind but tell the agent what to pass
@@ -477,6 +520,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         client.guest()
         with self.assertRaises(HTTPError) as ctx:
             client.request("POST", "/api/webmcp/prepare", {
+                "authorship": "their_own_words",
                 "request_id": "implicit-1",
                 "context": "The upstream was slow all week. Thousands of clients noticed timeouts. "
                            "The whole tier ended up saturated by Friday."})
@@ -495,15 +539,15 @@ class WebServerWebMCPTests(unittest.TestCase):
         text = ("A partial outage causes synchronized client retries. The retries cause "
                 "request amplification, which leads to cascading saturation.")
         first = Client(self.base); first.guest()
-        _, one, _ = first.request("POST", "/api/webmcp/prepare", {"request_id": "same-1", "context": text})
+        _, one, _ = first.request("POST", "/api/webmcp/prepare", {"authorship": "their_own_words", "request_id": "same-1", "context": text})
         _, preview, _ = first.request("GET", "/api/webmcp/preview")
         first.request("POST", "/api/webmcp/share", {"request_id": "same-2", "confirm": True,
                                                     "confirmation_token": preview["confirmation_token"]})
         first.request("POST", "/api/webmcp/consent", {"request_id": "same-3", "shared": False})
-        _, again, _ = first.request("POST", "/api/webmcp/prepare", {"request_id": "same-4", "context": text})
+        _, again, _ = first.request("POST", "/api/webmcp/prepare", {"authorship": "their_own_words", "request_id": "same-4", "context": text})
         self.assertNotEqual(again["draft_id"], one["draft_id"])
         second = Client(self.base); second.guest()
-        _, other, _ = second.request("POST", "/api/webmcp/prepare", {"request_id": "same-1", "context": text})
+        _, other, _ = second.request("POST", "/api/webmcp/prepare", {"authorship": "their_own_words", "request_id": "same-1", "context": text})
         self.assertFalse(other["discoverable"])
 
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
@@ -524,6 +568,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         client.guest()
 
         _, prepared, _ = client.request("POST", "/api/webmcp/prepare", {
+            "authorship": "their_own_words",
             "request_id": "flow-prepare-1", "thought": FLOW_THOUGHT,
         })
         self.assertFalse(prepared["discoverable"])
@@ -576,7 +621,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         client.guest()
         with self.assertRaises(HTTPError) as ctx:
             client.request("POST", "/api/webmcp/prepare",
-                           {"request_id": "empty-1", "note": "no content"})
+                           {"authorship": "their_own_words", "request_id": "empty-1", "note": "no content"})
         self.assertEqual(ctx.exception.code, 400)
         payload = json.loads(ctx.exception.read().decode())
         self.assertEqual(payload["error"], "validation_failed")
@@ -587,7 +632,7 @@ class WebServerWebMCPTests(unittest.TestCase):
     def test_webmcp_operation_receipt_reconciles_same_process_retry(self):
         client = Client(self.base)
         client.guest()
-        body = {"request_id": "idempotent-prepare", "thought": FLOW_THOUGHT}
+        body = {"authorship": "their_own_words", "request_id": "idempotent-prepare", "thought": FLOW_THOUGHT}
         _, first, _ = client.request("POST", "/api/webmcp/prepare", body)
         _, second, _ = client.request("POST", "/api/webmcp/prepare", body)
         self.assertEqual(first, second)

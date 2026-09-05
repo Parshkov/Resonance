@@ -156,9 +156,14 @@ const tools = [
     description: "Create a private, non-discoverable draft from the current Resonance thought. This does not share or index it. Supply a stable request_id and reuse it if the tool call is retried.",
     inputSchema: {
       type: "object",
-      required: ["request_id"],
+      required: ["request_id", "authorship"],
       properties: {
         request_id: REQUEST_ID_PROPERTY,
+        authorship: {
+          type: "string",
+          enum: ["their_own_words", "their_words_reorganised", "i_proposed_it"],
+          description: "Where this reasoning came from. Here the draft is built from what the person wrote on the page, so `their_own_words` is normally the honest answer. `i_proposed_it` is REFUSED: sharing a shape you supplied would index your reasoning under their name.",
+        },
         note: {type: "string", maxLength: 500, description: "Optional private note describing the draft."},
       },
       additionalProperties: false,
@@ -166,6 +171,7 @@ const tools = [
     annotations: {readOnlyHint: false},
     execute: async (input, options) => executeWrite("prepare", "/api/webmcp/prepare", {
       request_id: input?.request_id || "",
+      authorship: input?.authorship || "",
       note: input?.note || "",
     }, options),
   },

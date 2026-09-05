@@ -124,7 +124,8 @@ class Person:
 
     def share(self, thought, tag: str) -> str:
         status, prepared = self.call("POST", "/api/webmcp/prepare",
-                                     {"request_id": f"{tag}-prepare", "thought": thought})
+                                     {"request_id": f"{tag}-prepare", "thought": thought,
+                                      "authorship": "their_own_words"})
         if status != 200:
             raise Failure(f"{self.name} could not prepare: {status} {prepared}")
         status, preview = self.call("GET", "/api/webmcp/preview")

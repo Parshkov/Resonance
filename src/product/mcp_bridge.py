@@ -231,6 +231,8 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 # Tool table
 # ---------------------------------------------------------------------------
 
+from src.product import authorship as authorship_rule
+
 AUTHORSHIP = {
     "type": "string",
     "enum": ["their_own_words", "their_words_reorganised", "i_proposed_it"],
@@ -820,11 +822,7 @@ class RemoteMCPBridge:
             "freshness": self.product.freshness(),
         }
 
-    AUTHORSHIP_ACCEPTED = {
-        "their_own_words": "You said this. Your assistant copied it, it did not write it.",
-        "their_words_reorganised":
-            "Your claims, put in order by your assistant. Nothing was added.",
-    }
+    AUTHORSHIP_ACCEPTED = authorship_rule.ACCEPTED
 
     def tool_prepare_thought(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         actor = self._actor(token)
@@ -909,36 +907,14 @@ class RemoteMCPBridge:
     def _require_authorship(self, arguments: Mapping[str, Any]) -> str:
         """Make the assistant say whose reasoning this is, and refuse its own.
 
-        A long chat is half the assistant's words, and the assistant is the same
-        one for everybody. Indexing a shape it authored would match this person
-        to its own habits — and, because those habits are shared across every
-        conversation it has, would eventually match everyone to everyone. The
-        signal the product depends on is that the reasoning is one person's.
-
-        Nothing here can verify whose words they were: the conversation is never
-        sent to this service, by design. What it can do is make the claim
-        explicit, refuse the one that admits the assistant supplied the shape,
-        and hand the accepted claim back so the person is shown it before they
-        share and can say "no, that was your idea".
+        The rule itself lives in src.product.authorship, because the browser's
+        WebMCP surface has to apply the same one. All this does is translate
+        its refusal into the bridge's error shape.
         """
-        stated = str(arguments.get("authorship") or "").strip()
-        if not stated:
-            raise BridgeError(
-                "validation_failed",
-                "state authorship: their_own_words, their_words_reorganised, or "
-                "i_proposed_it. A chat is half your words, and only theirs can be shared.")
-        if stated == "i_proposed_it":
-            raise BridgeError(
-                "validation_failed",
-                "A shape you proposed cannot be shared as theirs — it would introduce this "
-                "person to people who match your reasoning, not to people who match them. "
-                "Ask them to say it in their own words, then prepare again with those.")
-        if stated not in self.AUTHORSHIP_ACCEPTED:
-            raise BridgeError(
-                "validation_failed",
-                f"unknown authorship {stated!r}; use their_own_words or "
-                "their_words_reorganised")
-        return stated
+        try:
+            return authorship_rule.require(arguments)
+        except authorship_rule.AuthorshipError as exc:
+            raise BridgeError("validation_failed", str(exc)) from exc
 
     def tool_share_thought(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)
