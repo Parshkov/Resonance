@@ -71,6 +71,25 @@ def check_alphabets_do_not_mix() -> list[str]:
     return problems
 
 
+def check_no_term_is_listed_twice() -> list[str]:
+    """A term repeated inside one class is a merge scar, not a synonym.
+
+    It changes no behaviour, which is why it survives: the second copy is
+    invisible to matching and to anyone reading a 200-term line. It is worth
+    catching because it is the shape a mistake takes when two people edit the
+    same class -- and the next such edit might duplicate a term into the wrong
+    class instead.
+    """
+    problems = []
+    for name, (_hint, terms) in CONCEPTS.items():
+        seen: set[str] = set()
+        for term in terms:
+            if term in seen:
+                problems.append(f"{name}: {term!r} listed twice")
+            seen.add(term)
+    return problems
+
+
 def english_signature() -> dict[str, tuple[str, ...]]:
     return {label: tuple(sorted(concepts(label))) for label in ENGLISH_PROBES}
 
@@ -115,6 +134,11 @@ def main() -> int:
     failures = check_alphabets_do_not_mix()
     for problem in failures:
         print(f"MIXED ALPHABET: {problem}")
+
+    repeats = check_no_term_is_listed_twice()
+    failures.extend(repeats)
+    for problem in repeats:
+        print(f"DUPLICATE TERM: {problem}")
 
     if args.baseline and not args.baseline.exists():
         failures.append(f"no baseline at {args.baseline}; English cannot be checked")
