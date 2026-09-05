@@ -36,12 +36,11 @@ from src.product import authorship as authorship_rule
 from src.product import phrasing
 from src.product.mcp_bridge import (
     BridgeError, _PRIVATE, _SHARED, _WITHDRAWN, _coarse_location,
-    _has_usable_structure, _in_state,
+    _has_usable_structure, _in_state, current_shared_session, when_last_shared,
     _insufficient_structure_message, _slug, _structure_summary, build_thought_dna,
 )
 from src.product.service import LOCATION_NOTE
 from src.identity.models import AuthenticationError
-from src.identity.service import CONSENT_SET
 from src.persistence.errors import PersistenceConflictError
 from src.product import oauth_mount
 from src.workspaces.topics import CONTRIBUTIONS_TABLE
@@ -144,11 +143,14 @@ def _latest_prepared_draft(product, token: str) -> str | None:
 
 
 def _owned_live_session(product, token: str) -> str | None:
-    rows = product.owned_sessions(token)
-    discoverable = [row for row in rows if row.get("share_state") == "discoverable"]
-    if not discoverable:
-        return None
-    return str(discoverable[-1].get("session_id") or "") or None
+    """The thought this page is about, or None when nothing is discoverable.
+
+    One rule for both halves: the chat's `resonance_discover` defaults to the
+    same thought, so the two never disagree about which of a person's thoughts
+    is "yours". The rule itself, and why it is "most recently shared" rather
+    than "last row from the store", is with `current_shared_session`.
+    """
+    return current_shared_session(product, token)
 
 
 def _has_shared(product, token: str) -> bool:
@@ -281,29 +283,6 @@ def _live_context(product, token: str) -> dict[str, Any] | None:
 MINE_CONTRACT = "resonance-mine/0.1"
 
 
-def _when_last_shared(product, user_id: str) -> dict[str, str]:
-    """When each of this person's thoughts last became discoverable.
-
-    The session record remembers when it was prepared and when it was
-    withdrawn, but not when it was shared: sharing is a consent decision, and
-    those live in the identity log. The last consent that said "discoverable"
-    is the moment a person means by "when I shared it".
-    """
-    moments: dict[str, str] = {}
-    for event in product.identity.backend.list_identity_events():
-        if event.user_id != user_id or not event.session_id:
-            continue
-        became_discoverable = event.event_type == INGESTION_SHARED or (
-            event.event_type == CONSENT_SET
-            and event.payload.get("share_thought_dna") is True)
-        if not became_discoverable:
-            continue
-        session_id = str(event.session_id)
-        if str(event.created_at) > moments.get(session_id, ""):
-            moments[session_id] = str(event.created_at)
-    return moments
-
-
 def _everything_here(product, token: str) -> dict[str, Any]:
     """Everything this person has here, each in one of three states.
 
@@ -331,7 +310,7 @@ def _everything_here(product, token: str) -> dict[str, Any]:
                          ("private", _PRIVATE)):
         for session_id in _in_state(rows, bucket):
             state_of.setdefault(str(session_id), word)
-    shared_at = _when_last_shared(product, actor.user_id)
+    shared_at = when_last_shared(product, actor.user_id)
 
     thoughts: list[dict[str, Any]] = []
     for row in rows:
@@ -1135,9 +1114,15 @@ class WebHandler(ProductHandler):
         else:
             if session_id:
                 product.revoke_session(token, session_id, confirmed=True, **security)
+            # This withdraws the one thought the page is about, and the fields
+            # above say so about that thought. What the person is then told
+            # must also be true of the person: how many of their thoughts are
+            # still out there is a separate fact, carried separately, and the
+            # sentence is built from both.
             wire = {"contract_version": WEBMCP_CONTRACT,
                     "session_id": session_id, "shared": False,
-                    "revoked": True, "discoverable": False}
+                    "revoked": True, "discoverable": False,
+                    "still_discoverable": len(_in_state(product.owned_sessions(token), _SHARED))}
         self._operation_finish(subject, operation, request_id, fingerprint,
                                _spoken(operation, wire))
 

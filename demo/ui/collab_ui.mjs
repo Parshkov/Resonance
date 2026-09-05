@@ -29,7 +29,7 @@
  * it is visibly marked as somebody else's words.
  */
 
-import { apiFetch, getCsrf } from "/session.mjs";
+import { apiFetch } from "/session.mjs";
 
 let requestCounter = 0;
 let refreshTimer = null;
@@ -56,9 +56,19 @@ function el(tag, props = {}, children = []) {
 
 function byId(id) { return document.getElementById(id); }
 
+// A request id names one intent, so that a retry of the same write (session.mjs
+// retries after a rotated CSRF token) is answered once and not done twice.
+// It used to be the counter plus a slice of the CSRF token -- and the counter
+// starts again at 1 on every page load while the token is kept across loads.
+// So after a reload, the first "Stop sharing" sent the same id as the one
+// before the reload, and the server answered with that earlier, already
+// committed result: nothing was withdrawn, and the page said so. Found by
+// pressing it. A nonce made once per load keeps retries within a load
+// idempotent and makes every load's writes its own.
+const loadNonce = Math.random().toString(36).slice(2, 10);
 function requestId(prefix) {
   requestCounter += 1;
-  return `ui-${prefix}-${requestCounter}-${getCsrf()?.slice(0, 6) || "anon"}`;
+  return `ui-${prefix}-${requestCounter}-${loadNonce}`;
 }
 
 // Anything that went wrong is said once, in the page's one notice slot
@@ -256,61 +266,114 @@ async function stopSharing() {
   });
 }
 
+// What pressing "Yes, stop" will do, in the person's situation. The control
+// sits beside the one thought the panel shows and stops that one; when they
+// have others out there, saying so is the difference between "I stopped
+// sharing" and "I stopped sharing this".
+export function stopSharingMeans(counts) {
+  const others = Math.max(0, (counts?.discoverable || 0) - 1);
+  const sentence = "This thought leaves discovery now and stops looking. Anyone it matched stops seeing it.";
+  if (others === 0) return sentence;
+  return `${sentence} Your ${others === 1 ? "other thought stays" : `${others} other thoughts stay`} discoverable.`;
+}
+
 // Stop sharing asks once, inline, where the person can read what it means.
-function stopSharingControl(host) {
+function stopSharingControl(host, counts) {
   const stop = el("button", {type: "button", className: "collab-button", textContent: "Stop sharing"});
   stop.addEventListener("click", () => {
     const box = el("div", {className: "stop-confirm", role: "group"});
     box.setAttribute("aria-label", "Confirm stop sharing");
-    const yes = actionButton("Yes, stop", async () => { await stopSharing(); await refreshAll(); }, "primary");
+    // The question is answered once it is done: the box goes before the
+    // re-read, because the re-read leaves a box alone (someone may be mid-
+    // question) and this one would otherwise stay on screen beside whichever
+    // thought the panel shows next -- with a "Yes, stop" that now means that
+    // one.
+    const yes = actionButton("Yes, stop", async () => {
+      await stopSharing();
+      box.remove();
+      await refreshAll();
+    }, "primary");
     const keep = el("button", {type: "button", className: "collab-button collab-button--quiet", textContent: "Keep sharing"});
     keep.addEventListener("click", () => { box.replaceWith(stop); stop.focus(); });
-    box.append(el("p", {textContent: "Your thought leaves discovery now and stops looking. Anyone it matched stops seeing it."}), yes, keep);
+    box.append(el("p", {textContent: stopSharingMeans(counts)}), yes, keep);
     stop.replaceWith(box);
     yes.focus();
   });
   host.append(stop);
 }
 
+// The one line about the person, from the three counts the server reports
+// (the same three the chat's whoami reports, sorted by the same function).
+//
+// It used to read "Private · nothing of yours is discoverable" whenever
+// nothing was -- to someone whose only thought was withdrawn, whose thought
+// is not private, it is withdrawn. Withdrawn is not private, and private is
+// not shared: three facts, three clauses, each true of the thing it names.
+// "Nothing of yours is discoverable" is a claim about the person and is only
+// ever made when it is true of the person.
+export function shareStateWords(counts) {
+  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
+  const discoverable = counts?.discoverable || 0;
+  const withdrawn = counts?.withdrawn || 0;
+  const kept = counts?.private || 0;
+  const parts = [discoverable > 0
+    ? `Discoverable · ${n(discoverable, "thought", "thoughts")} · still looking`
+    : "Nothing of yours is discoverable"];
+  if (withdrawn > 0) parts.push(`${n(withdrawn, "thought", "thoughts")} withdrawn`);
+  if (kept > 0) parts.push(`${n(kept, "thought", "thoughts")} kept private here`);
+  return parts.join(" · ");
+}
+
 // One line, in one place, says what is discoverable. The control beside it
 // is the one thing that changes that.
-function renderShareState(shared, count) {
+function renderShareState(counts) {
+  const shared = (counts?.discoverable || 0) > 0;
   const line = byId("share-state");
   if (line) {
     const light = el("span", {className: "status-light"});
     light.setAttribute("aria-hidden", "true");
-    line.replaceChildren(light, shared
-      ? `Discoverable · ${count === 1 ? "1 thought" : `${count} thoughts`} · still looking`
-      : "Private · nothing of yours is discoverable");
+    line.replaceChildren(light, shareStateWords(counts));
     line.dataset.shared = String(shared);
   }
   const control = byId("share-control");
   if (!control) return;
   if (control.querySelector(".stop-confirm")) return;   // mid-question: leave it
   control.replaceChildren();
-  if (shared) stopSharingControl(control);
+  if (shared) stopSharingControl(control, counts);
 }
 
-// One read of the person's own sessions serves both the share control and
-// the intro roster; the two used to read it separately.
+// The person's own sessions, as the intro roster needs them (consent choices
+// included). The share line used to be derived from the same rows; it now
+// reads the three counts from /api/product/mine instead, see refreshShare.
 async function ownedSessions() {
   return (await apiFetch("GET", "/api/product/sessions")).sessions || [];
 }
 
-async function refreshShare(owned) {
+// The share line is about the person: how many of their thoughts are
+// discoverable, withdrawn, kept private. /api/product/mine sorts them into
+// those three states with the very function the chat's whoami uses, so this
+// reads that rather than restating the rule over the raw rows -- the two
+// halves have disagreed about these words before, and a rule in two places
+// is how. One read of the person's own record, not a discovery.
+async function refreshShare() {
+  let mine;
   try {
-    owned = owned || await ownedSessions();
+    mine = await apiFetch("GET", "/api/product/mine");
   } catch (error) {
     showError(error.message);
     return;
   }
-  const discoverable = owned.filter((s) => s.share_state === "discoverable");
-  const shared = discoverable.length > 0;
+  const counts = mine.counts || {};
+  const shared = (counts.discoverable || 0) > 0;
   // Same announcement webmcp_live.mjs makes, for the human path: sharing from
-  // this page must also take it out of its onboarding state. Reuses the read
-  // we just did instead of adding one.
-  document.dispatchEvent(new CustomEvent("resonance:consent", {detail: {shared}}));
-  renderShareState(shared, discoverable.length);
+  // this page must also take it out of its onboarding state. This one also
+  // says WHICH thoughts are discoverable, so the page can tell "one of two
+  // withdrawn" from "nothing changed"; those identifiers are for comparing
+  // and never reach the screen.
+  const discoverable = (mine.thoughts || [])
+    .filter((t) => t.state === "discoverable").map((t) => t.session_id);
+  document.dispatchEvent(new CustomEvent("resonance:consent", {detail: {shared, discoverable}}));
+  renderShareState(counts);
   // Nothing shared: the composer IS the page's action, so it is open. Once
   // something is shared the panel shows the thought instead.
   if (shared) byId("share-composer")?.replaceChildren();
@@ -811,7 +874,7 @@ function attachMatchCardButtons() {
 async function refreshAll() {
   let owned = null;
   try { owned = await ownedSessions(); } catch (error) { showError(error.message); }
-  await Promise.all([refreshShare(owned), refreshInitiate(owned), refreshRequests(), refreshOpenChannel()]);
+  await Promise.all([refreshShare(), refreshInitiate(owned), refreshRequests(), refreshOpenChannel()]);
   attachMatchCardButtons();
 }
 
@@ -856,10 +919,14 @@ function init() {
   if (list) observer.observe(list, {childList: true});
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
+// Without a document (the test suite runs the words above under node)
+// there is nothing to render into, and nothing here should run.
+if (typeof document !== "undefined") {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 }
 
 export {
