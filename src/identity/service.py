@@ -49,6 +49,7 @@ THOUGHT_REVOKED = "identity.thought.revoked"
 THOUGHT_DELETED = "identity.thought.deleted"
 ACCOUNT_REGISTERED = "identity.account.registered"
 ACCOUNT_REVOKED = "identity.account.revoked"
+ACCOUNT_IDENTITY_LINKED = "identity.account.identity_linked"
 
 
 def _now_dt() -> datetime:
@@ -160,6 +161,133 @@ class IdentityService:
 
     def register_guest(self, *, actor_type: str = "human") -> SessionCredentials:
         return self.register(f"guest-{secrets.token_hex(3)}", actor_type=actor_type)
+
+    # -- federated sign-in ----------------------------------------------
+    def find_user_by_identity(self, provider: str, subject: str) -> str | None:
+        """The account a provider subject already belongs to, if any.
+
+        The link is read from the identity event log, the same place the
+        account's own credential verifier lives, so a sign-in and a recovery
+        login are accounted for by one durable history.
+        """
+        if not provider or not subject:
+            return None
+        found: str | None = None
+        for event in self.backend.list_identity_events():
+            if event.event_type != ACCOUNT_IDENTITY_LINKED:
+                continue
+            if event.payload.get("provider") != provider:
+                continue
+            if str(event.payload.get("subject") or "") != subject:
+                continue
+            found = event.user_id
+        if found is None:
+            return None
+        user = self.backend.get_user(found)
+        if user is None or _field(user, "revoked_at") is not None:
+            return None
+        return found
+
+    def identity_claims(self, user_id: str) -> dict[str, Any]:
+        """What is known about who this account belongs to.
+
+        Returned to a connected client through the OAuth userinfo endpoint, and
+        used to reach the person when a resonance appears for them.
+        """
+        claims: dict[str, Any] = {}
+        for event in self.backend.list_identity_events():
+            if event.event_type != ACCOUNT_IDENTITY_LINKED or event.user_id != user_id:
+                continue
+            claims = {
+                "provider": str(event.payload.get("provider") or ""),
+                "email": str(event.payload.get("email") or ""),
+                "email_verified": bool(event.payload.get("email_verified")),
+            }
+        return claims
+
+    def sign_in_federated(
+        self,
+        *,
+        provider: str,
+        subject: str,
+        email: str,
+        email_verified: bool,
+        display_label: str,
+        actor_type: str = "human",
+    ) -> SessionCredentials:
+        """Sign a person in behind a provider that has verified who they are.
+
+        An unverified address is refused rather than stored: the whole point of
+        an account here is that a match can be told to a real person later, and
+        an address nobody has proven cannot carry that.
+        """
+        if not provider or not subject:
+            raise IdentityValidationError("provider and subject are required")
+        if not email_verified or not email:
+            raise IdentityValidationError("a verified email address is required")
+        existing = self.find_user_by_identity(provider, subject)
+        if existing is not None:
+            return self._issue_session(existing, actor_type=actor_type)
+        credentials = self.register(display_label, actor_type=actor_type)
+        self._link_identity(
+            credentials.user_id,
+            provider=provider,
+            subject=subject,
+            email=email,
+            email_verified=email_verified,
+        )
+        return credentials
+
+    def link_identity_to_account(
+        self,
+        user_id: str,
+        *,
+        provider: str,
+        subject: str,
+        email: str,
+        email_verified: bool,
+    ) -> None:
+        """Attach a provider identity to an account that already exists.
+
+        Refused when the subject already belongs to a different account, so one
+        person's provider login can never silently take over another account.
+        """
+        owner = self.find_user_by_identity(provider, subject)
+        if owner is not None and owner != user_id:
+            raise AuthorizationError("this provider identity belongs to another account")
+        user = self.backend.get_user(user_id)
+        if user is None or _field(user, "revoked_at") is not None:
+            raise AuthenticationError("account unavailable")
+        if owner == user_id:
+            return
+        self._link_identity(
+            user_id,
+            provider=provider,
+            subject=subject,
+            email=email,
+            email_verified=email_verified,
+        )
+
+    def _link_identity(
+        self,
+        user_id: str,
+        *,
+        provider: str,
+        subject: str,
+        email: str,
+        email_verified: bool,
+    ) -> None:
+        self._append(
+            ACCOUNT_IDENTITY_LINKED,
+            user_id=user_id,
+            session_id=None,
+            payload={
+                "provider": provider,
+                "subject": subject,
+                "email": email,
+                "email_verified": bool(email_verified),
+            },
+        )
 
     def authenticate(self, access_token: str, *, actor_type: str | None = None) -> ActorContext:
         if not access_token:

@@ -63,7 +63,7 @@ from src.product.mcp_bridge import (
     RemoteMCPBridge,
     bearer_token,
 )
-from src.product import oauth_mount
+from src.product import auth_mount, oauth_mount
 
 REPO = Path(__file__).resolve().parents[2]
 UI_DIR = REPO / "demo" / "ui"
@@ -107,6 +107,7 @@ STATIC = {
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
     "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
     "/live_shell.mjs": ("live_shell.mjs", "text/javascript; charset=utf-8"),
+    "/account.mjs": ("account.mjs", "text/javascript; charset=utf-8"),
     # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
     # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
     "/live_ui.css": ("live_ui.css", "text/css; charset=utf-8"),
@@ -358,14 +359,16 @@ class ProductHandler(BaseHTTPRequestHandler):
     def _csrf(self) -> str | None:
         return self.headers.get("X-Resonance-CSRF")
 
+    def _secure_cookies(self) -> bool:
+        origins = self.runtime.allowed_origins
+        return bool(origins) and all(o.startswith("https://") for o in origins)
+
     def _cookie_for(self, token: str) -> str:
         # Behind a TLS-terminating proxy the process only ever sees plain HTTP,
         # so derive `Secure` from the deployment contract instead: when every
         # allowed browser origin is https://, the cookie must never travel over
         # http. Local http://127.0.0.1 runs and tests keep the plain form.
-        origins = self.runtime.allowed_origins
-        secure = "; Secure" if origins and all(
-            o.startswith("https://") for o in origins) else ""
+        secure = "; Secure" if self._secure_cookies() else ""
         return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Strict; Path=/{secure}")
 
     def _security_kwargs(self) -> dict[str, Any]:
@@ -401,6 +404,9 @@ class ProductHandler(BaseHTTPRequestHandler):
             if oauth_mount.is_oauth_path(parsed.path):
                 self._handle_oauth("GET", parsed.path, parse_qs(parsed.query))
                 return
+            if auth_mount.is_auth_path(parsed.path):
+                self._handle_auth("GET", parsed.path, parse_qs(parsed.query))
+                return
             self._route_get(parsed.path, parse_qs(parsed.query))
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
@@ -414,9 +420,58 @@ class ProductHandler(BaseHTTPRequestHandler):
             if oauth_mount.is_oauth_path(parsed.path):
                 self._handle_oauth("POST", parsed.path, parse_qs(parsed.query))
                 return
+            if auth_mount.is_auth_path(parsed.path):
+                self._handle_auth("POST", parsed.path, parse_qs(parsed.query))
+                return
             self._route_post(parsed.path)
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
+
+    # -- sign-in mount ---------------------------------------------------------
+    def _auth_mount(self) -> Any:
+        """One mount per process, so a sign-in in flight survives the redirect
+        out to the provider and back."""
+        mount = getattr(self.runtime, "auth_mount", None)
+        if mount is None:
+            mount = auth_mount.AuthMount(
+                self.runtime.identity,
+                cookie_for=self._cookie_for,
+                secure_cookies=self._secure_cookies(),
+            )
+            self.runtime.auth_mount = mount
+        # The cookie factory is bound to a handler instance, and handlers are
+        # per-request; rebind so the long-lived mount always writes a cookie
+        # shaped by the request it is answering.
+        mount.cookie_for = self._cookie_for
+        mount.secure_cookies = self._secure_cookies()
+        return mount
+
+    def _handle_auth(self, method: str, path: str, query: dict[str, list[str]]) -> None:
+        response = self._auth_mount().handle(
+            method, path, query, {k: v for k, v in self.headers.items()},
+            issuer=self._issuer())
+        self.send_response(response.status)
+        headers = dict(response.headers)
+        headers["Content-Length"] = str(len(response.body))
+        for key, value in headers.items():
+            self.send_header(key, value)
+        for cookie in response.cookies:
+            self.send_header("Set-Cookie", cookie)
+        self._security_headers()
+        self.end_headers()
+        if response.body:
+            self.wfile.write(response.body)
+
+    def _sign_in_required(self) -> bool:
+        """True where a real sign-in is on offer.
+
+        Resonance introduces people to each other, so an account has to belong
+        to someone who can be recognised on return and told when a match
+        appears. Wherever a provider is configured, that is the only way in. A
+        deployment with no provider at all — a local run, the test suite — has
+        no sign-in to insist on, and keeps the pseudonymous path.
+        """
+        return bool(self._auth_mount().providers)
 
     # -- canonical OAuth mount (R15C, #136) ------------------------------------
     def _issuer(self) -> str:
@@ -613,7 +668,8 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/collab.mjs"></script>\n'
                 '  <script type="module" src="/collab_ui.mjs"></script>\n'
                 '  <script type="module" src="/workspaces.mjs"></script>\n'
-                '  <script type="module" src="/live_shell.mjs"></script>\n</body>',
+                '  <script type="module" src="/live_shell.mjs"></script>\n'
+                '  <script type="module" src="/account.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
@@ -659,7 +715,12 @@ class ProductHandler(BaseHTTPRequestHandler):
                 token = self._token()
             except AuthenticationError:
                 pass
-            self._send_json(product.state(token))
+            state = dict(product.state(token))
+            # The page shows "Sign in" rather than an anonymous start only
+            # where a sign-in actually exists to offer.
+            state["sign_in_required"] = self._sign_in_required()
+            state["sign_in_url"] = auth_mount.SIGN_IN_PATH
+            self._send_json(state)
             return
         if path == "/api/product/sessions":
             self._send_json({"sessions": product.owned_sessions(self._token())})
@@ -738,6 +799,17 @@ class ProductHandler(BaseHTTPRequestHandler):
                 self._send_error_json(HTTPStatus.TOO_MANY_REQUESTS, "rate_limited",
                                       "too many accounts created from this address; try later")
                 return
+        if path in ("/api/product/guest", "/api/product/register") and \
+                self._sign_in_required():
+            # An anonymous account cannot be told that a match appeared, and
+            # cannot be recognised when the same person returns through another
+            # client. Where a sign-in exists, it is the only way an account is
+            # created.
+            self._send_json({"error": "sign_in_required",
+                             "message": "Resonance accounts are created by signing in.",
+                             "sign_in_url": auth_mount.SIGN_IN_PATH},
+                            status=HTTPStatus.FORBIDDEN)
+            return
         if path == "/api/product/guest":
             creds = product.register_guest()
             self._send_json(

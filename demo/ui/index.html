@@ -29,6 +29,10 @@
         <!-- Live-only modules append their status chips here (WebMCP capability,
              collaboration and workspace tool registration). -->
         <div class="tool-status" id="tool-status" aria-label="Tool status"></div>
+        <!-- Who you are here. Resonance introduces people to each other, so
+             the account is not an implementation detail the page can hide:
+             filled in by account.mjs once the session state is known. -->
+        <div class="account-slot" id="account-slot" hidden></div>
       </div>
     </header>
 

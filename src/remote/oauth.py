@@ -49,7 +49,7 @@ import time
 from dataclasses import dataclass, field
 from http.cookies import SimpleCookie
 from typing import Any, Mapping
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 # The single resource this authorization server protects, relative to issuer.
 RESOURCE_PATH = "/mcp"
@@ -134,6 +134,11 @@ button.primary { background: var(--ink); color: var(--paper); border-color: var(
 button:hover { border-color: var(--ink-3); }
 button.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
 .fine { margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 13px; color: var(--ink-3); }
+.who { margin: 10px 4px 4px; font-size: 14px; }
+a.primary-link { display: inline-flex; align-items: center; min-height: 42px; margin: 4px 4px 8px; padding: 0 22px; border-radius: 999px;
+  background: var(--ink); color: var(--paper); border: 1px solid var(--ink); font: 500 15px var(--sans); text-decoration: none; }
+a.primary-link:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+a.primary-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 """
 
 
@@ -304,12 +309,25 @@ class OAuthCore:
     def __init__(self, identity: Any, store: GrantStore | None = None, *,
                  code_ttl: int = DEFAULT_CODE_TTL,
                  refresh_ttl: int = DEFAULT_REFRESH_TTL,
-                 clock: Any = time.time) -> None:
+                 clock: Any = time.time,
+                 sign_in_required: Any = None) -> None:
         self.identity = identity
         self.store = store or GrantStore(clock=clock)
         self.code_ttl = code_ttl
         self.refresh_ttl = refresh_ttl
         self.clock = clock
+        # Callable answering whether this deployment offers a real sign-in.
+        # Where it does, a connector authorization must bind to the account the
+        # person signed into — a connection that minted a fresh anonymous
+        # account would make the same person a stranger on every surface, and
+        # leave no one to notify when a match appears.
+        self._sign_in_required = sign_in_required or (lambda: False)
+
+    def sign_in_required(self) -> bool:
+        try:
+            return bool(self._sign_in_required())
+        except Exception:  # noqa: BLE001 - never fail an authorization on this
+            return False
 
     # -- public helpers used by the transport ---------------------------
     def resource_for(self, issuer: str) -> str:
@@ -371,6 +389,8 @@ class OAuthCore:
                 return self._token(body, issuer)
             if path == "/oauth/revoke" and method == "POST":
                 return self._revoke(body)
+            if path == "/oauth/userinfo" and method in ("GET", "POST"):
+                return self._userinfo(headers, issuer)
             return OAuthResult(404, {"Content-Type": "application/json"},
                                _json_body({"error": "not_found"}))
         except OAuthError as exc:
@@ -394,6 +414,7 @@ class OAuthCore:
             "token_endpoint": issuer + "/oauth/token",
             "registration_endpoint": issuer + "/oauth/register",
             "revocation_endpoint": issuer + "/oauth/revoke",
+            "userinfo_endpoint": issuer + "/oauth/userinfo",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
@@ -402,6 +423,46 @@ class OAuthCore:
             "scopes_supported": list(SUPPORTED_SCOPES),
             "resource_indicators_supported": True,
         }
+
+    # -- userinfo -------------------------------------------------------
+    def _userinfo(self, headers: Mapping[str, str], issuer: str) -> OAuthResult:
+        """Who the presented bearer belongs to.
+
+        Hosted clients use this to show whose account they connected, and to
+        confirm that two of their surfaces reached the same person. Only the
+        account identifier and the sign-in address are returned; nothing about
+        what the person has thought or shared is reachable here.
+        """
+        raw = (headers.get("Authorization") or headers.get("authorization") or "")
+        token = raw[7:].strip() if raw[:7].lower() == "bearer " else ""
+        subject = self.resolve_bearer(token or None, resource=self.resource_for(issuer))
+        if not subject:
+            return OAuthResult(401, {
+                "Content-Type": "application/json",
+                "WWW-Authenticate": self.challenge_header(issuer),
+            }, _json_body({"error": "invalid_token"}))
+        try:
+            actor = self.identity.authenticate(subject)
+        except Exception:  # noqa: BLE001
+            return OAuthResult(401, {
+                "Content-Type": "application/json",
+                "WWW-Authenticate": self.challenge_header(issuer),
+            }, _json_body({"error": "invalid_token"}))
+        doc: dict[str, Any] = {"sub": actor.user_id}
+        claims = {}
+        if hasattr(self.identity, "identity_claims"):
+            try:
+                claims = self.identity.identity_claims(actor.user_id) or {}
+            except Exception:  # noqa: BLE001
+                claims = {}
+        if claims.get("email"):
+            doc["email"] = claims["email"]
+            doc["email_verified"] = bool(claims.get("email_verified"))
+        user = self.identity.backend.get_user(actor.user_id)
+        label = getattr(user, "display_label", None) if user is not None else None
+        if label:
+            doc["name"] = str(label)
+        return self._ok(doc)
 
     # -- dynamic client registration (RFC 7591) -------------------------
     def _register(self, body: bytes) -> OAuthResult:
@@ -494,7 +555,9 @@ class OAuthCore:
                 return self._redirect_error(params["redirect_uri"], exc, params.get("state"))
             raise
         current = self._cookie_subject(headers)
-        html_page = self._consent_page(clean, current_account=current)
+        html_page = self._consent_page(clean, current_account=current,
+                                       return_to="/oauth/authorize?" + urlencode(
+                                           {k: v for k, v in params.items() if v}))
         return OAuthResult(200, {"Content-Type": "text/html; charset=utf-8",
                                  "Cache-Control": "no-store"},
                            html_page.encode("utf-8"))
@@ -559,7 +622,11 @@ class OAuthCore:
                 raise OAuthError("access_denied", "no active browser session to continue")
             creds = identity._issue_session(subject, actor_type="agent")  # noqa: SLF001
             return creds.access_token, creds
-        # default: guest continuation
+        if self.sign_in_required():
+            # Reached only when the consent form was replayed without a signed-in
+            # browser session; the page itself offers no guest option.
+            raise OAuthError("access_denied", "sign in to Resonance before connecting a client")
+        # default: guest continuation (deployments with no sign-in provider)
         creds = identity.register_guest(actor_type="agent")
         return creds.access_token, creds
 
@@ -714,7 +781,8 @@ class OAuthCore:
         return True
 
     # -- rendering / helpers --------------------------------------------
-    def _consent_page(self, clean: Mapping[str, str], *, current_account: str | None) -> str:
+    def _consent_page(self, clean: Mapping[str, str], *, current_account: str | None,
+                      return_to: str = "/") -> str:
         e = html.escape
         hidden = "".join(
             f'<input type="hidden" name="{e(k)}" value="{e(v)}">'
@@ -729,12 +797,62 @@ class OAuthCore:
                 "scope": clean["scope"],
             }.items())
         offline = SCOPE_OFFLINE in clean["scope"].split()
-        current_block = ""
-        if current_account:
-            current_block = (
-                '<label class="opt"><input type="radio" name="identity" value="current" checked> '
-                f'Continue as your current account (<code>{e(current_account)}</code>)</label>')
-        guest_checked = "" if current_account else " checked"
+        # Where a real sign-in exists it is the only way in, and the choice on
+        # this page collapses to one: connect this client to the account you
+        # signed into. Anonymous connections are what made the same person a
+        # stranger on every surface, so they are not offered.
+        if self.sign_in_required():
+            if current_account:
+                identity_block = (
+                    '<input type="hidden" name="identity" value="current">'
+                    '<fieldset><legend>Your Resonance account</legend>'
+                    f'<p class="who">Signed in as <code>{e(current_account)}</code>.</p>'
+                    '</fieldset>')
+                actions = (
+                    '<div class="actions">'
+                    '<button type="submit" name="decision" value="approve" class="primary">'
+                    'Allow access</button>'
+                    '<button type="submit" name="decision" value="deny">Cancel</button>'
+                    '</div>')
+            else:
+                identity_block = (
+                    '<fieldset><legend>Sign in to Resonance</legend>'
+                    '<p class="who">Resonance introduces people whose reasoning has the '
+                    'same shape, so a connection has to belong to a person it can come '
+                    'back to. Sign in, and this client connects to that account.</p>'
+                    '<p><a class="primary-link" '
+                    # URL-encoded, not merely HTML-escaped: the authorize URL
+                    # carries its own query, and an unencoded `&` would split
+                    # `next` into separate parameters of the sign-in page and
+                    # lose the way back to this consent screen.
+                    f'href="/auth/sign-in?next={e(quote(return_to, safe=""))}">'
+                    'Sign in to continue</a></p></fieldset>')
+                actions = ('<div class="actions">'
+                           '<button type="submit" name="decision" value="deny">Cancel</button>'
+                           '</div>')
+        else:
+            current_block = ""
+            if current_account:
+                current_block = (
+                    '<label class="opt"><input type="radio" name="identity" value="current" checked> '
+                    f'Continue as your current account (<code>{e(current_account)}</code>)</label>')
+            guest_checked = "" if current_account else " checked"
+            identity_block = (
+                '<fieldset><legend>Sign in to Resonance</legend>'
+                f'{current_block}'
+                f'<label class="opt"><input type="radio" name="identity" value="guest"{guest_checked}> '
+                'Continue as a new pseudonymous guest</label>'
+                '<label class="opt"><input type="radio" name="identity" value="login"> '
+                'Sign in with an existing account</label>'
+                '<p><label>Account ID <input type="text" name="user_id" autocomplete="username"></label></p>'
+                '<p><label>Recovery secret <input type="password" name="recovery_secret" '
+                'autocomplete="current-password"></label></p>'
+                '</fieldset>')
+            actions = ('<div class="actions">'
+                       '<button type="submit" name="decision" value="approve" class="primary">'
+                       'Allow access</button>'
+                       '<button type="submit" name="decision" value="deny">Cancel</button>'
+                       '</div>')
         client = self.store.get_client(clean["client_id"]) or {}
         client_name = str(client.get("client_name") or "").strip()
         who = (f"<strong>{e(client_name)}</strong> (<code>{e(clean['client_id'])}</code>)"
@@ -760,18 +878,8 @@ every share still needs your separate in-tool confirmation.</p>
 {"<p>The client requested offline access (a refresh token so it can reconnect without asking again).</p>" if offline else ""}
 <form method="post" action="/oauth/authorize">
 {hidden}
-<fieldset>
-<legend>Sign in to Resonance</legend>
-{current_block}
-<label class="opt"><input type="radio" name="identity" value="guest"{guest_checked}> Continue as a new pseudonymous guest</label>
-<label class="opt"><input type="radio" name="identity" value="login"> Sign in with an existing account</label>
-<p><label>Account ID <input type="text" name="user_id" autocomplete="username"></label></p>
-<p><label>Recovery secret <input type="password" name="recovery_secret" autocomplete="current-password"></label></p>
-</fieldset>
-<div class="actions">
-<button type="submit" name="decision" value="approve" class="primary">Allow access</button>
-<button type="submit" name="decision" value="deny">Cancel</button>
-</div>
+{identity_block}
+{actions}
 </form>
 <p class="fine">Private by default. Only the structural Thought DNA you explicitly confirm becomes discoverable; conversation text is never stored.</p>
 </main>

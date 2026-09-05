@@ -69,12 +69,30 @@ async function bootstrap() {
     });
     if (rotated.ok) return rememberCredentials(await rotated.json()).csrf_token;
   }
-  const guest = await fetch("/api/product/guest", {
+  const response = await fetch("/api/product/guest", {
     method: "POST", credentials: "same-origin",
     headers: {"Content-Type": "application/json"}, body: "{}",
-  }).then(r => r.json());
-  return rememberCredentials(guest).csrf_token;
+  });
+  const created = await response.json().catch(() => ({}));
+  if (response.status === 403 && created.error === "sign_in_required") {
+    // Resonance introduces people to each other, so an account has to belong to
+    // someone who can be recognised on return and reached when a match appears.
+    // Announce it and let the page offer the sign-in; navigating from here
+    // would drag a reader off the landing page before they had read it, and a
+    // link back would only bounce them to sign-in again.
+    document.dispatchEvent(new CustomEvent("resonance:sign-in-required", {
+      detail: {signInUrl: created.sign_in_url || "/auth/sign-in"},
+    }));
+    // Panels surface `error.message` verbatim, so this reads as a sentence to
+    // a person rather than as an error code.
+    throw new Error("Sign in to Resonance to continue.");
+  }
+  if (!response.ok) {
+    throw new Error(`${created.error || response.status}: ${created.message || "request failed"}`);
+  }
+  return rememberCredentials(created).csrf_token;
 }
+
 
 async function ensureSession({ force = false } = {}) {
   if (force) { clearStored(CSRF_KEY); bootstrapPromise = null; }

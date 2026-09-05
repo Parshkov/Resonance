@@ -17,8 +17,10 @@
 
   <h2>The short version</h2>
   <ul>
-    <li>You can use the service without giving a name, an email address, or any
-      other identifier. Accounts are pseudonymous by default.</li>
+    <li>You sign in with Google or GitHub. Resonance receives your verified
+      email address and the name on that account, and never your password.</li>
+    <li>Other people never see your email address. What they see is a
+      pseudonymous identifier and what you explicitly chose to share.</li>
     <li>The text you or your assistant write is <strong>not stored</strong>. What is
       stored is the causal structure extracted from it.</li>
     <li>Nothing you share is discoverable by anyone until you explicitly confirm it,
@@ -29,10 +31,21 @@
 
   <h2>What is stored</h2>
   <h3>Your account</h3>
-  <p>A pseudonymous identifier (<code>person-…</code>) and a display label
-    (<code>guest-…</code>). If you choose to keep access across devices you are
-    given a recovery secret; it is stored only as a verifier, and cannot be read
-    back by anyone, including the operator.</p>
+  <p>A pseudonymous identifier (<code>person-…</code>) and a display label taken
+    from the name on the account you signed in with.</p>
+  <p>From your sign-in provider, Resonance stores three things: which provider it
+    was, the stable identifier that provider uses for you, and your verified email
+    address. Nothing else is requested — no contacts, no repositories, no files,
+    no ability to act anywhere on your behalf — and your password never reaches
+    this service.</p>
+  <p><strong>Why an email address is required.</strong> Resonance's purpose is to
+    tell you when someone whose reasoning has the same shape as yours appears. If
+    nobody matches you today, the service keeps looking; when someone does, there
+    has to be a way to reach you. An account nobody can reach could never be told,
+    and would be a different stranger each time you connected a new chat client.
+    The address is used for that, and to recognise you as the same person across
+    the browser and every chat client you connect. It is not used for marketing,
+    and it is never shown to other participants.</p>
 
   <h3>A thought you share</h3>
   <p>The <em>Thought DNA</em>: short labels for the nodes of your reasoning and the
@@ -68,9 +81,10 @@
   <h2>What is not stored</h2>
   <ul>
     <li>The raw text of your conversation.</li>
-    <li>Names, email addresses or phone numbers, unless you type them into a field
-      yourself. Contact details found in submitted text are scrubbed by the
-      extractor.</li>
+    <li>Your password, for any provider. Sign-in happens on the provider's own
+      pages; Resonance only ever receives the result.</li>
+    <li>Any email address or phone number other than your sign-in address —
+      including any found in text you submit, which the extractor scrubs.</li>
     <li>Precise location.</li>
     <li>Third-party analytics or advertising identifiers. The pages load no external
       scripts, fonts or trackers of any kind — the origin enforces this with a
@@ -80,8 +94,8 @@
   <h2>Who can see what</h2>
   <p>A thought you have shared is visible, as its Thought DNA and display labels, to
     other people who run a discovery that matches it. Your account identifier is
-    pseudonymous. Nothing is sold, and nothing is shared with a third party for
-    their own purposes.</p>
+    pseudonymous and your email address is never among what they see. Nothing is
+    sold, and nothing is shared with a third party for their own purposes.</p>
   <p>A chat client you connect through MCP acts as you, within the tools it was
     authorised for, until you disconnect it or revoke the grant.</p>
 
@@ -92,7 +106,9 @@
     Audit events for an action are retained after it, because their purpose is to
     account for what happened.</p>
   <p>You can revoke from your chat (<code>resonance_stop_sharing</code>), from the
-    Collaboration panel on this site, or by asking the operator.</p>
+    Collaboration panel on this site, or by asking the operator. Removing your
+    account removes the link to your sign-in provider and the email address with
+    it; signing in again afterwards creates a new account, not the old one.</p>
 
   <h2>Security</h2>
   <p>Traffic is served over HTTPS. Client connections use OAuth 2.1 with PKCE;

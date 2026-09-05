@@ -186,7 +186,17 @@ class LiveProductService:
                 authenticated = True
             except Exception:
                 authenticated = False
+        account: dict[str, Any] = {}
         if authenticated:
+            actor = self.identity.authenticate(access_token)
+            user = self.identity.backend.get_user(actor.user_id)
+            account = {
+                "user_id": actor.user_id,
+                "display_label": str(getattr(user, "display_label", "") or ""),
+                # Whether this account was signed into, as opposed to a
+                # pseudonymous account on a deployment with no sign-in.
+                "signed_in": bool(self.identity.identity_claims(actor.user_id)),
+            }
             owned = [
                 {
                     "session_id": row.get("session_id"),
@@ -207,6 +217,7 @@ class LiveProductService:
             "sessions": health.sessions,
             "discoverable": health.discoverable,
             "authenticated": authenticated,
+            "account": account,
             "owned_sessions": owned,
         }
 
