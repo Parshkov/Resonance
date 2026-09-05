@@ -47,17 +47,40 @@ The frontend selects the first four discoverable, non-hard-rejected
 remain accessible in the secondary drawer, while hard rejections appear only
 as contradictions.
 
-## Record at 1920×1080
+## The page
 
-1. Run `python3 -m demo.ui.serve --source replay`.
-2. Set the browser viewport to exactly 1920×1080 at 100% zoom.
-3. Open `http://127.0.0.1:8765/?source=replay`.
-4. Wait until the footer reads `REPLAY · genuine accepted R8 fixture · analogical / k=15`.
-5. Record or capture the viewport; no page scrolling is required.
+The page is a normal scrolling document with no fixed-height panels, so
+nothing is clipped out of reach at any viewport (390×844 through
+1920×1080). A visitor who has shared nothing sees the onboarding page
+(`#app-shell[data-state="unshared"]`); a rendered result shows, in reading
+order:
 
-The inspected reference frame is
-[`artifacts/canonical-1920x1080.jpg`](artifacts/canonical-1920x1080.jpg).
-Its dimensions are asserted by the UI test suite.
+1. **Your thought** — the Thought DNA nodes and typed relations that are
+   discoverable, with the domain and coarse location that were consented to.
+2. **Resonance map** — a map of *structural relationship*, not geography.
+   Every position is a function of numbers in the discovery response and
+   nothing else:
+   - distance from the centre = `1 − scores.structural` (inner ring 1.0, rim 0);
+   - sector = `display.cluster_id`, lettered in the key under the map, in
+     order of first appearance;
+   - angle inside a sector = backend order;
+   - line weight = `evidence.preserved_relation_count`;
+   - dashed = `evidence.contradiction_count > 0` or a hard rejection.
+   The number on every marker is the row's position in the engine's returned
+   list (`01`… for `matches[]`, `R1`… for `rejected[]`), so the backend order
+   is recoverable from the map, the cards and the drawer alike. Coarse
+   location is an annotation on a match and never affects position or ranking.
+3. **Resonances** — the first four eligible rows in backend order, never
+   sorted; every other returned row stays inspectable in the drawer.
+4. **Evidence** — the node-to-node correspondences and preserved relations the
+   engine returned for the selected match. The query side of a preserved
+   relation is resolved from the visitor's own Thought DNA; the candidate side
+   is shown as the id the engine returned, because the other person's
+   relations are not in the response.
+
+The footer states the source (`REPLAY` is the accepted fixture with example
+personas; `LIVE` is the visitor's own discovery), the corpus snapshot and the
+discovery contract.
 
 ## Browser WebMCP (R10)
 
@@ -180,11 +203,13 @@ security gate are owned by R11/R12/R12B rather than being faked here.
 
 - Only rows with `display.share_state=discoverable` can render.
 - Missing location stays missing; Gabe is shown as `Location not shared`.
-- Locations are coarse/synthetic map decoration and never affect ordering.
+- Locations are coarse/synthetic annotations on a match and never affect
+  ordering or map position.
 - Hard rejections are segregated into the rust contradiction treatment.
 - No contact details are requested or rendered.
-- Introductions are explicitly unavailable because `request_intro` is not an
-  accepted R8 MCP tool.
+- The page states that an introduction needs both sides; the R9 page itself
+  requests none (`request_intro` is not an accepted R8 MCP tool), the live
+  Collaboration drawer does.
 - The UI imports no engine, alignment, retrieval, verifier, fingerprint, index,
   or scoring internals.
 

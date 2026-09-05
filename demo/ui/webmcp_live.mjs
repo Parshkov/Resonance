@@ -30,7 +30,7 @@ function statusNode() {
   node.className = "offline-badge";
   node.setAttribute("role", "status");
   node.textContent = "WebMCP · checking";
-  (document.querySelector(".system-status") || document.body).append(node);
+  (document.getElementById("tool-status") || document.querySelector(".system-status") || document.body).append(node);
   return node;
 }
 

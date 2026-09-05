@@ -14,12 +14,17 @@ import { apiFetch } from "/session.mjs";
 const COLLAB_CONTRACT = "resonance-collab/0.1";
 
 function setStatus(text) {
+  // Whether this browser has WebMCP at all is stated once, by the capability
+  // pill (#webmcp-status); repeating it per module is noise, not information.
+  if (/WebMCP unavailable$/.test(text)) return;
   let node = document.getElementById("collab-status");
   if (!node) {
     node = document.createElement("span");
     node.id = "collab-status";
-    node.style.marginLeft = "0.75em";
-    const host = document.getElementById("header-consent") || document.body;
+    node.className = "tool-chip";
+    node.setAttribute("role", "status");
+    const host = document.getElementById("tool-status")
+      || document.querySelector(".system-status") || document.body;
     host.appendChild(node);
   }
   node.textContent = text;

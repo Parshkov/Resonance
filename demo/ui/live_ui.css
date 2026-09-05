@@ -1,102 +1,94 @@
 /*
- * Live-product UI additions (R16 Chrome audit fixes).
+ * Live-product UI additions.
  *
- * Served and linked only by the live product server; the accepted R9 files
- * (index.html, styles.css, app.mjs) are untouched. The live CSP is
- * `default-src 'self'`, so the collaboration panel's presentation lives here
- * instead of inline style attributes, reusing the R9 design tokens.
- *
- * Audit findings addressed:
- *  - #collab-panel used to be appended as a 4th item of the 3-column
- *    `.workspace` grid, wrapping into a second row that halved the three
- *    accepted surfaces inside the 100vh app shell. It is now a right-hand
- *    drawer toggled from the top bar (same pattern as the R9 secondary drawer).
- *  - The panel carried its own blue palette; it now uses the page tokens.
- *  - Narrow viewports overflowed horizontally (top bar with nowrap controls).
+ * Served and linked only by the live product server (CSP `default-src 'self'`):
+ * the collaboration drawer and the tool-status chips the live modules add to
+ * the masthead. Uses the page tokens from styles.css.
  */
 
-/* ---- top bar toggle ------------------------------------------------- */
+/* ---- masthead toggle ------------------------------------------------- */
 .collab-toggle {
-  display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px;
-  border: 1px solid var(--border); border-radius: 13px; background: transparent;
-  color: var(--text-2); font-size: 12px; cursor: pointer; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2);
+  color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer;
 }
-.collab-toggle:hover { color: var(--text); border-color: rgba(255,255,255,.18); }
-.collab-toggle[aria-expanded="true"] { color: var(--bright); border-color: rgba(201,184,160,.42); background: rgba(201,184,160,.055); }
+.collab-toggle:hover { border-color: var(--ink-3); }
+.collab-toggle[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .collab-badge {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: 9px; background: var(--gold); color: var(--canvas);
-  font-family: var(--mono); font-size: 10px; font-weight: 650;
+  border-radius: 9px; background: var(--rust); color: #fff; font-family: var(--mono); font-size: 11px; font-weight: 600;
 }
-.collab-badge[hidden] { display: none; }
 
 /* ---- drawer ---------------------------------------------------------- */
-.collab-backdrop { position: fixed; z-index: 20; inset: 0; background: rgba(0,0,0,.52); backdrop-filter: blur(3px); }
-.collab-backdrop[hidden] { display: none; }
+.collab-backdrop { position: fixed; z-index: 20; inset: 0; background: rgba(29, 26, 22, 0.35); }
 .collab-drawer {
-  position: fixed; z-index: 21; top: 18px; right: 18px; bottom: 18px; width: min(480px, calc(100vw - 36px));
-  display: flex; flex-direction: column; gap: 14px; padding: 23px; overflow-y: auto;
-  border: 1px solid var(--border); border-radius: 28px; background: rgba(16,16,15,.97);
-  color: var(--text); font-family: var(--sans); font-size: 13px;
-  box-shadow: -28px 0 90px rgba(0,0,0,.46); transform: translateX(calc(100% + 30px)); transition: transform 260ms ease-out;
+  position: fixed; z-index: 21; top: 0; right: 0; bottom: 0; width: min(560px, 100vw);
+  display: flex; flex-direction: column; gap: 18px; padding: 22px; overflow-y: auto;
+  border-left: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+  font-family: var(--sans); font-size: 14px; line-height: 1.5;
+  box-shadow: -12px 0 40px rgba(29, 26, 22, 0.12); transform: translateX(100%); transition: transform 200ms ease-out;
 }
 .collab-drawer.is-open { transform: translateX(0); }
-.collab-drawer h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 25px; font-weight: 500; letter-spacing: -.02em; }
-.collab-drawer h3 { margin: 0 0 8px; color: var(--text-2); font-family: var(--serif); font-size: 17px; font-weight: 500; }
+.collab-drawer h2 { margin: 4px 0 0; font-family: var(--serif); font-size: 26px; font-weight: 500; }
+.collab-drawer h3 { margin: 0 0 8px; font-family: var(--serif); font-size: 19px; font-weight: 500; }
 .collab-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.collab-header .eyebrow { margin-bottom: 4px; }
-.collab-copy { margin: 0; color: var(--text-3); font-size: 11px; line-height: 1.5; }
-.collab-section { padding-top: 14px; border-top: 1px solid var(--border-soft); }
-.collab-error { min-height: 1em; color: var(--rust); font-size: 12px; }
+.collab-copy { margin: 0; color: var(--ink-2); font-size: 14px; }
+.collab-section { padding-top: 18px; border-top: 1px solid var(--line); }
+.collab-error { min-height: 1em; padding: 8px 12px; border: 1px solid var(--rust-line); border-radius: var(--radius-sm); background: var(--rust-soft); color: var(--rust); font-size: 13px; }
 .collab-error:empty { display: none; }
-.collab-muted { margin: 0; color: var(--text-3); font-size: 12px; }
+.collab-muted { margin: 0 0 8px; color: var(--ink-2); font-size: 13.5px; }
+.collab-muted:last-child { margin-bottom: 0; }
 
 .collab-row {
-  display: flex; align-items: center; gap: 10px; padding: 9px 0;
-  border-bottom: 1px solid var(--border-soft); font-size: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
 }
 .collab-row:last-child { border-bottom: 0; }
-.collab-row strong { font-size: 12px; font-weight: 650; }
-.collab-row .collab-grow { flex: 1; min-width: 0; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; }
-.collab-row .collab-state { color: var(--text-3); font-family: var(--mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.collab-row strong { font-weight: 600; }
+.collab-row .collab-grow { flex: 1 1 160px; min-width: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.collab-row .collab-state {
+  padding: 2px 8px; border-radius: 999px; background: var(--paper-3); color: var(--ink-2);
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+}
 
 .collab-button {
-  padding: 6px 11px; border: 1px solid var(--border); border-radius: 10px; background: transparent;
-  color: var(--text-2); font-size: 11px; cursor: pointer; white-space: nowrap;
+  min-height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2);
+  color: var(--ink); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
 }
-.collab-button:hover { color: var(--text); border-color: rgba(255,255,255,.18); }
-.collab-button:disabled { opacity: .45; cursor: default; }
-.collab-button--primary { color: var(--bright); border-color: rgba(201,184,160,.42); background: rgba(201,184,160,.055); }
-.collab-button--primary:hover { background: rgba(201,184,160,.11); }
-.collab-request-btn { margin-top: 6px; }
+.collab-button:hover { border-color: var(--ink-3); }
+.collab-button:disabled { opacity: 0.5; cursor: default; }
+.collab-button--primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.collab-button--primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+.collab-request-btn { min-height: 30px; font-size: 12.5px; }
 
-.collab-share-state { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: var(--text-2); font-size: 12px; }
+.collab-share-state { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 14px; }
 .collab-share-state .status-light { flex: none; }
 
 .collab-thread { display: flex; flex-direction: column; gap: 6px; }
-.collab-message { padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 12px; font-size: 12px; line-height: 1.4; color: var(--text-2); }
-.collab-message.is-mine { align-self: flex-end; color: var(--text); background: var(--panel-strong); }
-.collab-compose { display: flex; gap: 8px; margin-top: 10px; }
+.collab-message { max-width: 90%; padding: 8px 12px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--paper); font-size: 13.5px; overflow-wrap: anywhere; }
+.collab-message.is-mine { align-self: flex-end; background: var(--accent-soft); border-color: var(--accent-line); }
+.collab-compose { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .collab-input {
-  flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--canvas-raised); color: var(--text); font: inherit; font-size: 12px;
+  flex: 1 1 200px; min-width: 0; min-height: 34px; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--ink); font: inherit; font-size: 13.5px;
 }
-.collab-input:focus-visible { outline: 1px solid var(--bright); outline-offset: 2px; }
 
-.collab-subhead { margin: 12px 0 4px; color: var(--text-3); font-family: var(--mono); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.collab-subhead { margin: 14px 0 6px; color: var(--ink-3); font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
 .collab-code {
-  margin: 0; padding: 8px 10px; overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 10px;
-  background: var(--canvas-raised); color: var(--text-2); font-family: var(--mono); font-size: 10px; line-height: 1.45;
-  white-space: pre-wrap; word-break: break-all; user-select: all;
+  margin: 0; padding: 8px 12px; overflow-x: auto; border: 1px solid var(--accent-line); border-radius: var(--radius-sm);
+  background: var(--paper); color: var(--accent-ink); font-family: var(--mono); font-size: 12.5px; line-height: 1.45;
+  white-space: pre-wrap; overflow-wrap: anywhere; user-select: all;
 }
+.collab-clients { display: grid; gap: 8px; margin: 12px 0; }
+.collab-client { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--paper); }
+.collab-client dt { font-weight: 600; font-size: 13.5px; }
+.collab-client dd { margin: 0; color: var(--ink-2); font-size: 13px; overflow-wrap: anywhere; }
+.collab-client dd .collab-code { margin-top: 4px; }
+.collab-advanced { margin-top: 12px; }
+.collab-advanced summary { cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.collab-advanced[open] summary { margin-bottom: 8px; }
+.collab-advanced .collab-code + .collab-code { margin-top: 8px; }
 
-/* ---- narrow viewports (audit: horizontal overflow at 390px) ------------ */
-@media (max-width: 760px) {
-  .app-shell { padding-inline: 10px; min-height: 0; }
-  .topbar { flex-wrap: wrap; row-gap: 10px; }
-  .system-status { flex-wrap: wrap; row-gap: 8px; }
-  .consent-status, .offline-badge, .collab-toggle { white-space: normal; }
-  .surface, .discovery-surface, .matches-surface { min-height: 0; }
-  .map-frame { min-height: 260px; }
-  .collab-drawer { top: 10px; right: 10px; bottom: 10px; padding: 18px; border-radius: 22px; }
+@media (max-width: 600px) {
+  .collab-drawer { padding: 16px; }
 }
