@@ -9,8 +9,12 @@ from http.cookies import SimpleCookie
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from pathlib import Path
+
 from src.product.web_server import serve
 from src.product.server import build_runtime
+
+UI_DIR = Path(__file__).resolve().parents[1] / "demo" / "ui"
 
 
 class Client:
@@ -683,6 +687,25 @@ class WebServerWebMCPTests(unittest.TestCase):
         self.assertTrue(shared["discoverable"])
         self.assertIn("discoverable", shared["say"])
         self.assertNotIn("session_id", shared["say"])
+
+    def test_the_person_typing_on_their_own_page_is_not_interrogated(self):
+        """A regression that reached production and broke sharing outright.
+
+        The authorship question exists because an assistant driving the tools
+        might be sharing its own framing under someone's name. The page's own
+        composer posts to the same endpoint -- and requiring it there meant a
+        person pasting their own words into the textarea got
+        "state authorship: their_own_words, ..." thrown back at them, which is
+        both unanswerable and untrue: they are the author.
+
+        The page states it, because the page knows it. This pins that the file
+        the browser actually runs says so, since the server cannot tell the
+        two callers apart.
+        """
+        composer = (UI_DIR / "collab_ui.mjs").read_text(encoding="utf-8")
+        prepare = composer[composer.index("/api/webmcp/prepare"):]
+        self.assertIn("their_own_words", prepare[:400],
+                      "the page's own share must declare authorship for the person")
 
 if __name__ == "__main__":
     unittest.main()

@@ -195,7 +195,16 @@ function openShareComposer() {
     status.textContent = "Reading the structure…";
     let preview;
     try {
-      await apiFetch("POST", "/api/webmcp/prepare", {request_id: requestId("prep"), context});
+      // This is the person, typing into their own page. The authorship
+      // question exists because an assistant driving these tools might be
+      // sharing its own framing under someone's name; here there is no
+      // assistant between the words and the person who wrote them, and the
+      // page can say so truthfully rather than asking them to confirm what
+      // they just did.
+      await apiFetch("POST", "/api/webmcp/prepare", {
+        request_id: requestId("prep"), context,
+        authorship: "their_own_words",
+      });
       preview = await apiFetch("GET", "/api/webmcp/preview");
     } catch (error) {
       status.classList.add("is-error");
