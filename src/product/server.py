@@ -103,6 +103,9 @@ def registration_allowed(ip: str, *, now: float | None = None) -> bool:
 COOKIE_NAME = "resonance_token"
 
 STATIC = {
+    # The type scale and the radii, linked by the product page and by the
+    # documentation pages, which do not share a stylesheet.
+    "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
     "/webmcp.mjs": ("webmcp.mjs", "text/javascript; charset=utf-8"),

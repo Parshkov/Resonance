@@ -12,7 +12,7 @@
 
 .geo-panel { padding: 12px; }
 .geo-panel .panel-head { padding: 6px 8px 0; }
-.geo-count { align-self: center; color: var(--ink-3); font-size: 13px; }
+.geo-count { align-self: center; color: var(--ink-3); font-size: var(--text-md); }
 
 /* The map: a sketch of the continents in the panel's own paper, the water
    left as the panel, the graticule barely there. */
@@ -28,11 +28,15 @@
    the seeded examples, so a real person is never mistaken for one. */
 .geo-point { cursor: default; }
 .geo-point[role="button"] { cursor: pointer; }
+/* Carries the touch target and is never drawn. `fill: none` would make it
+   unhittable, so it is filled and transparent. sizeHitAreas() sets the radius. */
+.geo-hit { fill: transparent; }
+.geo-point:not([role="button"]) .geo-hit { display: none; }
 .geo-dot { fill: var(--accent); stroke: var(--paper-2); stroke-width: 1.5; }
 .geo-point.is-other .geo-dot { fill: var(--paper-2); stroke: var(--ink-3); stroke-width: 1.5; }
 .geo-point.is-example .geo-dot { stroke-dasharray: 2 2; }
 .geo-point.is-you .geo-dot { fill: var(--ink); stroke: var(--paper); stroke-width: 2; }
-.geo-label { fill: var(--ink); font-size: 15px; pointer-events: none; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+.geo-label { fill: var(--ink); font-size: var(--text-body); pointer-events: none; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
 .geo-point.is-you .geo-label { font-weight: 600; }
 /* Names of people the engine did not endorse show on hover or focus, so the
    people it did stay legible when the seeded examples crowd one region. */
@@ -42,7 +46,7 @@
 .geo-point:focus-visible .geo-dot { stroke: var(--focus); stroke-width: 2.5; }
 
 /* The key, one line, in the map's own marks. */
-.geo-key { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 8px 0; color: var(--ink-3); font-size: 12px; }
+.geo-key { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 10px 8px 0; color: var(--ink-3); font-size: var(--text-sm); }
 .geo-key-item { display: inline-flex; align-items: center; gap: 6px; }
 .geo-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--paper-2); box-sizing: border-box; }
 .geo-swatch.is-other { background: var(--paper-2); border-color: var(--ink-3); }
@@ -52,27 +56,31 @@
 /* The list under the map: one row per person with a place, in the engine's
    order, the name a button that selects them on the page. */
 .geo-list { margin: 12px 8px 0; padding: 0; list-style: none; display: grid; gap: 6px; }
-.geo-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: 14px; }
+.geo-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-size: var(--text-base); }
 .geo-row.is-you { color: var(--ink-2); }
-.geo-name { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent-line); text-underline-offset: 3px; }
+/* The row is one line of text, but the name is a control, and a control has
+   to be reachable by a finger as well as a cursor: padding grows the target
+   to the 24px minimum, the matching negative margin keeps the line looking
+   exactly like a line of text. */
+.geo-name { padding: 6px 4px; margin: -6px -4px; min-height: 24px; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-decoration-color: var(--accent-line); text-underline-offset: 3px; }
 .geo-name:hover, .geo-name:focus-visible { text-decoration-color: var(--accent); outline: none; }
-.geo-name:focus-visible { box-shadow: 0 0 0 2px var(--paper-2), 0 0 0 4px var(--focus); border-radius: 2px; }
+.geo-name:focus-visible { box-shadow: 0 0 0 2px var(--paper-2), 0 0 0 4px var(--focus); border-radius: var(--radius-xs); }
 .geo-row.is-other .geo-name { font-weight: 500; color: var(--ink-2); }
 .geo-place { color: var(--ink-2); }
-.geo-distance { color: var(--ink-3); font-size: 13px; }
-.geo-example { color: var(--ink-3); font-size: 12px; font-style: italic; }
+.geo-distance { color: var(--ink-3); font-size: var(--text-md); }
+.geo-example { color: var(--ink-3); font-size: var(--text-sm); font-style: italic; }
 
 /* The sentences: who chose not to say, what you have shared, the region
    counts, and what none of this is used for. */
-.geo-you, .geo-unlocated, .geo-regions, .geo-note { margin: 10px 8px 0; max-width: var(--measure); font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.geo-you, .geo-unlocated, .geo-regions, .geo-note { margin: 10px 8px 0; max-width: var(--measure); font-size: var(--text-md); line-height: 1.5; color: var(--ink-2); }
 .geo-unlocated { color: var(--ink); }
-.geo-note { color: var(--ink-3); font-size: 12.5px; }
+.geo-note { color: var(--ink-3); font-size: var(--text-sm); }
 
 /* People, but none with a place: one sentence where the map would be, in the
    grid so it stands where the map would have stood. */
-.geo-absent { align-self: start; margin: 0; padding: 14px var(--pad); border: 1px dashed var(--line); border-radius: var(--radius); color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.geo-absent { align-self: start; margin: 0; padding: 14px var(--pad); border: 1px dashed var(--line); border-radius: var(--radius); color: var(--ink-2); font-size: var(--text-base); line-height: 1.5; }
 
 @media (max-width: 600px) {
-  .geo-label { font-size: 18px; }
+  .geo-label { font-size: var(--text-lg); }
   .geo-key { gap: 4px 12px; }
 }

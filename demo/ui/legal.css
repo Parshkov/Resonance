@@ -38,15 +38,15 @@ html, body { margin: 0; background: var(--paper); }
 body {
   color: var(--ink);
   font-family: var(--sans);
-  font-size: 15px;
+  font-size: var(--text-body);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
 
 .doc { max-width: 68ch; margin: 0 auto; padding: 40px 22px 72px; }
 
-.doc-brand { margin: 0 0 30px; font-family: var(--serif); font-size: 19px; letter-spacing: -.01em; }
-.doc-brand a { color: var(--ink); text-decoration: none; }
+.doc-brand { margin: 0 0 30px; font-family: var(--serif); font-size: var(--text-lg); letter-spacing: -.01em; }
+.doc-brand a { display: inline-flex; align-items: center; min-height: 24px; color: var(--ink); text-decoration: none; }
 .doc-brand a:hover { color: var(--accent); }
 
 h1 {
@@ -58,19 +58,19 @@ h1 {
   letter-spacing: -.025em;
 }
 
-.doc-lede { margin: 0 0 34px; color: var(--ink-2); font-size: 16px; line-height: 1.6; }
+.doc-lede { margin: 0 0 34px; color: var(--ink-2); font-size: var(--text-body); line-height: 1.6; }
 
 h2 {
   margin: 38px 0 10px;
   padding-top: 18px;
   border-top: 1px solid var(--line-soft);
   font-family: var(--serif);
-  font-size: 21px;
+  font-size: var(--text-xl);
   font-weight: 500;
   letter-spacing: -.015em;
 }
 
-h3 { margin: 22px 0 6px; font-size: 14px; font-weight: 650; letter-spacing: .01em; color: var(--ink); }
+h3 { margin: 22px 0 6px; font-size: var(--text-base); font-weight: 650; letter-spacing: .01em; color: var(--ink); }
 
 p { margin: 0 0 12px; color: var(--ink-2); }
 p strong, li strong { color: var(--ink); font-weight: 600; }
@@ -80,12 +80,12 @@ ul { margin: 0 0 12px; padding-left: 20px; color: var(--ink-2); }
 li { margin: 0 0 7px; }
 
 .doc-list { margin: 14px 0 0; }
-.doc-list dt { margin-top: 15px; font-weight: 650; color: var(--ink); font-size: 14px; }
+.doc-list dt { margin-top: 15px; font-weight: 650; color: var(--ink); font-size: var(--text-base); }
 .doc-list dd { margin: 5px 0 0; color: var(--ink-2); }
 
 code {
   padding: 1px 5px;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: var(--code-bg);
   font-family: var(--mono);
   font-size: .88em;
@@ -96,10 +96,10 @@ code {
   margin: 12px 0 14px;
   padding: 13px 15px;
   border: 1px solid var(--line);
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   background: var(--code-bg);
 }
-.doc-code code { padding: 0; background: none; font-size: 14px; }
+.doc-code code { padding: 0; background: none; font-size: var(--text-base); }
 
 .contact-value { font-family: var(--mono); font-size: .92em; overflow-wrap: anywhere; }
 
@@ -110,7 +110,13 @@ a { color: var(--accent); text-underline-offset: 2px; }
   padding-top: 18px;
   border-top: 1px solid var(--line-soft);
   color: var(--ink-3);
-  font-size: 13px;
+  font-size: var(--text-md);
+}
+/* One line of small text, but three of the words are links, and a link is a
+   control: padding carries the 24px target, the matching negative margin keeps
+   the line reading as a sentence rather than as three buttons. */
+.doc-foot a {
+  display: inline-block; min-height: 24px; padding: 3px 2px; margin: -3px -2px;
 }
 
 @media (max-width: 520px) {
@@ -126,7 +132,7 @@ a { color: var(--accent); text-underline-offset: 2px; }
    put near-white dark-mode text on a white pill. */
 .signin-provider {
   display: flex; align-items: center; justify-content: center;
-  min-height: 3rem; padding: 0 1.25rem; border-radius: 999px;
+  min-height: 3rem; padding: 0 1.25rem; border-radius: var(--radius-pill);
   border: 1px solid var(--ink); background: var(--ink);
   color: var(--paper); font-weight: 500; text-decoration: none;
 }
