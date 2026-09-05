@@ -387,11 +387,16 @@
         <a href="/terms">Terms</a>
         <a href="/support">Support</a>
       </p>
-      <!-- The colour control's home. account.mjs lifts it into the account
-           panel when there is one, which is where a preference belongs; a
-           visitor who has not signed in still has it here rather than nowhere.
-           One place at a time, and never across the top of the page. -->
-      <div class="theme-home" id="theme-home">
+      <!-- Where the colour control waits between openings. Never seen: it is
+           lifted into whichever masthead menu is open, and put back when that
+           menu is rebuilt, so there is exactly one of it and shell.mjs keeps
+           the listeners it bound at load.
+
+           It used to live here visibly whenever nobody was signed in, which
+           put a segmented control under the legal links looking like it had
+           fallen off the page. A preference belongs behind the control in the
+           masthead, in the same place whether or not you have an account. -->
+      <div class="theme-home" id="theme-home" hidden>
         <div class="theme-switch" id="theme-switch" role="radiogroup" aria-labelledby="theme-switch-label">
           <span class="theme-switch__label" id="theme-switch-label">Colours</span>
           <label class="theme-option"><input type="radio" name="theme" value="light"><span>Light</span></label>

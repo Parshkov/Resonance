@@ -31,18 +31,56 @@ function signInLink(base, className) {
 }
 
 function returnThemeHome() {
-  // Whoever is looking must be able to reach it. With no account button there
-  // is no panel to hold it, so it goes back to where the page keeps it.
+  // Exactly one colour control exists, so it is parked rather than copied:
+  // a second copy would carry no listeners and would disagree with the first.
   const theme = document.getElementById("theme-switch");
   const home = document.getElementById("theme-home");
   if (theme && home && theme.parentElement !== home) home.append(theme);
+}
+
+function coloursRow() {
+  const theme = document.getElementById("theme-switch");
+  if (!theme) return null;
+  const row = element("div", "account-panel__row");
+  row.append(element("p", "account-panel__caption", "Colours"));
+  row.append(theme);
+  return row;
+}
+
+function panelToggle(button, panel) {
+  button.setAttribute("aria-expanded", "false");
+  button.setAttribute("aria-haspopup", "dialog");
+  panel.hidden = true;
+  panel.setAttribute("role", "dialog");
+  button.addEventListener("click", () => {
+    const showing = panel.hidden;
+    panel.hidden = !showing;
+    button.setAttribute("aria-expanded", showing ? "true" : "false");
+  });
 }
 
 function renderSignedOut(state, urgent = false) {
   returnThemeHome();
   const link = signInLink(state.sign_in_url, "account-action");
   if (urgent) link.classList.add("account-action-urgent");
-  slot.replaceChildren(link);
+
+  // Signing in is what this page is asking for, so it stays a button and is
+  // never buried in a menu. Preferences sit beside it, behind the same kind of
+  // control they sit behind once you have an account -- one place, both
+  // states, so nobody has to learn it twice.
+  const settings = element("button", "settings-button");
+  settings.type = "button";
+  settings.title = "Display settings";
+  settings.setAttribute("aria-label", "Display settings");
+  settings.append(element("span", "settings-button__glyph", "Aa"));
+  const panel = element("div", "account-panel account-panel--compact");
+  panel.setAttribute("aria-label", "Display settings");
+  const colours = coloursRow();
+  if (colours) panel.append(colours);
+  panelToggle(settings, panel);
+
+  slot.replaceChildren(link, settings, panel);
+  rendered = null;
   if (gate && gateActions) {
     gateActions.replaceChildren(signInLink(state.sign_in_url, "button button-primary"));
     gate.hidden = false;
@@ -79,8 +117,6 @@ function renderSignedIn(account) {
 
   const button = element("button", "account-button");
   button.type = "button";
-  button.setAttribute("aria-expanded", "false");
-  button.setAttribute("aria-haspopup", "dialog");
   button.append(element("span", "account-button__mark", initials(label)));
   const naming = element("span", "account-button__naming");
   naming.append(element("span", "account-button__role", "Your name here"));
@@ -88,8 +124,6 @@ function renderSignedIn(account) {
   button.append(naming);
 
   const panel = element("div", "account-panel");
-  panel.hidden = true;
-  panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", "Your account");
 
   const seen = element("div", "account-panel__row");
@@ -117,16 +151,10 @@ function renderSignedIn(account) {
     panel.append(local);
   }
 
-  // A preference lives behind the account, not across the top of the page.
-  // The control itself is moved, not rebuilt, so shell.mjs keeps the one set
-  // of listeners it bound at load and there is no second copy to disagree.
-  const theme = document.getElementById("theme-switch");
-  if (theme) {
-    const row = element("div", "account-panel__row");
-    row.append(element("p", "account-panel__caption", "Colours"));
-    row.append(theme);
-    panel.append(row);
-  }
+  // A preference lives behind the account, not across the top of the page and
+  // never in the footer.
+  const colours = coloursRow();
+  if (colours) panel.append(colours);
 
   // Sign-out changes state, so it is a POST form rather than a link that a
   // prefetch or a link scanner could follow on the person's behalf.
@@ -138,12 +166,7 @@ function renderSignedIn(account) {
   form.append(out);
   panel.append(form);
 
-  button.addEventListener("click", () => {
-    const showing = panel.hidden;
-    panel.hidden = !showing;
-    button.setAttribute("aria-expanded", showing ? "true" : "false");
-  });
-
+  panelToggle(button, panel);
   slot.replaceChildren(button, panel);
   rendered = fingerprint(account);
   if (gate) gate.hidden = true;

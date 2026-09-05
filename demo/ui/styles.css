@@ -167,7 +167,23 @@ section:focus { outline: none; }
 .theme-switch__label { padding: 0 9px 0 11px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
 .account-panel .theme-switch { width: 100%; justify-content: space-between; background: var(--paper); }
 .account-panel .theme-switch__label { display: none; }
-.theme-home { display: flex; }
+/* A parking place, never seen: the control is lifted into whichever masthead
+   menu is open. It used to sit visibly in the footer whenever nobody was
+   signed in, which read as a segmented control that had fallen off the page. */
+.theme-home { display: none; }
+
+/* The settings control for someone who has not signed in. Same place, same
+   behaviour and same panel as the account menu has once they do, so the way
+   to reach a preference is learned once. */
+.settings-button {
+  display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2);
+  color: var(--ink-2); cursor: pointer;
+}
+.settings-button:hover { border-color: var(--ink-3); color: var(--ink); background: var(--paper-3); }
+.settings-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.settings-button__glyph { font-family: var(--serif); font-size: 14px; line-height: 1; }
+.account-panel--compact { width: min(260px, calc(100vw - 32px)); }
 .theme-option { position: relative; display: inline-flex; }
 .theme-option input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .theme-option span {
@@ -179,7 +195,7 @@ section:focus { outline: none; }
 .theme-option:hover input:not(:checked) + span { background: var(--paper-3); color: var(--ink); }
 
 /* Who you are, and the name others see. */
-.account-slot { position: relative; display: flex; align-items: center; min-width: 0; }
+.account-slot { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .account-slot:empty { display: none; }
 
 /* One control instead of three competing texts. It shows the only identity
