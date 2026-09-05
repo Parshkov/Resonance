@@ -104,6 +104,51 @@ class AuthorshipTests(unittest.TestCase):
         self.assertIn("half your words", instructions)
         self.assertIn("everyone to everyone", instructions)
 
+class TopicAuthorshipTests(unittest.TestCase):
+    """A topic is where the assistant's framing would creep in unwatched.
+
+    The first share is asked whose reasoning it is. Everything a person adds
+    to a shared topic afterwards is the same act — structure indexed under
+    their name and read by the other side — and it was not asked at all, so
+    an assistant could contribute its own shape freely once an introduction
+    had been made.
+    """
+
+    def setUp(self):
+        self.runtime = build_runtime(":memory:",
+                                     allowed_origins=frozenset({"http://127.0.0.1"}),
+                                     seed=False)
+        self.bridge = RemoteMCPBridge(self.runtime.product)
+        self.token = self.runtime.product.register_guest().access_token
+
+    def _contribute(self, **extra):
+        return self.bridge.tool_contribute_to_topic(self.token, {
+            "workspace_id": "ws-1", "thought": THOUGHT, "confirm": True,
+            "note": "what I now understand", **extra})
+
+    def test_contributing_must_say_whose_reasoning_it_is(self):
+        for arguments, why in (({}, "omitted"),
+                               ({"authorship": "i_proposed_it"}, "the assistant's own"),
+                               ({"authorship": "probably_theirs"}, "invented")):
+            with self.subTest(why):
+                with self.assertRaises(BridgeError) as caught:
+                    self._contribute(**arguments)
+                self.assertEqual(caught.exception.code, "validation_failed")
+                self.assertIn("authorship", str(caught.exception).lower() + " authorship")
+
+    def test_the_published_schema_asks_for_what_the_server_requires(self):
+        """A required field missing from the schema, with additionalProperties
+        false, makes the tool impossible to call correctly rather than merely
+        strict — the client is told not to send the only thing that would work.
+        """
+        for name in ("resonance_prepare_thought", "resonance_contribute_to_topic"):
+            with self.subTest(name):
+                tool = next(t for t in TOOLS if t["name"] == name)
+                schema = tool["inputSchema"]
+                self.assertIn("authorship", schema["properties"], name)
+                self.assertIn("authorship", schema["required"], name)
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -552,10 +552,11 @@ TOOLS: list[dict[str, Any]] = [
         "inputSchema": {
             "type": "object",
             "properties": {"workspace_id": {"type": "string"},
+                           "authorship": AUTHORSHIP,
                            "thought": THOUGHT_SCHEMA,
                            "note": {"type": "string", "maxLength": 1000},
                            "confirm": _CONFIRM, "request_id": _REQUEST_ID},
-            "required": ["workspace_id", "thought", "confirm"],
+            "required": ["workspace_id", "authorship", "thought", "confirm"],
             "additionalProperties": False,
         },
         "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": False},
@@ -801,6 +802,22 @@ class RemoteMCPBridge:
                               "confirm=true is required after the person explicitly approved this action")
 
     @staticmethod
+    def _required_id(arguments: Mapping[str, Any], name: str) -> str:
+        """A required identifier, or a refusal that names what is missing.
+
+        Omitting one used to reach the product layer as the empty string, and
+        the empty string belongs to nobody — so the caller was told the
+        resource was "unavailable to authenticated subject", which reads as
+        "that is someone else's data" rather than "you left out an argument".
+        An assistant reading that would apologise to the person for something
+        that never went wrong.
+        """
+        value = str(arguments.get(name) or "").strip()
+        if not value:
+            raise BridgeError("validation_failed", f"{name} is required")
+        return value
+
+    @staticmethod
     def _request_id(arguments: Mapping[str, Any]) -> str:
         value = str(arguments.get("request_id") or "")
         if not value:
@@ -922,8 +939,8 @@ class RemoteMCPBridge:
         # The share commit is idempotent on the draft itself (one confirmation
         # token, one commit); request_id is kept in the contract for parity.
         result = self.product.share_prepared(
-            token, str(arguments.get("draft_id", "")),
-            confirmation_token=str(arguments.get("confirmation_token", "")),
+            token, self._required_id(arguments, "draft_id"),
+            confirmation_token=self._required_id(arguments, "confirmation_token"),
             confirmed=True, **self._security())
         return {"contract_version": BRIDGE_CONTRACT, "shared": True, "discoverable": True,
                 "request_id": request_id,
@@ -992,8 +1009,8 @@ class RemoteMCPBridge:
                               "presentation only)")]
 
     def tool_explain_match(self, token: str, arguments: dict[str, Any]) -> Any:
-        result_id = str(arguments.get("result_id", ""))
-        session_id = str(arguments.get("session_id", ""))
+        result_id = self._required_id(arguments, "result_id")
+        session_id = self._required_id(arguments, "session_id")
         evidence = self.product.get_match(token, result_id, session_id)
         try:
             svg = self.product.visual_structure(token, result_id, session_id)
@@ -1063,9 +1080,15 @@ class RemoteMCPBridge:
 
     def tool_contribute_to_topic(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)
+        # A topic is where reasoning keeps accumulating after the introduction,
+        # so it is exactly where the assistant's own framing would creep in if
+        # only the first share were asked. Same question, same refusal.
+        authorship = self._require_authorship(arguments)
         return {"contract_version": BRIDGE_CONTRACT,
+                "authorship": authorship,
+                "authorship_note": self.AUTHORSHIP_ACCEPTED[authorship],
                 **self.product.contribute_to_topic(
-                    token, str(arguments.get("workspace_id", "")),
+                    token, self._required_id(arguments, "workspace_id"),
                     thought=arguments.get("thought"),
                     note=str(arguments.get("note", "") or ""),
                     confirmed=True, **self._security())}
@@ -1084,7 +1107,7 @@ class RemoteMCPBridge:
 
     def tool_stop_sharing(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)
-        session_id = str(arguments.get("session_id", ""))
+        session_id = self._required_id(arguments, "session_id")
         self.product.revoke_session(token, session_id, confirmed=True, **self._security())
         return {"contract_version": BRIDGE_CONTRACT, "session_id": session_id,
                 "shared": False, "discoverable": False, "revoked": True}
