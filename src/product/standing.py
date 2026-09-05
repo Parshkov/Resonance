@@ -130,6 +130,8 @@ class StandingSearch:
         theirs = str(row.get("session_id", ""))
         if not theirs or theirs == session_id:
             return 0
+        if not self._is_a_resonance(row):
+            return 0
         source = self.identity.policy_source
         their_owner = source.owner_of("session", theirs)
         if not their_owner or their_owner == owner:
@@ -152,6 +154,22 @@ class StandingSearch:
             written += self._put(their_owner, theirs, session_id, scores=scores,
                                  mode=mode, reason="they_arrived")
         return written
+
+    @staticmethod
+    def _is_a_resonance(row: Mapping[str, Any]) -> bool:
+        """Only tell someone about a pair the engine itself calls a resonance.
+
+        Discovery returns rows it declines to endorse: a shared skeleton with no
+        semantic evidence comes back classified `negative`, and a row can carry a
+        hard rejection outright. The engine decides what a resonance is, and this
+        half of the product had been overriding it — telling a person "someone
+        resonates with your thought" about a pair the very same search reported
+        as a non-match, one screen away. Worse, that is the pair a person would
+        then be asked to make an introduction over.
+        """
+        if row.get("hard_rejection"):
+            return False
+        return str(row.get("mode_classification") or "").lower() not in {"", "negative"}
 
     def _is_live_participant(self, session_id: str) -> bool:
         """A session worth telling someone about: discoverable, and a person.

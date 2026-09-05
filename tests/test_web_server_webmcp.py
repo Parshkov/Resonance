@@ -297,6 +297,41 @@ class WebServerWebMCPTests(unittest.TestCase):
                 _os.environ["RESONANCE_OPENAI_CHALLENGE"] = previous
         self.assertIsNotNone(product_server)
 
+    def test_a_thought_shared_from_the_page_is_named_after_its_own_structure(self):
+        """A share from this page arrives as text, so there is no topic to take
+        from the caller, and every one of them was landing as "Shared thought"
+        in the domain "general" — indistinguishable to the people they matched."""
+        from src.product.web_server import _topic_from_structure
+        client = Client(self.base)
+        client.guest()
+        client.request("POST", "/api/webmcp/prepare", {
+            "request_id": "name-1",
+            "context": ("Delivery pressure causes shortcuts. Shortcuts cause rework. "
+                        "A protected slack week prevents shortcuts.")})
+        _, preview, _ = client.request("GET", "/api/webmcp/preview")
+        client.request("POST", "/api/webmcp/share", {
+            "request_id": "name-2", "confirm": True,
+            "confirmation_token": preview["confirmation_token"]})
+        _, context, _ = client.request("GET", "/api/context")
+        topic = (context.get("presentation") or {}).get("topic", "")
+        self.assertNotEqual(topic, "Shared thought")
+        self.assertIn("→", topic)
+        # Derived from the structure the person already read and approved, so
+        # naming it afterwards discloses nothing new.
+        self.assertEqual(
+            topic,
+            _topic_from_structure(preview["will_become_discoverable"]["thought"])[:120])
+
+    def test_naming_survives_a_thought_with_no_causal_spine(self):
+        from src.product.web_server import _topic_from_structure
+        self.assertEqual(_topic_from_structure({}), "")
+        self.assertEqual(_topic_from_structure(None), "")
+        self.assertEqual(
+            _topic_from_structure({"nodes": [{"id": "a", "label": "one"},
+                                             {"id": "b", "label": "two"}],
+                                   "relations": []}),
+            "one · two")
+
     def test_every_remote_tool_carries_the_annotations_directories_require(self):
         # Anthropic requires a `title` plus the applicable readOnlyHint /
         # destructiveHint. OpenAI requires readOnlyHint, openWorldHint AND

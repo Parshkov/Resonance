@@ -124,15 +124,85 @@ def _has_shared(product, token: str) -> bool:
 MAX_CONTEXT_CHARS = 4000
 
 
+PLACEHOLDER_TOPIC = "Shared thought"
+
+
 def _presentation_for(thought: Any) -> dict[str, Any]:
     """The durable projection needs exactly {topic, domain, cluster_id}; derive
     them from what the agent supplied (never from the raw text)."""
     topic = (str(thought.get("topic") or "").strip() if isinstance(thought, Mapping) else "") \
-        or "Shared thought"
+        or PLACEHOLDER_TOPIC
     domain = (str(thought.get("domain") or "").strip() if isinstance(thought, Mapping) else "") \
         or "general"
     return {"topic": topic[:120], "domain": domain[:60],
             "cluster_id": (_slug(topic) or "shared")[:48]}
+
+
+def _topic_from_structure(thought_dna: Any) -> str:
+    """Name a thought after its own causal spine.
+
+    A share from this page arrives as text, so there is no topic to take from
+    the caller and everything was landing as "Shared thought" in the domain
+    "general" — every browser-shared thought titled identically, and the domain
+    signal the classifier uses thrown away before it was ever computed. The
+    extracted graph already says what the thought is: the thing that starts the
+    chain and the thing it ends in.
+    """
+    if not isinstance(thought_dna, Mapping):
+        return ""
+    nodes = {str(n.get("id")): str(n.get("label") or "").strip()
+             for n in (thought_dna.get("nodes") or []) if isinstance(n, Mapping)}
+    relations = [r for r in (thought_dna.get("relations") or []) if isinstance(r, Mapping)]
+    causal = [r for r in relations if str(r.get("type")) == "causes"]
+    if not causal or not nodes:
+        labels = [label for label in nodes.values() if label]
+        return " · ".join(labels[:2])
+    sources = {str(r.get("source")) for r in causal}
+    targets = {str(r.get("target")) for r in causal}
+    starts = [nodes[i] for i in sources - targets if nodes.get(i)]
+    ends = [nodes[i] for i in targets - sources if nodes.get(i)]
+    if starts and ends:
+        return f"{sorted(starts)[0]} → {sorted(ends)[0]}"
+    first = causal[0]
+    head, tail = nodes.get(str(first.get("source")), ""), nodes.get(str(first.get("target")), "")
+    return f"{head} → {tail}" if head and tail else (head or tail)
+
+
+def _name_after_its_structure(product, token: str, session_id: Any,
+                              security: Mapping[str, Any]) -> None:
+    """Give a thought shared from this page a name of its own.
+
+    A share from here arrives as text, so there is no topic to take from the
+    caller, and every one of them was landing as "Shared thought" in the domain
+    "general" — indistinguishable from each other to the people they matched.
+
+    Named after the share rather than before it: renaming bumps the session
+    version, and the share checks the version it prepared against. Nothing new
+    is disclosed by doing it afterwards, because the name is derived from the
+    same extracted structure the person had already read in the preview and
+    approved. A failure here is silent: a plainly titled shared thought is
+    better than a share that did not happen.
+    """
+    if not session_id:
+        return
+    try:
+        session = product.identity.backend.get_session(str(session_id))
+        existing = dict(getattr(session, "presentation", {}) or {})
+        if str(existing.get("topic") or "") != PLACEHOLDER_TOPIC:
+            # The caller named it. A structured share carries the person's own
+            # words for what this is, and those are not ours to overwrite.
+            return
+        derived = _topic_from_structure(dict(getattr(session, "thought_dna", {}) or {}))
+        if not derived:
+            return
+        product.update_metadata(
+            token, str(session_id),
+            presentation={"topic": derived[:120],
+                          "domain": existing.get("domain") or "general",
+                          "cluster_id": (_slug(derived) or "shared")[:48]},
+            **security)
+    except Exception:  # noqa: BLE001 - a plain title beats a broken share
+        pass
 
 
 def _live_context(product, token: str) -> dict[str, Any] | None:
@@ -495,6 +565,7 @@ class WebHandler(ProductHandler):
                 confirmation_token=str(body.get("confirmation_token", "")),
                 confirmed=True, **security,
             )
+            _name_after_its_structure(product, token, result.get("session_id"), security)
             wire = {
                 "contract_version": WEBMCP_CONTRACT,
                 "draft_id": draft_id,

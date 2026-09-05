@@ -146,6 +146,78 @@ class WaitingTests(unittest.TestCase):
             self.alice.access_token, include_seen=True)["alerts"], [])
 
 
+class OnlyWhatTheEngineEndorsesTests(unittest.TestCase):
+    """The two halves of the product must not contradict each other.
+
+    Discovery returns rows it declines to endorse: a shared skeleton with no
+    semantic evidence comes back classified `negative`. The standing search was
+    alerting on every row, so a person could be told "someone resonates with
+    your thought" about a pair the very same search called a non-match one
+    screen away — and then be invited to ask that person for an introduction.
+
+    The engine decides what a resonance is. This half obeys it.
+    """
+
+    def setUp(self):
+        self.live, self.identity, self.product = build_stack()
+        self.alice = self.product.register("Alice")
+        self.bob = self.product.register("Bob")
+
+    def _shape(self, labels, prefix):
+        roles = ("problem", "mechanism", "outcome")
+        nodes = [{"id": f"{prefix}{i}", "label": labels[i], "role": roles[i]}
+                 for i in range(3)]
+        return {"topic": prefix, "domain": "d", "nodes": nodes,
+                "relations": [{"source": f"{prefix}0", "target": f"{prefix}1",
+                               "type": "causes"},
+                              {"source": f"{prefix}1", "target": f"{prefix}2",
+                               "type": "causes"}]}
+
+    def _classification(self, creds, session_id):
+        found = self.product.discover(creds.access_token, session_id)
+        rows = found.get("matches") or []
+        return rows[0]["mode_classification"] if rows else None
+
+    def test_a_pair_the_engine_calls_negative_is_never_reported(self):
+        """Same skeleton, no shared meaning — here across two languages, which
+        is the clearest way to hold the semantics at zero."""
+        from src.product.mcp_bridge import build_thought_dna
+        english = self._shape(["delivery pressure", "skipped review", "rework"], "e")
+        russian = self._shape(["давление сроков", "пропущенная проверка",
+                               "переделка"], "r")
+        alice_session = share(self.product, self.alice,
+                              build_thought_dna(english, human_id=self.alice.user_id))
+        share(self.product, self.bob,
+              build_thought_dna(russian, human_id=self.bob.user_id))
+        self.assertEqual(self._classification(self.alice, alice_session), "negative")
+        self.assertEqual(
+            self.product.pending_resonances(self.alice.access_token)["alerts"], [],
+            "a pair the search reports as a non-match must not arrive as news")
+
+    def test_a_pair_the_engine_endorses_is_still_reported(self):
+        from src.product.mcp_bridge import build_thought_dna
+        one = self._shape(["delivery pressure", "skipped review", "rework"], "a")
+        two = self._shape(["yield pressure", "salt accumulation",
+                           "root damage"], "b")
+        alice_session = share(self.product, self.alice,
+                              build_thought_dna(one, human_id=self.alice.user_id))
+        share(self.product, self.bob,
+              build_thought_dna(two, human_id=self.bob.user_id))
+        self.assertNotEqual(self._classification(self.alice, alice_session), "negative")
+        self.assertEqual(
+            len(self.product.pending_resonances(self.alice.access_token)["alerts"]), 1)
+
+    def test_a_hard_rejection_is_never_reported(self):
+        from src.product.standing import StandingSearch
+        judge = StandingSearch._is_a_resonance
+        self.assertFalse(judge({"mode_classification": "analogical",
+                                "hard_rejection": "causal inversion"}))
+        self.assertFalse(judge({"mode_classification": "negative"}))
+        self.assertFalse(judge({}))
+        for endorsed in ("analogical", "direct", "approximate", "complementary"):
+            self.assertTrue(judge({"mode_classification": endorsed}), endorsed)
+
+
 class WithdrawalTests(unittest.TestCase):
     """A withdrawal has to reach the people who were already told."""
 
