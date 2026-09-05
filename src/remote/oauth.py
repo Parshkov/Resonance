@@ -424,9 +424,21 @@ class OAuthCore:
             if method == "GET" and path == "/.well-known/oauth-authorization-server/mcp":
                 return self._ok(self._authorization_server_metadata(issuer))
             if path == "/oauth/consent.css" and method == "GET":
+                # An hour of max-age with no validator meant a fix to this
+                # sheet reached nobody who had already seen the page, and
+                # their browser could not even ask whether it had changed --
+                # the stale copy simply won. It is one small file on a page
+                # shown once per authorization, so it revalidates every time;
+                # the ETag keeps that a 304 rather than a refetch.
+                css = CONSENT_CSS.encode("utf-8")
+                etag = '"%s"' % hashlib.sha256(css).hexdigest()[:32]
+                sent = next((v for k, v in headers.items()
+                             if k.lower() == "if-none-match"), None)
+                if sent == etag:
+                    return OAuthResult(304, {"ETag": etag, "Cache-Control": "no-cache"}, b"")
                 return OAuthResult(200, {"Content-Type": "text/css; charset=utf-8",
-                                         "Cache-Control": "public, max-age=3600"},
-                                   CONSENT_CSS.encode("utf-8"))
+                                         "Cache-Control": "no-cache", "ETag": etag},
+                                   css)
             if path == "/oauth/register" and method == "POST":
                 return self._register(body)
             if path == "/oauth/authorize" and method == "GET":

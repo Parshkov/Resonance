@@ -386,6 +386,15 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(headers.get("Content-Type", "").startswith("text/css"))
         self.assertIn("main.consent", body.decode())
+        # A cached sheet with no validator once outlived a fix to it by an
+        # hour, and the browser had no way to ask whether it had changed.
+        self.assertEqual(headers.get("Cache-Control"), "no-cache")
+        etag = headers.get("ETag")
+        self.assertTrue(etag and etag.startswith('"'), etag)
+        status, headers, body = c.get("/oauth/consent.css",
+                                      headers={"If-None-Match": etag})
+        self.assertEqual(status, 304)
+        self.assertEqual(body, b"")
 
     def test_consent_page_carries_no_token(self):
         c = self.c()

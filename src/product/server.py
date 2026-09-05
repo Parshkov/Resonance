@@ -683,8 +683,12 @@ class ProductHandler(BaseHTTPRequestHandler):
             headers={k: v for k, v in self.headers.items()}, body=body, issuer=self._issuer())
         self.send_response(response.status)
         headers = dict(response.headers)
-        headers.setdefault("Content-Type", "application/json; charset=utf-8")
-        headers["Content-Length"] = str(len(response.body))
+        if response.status != 304:
+            # A 304 answers "what you have is current" and carries no
+            # representation, so it must not describe one: no body, and no
+            # Content-Type or Content-Length invented for an absent one.
+            headers.setdefault("Content-Type", "application/json; charset=utf-8")
+            headers["Content-Length"] = str(len(response.body))
         for key, value in headers.items():
             self.send_header(key, value)
         # Same CSP as the rest of the origin; the consent page must not need
