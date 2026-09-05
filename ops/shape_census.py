@@ -10,9 +10,11 @@ anyone tightens them:
     python3 ops/shape_census.py var/resonance-pilot.sqlite
     python3 ops/shape_census.py postgresql://...
 
-It prints counts only. No signature, session, account or label leaves it, and
-shapes held by fewer than three accounts are folded into one number, the same
-rule the heat map uses, so the output cannot single out one person's thought.
+It prints counts only, over real participants (seeded demo personas are not
+people and are not counted). No signature, session, account or label leaves
+it, and shapes held by fewer than three accounts are folded into one number,
+the same rule the heat map uses, so the output cannot single out one person's
+thought.
 """
 from __future__ import annotations
 

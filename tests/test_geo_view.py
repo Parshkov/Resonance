@@ -36,6 +36,18 @@ SHAPE = {
                   {"source": "n3", "target": "n2", "type": "prevents"}],
 }
 
+# What a viewer shares: the cast's reasoning with one more step in it. Every
+# test below adds a viewer to one shared server, and a viewer sharing the
+# cast's exact skeleton would, a dozen tests in, make that skeleton one held by
+# a dozen unrelated accounts and nobody else -- which is precisely what
+# src/product/shapes.py exists to stop treating as a resonance. A viewer whose
+# thought merely resembles the cast's still finds all of them.
+VIEWER_SHAPE = {
+    **SHAPE,
+    "nodes": SHAPE["nodes"] + [{"id": "n4", "label": "review budget", "role": "resource"}],
+    "relations": SHAPE["relations"] + [{"source": "n4", "target": "n3", "type": "supports"}],
+}
+
 
 class Client:
     def __init__(self, base: str):
@@ -64,10 +76,10 @@ class Client:
         self.csrf = payload["csrf_token"]
         return payload
 
-    def share(self, name: str, location=None) -> str:
+    def share(self, name: str, location=None, thought=None) -> str:
         """Prepare, preview and share the common shape; returns the session id."""
         body = {"request_id": f"{name}-prepare", "authorship": "their_own_words",
-                "thought": SHAPE}
+                "thought": thought or SHAPE}
         if location is not None:
             body["coarse_location"] = location
         self.request("POST", "/api/webmcp/prepare", body)
@@ -125,7 +137,7 @@ class GeoRouteTests(unittest.TestCase):
     def _viewer(self, name: str, location=None):
         viewer = Client(self.base)
         viewer.guest()
-        viewer.share(name, location)
+        viewer.share(name, location, VIEWER_SHAPE)
         _, geo = viewer.request("GET", "/api/geo")
         return viewer, geo
 

@@ -37,16 +37,18 @@ Three conditions, all of which must hold before a match is touched:
   pair is a resonance is already decided by the semantic layer, not the
   skeleton. Judging them would mostly delete real matches;
 
-* at least MIN_ACCOUNTS distinct accounts hold it. Below that, coincidence
-  among true ideas is entirely plausible -- people who come here self-select
-  for thinking causally about systems, and small graphs have few shapes. The
-  floor was set by measurement: the R7 demo corpus that ships with the
-  product, which is 23 personas written from templates by one author, tops
-  out at 7 accounts on one exact ten-relation shape. That is the one-author
-  phenomenon in miniature, and it is also the demo; anything that fires at 7
-  deletes the demo's own matches, and `ops/populate_local.py`'s three people
-  after it. Twelve sits clearly above what a curated template corpus reaches
-  and well above anything a small pilot reaches by chance;
+* at least MIN_ACCOUNTS distinct accounts of real participants hold it.
+  Below that, coincidence among true ideas is entirely plausible -- people
+  who come here self-select for thinking causally about systems, and small
+  graphs have few shapes. The floor was set by measurement: the R7 demo
+  corpus that ships with the product, which is 23 personas written from
+  templates by one author, tops out at 7 accounts on one exact ten-relation
+  shape. That is the one-author phenomenon in miniature, and it is also the
+  demo; anything that fires at 7 deletes the demo's own matches, and
+  `ops/populate_local.py`'s three people after it. Twelve sits clearly above
+  what a curated template corpus reaches and well above anything a small
+  pilot reaches by chance. Seeded personas are not counted at all, for the
+  reason given at `census_of_repository`;
 
 * those accounts are at least MIN_SHARE of every account with a discoverable
   thought. A popular true idea is not a defect: in a corpus of thousands, a
@@ -87,6 +89,10 @@ from typing import Any, Iterable, Mapping
 from src.graph import ThoughtGraph
 
 SHAPE_SIGNATURE_VERSION = "resonance-shape-signature/0.1"
+
+# The record kind of a real participant; everything else is seeded demo state
+# (the same distinction standing.py draws before telling anyone anything).
+PERSON = "volunteer"
 
 # See the module prose for why each of these is where it is.
 MIN_RELATIONS = 3
@@ -172,9 +178,10 @@ class ShapeCount:
 class ShapeCensus:
     """How many unrelated accounts hold each exact shape, right now.
 
-    Built from every discoverable thought the engine searches over -- the
-    people, the seeded personas, all of it -- because that is the population
-    whose concentration decides whether a shape still means anything.
+    Built from every discoverable thought a real participant holds, because
+    that is the population whose concentration decides whether a shape still
+    means anything about a person (`census_of_repository` says why seeded
+    personas are not in it).
     """
     accounts: int
     thoughts: int
@@ -259,13 +266,27 @@ class ShapeCensus:
 
 
 def census_of_repository(repo: Any) -> ShapeCensus:
-    """The census over what the engine actually searches: discoverable rows of
-    accounts that are not hidden, mirroring the persistence layer's own notion
-    of a visible session. A store that cannot answer is an empty census, and an
-    empty census never condemns anything."""
+    """The census over the people the engine searches: discoverable rows of
+    volunteer accounts that are not hidden.
+
+    Seeded demo personas are left out on purpose. They are one author's
+    fixtures by construction -- the product already labels them so and the
+    standing search already refuses to tell anyone that a fixture resonates
+    with them -- and their concentration is known: 23 personas, 8 shapes,
+    seven of them on one. Count them and the demo's own template shapes
+    condemn any real person who happens to think in one of them the moment a
+    handful more people arrive; measured on the product's own test corpus,
+    seven personas plus five people crossed the floor. The question the
+    census asks is how many *people* hold a shape, and a persona is not one.
+
+    A store that cannot answer is an empty census, and an empty census never
+    condemns anything.
+    """
     rows: list[tuple[str, Mapping[str, Any]]] = []
     try:
         for session in repo.list_discoverable_sessions():
+            if str(getattr(session, "record_kind", "") or "") != PERSON:
+                continue
             user = repo.get_user(session.user_id)
             if user is None or getattr(user, "hidden", False):
                 continue
