@@ -84,11 +84,21 @@ def report_russian() -> tuple[int, list[str]]:
     return len(RUSSIAN_PROBES) - len(missing), missing
 
 
+DEFAULT_BASELINE = Path(__file__).resolve().parent / "english_lexicon.baseline"
+"""The English signature as it stood before any other language was added.
+
+Without it, "English is unchanged" is a claim rather than a check: the run
+prints a healthy line and verifies nothing. It is recorded from the commit
+before the Russian work began, so a regression in either direction shows up
+as a diff and not as a silence.
+"""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--russian", action="store_true",
                         help="report which Russian probes resolve")
-    parser.add_argument("--baseline", type=Path,
+    parser.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE,
                         help="a signature file written by --write-baseline")
     parser.add_argument("--write-baseline", type=Path,
                         help="record the current English signature and exit")
@@ -106,7 +116,10 @@ def main() -> int:
     for problem in failures:
         print(f"MIXED ALPHABET: {problem}")
 
-    if args.baseline and args.baseline.exists():
+    if args.baseline and not args.baseline.exists():
+        failures.append(f"no baseline at {args.baseline}; English cannot be checked")
+        print(f"MISSING BASELINE: {args.baseline}")
+    elif args.baseline:
         recorded = {}
         for line in args.baseline.read_text(encoding="utf-8").splitlines():
             if "\t" in line:
