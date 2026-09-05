@@ -51,6 +51,8 @@ from http.cookies import SimpleCookie
 from typing import Any, Mapping
 from urllib.parse import quote, urlencode
 
+from .cimd import ClientMetadataCache, CimdError, looks_like_cimd
+
 # The single resource this authorization server protects, relative to issuer.
 RESOURCE_PATH = "/mcp"
 COOKIE_NAME = "resonance_token"
@@ -351,6 +353,10 @@ class OAuthCore:
         # account would make the same person a stranger on every surface, and
         # leave no one to notify when a match appears.
         self._sign_in_required = sign_in_required or (lambda: False)
+        # Client ID Metadata Documents: a client identified by an https URL
+        # rather than by a stored registration. Fetched documents are cached
+        # briefly so a busy directory costs one fetch, not one per person.
+        self.client_metadata = ClientMetadataCache()
 
     def sign_in_required(self) -> bool:
         try:
@@ -448,6 +454,9 @@ class OAuthCore:
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
             "token_endpoint_auth_methods_supported": ["none"],
+            # Selected over dynamic registration when a host sees both this and
+            # the "none" auth method above.
+            "client_id_metadata_document_supported": True,
             "revocation_endpoint_auth_methods_supported": ["none"],
             "scopes_supported": list(SUPPORTED_SCOPES),
             "resource_indicators_supported": True,
@@ -548,9 +557,21 @@ class OAuthCore:
             raise OAuthError("invalid_request", "client_id required")
         if not redirect_uri or not self._redirect_shape_ok(redirect_uri):
             raise OAuthError("invalid_request", "a valid absolute redirect_uri is required")
-        client = self.store.get_client(client_id)
-        if client is not None and redirect_uri not in client["redirect_uris"]:
-            raise OAuthError("invalid_request", "redirect_uri not registered for this client")
+        if looks_like_cimd(client_id):
+            # The client_id is its own metadata document. Its redirect_uris are
+            # authoritative, so an unknown redirect_uri is refused here rather
+            # than tolerated the way an unregistered client_id is.
+            try:
+                metadata = self.client_metadata.get(client_id)
+            except CimdError as exc:
+                raise OAuthError("invalid_client", str(exc))
+            if not metadata.allows(redirect_uri):
+                raise OAuthError("invalid_request",
+                                 "redirect_uri is not listed in the client metadata document")
+        else:
+            client = self.store.get_client(client_id)
+            if client is not None and redirect_uri not in client["redirect_uris"]:
+                raise OAuthError("invalid_request", "redirect_uri not registered for this client")
         # Past this point redirect_uri is trusted enough to redirect errors to it.
         resp_type = params.get("response_type", "")
         if resp_type != "code":
@@ -912,8 +933,15 @@ class OAuthCore:
                        'Allow access</button>'
                        '<button type="submit" name="decision" value="deny">Cancel</button>'
                        '</div>')
-        client = self.store.get_client(clean["client_id"]) or {}
-        client_name = str(client.get("client_name") or "").strip()
+        client_name = ""
+        if looks_like_cimd(clean["client_id"]):
+            try:
+                client_name = self.client_metadata.get(clean["client_id"]).client_name
+            except CimdError:
+                client_name = ""
+        else:
+            client = self.store.get_client(clean["client_id"]) or {}
+            client_name = str(client.get("client_name") or "").strip()
         who = (f"<strong>{e(client_name)}</strong> (<code>{e(clean['client_id'])}</code>)"
                if client_name else f"A client (<code>{e(clean['client_id'])}</code>)")
         # No inline script/style: the origin serves CSP default-src 'self'. The
