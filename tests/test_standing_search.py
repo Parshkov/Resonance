@@ -179,16 +179,22 @@ class OnlyWhatTheEngineEndorsesTests(unittest.TestCase):
         return rows[0]["mode_classification"] if rows else None
 
     def test_a_pair_the_engine_calls_negative_is_never_reported(self):
-        """Same skeleton, no shared meaning — here across two languages, which
-        is the clearest way to hold the semantics at zero."""
+        """Same skeleton, no shared meaning.
+
+        This used to be written as English against its own Russian
+        translation, on the reasoning that the lexicon could not read one of
+        them. It can now — «давление сроков» is the same thought as "delivery
+        pressure" and the engine says so — so holding the semantics at zero
+        takes labels the lexicon is genuinely silent about, in any language.
+        """
         from src.product.mcp_bridge import build_thought_dna
         english = self._shape(["delivery pressure", "skipped review", "rework"], "e")
-        russian = self._shape(["давление сроков", "пропущенная проверка",
-                               "переделка"], "r")
+        unrelated = self._shape(["blue kettle", "wooden fence",
+                                 "paper lantern"], "r")
         alice_session = share(self.product, self.alice,
                               build_thought_dna(english, human_id=self.alice.user_id))
         share(self.product, self.bob,
-              build_thought_dna(russian, human_id=self.bob.user_id))
+              build_thought_dna(unrelated, human_id=self.bob.user_id))
         self.assertEqual(self._classification(self.alice, alice_session), "negative")
         self.assertEqual(
             self.product.pending_resonances(self.alice.access_token)["alerts"], [],
