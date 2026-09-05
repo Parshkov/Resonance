@@ -38,9 +38,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import os
 import smtplib
 import ssl
+import urllib.error
+import urllib.request
 import time
 from email.message import EmailMessage
 from typing import Any, Callable, Mapping
@@ -76,8 +79,10 @@ class Sender:
 class NoTransport(Sender):
     """No mail server is configured, so nothing is sent and nothing pretends."""
 
-    reason = ("no mail server configured (set RESONANCE_SMTP_HOST, "
-              "RESONANCE_SMTP_USER, RESONANCE_SMTP_PASSWORD, RESONANCE_MAIL_FROM)")
+    reason = ("nowhere to hand an email: set RESONANCE_MAIL_API_KEY and "
+              "RESONANCE_MAIL_FROM (an HTTPS provider, which is what works "
+              "where outbound SMTP is blocked), or the RESONANCE_SMTP_* "
+              "variables where it is not")
 
     def send(self, to: str, subject: str, body: str,
              unsubscribe: str = "") -> bool:
@@ -129,8 +134,70 @@ class SmtpSender(Sender):
         return True
 
 
+class HttpApiSender(Sender):
+    """An email provider's HTTPS API, because SMTP does not leave this host.
+
+    Measured, not assumed: on the platform this runs on, ports 587, 465 and 25
+    all time out on IPv4 and have no IPv6 route at all. That is a block, and no
+    credential fixes it. Port 443 obviously works -- the site is served over it
+    -- so the message goes out the same door as everything else.
+
+    Written for Resend's shape (POST /emails with from/to/subject/text), which
+    Postmark and Mailgun differ from only in field names and URL; swapping is a
+    handful of lines if this one ever disappoints.
+    """
+
+    def __init__(self, api_key: str, sender: str, reply_to: str = "",
+                 url: str = "https://api.resend.com/emails",
+                 timeout: float = 20.0) -> None:
+        self.api_key = api_key
+        self.sender = sender
+        self.reply_to = reply_to
+        self.url = url
+        self.timeout = timeout
+
+    def send(self, to: str, subject: str, body: str,
+             unsubscribe: str = "") -> bool:
+        payload: dict[str, Any] = {"from": self.sender, "to": [to],
+                                   "subject": subject, "text": body}
+        if self.reply_to:
+            payload["reply_to"] = self.reply_to
+        if unsubscribe:
+            # RFC 8058, same as over SMTP: the way out is a button in the mail
+            # client, not a link to hunt for at the bottom.
+            payload["headers"] = {
+                "List-Unsubscribe": f"<{unsubscribe}>",
+                "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            }
+        request = urllib.request.Request(
+            self.url, data=json.dumps(payload).encode("utf-8"),
+            headers={"Authorization": f"Bearer {self.api_key}",
+                     "Content-Type": "application/json"},
+            method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                return 200 <= response.status < 300
+        except urllib.error.HTTPError as exc:
+            # The provider's own words about why, which is the whole reason to
+            # surface this rather than return a bare False.
+            detail = exc.read().decode("utf-8", "replace")[:200]
+            raise RuntimeError(f"{exc.code} {detail}") from exc
+
+
 def sender_from_env(environ: Mapping[str, str] | None = None) -> Sender:
     env = environ if environ is not None else os.environ
+    sender_address = str(env.get("RESONANCE_MAIL_FROM") or "").strip()
+    reply_to_address = str(env.get("RESONANCE_MAIL_REPLY_TO")
+                           or env.get("RESONANCE_CONTACT") or "").strip()
+
+    # Preferred, because it is the one that works where this runs.
+    api_key = str(env.get("RESONANCE_MAIL_API_KEY") or "").strip()
+    if api_key and sender_address:
+        return HttpApiSender(
+            api_key, sender_address, reply_to_address,
+            url=str(env.get("RESONANCE_MAIL_API_URL")
+                    or "https://api.resend.com/emails").strip())
+
     host = str(env.get("RESONANCE_SMTP_HOST") or "").strip()
     user = str(env.get("RESONANCE_SMTP_USER") or "").strip()
     password = str(env.get("RESONANCE_SMTP_PASSWORD") or "").strip()
