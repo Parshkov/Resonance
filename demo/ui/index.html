@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Resonance</title>
+  <!-- The scale first: every sheet below reads it, and a missing custom
+       property is dropped silently rather than reported. -->
+  <link rel="stylesheet" href="/tokens.css">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/topics.css">
   <link rel="stylesheet" href="/geo.css">
@@ -28,10 +31,18 @@
        so the first paint is already the right one. -->
   <div class="app-shell" id="app-shell" data-state="loading">
     <header class="masthead">
-      <a class="brand" href="/" aria-label="Resonance">
-        <span class="brand-mark" aria-hidden="true"></span>
-        <span class="wordmark">Resonance</span>
-      </a>
+      <!-- The page's one h1. It sits here rather than in a section because the
+           sections come and go with what a person has: the hero is gone once a
+           thought is shared, and the news section can stand above everything.
+           A heading that moves, or disappears, leaves the document opening on
+           an h2 -- so the name of the page is the page's heading, and every
+           section under it is an h2. -->
+      <h1 class="brand-title">
+        <a class="brand" href="/" aria-label="Resonance">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="wordmark">Resonance</span>
+        </a>
+      </h1>
 
       <!-- Filled by shell.mjs from the sections that are actually present. -->
       <nav class="page-nav" id="page-nav" aria-label="On this page" hidden></nav>
@@ -72,13 +83,19 @@
       <section class="thought" id="thought" aria-labelledby="thought-heading" data-nav-label="Your thought">
 
         <div class="intro" id="intro">
-          <h1 class="intro-title">Find the people whose <em>reasoning</em> has the same shape as yours.</h1>
-          <p class="intro-lede">
-            Not the same subject — the same structure. Someone watching a team slow
-            down the harder it is pushed, and someone watching soil give less the
-            more it is fed, are having the same thought in different words. Neither
-            would ever search for the other. This notices.
-          </p>
+          <!-- The words, and beside them the picture of what the words mean.
+               They were stacked in a 900px column inside a 1280px shell, which
+               left the right third of a wide screen empty and made the page
+               look like it had lost something. -->
+          <div class="intro-words">
+            <h2 class="intro-title">Find the people whose <em>reasoning</em> has the same shape as yours.</h2>
+            <p class="intro-lede">
+              Not the same subject — the same structure. Someone watching a team
+              slow down the harder it is pushed, and someone watching soil give
+              less the more it is fed, are having the same thought in different
+              words. Neither would ever search for the other. This notices.
+            </p>
+          </div>
 
           <!-- Two thoughts, different words, one shape. The picture the product
                is about, instead of a paragraph about it. -->
@@ -380,13 +397,30 @@
       </section>
     </main>
 
+    <!-- A footer says who this is, then where else to go, then how to reach
+         someone. It was a loose paragraph of product claim with three
+         underlined words beneath it, which is neither identity nor
+         navigation: three links styled like links inside a sentence, with
+         nothing saying they were a group or what group they were.
+
+         The claim stays, shortened, as the line under the name -- a colophon,
+         which is what a footer sentence is for. The links are a labelled nav
+         with a list, because that is what a screen reader announces as
+         navigation and what a keyboard reaches as one thing. -->
     <footer class="page-foot">
-      <p class="foot-claim">The match is computed, not judged: no language model decides who resonates with you. It comes out the same every time, and you are shown the working.</p>
-      <p class="foot-links">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="/support">Support</a>
-      </p>
+      <div class="foot-identity">
+        <p class="foot-name"><span class="brand-mark" aria-hidden="true"></span>Resonance</p>
+        <p class="foot-claim">The match is computed, not judged: no language
+          model decides who resonates with you. It comes out the same every
+          time, and you are shown the working.</p>
+      </div>
+      <nav class="foot-nav" aria-label="Footer">
+        <ul>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+          <li><a href="/support">Support</a></li>
+        </ul>
+      </nav>
       <!-- Where the colour control waits between openings. Never seen: it is
            lifted into whichever masthead menu is open, and put back when that
            menu is rebuilt, so there is exactly one of it and shell.mjs keeps

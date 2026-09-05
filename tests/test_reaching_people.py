@@ -218,6 +218,51 @@ class WhatAnEmailSaysTests(unittest.TestCase):
         self.assertNotIn("ses-", whole)
 
 
+class WhichDoorTests(unittest.TestCase):
+    """Outbound SMTP does not leave this host, and no credential fixes that.
+
+    Measured on the deployment: ports 587, 465 and 25 all time out on IPv4,
+    and every IPv6 address answers "network is unreachable". Railway's own
+    documentation then confirmed it -- "SMTP is only available on the Pro plan
+    and above... Free, Trial, and Hobby plans must use transactional email
+    services with HTTPS APIs" -- and names Resend as its recommendation.
+
+    So the HTTPS sender is preferred wherever it is configured, and SMTP stays
+    for a deployment that allows it. Choosing the transport by measurement
+    rather than by hope is the whole point.
+    """
+
+    def test_an_api_key_wins_over_smtp(self):
+        from src.product import notify
+        both = {"RESONANCE_MAIL_API_KEY": "re_x", "RESONANCE_MAIL_FROM": "p@example.test",
+                "RESONANCE_SMTP_HOST": "smtp.example.test",
+                "RESONANCE_SMTP_USER": "p@example.test",
+                "RESONANCE_SMTP_PASSWORD": "x" * 16}
+        self.assertIsInstance(notify.sender_from_env(both), notify.HttpApiSender)
+
+    def test_smtp_still_works_where_it_is_allowed(self):
+        from src.product import notify
+        smtp_only = {"RESONANCE_SMTP_HOST": "smtp.example.test",
+                     "RESONANCE_SMTP_USER": "p@example.test",
+                     "RESONANCE_SMTP_PASSWORD": "x" * 16,
+                     "RESONANCE_MAIL_FROM": "p@example.test"}
+        self.assertIsInstance(notify.sender_from_env(smtp_only), notify.SmtpSender)
+
+    def test_the_http_sender_carries_the_same_promises(self):
+        """Same reply-to, same one-click unsubscribe: swapping the transport
+        must not quietly drop what the email owes the person."""
+        from src.product import notify
+        sender = notify.sender_from_env({
+            "RESONANCE_MAIL_API_KEY": "re_x", "RESONANCE_MAIL_FROM": "pulse@example.test",
+            "RESONANCE_CONTACT": "someone@example.test"})
+        self.assertEqual(sender.reply_to, "someone@example.test")
+        self.assertEqual(sender.sender, "pulse@example.test")
+
+    def test_it_says_where_to_hand_an_email_when_nowhere_is_set(self):
+        from src.product import notify
+        self.assertIn("RESONANCE_MAIL_API_KEY", notify.NoTransport.reason)
+
+
 class WhereTheLinkPointsTests(unittest.TestCase):
     """An email is useless if it sends someone to a host that no longer exists.
 

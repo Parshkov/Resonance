@@ -135,6 +135,7 @@ def _page(body: str, *, status: int = 200,
         "<meta charset=\"utf-8\">\n"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
         "<title>Sign in — Resonance</title>\n"
+        "<link rel=\"stylesheet\" href=\"/tokens.css\">\n"
         "<link rel=\"stylesheet\" href=\"/legal.css\">\n"
         "<link rel=\"icon\" href=\"/favicon.svg\" type=\"image/svg+xml\">\n"
         "</head>\n<body>\n<main class=\"doc doc-narrow\">\n"

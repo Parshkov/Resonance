@@ -13,7 +13,7 @@
 
 .mine { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line-soft); }
 .mine-heading { margin-bottom: 6px; }
-.mine-lede { max-width: var(--measure); margin: 0 0 14px; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+.mine-lede { max-width: var(--measure); margin: 0 0 14px; color: var(--ink-2); font-size: var(--text-md); line-height: 1.5; }
 
 .mine-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .mine-item {
@@ -23,37 +23,37 @@
 .mine-item[data-state="withdrawn"] { color: var(--ink-2); }
 
 .mine-head { display: grid; gap: 4px; }
-.mine-state { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--ink-2); font-size: 12.5px; font-weight: 600; letter-spacing: 0.02em; }
+.mine-state { display: inline-flex; align-items: center; gap: 8px; margin: 0; color: var(--ink-2); font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em; }
 .mine-light { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sage); }
 .mine-item[data-state="private"] .mine-light { background: var(--ink-3); }
 .mine-item[data-state="withdrawn"] .mine-light { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
-.mine-title { margin: 0; font-family: var(--serif); font-size: 18px; font-weight: 500; line-height: 1.2; overflow-wrap: anywhere; }
+.mine-title { margin: 0; font-family: var(--serif); font-size: var(--text-lg); font-weight: 500; line-height: 1.2; overflow-wrap: anywhere; }
 .mine-item[data-state="withdrawn"] .mine-title { color: var(--ink-2); }
-.mine-meaning { max-width: var(--measure); margin: 2px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.5; }
+.mine-meaning { max-width: var(--measure); margin: 2px 0 0; color: var(--ink-2); font-size: var(--text-md); line-height: 1.5; }
 .mine-meaning time { color: var(--ink); }
 .mine-item[data-state="withdrawn"] .mine-meaning time { color: var(--ink-2); }
 
 /* The structure: folded to its count where the panel above already draws it,
    open where this is the only place it can be seen. */
-.mine-structure { font-size: 14px; }
-.mine-count { cursor: pointer; color: var(--ink-3); font-size: 13px; }
+.mine-structure { font-size: var(--text-base); }
+.mine-count { cursor: pointer; color: var(--ink-3); font-size: var(--text-md); }
 .mine-structure[open] .mine-count { margin-bottom: 8px; }
 .mine-links { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
 .mine-link { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .mine-node { display: inline-block; padding: 3px 8px; border: 1px solid var(--line-soft); border-radius: var(--radius-sm); background: var(--paper-2); }
 .mine-item[data-state="withdrawn"] .mine-node { border-style: dashed; }
-.mine-rel { color: var(--accent-ink); font-family: var(--mono); font-size: 12px; }
-.mine-loose { margin: 8px 0 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.9; }
+.mine-rel { color: var(--accent-ink); font-family: var(--mono); font-size: var(--text-sm); }
+.mine-loose { margin: 8px 0 0; color: var(--ink-2); font-size: var(--text-md); line-height: 1.9; }
 
 /* Stop sharing asks once, inline, and says what will happen. */
 .mine-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .mine-actions:empty { display: none; }
 .mine-stop {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; width: 100%; padding: 10px 12px;
-  border: 1px solid var(--rust-line); border-radius: var(--radius-sm); background: var(--rust-soft); font-size: 13.5px;
+  border: 1px solid var(--rust-line); border-radius: var(--radius-sm); background: var(--rust-soft); font-size: var(--text-md);
 }
 .mine-stop p { flex: 1 1 240px; margin: 0; color: var(--ink); }
-.mine-error { flex: 1 1 100%; margin: 0; color: var(--rust); font-size: 13px; }
+.mine-error { flex: 1 1 100%; margin: 0; color: var(--rust); font-size: var(--text-md); }
 .mine-error:empty { display: none; }
 
 @media (max-width: 560px) {

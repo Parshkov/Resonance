@@ -270,9 +270,15 @@ class OnThePageTests(unittest.TestCase):
         self.assertNotIn("rgb(", self.stylesheet)
         self.assertNotIn("rgba(", self.stylesheet)
         tokens = set(re.findall(r"var\(--([a-z0-9-]+)\)", self.stylesheet))
-        palette = (UI_DIR / "styles.css").read_text(encoding="utf-8")
+        # Two files, because the type scale and the radii moved out of
+        # styles.css into tokens.css: the documentation pages need the scale
+        # and do not link the product page's stylesheet, and a var() nothing
+        # declares is dropped in silence rather than reported.
+        declared = "".join((UI_DIR / name).read_text(encoding="utf-8")
+                           for name in ("styles.css", "tokens.css"))
         for token in tokens:
-            self.assertIn(f"--{token}:", palette, f"--{token} is not a palette token")
+            self.assertIn(f"--{token}:", declared,
+                          f"--{token} is neither a palette token nor a scale token")
 
     def test_served_and_wired_by_the_live_server(self):
         server, base, _ = _live_server()
