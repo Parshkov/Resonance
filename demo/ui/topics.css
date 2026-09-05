@@ -1,0 +1,6 @@
+/* Shared topics on the site: the place more than two people build
+   one understanding together. Owned by the shared-topics work.
+
+   Linked, never inline: the page is served under default-src 'self',
+   so a <style> block or a style attribute silently does nothing. Use the
+   palette tokens defined at the top of styles.css -- never a raw colour. */

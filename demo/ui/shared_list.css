@@ -1,0 +1,5 @@
+/* Everything this person has here, and what state each is in.
+
+   Linked, never inline: the page is served under default-src 'self',
+   so a <style> block or a style attribute silently does nothing. Use the
+   palette tokens defined at the top of styles.css -- never a raw colour. */

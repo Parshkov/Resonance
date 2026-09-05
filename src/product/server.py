@@ -110,6 +110,14 @@ STATIC = {
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
     "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
     "/account.mjs": ("account.mjs", "text/javascript; charset=utf-8"),
+    # One file per piece of work, so several people can build at once without
+    # meeting in the middle of styles.css.
+    "/topics.mjs": ("topics.mjs", "text/javascript; charset=utf-8"),
+    "/topics.css": ("topics.css", "text/css; charset=utf-8"),
+    "/geo.mjs": ("geo.mjs", "text/javascript; charset=utf-8"),
+    "/geo.css": ("geo.css", "text/css; charset=utf-8"),
+    "/shared_list.mjs": ("shared_list.mjs", "text/javascript; charset=utf-8"),
+    "/shared_list.css": ("shared_list.css", "text/css; charset=utf-8"),
     # The frame: colour scheme (applied before first paint), navigation built
     # from the sections that are on the page, notices. Loaded by index.html.
     "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
@@ -883,7 +891,10 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/collab_ui.mjs"></script>\n'
                 '  <script type="module" src="/workspaces.mjs"></script>\n'
                 '  <script type="module" src="/account.mjs"></script>\n'
-                '  <script type="module" src="/resonances.mjs"></script>\n</body>',
+                '  <script type="module" src="/resonances.mjs"></script>\n'
+                '  <script type="module" src="/topics.mjs"></script>\n'
+                '  <script type="module" src="/geo.mjs"></script>\n'
+                '  <script type="module" src="/shared_list.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Resonance</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/topics.css">
+  <link rel="stylesheet" href="/geo.css">
+  <link rel="stylesheet" href="/shared_list.css">
   <!-- Applies the viewer's colour scheme before the first paint. Plain script,
        same origin, no inline code: the CSP is default-src 'self'. -->
   <script src="/theme.mjs"></script>
@@ -290,6 +293,12 @@
            both agree, and only what is typed here is passed on. Filled by
            collab_ui.mjs; on the page once something is shared or anyone has
            ever asked. -->
+      <!-- Shared topics live here: after an introduction, what accumulates
+           between people is structure, not a transcript, and a topic can hold
+           more than two of them. Built by topics.mjs, and absent until there
+           is one -- like every other section on this page. -->
+      <div id="topics-anchor"></div>
+
       <section class="talk" id="conversations" aria-labelledby="conversations-heading" data-nav-label="Talk" hidden>
         <div class="section-head">
           <div>
