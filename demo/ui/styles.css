@@ -137,15 +137,6 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .pill-consent[data-shared="false"] .status-light { background: var(--ink-3); }
 .offline-badge, .tool-chip { font-family: var(--mono); font-size: 12px; }
 
-.source-switch { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2); }
-.source-option {
-  min-height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent;
-  color: var(--ink-2); font-size: 13px; cursor: pointer;
-}
-.source-option.is-active { background: var(--ink); color: var(--paper); }
-.source-option:disabled { cursor: default; opacity: 0.55; }
-.source-option.is-loading { opacity: 0.7; }
-
 .button {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 18px;
   border: 1px solid var(--line); border-radius: 999px; background: var(--paper-2); color: var(--ink);
@@ -210,9 +201,8 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .dashboard {
   display: grid; gap: var(--gap);
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "banner" "thought" "map" "matches" "evidence";
+  grid-template-areas: "thought" "map" "matches" "evidence";
 }
-.source-banner { grid-area: banner; }
 .thought-panel { grid-area: thought; }
 .map-panel { grid-area: map; }
 .matches-panel { grid-area: matches; }
@@ -221,7 +211,7 @@ code { font-family: var(--mono); font-size: 0.92em; }
 @media (min-width: 760px) {
   .dashboard {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-areas: "banner banner" "thought thought" "map matches" "evidence evidence";
+    grid-template-areas: "thought thought" "map matches" "evidence evidence";
   }
 }
 @media (min-width: 1180px) {
@@ -232,7 +222,7 @@ code { font-family: var(--mono); font-size: 0.92em; }
 @media (min-width: 1680px) {
   .dashboard {
     grid-template-columns: minmax(0, 1fr) minmax(360px, 400px) minmax(0, 1.1fr);
-    grid-template-areas: "banner banner banner" "thought thought thought" "map matches evidence";
+    grid-template-areas: "thought thought thought" "map matches evidence";
   }
 }
 
@@ -241,11 +231,6 @@ code { font-family: var(--mono); font-size: 0.92em; }
 }
 .panel-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
 .panel-head h2 { margin-top: 4px; font-family: var(--serif); font-size: 22px; line-height: 1.15; }
-
-.source-banner {
-  padding: 10px 14px; border: 1px solid var(--accent-line); border-radius: var(--radius-sm);
-  background: var(--accent-soft); color: var(--accent-ink); font-size: 13.5px; line-height: 1.45;
-}
 
 /* ---- your thought --------------------------------------------------- */
 .thought-title { margin: 2px 0 6px; font-family: var(--serif); font-size: clamp(24px, 2.4vw, 32px); line-height: 1.12; letter-spacing: -0.015em; overflow-wrap: anywhere; }
@@ -457,9 +442,6 @@ code { font-family: var(--mono); font-size: 0.92em; }
 .app-shell[data-state="error"] .matches-panel,
 .app-shell[data-state="error"] .evidence-body { display: none; }
 .app-shell[data-state="error"] .evidence-panel { border-color: var(--rust-line); }
-/* The API-only origin has no demo context; live_shell.mjs marks the body and
-   the panel then carries a pointer to the working surfaces, not a failure. */
-body[data-resonance-mode="live"] .app-shell[data-state="error"] .evidence-panel { border-color: var(--line); }
 .app-shell[data-state="error"] .evidence-metrics { display: none; }
 .app-shell[data-state="empty"] .evidence-metrics { display: none; }
 .app-shell[data-state="empty"] .mapping-columns,
@@ -471,10 +453,6 @@ body[data-resonance-mode="live"] .app-shell[data-state="error"] .evidence-panel 
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; padding-top: 12px;
   border-top: 1px solid var(--line); color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; line-height: 1.5;
 }
-.provenance-detail { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
-.snapshot-button { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
-.snapshot-button:disabled { cursor: default; }
-.snapshot-button code, .contract-note code { color: var(--ink-2); }
 
 /* ---- drawers -------------------------------------------------------- */
 .drawer-backdrop { position: fixed; z-index: 20; inset: 0; background: rgba(29, 26, 22, 0.35); }

@@ -83,9 +83,9 @@ that first real build, so nobody repeats them:
   show the daily schedule and, after the first run, a completed backup. Until
   someone has seen a completed backup there, treat the database as
   **unbacked-up**.
-- **Entrypoint is `src.product.competition_server`** (the image default, and
-  set explicitly as the Railway start command): the live product handler plus
-  the R9/R10 presentation routes and the live WebMCP module, so the public
+- **Entrypoint is `src.product.web_server`** (the image default, and set
+  explicitly as the Railway start command): the live product handler plus the
+  browser presentation routes and the browser WebMCP module, so the public
   page shows the visual discovery view on real data and registers the six
   tools. `RESONANCE_ENTRYPOINT=src.product.server` runs the API-only server.
 
@@ -236,12 +236,11 @@ The manual MCP key path (Collaboration panel → **Create MCP key**, or
 
 ## Known limits at the time of writing
 
-- The R9 visual discovery view (map, match cards) does not initialise on the
-  live origin — its `/api/config` + `/api/context` routes exist only on the R9
-  demo server (#88). `demo/ui/live_shell.mjs` moves the page to an explicit
-  "Live product" state instead of loading placeholders and puts the
-  Collaboration panel first; the panel and every product API work. Wiring the
-  visual view to live per-user data is the remaining R13 follow-up.
+- The visual discovery view (map, match cards) needs the `/api/context` and
+  `/api/discover` routes, which `src.product.web_server` serves and the
+  API-only `src.product.server` does not. On the API-only entrypoint the page
+  settles in its error state; the Collaboration panel and every product API
+  still work.
 - One process, one machine: fine for the ≥100-user pilot on the accepted
   structural engine; scale-out would need sticky sessions or a shared
   idempotency store, neither of which the pilot requires.

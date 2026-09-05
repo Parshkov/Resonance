@@ -1,4 +1,4 @@
-"""Competition browser bridge: real R13/R14 product state behind R10 WebMCP UX."""
+"""The production web server: real product state behind the browser WebMCP tools."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from http.cookies import SimpleCookie
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-from src.product.competition_server import serve
+from src.product.web_server import serve
 from src.product.server import build_runtime
 
 
@@ -41,7 +41,18 @@ class Client:
         return payload
 
 
-class CompetitionWebMCPTests(unittest.TestCase):
+FLOW_THOUGHT = {
+    "topic": "Retry storm overloads a delivery queue",
+    "domain": "distributed-systems",
+    "nodes": [{"id": "n0", "label": "partial outage", "role": "problem"},
+              {"id": "n1", "label": "synchronized retries", "role": "mechanism"},
+              {"id": "n2", "label": "queue saturation", "role": "outcome"}],
+    "relations": [{"source": "n0", "target": "n1", "type": "causes"},
+                  {"source": "n1", "target": "n2", "type": "causes"}],
+}
+
+
+class WebServerWebMCPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}))
@@ -61,7 +72,7 @@ class CompetitionWebMCPTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=5)
 
-    def test_root_serves_live_webmcp_transport_but_replay_starts_explicit(self):
+    def test_root_serves_the_live_webmcp_transport(self):
         with urlopen(self.base + "/", timeout=10) as response:
             html = response.read().decode()
             self.assertIn('src="/webmcp.mjs"', html)
@@ -72,23 +83,21 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertIn('from "/session.mjs"', source)
         self.assertIn("apiFetch", source)
         self.assertNotIn("STATE =", source)
-        with urlopen(self.base + "/api/config", timeout=10) as response:
-            config = json.loads(response.read())
-        # The public origin must open on the visitor's own state. Defaulting to
-        # "replay" made every first load render the four fixture personas from
-        # src/discovery/fixtures/example_response.json as if they were people in
-        # the live corpus.
-        self.assertEqual(config["default_source"], "live")
-        self.assertTrue(config["live_product"])
+        # The page cannot ask for anything but the visitor's own state: the
+        # route that used to hand it a default source is gone along with the
+        # fixture that source selected.
+        with self.assertRaises(HTTPError) as ctx:
+            urlopen(self.base + "/api/config", timeout=10)
+        self.assertEqual(ctx.exception.code, 404)
 
-    def test_live_source_without_shared_thought_is_409_not_500(self):
-        # R16 Chrome audit: a fresh visitor clicking "Live MCP" used to get a
-        # 500 ("unexpected product error") because the unshared case raised an
-        # unmapped PermissionError. It is a product state, not a server fault.
+    def test_discovery_without_a_shared_thought_is_409_not_500(self):
+        # R16 Chrome audit: a fresh visitor used to get a 500 ("unexpected
+        # product error") because the unshared case raised an unmapped
+        # PermissionError. It is a product state, not a server fault.
         client = Client(self.base)
         client.guest()
         with self.assertRaises(HTTPError) as ctx:
-            client.request("GET", "/api/discover?source=live")
+            client.request("GET", "/api/discover")
         self.assertEqual(ctx.exception.code, 409)
         payload = json.loads(ctx.exception.read().decode())
         self.assertEqual(payload["error"], "share_required")
@@ -96,11 +105,10 @@ class CompetitionWebMCPTests(unittest.TestCase):
 
     def test_header_consent_pill_is_truthful_without_native_webmcp(self):
         # R17 acceptance finding (public-origin browser run): in a browser
-        # without document.modelContext the R9 replay narrative labelled a
-        # fresh, never-shared guest "Shared with Resonance". The live module
-        # must apply the visitor's authoritative consent state even when no
-        # agent surface exists, and the replay narrative must yield on the
-        # live product.
+        # without document.modelContext the page labelled a fresh,
+        # never-shared guest "Shared with Resonance". The live module must
+        # apply the visitor's authoritative consent state even when no agent
+        # surface exists.
         with urlopen(self.base + "/webmcp.mjs", timeout=10) as response:
             live = response.read().decode()
         unavailable = live.index('setStatus("WebMCP · unavailable")')
@@ -155,7 +163,7 @@ class CompetitionWebMCPTests(unittest.TestCase):
             self.assertNotIn(name, app)
         self.assertNotIn("aria-plasma-lens", html)
         # Both data routes the default view touches fail closed for this visitor.
-        for path in ("/api/context", "/api/discover?source=live"):
+        for path in ("/api/context", "/api/discover"):
             with self.assertRaises(HTTPError) as ctx:
                 client.request("GET", path)
             self.assertEqual(ctx.exception.code, 409, path)
@@ -165,11 +173,9 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertIn('dataset.state = "unshared"', app)
         self.assertIn("function renderUnshared()", app)
         self.assertIn("clearActiveThought()", app)
-        # Replay stays reachable and stays labelled as example data.
-        _, replay_context, _ = client.request("GET", "/api/context?source=replay")
-        self.assertEqual(replay_context["active_thought"]["thought_id"],
-                         "thought-aria-plasma-lens")
-        self.assertIn("example personas, not real participants", app)
+        # There is no second source to fall back to any more: the fixture
+        # thought is not reachable from the product at all.
+        self.assertNotIn("thought-aria-plasma-lens", app)
 
     def test_index_is_served_in_the_state_it_will_settle_in(self):
         # Served at data-state="loading", the page painted the results dashboard
@@ -180,9 +186,6 @@ class CompetitionWebMCPTests(unittest.TestCase):
             html = response.read().decode()
         self.assertIn('data-state="unshared"', html)      # no cookie: shared nothing
         self.assertNotIn('data-state="loading"', html)
-        # asking for the fixture explicitly keeps the neutral loading state
-        with urlopen(self.base + "/?source=replay", timeout=10) as response:
-            self.assertIn('data-state="loading"', response.read().decode())
 
         # once something IS shared, the dashboard is the right first paint
         client = Client(self.base)
@@ -386,19 +389,14 @@ class CompetitionWebMCPTests(unittest.TestCase):
         _, preview, _ = client.request("GET", "/api/webmcp/preview")
         client.request("POST", "/api/webmcp/share", {"request_id": "ctx-2", "confirm": True,
                                                      "confirmation_token": preview["confirmation_token"]})
-        _, live, _ = client.request("GET", "/api/context?source=live")
+        _, live, _ = client.request("GET", "/api/context")
         self.assertEqual({n["label"] for n in live["active_thought"]["nodes"]},
                          {n["label"] for n in thought["nodes"]})
         self.assertEqual(live["presentation"]["topic"], "Panic buying after a shortage rumour")
         self.assertTrue(live["consent"]["shared_with_resonance"])
-        _, replay, _ = client.request("GET", "/api/context?source=replay")
-        self.assertEqual(replay["active_thought"]["thought_id"], "thought-aria-plasma-lens")
-        with self.assertRaises(HTTPError) as ctx:
-            client.request("GET", "/api/context?source=nope")
-        self.assertEqual(ctx.exception.code, 400)
         with urlopen(self.base + "/app.mjs", timeout=10) as response:
             app = response.read().decode()
-        self.assertIn("fetch(`/api/context?source=${encodeURIComponent(source)}`", app)
+        self.assertIn('fetch("/api/context", {cache: "no-store"})', app)
 
     def test_webmcp_prepare_raw_context_and_invalid_thought(self):
         client = Client(self.base)
@@ -460,25 +458,24 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertFalse(other["discoverable"])
 
     def test_webmcp_discover_before_share_is_409_share_required_not_500(self):
-        # R17 acceptance finding: the first thing a judge does on the card is a
-        # read through the page tool; an unshared visitor must get a mapped
-        # product state (409 share_required), not "unexpected product error".
+        # R17 acceptance finding: the first thing anyone does through the page
+        # tools is a read; an unshared visitor must get a mapped product state
+        # (409 share_required), not "unexpected product error".
         client = Client(self.base)
         client.guest()
-        for source in ("replay", "live"):
-            with self.assertRaises(HTTPError) as ctx:
-                client.request("GET", f"/api/webmcp/discover?source={source}")
-            self.assertEqual(ctx.exception.code, 409, source)
-            payload = json.loads(ctx.exception.read().decode())
-            self.assertEqual(payload["error"], "share_required")
-            self.assertIn("resonance_prepare_thought", payload["message"])
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/webmcp/discover")
+        self.assertEqual(ctx.exception.code, 409)
+        payload = json.loads(ctx.exception.read().decode())
+        self.assertEqual(payload["error"], "share_required")
+        self.assertIn("resonance_prepare_thought", payload["message"])
 
     def test_webmcp_prepare_preview_share_live_discover_updates_same_product(self):
         client = Client(self.base)
         client.guest()
 
         _, prepared, _ = client.request("POST", "/api/webmcp/prepare", {
-            "request_id": "competition-prepare-1", "note": "judge flow",
+            "request_id": "flow-prepare-1", "thought": FLOW_THOUGHT,
         })
         self.assertFalse(prepared["discoverable"])
         self.assertTrue(prepared["session_id"].startswith("ses-"))
@@ -494,7 +491,7 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertIn("thought", preview["will_become_discoverable"])
 
         _, shared, _ = client.request("POST", "/api/webmcp/share", {
-            "request_id": "competition-share-1",
+            "request_id": "flow-share-1",
             "confirm": True,
             "confirmation_token": preview["confirmation_token"],
         })
@@ -505,7 +502,7 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertFalse(state["draft_ready"])
         self.assertTrue(state["shared"])
 
-        _, result, _ = client.request("GET", "/api/webmcp/discover?source=live")
+        _, result, _ = client.request("GET", "/api/webmcp/discover")
         self.assertEqual(result["source"], "live")
         self.assertRegex(result["result_id"], r"^result-[0-9a-f]{24}$")
         self.assertGreater(len(result["matches_in_backend_order"]), 0)
@@ -517,22 +514,37 @@ class CompetitionWebMCPTests(unittest.TestCase):
         self.assertEqual(evidence["source"], "live")
         self.assertEqual(evidence["match"]["session_id"], session_id)
 
-        # The unchanged R9 page source switch reads the SAME live product result
-        # contract through its presentation adapter, not legacy stdio shadow state.
-        _, visible, _ = client.request("GET", "/api/discover?source=live")
+        # The page reads the SAME live product result contract through its
+        # presentation adapter, not a separate shadow state.
+        _, visible, _ = client.request("GET", "/api/discover")
         self.assertEqual(visible["contract_version"], "resonance-discovery/0.1")
         self.assertGreater(len(visible["matches"]), 0)
+
+    def test_prepare_without_the_person_s_own_reasoning_is_refused(self):
+        # An empty prepare used to clone a fixture thought, so a visitor's first
+        # durable row was a thought they had never had.
+        client = Client(self.base)
+        client.guest()
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/webmcp/prepare",
+                           {"request_id": "empty-1", "note": "no content"})
+        self.assertEqual(ctx.exception.code, 400)
+        payload = json.loads(ctx.exception.read().decode())
+        self.assertEqual(payload["error"], "validation_failed")
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("GET", "/api/webmcp/preview")
+        self.assertEqual(ctx.exception.code, 409)  # no draft was created
 
     def test_webmcp_operation_receipt_reconciles_same_process_retry(self):
         client = Client(self.base)
         client.guest()
-        body = {"request_id": "competition-idempotent-prepare", "note": "once"}
+        body = {"request_id": "idempotent-prepare", "thought": FLOW_THOUGHT}
         _, first, _ = client.request("POST", "/api/webmcp/prepare", body)
         _, second, _ = client.request("POST", "/api/webmcp/prepare", body)
         self.assertEqual(first, second)
         _, op, _ = client.request(
             "GET", "/api/webmcp/operation?operation=prepare"
-                   "&request_id=competition-idempotent-prepare")
+                   "&request_id=idempotent-prepare")
         self.assertTrue(op["committed"])
         self.assertEqual(op["result"], first)
 

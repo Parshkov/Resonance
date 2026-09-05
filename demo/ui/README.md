@@ -1,6 +1,6 @@
 # R9 visual client
 
-This is the competition-recordable Resonance discovery surface. It is an
+This is the Resonance discovery surface. It is an
 offline-first presentation client over the accepted
 `resonance-discovery/0.1` response. The browser does not match, retrieve,
 rerank, verify, threshold, or calculate scores.
@@ -17,7 +17,7 @@ python3 -m demo.ui.serve --source replay
 python3 -m demo.ui.serve --source live
 ```
 
-Open <http://127.0.0.1:8765/>. Both modes remain switchable in the header.
+Open <http://127.0.0.1:8765/>. The mode is chosen when the server starts.
 The request is pinned in both paths to:
 
 ```text
@@ -78,9 +78,8 @@ order:
    is shown as the id the engine returned, because the other person's
    relations are not in the response.
 
-The footer states the source (`REPLAY` is the accepted fixture with example
-personas; `LIVE` is the visitor's own discovery), the corpus snapshot and the
-discovery contract.
+The footer says in one sentence what is on screen: the visitor's own live
+result, or why there is nothing to show.
 
 ## Browser WebMCP (R10)
 

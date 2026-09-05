@@ -106,7 +106,6 @@ STATIC = {
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
     "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
     "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
-    "/live_shell.mjs": ("live_shell.mjs", "text/javascript; charset=utf-8"),
     "/account.mjs": ("account.mjs", "text/javascript; charset=utf-8"),
     # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
     # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
@@ -641,7 +640,7 @@ class ProductHandler(BaseHTTPRequestHandler):
         """`data-state` to serve in the HTML, before any JavaScript runs.
 
         The API-only server has no live browser product, so it keeps the
-        neutral "loading". The competition server overrides this: it can tell
+        neutral "loading". `src/product/web_server.py` overrides this: it can tell
         whether this visitor has anything shared, and serving the answer is
         what stops the page rendering one view and then replacing it.
         """
@@ -668,7 +667,6 @@ class ProductHandler(BaseHTTPRequestHandler):
                 '  <script type="module" src="/collab.mjs"></script>\n'
                 '  <script type="module" src="/collab_ui.mjs"></script>\n'
                 '  <script type="module" src="/workspaces.mjs"></script>\n'
-                '  <script type="module" src="/live_shell.mjs"></script>\n'
                 '  <script type="module" src="/account.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")

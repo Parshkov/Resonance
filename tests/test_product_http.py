@@ -389,8 +389,7 @@ class ProductHttpTests(unittest.TestCase):
         with urlopen(request, timeout=10) as response:
             html = response.read().decode("utf-8")
         # The former inline `window.RESONANCE_MODE` marker was refused by the
-        # page's own CSP (default-src 'self') and had no readers; live mode is
-        # now carried by live_shell.mjs as a body data attribute.
+        # page's own CSP (default-src 'self') and had no readers.
         self.assertNotIn("<script>window.RESONANCE_MODE", html)
         self.assertIn('src="/webmcp.mjs"', html)
         self.assertIn('src="/deeplink.mjs"', html)
@@ -398,12 +397,6 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn('src="/collab.mjs"', html)
         self.assertIn('src="/collab_ui.mjs"', html)
         self.assertIn('src="/workspaces.mjs"', html)
-        # R13 live-origin shell state (#88): the module that moves the R9 page
-        # off its loading placeholders when /api/config is absent is served and
-        # injected after the collaboration panel so it can reorder it.
-        self.assertIn('src="/live_shell.mjs"', html)
-        self.assertLess(html.index('src="/collab_ui.mjs"'), html.index('src="/live_shell.mjs"'))
-        self.assertLess(html.index('src="/workspaces.mjs"'), html.index('src="/live_shell.mjs"'))
         # R16 Chrome audit: the collaboration drawer is styled by a linked
         # stylesheet (CSP default-src 'self' forbids inline styles) and the page
         # ships a favicon, both injected into <head>; served with proper types.
@@ -420,15 +413,14 @@ class ProductHttpTests(unittest.TestCase):
             with urlopen(Request(self.base + icon), timeout=10) as response:
                 self.assertEqual(response.headers["Content-Type"], "image/svg+xml")
                 self.assertIn(b"<svg", response.read())
-        with urlopen(Request(self.base + "/live_shell.mjs"), timeout=10) as response:
-            shell = response.read().decode("utf-8")
-        self.assertIn("markLiveShell", shell)
-        self.assertNotIn(".innerHTML", shell)
-        # the R9 demo routes stay absent on the live origin — that absence is
-        # exactly what the shell module keys on
-        with self.assertRaises(HTTPError) as ctx:
-            urlopen(Request(self.base + "/api/config"), timeout=10)
-        self.assertEqual(ctx.exception.code, 404)
+        # /api/config existed only to tell the page which source to open on,
+        # and live_shell.mjs existed only to rewrite the page when that route
+        # was missing. Both went with the replay source they served.
+        self.assertNotIn("live_shell", html)
+        for gone in ("/api/config", "/live_shell.mjs"):
+            with self.assertRaises(HTTPError) as ctx:
+                urlopen(Request(self.base + gone), timeout=10)
+            self.assertEqual(ctx.exception.code, 404, gone)
         # the human-UI collaboration module is committed and served
         with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")

@@ -22,10 +22,6 @@
           <span class="status-light" aria-hidden="true"></span>
           <span>Checking consent</span>
         </div>
-        <div class="source-switch" role="group" aria-label="Discovery source">
-          <button class="source-option is-active" id="source-replay" type="button" data-source="replay" aria-pressed="true">Replay fixture</button>
-          <button class="source-option" id="source-live" type="button" data-source="live" aria-pressed="false">Live MCP</button>
-        </div>
         <!-- Live-only modules append their status chips here (WebMCP capability,
              collaboration and workspace tool registration). -->
         <div class="tool-status" id="tool-status" aria-label="Tool status"></div>
@@ -53,12 +49,7 @@
           </p>
           <div class="onboarding-actions">
             <button class="button button-primary" id="onboarding-connect" type="button">Connect your chat</button>
-            <button class="button" id="onboarding-example" type="button">See a worked example</button>
           </div>
-          <p class="onboarding-note">
-            The example uses a labelled fixture with invented people, so you can see
-            what a result looks like without sharing anything.
-          </p>
         </div>
 
         <ol class="onboarding-steps">
@@ -158,12 +149,10 @@
            matches relate to it, the matches in the engine's order, and the
            evidence for the selected one. -->
       <div class="dashboard" id="dashboard">
-        <p class="source-banner" id="source-banner" hidden></p>
-
         <section class="panel thought-panel" aria-labelledby="thought-heading">
           <div class="panel-head">
             <p class="eyebrow">Your thought</p>
-            <p class="microcopy" id="thought-id">Loading accepted context…</p>
+            <p class="microcopy" id="thought-id">Loading your shared thought…</p>
           </div>
           <h1 class="thought-title" id="thought-heading">
             <span class="loading-line wide"></span>
@@ -298,14 +287,12 @@
       </div>
     </main>
 
+    <!-- One line that says what the visitor is looking at. Everything on this
+         page is the visitor's own live result, and saying so is the point;
+         the hash of the searched set and the wire contract version were only
+         ever readable to the people who built it. -->
     <footer class="provenance">
-      <span id="source-note">Loading accepted R8 discovery contract…</span>
-      <span class="provenance-detail">
-        <button class="snapshot-button" id="snapshot-button" type="button" aria-label="Copy corpus snapshot" disabled>
-          corpus <code id="snapshot-short">────────</code>
-        </button>
-        <span class="contract-note">contract <code id="contract-note">resonance-discovery/0.1</code></span>
-      </span>
+      <span id="source-note">Nothing has been discovered yet.</span>
     </footer>
 
     <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>

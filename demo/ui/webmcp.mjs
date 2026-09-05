@@ -135,8 +135,10 @@ function selectVisibleMatch(sessionId) {
   document.querySelector(selector)?.click();
 }
 
-function activateLiveDiscovery() {
-  document.getElementById("source-live")?.click();
+// The page owns the results view; a discovery run through the tools has to
+// show up there too, or the visitor is looking at a stale answer.
+function announceDiscovery() {
+  document.dispatchEvent(new CustomEvent("resonance:discovered"));
 }
 
 const REQUEST_ID_PROPERTY = {
@@ -199,27 +201,20 @@ const tools = [
   {
     name: "resonance_discover",
     title: "Discover structural resonance",
-    description: "Run the accepted structural discovery path for the currently shared thought. Returns a result_id that binds later evidence reads to this exact discovery payload and source.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        source: {type: "string", enum: ["live", "replay"], default: "live"},
-      },
-      additionalProperties: false,
-    },
+    description: "Run structural discovery for the currently shared thought. Returns a result_id that binds later evidence reads to this exact discovery payload.",
+    inputSchema: {type: "object", properties: {}, additionalProperties: false},
     annotations: {readOnlyHint: true, untrustedContentHint: true},
     execute: async (input, options) => {
-      const source = input?.source === "replay" ? "replay" : "live";
-      const result = await jsonFetch(`/api/webmcp/discover?source=${encodeURIComponent(source)}`, {}, options);
-      if (source === "live") activateLiveDiscovery();
-      setStatus(`WebMCP · ${source} discovery`);
+      const result = await jsonFetch("/api/webmcp/discover", {}, options);
+      announceDiscovery();
+      setStatus("WebMCP · discovery run");
       return result;
     },
   },
   {
     name: "resonance_get_match",
     title: "Get evidence for a Resonance match",
-    description: "Return backend evidence for one discoverable match from the exact discovery result identified by result_id. This never silently switches between LIVE and REPLAY sources.",
+    description: "Return backend evidence for one discoverable match from the exact discovery result identified by result_id.",
     inputSchema: {
       type: "object",
       required: ["result_id", "session_id"],
@@ -236,7 +231,7 @@ const tools = [
       const query = new URLSearchParams({result_id: resultId, session_id: sessionId});
       const result = await jsonFetch(`/api/webmcp/match?${query}`, {}, options);
       selectVisibleMatch(sessionId);
-      setStatus(`WebMCP · ${result.source} evidence opened`);
+      setStatus("WebMCP · evidence opened");
       return result;
     },
   },
