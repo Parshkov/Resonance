@@ -1,0 +1,29 @@
+[PASS] 1 unauthenticated /mcp is 401
+[PASS] 1 challenge carries resource_metadata
+[PASS] 2 protected-resource metadata 200
+[PASS] 2 resource matches /mcp URL
+[PASS] 2 authorization_servers present
+[PASS] 3 authorization-server metadata discoverable
+[PASS] 3 issuer matches
+[PASS] 3 S256 advertised
+[PASS] 3 absolute https endpoints
+[PASS] 4 dynamic registration 201/200
+[PASS] 4 client_id issued
+[PASS] 5 GET authorize renders a page (200)
+[PASS] 5 consent form present
+[PASS] 5 consent POST redirects (302/303)
+[PASS] 5 redirect goes to the exact redirect_uri
+[PASS] 5 code returned
+[PASS] 5 exact state round-trip
+[PASS] 6 token exchange 200
+[PASS] 6 token_type Bearer
+[PASS] 8 replayed code rejected
+[PASS] 8 wrong verifier rejected
+[PASS] 8 wrong redirect_uri rejected
+[PASS] 7 initialize 200
+[PASS] 7 tools/list includes resonance_whoami
+[PASS] 7 resonance_whoami returns an account
+[PASS] 9 refresh_token grant 200
+[PASS] 9 refreshed token maps to the same account
+
+27/27 checks passed

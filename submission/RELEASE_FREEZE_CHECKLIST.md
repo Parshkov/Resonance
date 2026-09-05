@@ -226,6 +226,12 @@ Nothing below is claimed as done. Each item names who has to do it.
   reports `demo_personas_present: false`; `ops/oauth_smoke.py` re-run against the origin: 27/27.
   The deployed runtime is the same as `0aea577`.
 
+**Closed after the freeze, on the live product**
+
+- ~~The landing page was an empty results dashboard for anyone who had not shared.~~ **Fixed and deployed** (#175, `3ca7bc4`). Removing the fixture personas (#169) made the page honest but not usable: a stranger got three empty panels, no statement of what Resonance is, and no way to connect. The unshared state is now an onboarding page — what this is, what happens to a thought, and the connector URL with per-client steps — and the results dashboard appears only when there are results. Verified on the deployed origin: `data-state="unshared"`, all three surfaces `display: none`, `#mcp-url` showing the serving origin, no fixture persona and no key material anywhere on the page. Evidence: `submission/evidence/public-origin-3ca7bc4/`.
+  - Two adjacent untruths went with it. The Collaboration panel's "Connect your chat (MCP)" led with **Create MCP key** and handed out `Authorization: Bearer <key>` plus a `…/mcp/<key>` capability URL — exactly the path `ops/CONNECT_MCP.md` §2 calls "debug only, not the normal path" and this document calls a **FAIL**. And "Introductions unavailable — not exposed by the accepted R8 MCP" had been false since R13/R14, hidden by a runtime patch rather than corrected.
+  - Recorded because it nearly shipped: two attempts at "leave onboarding when consent changes" broke Card A's revoke with `rate limit exceeded` (30 tokens, 1/s). Caught by serving a `git worktree` of pristine `main` on a second port and running the same harness against both. The accepted fix adds no requests at all.
+
 **Engineering, not blocking this freeze**
 
 - ~~R9 presentation: when every live match is `negative` the page shows a match count with an empty primary rail and keeps stale REPLAY evidence.~~ **Fixed and deployed** (#167, `b6b43c5`): the empty case is now its own state with honest counts and an explanation, and an error clears every surface a rendered result owns. Verified against the live origin with `submission/evidence/r9_empty_state_harness.py`: 16/16 — evidence in `submission/evidence/public-origin-b6b43c5/`.
