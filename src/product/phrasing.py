@@ -25,6 +25,23 @@ from typing import Any, Callable, Mapping
 Result = Mapping[str, Any]
 
 
+# The engine's own words for how two thoughts relate. Precise, and right where
+# they are -- but "negative" beside a person's name reads as a verdict on THEM,
+# and nobody arrives knowing "analogical". One table, so the sentence, the
+# picture and the page cannot drift into saying different things.
+CLASSIFICATION_IN_WORDS = {
+    "analogical": "same shape, different subject",
+    "approximate": "close — some of it lines up",
+    "literal": "the same thing, said the same way",
+    "negative": "not called a resonance",
+}
+
+
+def classification(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    return CLASSIFICATION_IN_WORDS.get(text, str(value or ""))
+
+
 def _count(n: int, one: str, many: str) -> str:
     return f"1 {one}" if n == 1 else f"{n} {many}"
 

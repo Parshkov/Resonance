@@ -234,6 +234,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 
 from src.product import authorship as authorship_rule
 from src.product import phrasing
+from src.product import pictures
 from src.product import rich
 
 AUTHORSHIP = {
@@ -651,21 +652,32 @@ def _svg_resource(name: str, key: str, svg: str, label: str) -> dict[str, Any]:
     }
 
 
-def _svg_image(svg: str) -> dict[str, Any]:
-    """The same drawing as an MCP image block.
+def _png_image(png: bytes) -> dict[str, Any]:
+    """The drawing, as an image block a client will actually render.
 
-    A client is documented to render `image`; whether it renders an
-    EmbeddedResource carrying SVG is its own business, and several do not --
-    which meant our drawings could reach a chat and be shown as nothing. Both
-    are sent: a client that renders either shows the picture, one that renders
-    neither still has the text, and none of them receives anything the JSON
-    did not already carry.
+    It was sent as SVG, and Claude answered plainly when asked: image/svg+xml
+    is not a supported image type -- only GIF, JPEG, PNG and WEBP -- so the
+    markup was passed through as text and shown as nothing. Every drawing
+    Resonance sent into a chat had been invisible.
+
+    The SVG resource still rides alongside for any client that can use it. A
+    client that renders neither still has the sentence, and none of them
+    receives anything the JSON did not already carry.
     """
     return {
         "type": "image",
-        "data": base64.b64encode(svg.encode("utf-8")).decode("ascii"),
-        "mimeType": "image/svg+xml",
+        "data": base64.b64encode(png).decode("ascii"),
+        "mimeType": "image/png",
     }
+
+
+def _drawing(render: Any, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+    """A picture, or nothing. A drawing never costs the answer it came with."""
+    try:
+        return [_png_image(render(*args, **kwargs))]
+    except Exception as exc:  # noqa: BLE001
+        print(f"[bridge] could not draw: {type(exc).__name__}: {exc}", flush=True)
+        return []
 
 
 _SHARED = {"discoverable"}
@@ -1020,7 +1032,9 @@ class RemoteMCPBridge:
                 continue
             drawings.append(_svg_resource("thought", f"mine/{index}", svg,
                                           "Your thought, as its causal spine"))
-            drawings.append(_svg_image(svg))
+            drawings.extend(_drawing(
+                pictures.render_thought_png, dna,
+                topic=str((session.get("presentation") or {}).get("topic") or "")))
         return ToolOutput(result, drawings) if drawings else result
 
     def tool_pending_resonances(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -1080,7 +1094,7 @@ class RemoteMCPBridge:
         return [_svg_resource("map", result_id, svg,
                               "Where the matches are (coarse, consented, "
                               "presentation only)"),
-                _svg_image(svg)]
+                *_drawing(pictures.render_map_png, response)]
 
     def tool_explain_match(self, token: str, arguments: dict[str, Any]) -> Any:
         result_id = self._required_id(arguments, "result_id")
@@ -1093,7 +1107,7 @@ class RemoteMCPBridge:
         return ToolOutput(evidence, [
             _svg_resource("structure", f"{result_id}/{session_id}", svg,
                           "Which node answers which, and the relations both kept"),
-            _svg_image(svg)])
+            *_drawing(pictures.render_structure_png, evidence.get("match") or evidence)])
 
     def tool_request_intro(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)

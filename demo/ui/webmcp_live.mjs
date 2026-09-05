@@ -199,6 +199,18 @@ const tools = [
           }, additionalProperties: false,
         },
         context: {type: "string", maxLength: 4000, description: "Raw text fallback when a graph cannot be extracted."},
+        // The server accepts a coarse location and the geographic map draws
+        // one, but this schema declared additionalProperties:false without the
+        // field -- so an assistant driving the page was told not to send the
+        // only thing that would put its person on that map.
+        coarse_location: {
+          type: "object", required: ["city", "region", "lat", "lon"],
+          description: "City-level only, and only if the person offers it. Coordinates are rounded to 0.1 degree. Location is shown to people, never used to match or to rank.",
+          properties: {city: {type: "string", maxLength: 80},
+                       region: {type: "string", maxLength: 80},
+                       lat: {type: "number"}, lon: {type: "number"}},
+          additionalProperties: false,
+        },
       }, additionalProperties: false,
     },
     annotations: {readOnlyHint: false, untrustedContentHint: true},
@@ -207,6 +219,7 @@ const tools = [
                        authorship: input?.authorship || ""};
       if (input?.thought !== undefined) payload.thought = input.thought;
       if (input?.context) payload.context = input.context;
+      if (input?.coarse_location) payload.coarse_location = input.coarse_location;
       return executeWrite("prepare", "/api/webmcp/prepare", payload);
     },
   },
