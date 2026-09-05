@@ -210,8 +210,14 @@ class CompetitionWebMCPTests(unittest.TestCase):
         with urlopen(self.base + "/", timeout=10) as response:
             html = response.read().decode()
         self.assertIn("Resonance also speaks WebMCP", html)
-        self.assertIn("Both routes are the same product", html)
-        self.assertIn("Continue as your current account", html)
+        # The page used to claim the two surfaces could be one account via the
+        # consent screen's "Continue as your current account". That option cannot
+        # appear in the flow it exists for: the session cookie is SameSite=Strict,
+        # so a browser navigating from claude.ai to /oauth/authorize does not send
+        # it, and the consent page sees no current account. Until identity is
+        # fixed, the page must say what is true.
+        self.assertIn("today they are not the same", html)
+        self.assertNotIn("preselects it", html)
         with urlopen(self.base + "/app.mjs", timeout=10) as response:
             app = response.read().decode()
         # both branches describe the BROWSER, and neither denies the capability
