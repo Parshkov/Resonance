@@ -444,6 +444,25 @@ class LiveProductService:
             self._workspaces = WorkspaceService(self.identity)
         return self._workspaces
 
+    @property
+    def topics(self):
+        """The shared topic each introduction can grow into.
+
+        Two assistants meet here on behalf of two people, so what accumulates
+        is structure rather than a transcript. Lazily built for the same reason
+        as the workspace service it sits on.
+        """
+        from src.workspaces.topics import SharedTopicService
+        if not hasattr(self, "_topics"):
+            self._topics = SharedTopicService(self.workspaces)
+        return self._topics
+
+    def contribute_to_topic(self, access_token, workspace_id, **kwargs):
+        return self.topics.contribute(access_token, workspace_id, **kwargs)
+
+    def read_topic(self, access_token, workspace_id, **kwargs):
+        return self.topics.read(access_token, workspace_id, **kwargs)
+
     def create_workspace(self, access_token, intro_id, **kwargs):
         return self.workspaces.create_from_intro(access_token, intro_id, **kwargs)
 

@@ -305,12 +305,20 @@ class WebServerWebMCPTests(unittest.TestCase):
         from src.product.mcp_bridge import TOOLS
         # A deliberate canary: adding a tool must be a conscious act, because a
         # tool that reaches a directory without these hints is a tool the host
-        # cannot reason about. It caught the two standing-search tools.
-        self.assertEqual(len(TOOLS), 14)
+        # cannot reason about. It caught the two standing-search tools, and then
+        # the six shared-topic ones.
+        self.assertEqual(len(TOOLS), 20)
         writes_visible_to_others = {
             "resonance_share_thought", "resonance_request_intro",
             "resonance_respond_intro", "resonance_send_message",
             "resonance_stop_sharing",
+            # A shared topic is a place other people are looking at, so opening
+            # one, contributing to it, and inviting or answering an invitation
+            # all change what someone else can see. Reading it does not:
+            # resonance_read_topic writes only this reader's own cursor, which
+            # no other participant can observe.
+            "resonance_open_topic", "resonance_contribute_to_topic",
+            "resonance_invite_to_topic", "resonance_respond_topic_invite",
         }
         for tool in TOOLS:
             name = tool["name"]

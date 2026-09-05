@@ -906,11 +906,25 @@ class SQLiteRepository:
                 self._conn.rollback()
                 raise
 
+    # The generic helpers below interpolate the table name into SQL. Every
+    # caller passes a literal, but "every caller today" is not a guarantee, so
+    # the set of tables they may touch is stated once here.
+    WORKSPACE_ROW_TABLES = frozenset({
+        "workspace_notes", "workspace_tasks", "workspace_artifacts",
+        "workspace_links", "workspace_activity", "workspace_contributions",
+    })
+
+    def _workspace_table(self, table: str) -> str:
+        if table not in self.WORKSPACE_ROW_TABLES:
+            raise ValueError(f"unknown workspace table {table!r}")
+        return table
+
     def add_workspace_row(self, table, columns, values, *, audit=None):
         """Generic single-row insert for notes/tasks/artifacts/links/activity."""
         with self._lock:
             self._begin()
             try:
+                table = self._workspace_table(table)
                 placeholders = ", ".join("?" for _ in columns)
                 self._conn.execute(
                     f"INSERT INTO {table}({', '.join(columns)}) VALUES ({placeholders})",
@@ -938,7 +952,7 @@ class SQLiteRepository:
     def list_workspace_rows(self, table, workspace_id, order="created_at"):
         with self._lock:
             rows = self._conn.execute(
-                f"SELECT * FROM {table} WHERE workspace_id = ? ORDER BY {order}",
+                f"SELECT * FROM {self._workspace_table(table)} WHERE workspace_id = ? ORDER BY {order}",
                 (workspace_id,)).fetchall()
             return [dict(r) for r in rows]
 
