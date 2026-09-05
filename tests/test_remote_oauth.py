@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import secrets
 import threading
 import unittest
@@ -371,7 +372,16 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertIn("<strong>Test</strong>", page)          # registered client_name
         self.assertIn('href="/oauth/consent.css"', page)
         self.assertNotIn("<style", page)
-        self.assertNotIn("<script", page)
+        # Nothing inline: the page is served under default-src 'self' with no
+        # unsafe-inline, so an inline style or script would silently not run.
+        # A same-origin src is exactly what that policy allows, and the theme
+        # script has to be one -- the person's Light/Dark choice, made on the
+        # site, must reach the screen where they decide whether to trust a
+        # client. Without it this page follows the OS and contradicts them.
+        self.assertNotIn("<script>", page)
+        self.assertIn('<script src="/theme.mjs"></script>', page)
+        for tag in re.findall(r"<script[^>]*>", page):
+            self.assertRegex(tag, r'^<script src="/[^"]+">$', tag)
         status, headers, body = c.get("/oauth/consent.css")
         self.assertEqual(status, 200)
         self.assertTrue(headers.get("Content-Type", "").startswith("text/css"))

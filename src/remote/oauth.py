@@ -104,10 +104,18 @@ CONSENT_CSS = """
   --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
   --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-@media (prefers-color-scheme: dark) { :root {
+/* The person's own choice, made on the site, decides this page too: it is the
+   same origin and the same person, and this is the one screen where Resonance
+   should not look like a different service. /theme.mjs stamps data-theme
+   before first paint; the media query only speaks when nothing was chosen. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --paper: #16140f; --paper-2: #1e1b16; --paper-3: #26221c; --ink: #ede8df; --ink-2: #b7b0a4; --ink-3: #8c8579;
   --line: rgba(237,232,223,.16); --line-soft: rgba(237,232,223,.09);
   --accent: #d3a66f; --accent-ink: #e2bc8a; --accent-soft: rgba(211,166,111,.12); --accent-line: rgba(211,166,111,.4); } }
+:root[data-theme="dark"] {
+  --paper: #16140f; --paper-2: #1e1b16; --paper-3: #26221c; --ink: #ede8df; --ink-2: #b7b0a4; --ink-3: #8c8579;
+  --line: rgba(237,232,223,.16); --line-soft: rgba(237,232,223,.09);
+  --accent: #d3a66f; --accent-ink: #e2bc8a; --accent-soft: rgba(211,166,111,.12); --accent-line: rgba(211,166,111,.4); }
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans);
   display: flex; align-items: flex-start; justify-content: center; padding: clamp(16px, 6vh, 64px) 16px; }
@@ -962,7 +970,8 @@ class OAuthCore:
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Authorize Resonance access</title>
-<link rel="stylesheet" href="/oauth/consent.css"></head>
+<link rel="stylesheet" href="/oauth/consent.css">
+<script src="/theme.mjs"></script></head>
 <body>
 <main class="consent">
 <p class="brand"><span class="mark" aria-hidden="true"></span>Resonance</p>
