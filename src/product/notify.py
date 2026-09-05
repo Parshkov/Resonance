@@ -185,6 +185,41 @@ def unsubscribe_matches(user_id: str, token: str, secret: bytes) -> bool:
     return account_in_token(token, secret) == user_id
 
 
+SELF_TEST_SUBJECT = "Resonance can reach you"
+SELF_TEST_BODY = (
+    "This is the one message Resonance sends to prove it can send anything.\n\n"
+    "If you are reading it, the mail path works end to end: the server has\n"
+    "credentials, your provider accepted them, and the message arrived rather\n"
+    "than being quarantined.\n\n"
+    "Nothing about anybody was in this message, and nothing about anybody is\n"
+    "in the real ones either -- they say that someone whose reasoning has the\n"
+    "same shape as yours is here, and nothing more.\n\n"
+    "Unset RESONANCE_MAIL_SELFTEST now; it costs one email on every restart.\n"
+)
+
+
+def self_test(sender: Sender, address: str) -> str:
+    """Send one message to a named address and say what happened.
+
+    "The variables are set" and "mail leaves the building" are different
+    claims, and only the second one matters. Proving the second normally needs
+    two people and a real match; this proves it with neither, before anyone is
+    invited and finds out the hard way that nothing arrives.
+
+    Deliberately an operator action, like the purge and the pseudonym
+    backfill: it goes to one address the operator names, never to a
+    participant, and it says so in its own body.
+    """
+    if isinstance(sender, NoTransport):
+        return f"not sent: {NoTransport.reason}"
+    try:
+        if sender.send(address, SELF_TEST_SUBJECT, SELF_TEST_BODY):
+            return f"sent to {address}"
+        return "not sent: the transport declined it"
+    except Exception as exc:  # noqa: BLE001 - the whole point is to report this
+        return f"not sent: {type(exc).__name__}: {exc}"
+
+
 class Notifier:
     """Decides who to tell, and remembers that they were told."""
 

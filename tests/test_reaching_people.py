@@ -191,6 +191,32 @@ class WhatAnEmailSaysTests(unittest.TestCase):
             "RESONANCE_CONTACT": "someone@example.test"})
         self.assertEqual(sender.reply_to, "someone@example.test")
 
+    def test_the_self_test_reports_what_actually_happened(self):
+        """"The variables are set" and "mail leaves the building" are
+        different claims, and only the second one matters. Proving the second
+        normally needs two people and a real match; this proves it with
+        neither, before anyone is invited and finds out the hard way."""
+        from src.product import notify
+        self.assertIn("sent to someone@example.test",
+                      notify.self_test(self.sender, "someone@example.test"))
+        self.assertIn(notify.NoTransport.reason,
+                      notify.self_test(notify.NoTransport(), "someone@example.test"))
+
+        class Refused(notify.Sender):
+            def send(self, to, subject, body, unsubscribe=""):
+                raise RuntimeError("535 authentication failed")
+
+        outcome = notify.self_test(Refused(), "someone@example.test")
+        self.assertIn("authentication failed", outcome,
+                      "a rejected password must be reported, not swallowed")
+
+    def test_the_self_test_says_nothing_about_anybody(self):
+        from src.product import notify
+        notify.self_test(self.sender, "someone@example.test")
+        whole = self.sender.sent[-1]["subject"] + self.sender.sent[-1]["body"]
+        self.assertNotIn("person-", whole)
+        self.assertNotIn("ses-", whole)
+
 
 class WhereTheLinkPointsTests(unittest.TestCase):
     """An email is useless if it sends someone to a host that no longer exists.

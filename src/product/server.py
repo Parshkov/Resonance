@@ -58,7 +58,8 @@ from src.collaboration import CollaborationError
 from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product import authorship as authorship_rule
-from src.product.notify import Notifier, NoTransport, account_in_token
+from src.product.notify import (Notifier, NoTransport, account_in_token,
+                                self_test)
 from src.product.service import LiveProductService, ProductError, StaleResultError
 from src.product.mcp_bridge import (
     BridgeError,
@@ -470,6 +471,11 @@ def build_runtime(
         secret=confirmation_secret)
     product.standing.notifier = notifier
     product.notifier = notifier
+    address = str(os.environ.get("RESONANCE_MAIL_SELFTEST") or "").strip()
+    if address and "@" in address:
+        # One message, to one address the operator named, to answer the only
+        # question the health endpoint cannot: does mail actually arrive.
+        print(f"mail self-test: {self_test(notifier.sender, address)}", flush=True)
     if isinstance(notifier.sender, NoTransport):
         # Once, here, rather than on every finding: a deployment that cannot
         # reach anyone should be impossible to miss and impossible to drown in.
