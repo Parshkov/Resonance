@@ -171,11 +171,22 @@ class IdentityService:
         backend rather than assumed, because two people meeting under the same
         name in a service built for introductions would be worse than an ugly
         name.
+
+        A backend that cannot list its users is a wiring fault, not a runtime
+        hiccup, and it is raised. Swallowing it is what let this method hand
+        out names blind: every draw looked fine, and uniqueness was left to
+        luck until two people collided.
         """
+        lister = getattr(self.backend, "list_users", None)
+        if lister is None:
+            raise AttributeError(
+                f"{type(self.backend).__name__} cannot list users, so a unique "
+                "pseudonym cannot be chosen")
         try:
-            taken = {str(_field(user, "display_label") or "")
-                     for user in self.backend.list_users()}
-        except Exception:  # noqa: BLE001 - a name is better than a failed sign-in
+            taken = {str(_field(user, "display_label") or "") for user in lister()}
+        except Exception as exc:  # noqa: BLE001 - a name is better than a failed sign-in
+            print(f"[identity] could not read existing names, naming blind: "
+                  f"{type(exc).__name__}: {exc}", flush=True)
             taken = set()
         return generate_pseudonym(taken)
 

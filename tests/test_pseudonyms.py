@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -134,6 +135,38 @@ class WhatOthersSeeTests(unittest.TestCase):
             label = self.identity.backend.get_user(creds.user_id).display_label
             self.assertNotIn(label, labels)
             labels.add(label)
+
+    def test_the_names_already_handed_out_are_actually_read(self):
+        """Uniqueness has to be arranged, not left to a big vocabulary.
+
+        The backend the product runs on once had no way to list its users. The
+        lookup raised, a broad `except` swallowed it, and every name was drawn
+        blind from 11,100 pairs -- so 40 accounts collided about one run in
+        twenty and looked correct the rest of the time. Counting the draws is
+        the only way to tell arrangement from luck.
+        """
+        creds = self.identity.register_guest()
+        mine = self.identity.backend.get_user(creds.user_id).display_label
+        self.assertIn(mine, {str(getattr(user, "display_label", "") or "")
+                             for user in self.identity.backend.list_users()})
+
+        seen = []
+        with mock.patch("src.identity.service.generate_pseudonym",
+                        side_effect=lambda taken: seen.append(set(taken)) or "Test Name"):
+            self.identity.fresh_pseudonym()
+        self.assertEqual(len(seen), 1)
+        self.assertIn(mine, seen[0])
+
+    def test_a_backend_that_cannot_list_users_is_a_loud_failure(self):
+        """Rather than a quiet one that only shows up as two people sharing a
+        name months later."""
+        class Blind:
+            def __getattr__(self, name):
+                raise AttributeError(name)
+
+        self.identity.backend = Blind()
+        with self.assertRaises(AttributeError):
+            self.identity.fresh_pseudonym()
 
 
 class BackfillTests(unittest.TestCase):
