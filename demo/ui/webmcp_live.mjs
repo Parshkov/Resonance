@@ -116,18 +116,28 @@ async function reconcileCommitted(operation, requestId) {
   return null;
 }
 
+// The server answers with `say`: the same result in words. A WebMCP tool that
+// returns a bare object leaves the client to render JSON, and an assistant
+// then reads contract_version and session ids out to the person. The object
+// still travels, so nothing that reads the fields loses anything.
+function spoken(result) {
+  const text = result && typeof result.say === "string" ? result.say : null;
+  if (!text) return result;
+  return {content: [{type: "text", text}], structuredContent: result};
+}
+
 async function executeWrite(operation, url, payload) {
   try {
     const result = await apiFetch("POST", url, payload);
     applyAuthoritativeState(await readAuthoritativeState());
-    return result;
+    return spoken(result);
   } catch (error) {
     if (error?.name !== "AbortError") throw error;
     const committed = await reconcileCommitted(operation, payload.request_id);
     if (committed === null) throw error;
     applyAuthoritativeState(await readAuthoritativeState());
     setStatus(`${statusNode().textContent} · reconciled`);
-    return committed;
+    return spoken(committed);
   }
 }
 

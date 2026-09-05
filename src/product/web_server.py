@@ -33,6 +33,7 @@ from src.ingestion.identity import (
 )
 from src.ingestion.service import ShareIntent
 from src.product import authorship as authorship_rule
+from src.product import phrasing
 from src.product.mcp_bridge import (
     BridgeError, _has_usable_structure, _insufficient_structure_message, _slug,
     _structure_summary, build_thought_dna,
@@ -67,6 +68,34 @@ def _fingerprint(body: Mapping[str, Any]) -> str:
     raw = json.dumps(semantic, sort_keys=True, separators=(",", ":"),
                      ensure_ascii=False).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+
+WEBMCP_SPOKEN_AS = {
+    "prepare": "resonance_prepare_thought",
+    "share": "resonance_share_thought",
+    "consent": "resonance_stop_sharing",
+}
+"""Which tool's words fit each browser operation.
+
+The browser surface had the same defect the chat one did: its tools handed
+back a bare object, so an assistant driving the page read JSON out to the
+person. The sentence comes from src.product.phrasing, the same place the MCP
+bridge gets it, because two hand-written descriptions of one result is how
+they start disagreeing.
+"""
+
+
+def _spoken(operation: str, wire: dict) -> dict:
+    """The wire result, plus `say`: the same answer in words.
+
+    Nothing is removed and nothing is restated differently — a client that
+    ignores `say` sees exactly what it saw before.
+    """
+    tool = WEBMCP_SPOKEN_AS.get(operation)
+    if tool is None:
+        return wire
+    return {**wire, "say": phrasing.say(tool, wire)}
 
 
 class LiveWebMCPBridge:
@@ -559,7 +588,8 @@ class WebHandler(ProductHandler):
                 "input_kind": result.get("input_kind"),
                 "next_step": "Preview exactly what will be shared, then confirm.",
             }
-            self._operation_finish(subject, operation, request_id, fingerprint, wire)
+            self._operation_finish(subject, operation, request_id, fingerprint,
+                                   _spoken(operation, wire))
             return
 
         if operation == "share":
@@ -581,7 +611,8 @@ class WebHandler(ProductHandler):
                 "shared": True,
                 "discoverable": True,
             }
-            self._operation_finish(subject, operation, request_id, fingerprint, wire)
+            self._operation_finish(subject, operation, request_id, fingerprint,
+                                   _spoken(operation, wire))
             return
 
         # The consent tool is intentionally revoke-only unless already shared.
@@ -600,7 +631,8 @@ class WebHandler(ProductHandler):
             wire = {"contract_version": WEBMCP_CONTRACT,
                     "session_id": session_id, "shared": False,
                     "revoked": True, "discoverable": False}
-        self._operation_finish(subject, operation, request_id, fingerprint, wire)
+        self._operation_finish(subject, operation, request_id, fingerprint,
+                               _spoken(operation, wire))
 
 
 def serve(host: str, port: int, *, runtime: ProductRuntime) -> ThreadingHTTPServer:

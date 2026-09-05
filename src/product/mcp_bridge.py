@@ -232,6 +232,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 # ---------------------------------------------------------------------------
 
 from src.product import authorship as authorship_rule
+from src.product import phrasing
 
 AUTHORSHIP = {
     "type": "string",
@@ -760,18 +761,21 @@ class RemoteMCPBridge:
             if not actionable:
                 return _error(msg_id, INTERNAL_ERROR, "unexpected product error")
             payload = {"error": code, "message": str(exc) or code}
+            # The message is already written for a person to hear; wrapping it
+            # in JSON only made an assistant read the wrapper out loud.
             return _result(msg_id, {
-                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False)}],
+                "content": [{"type": "text", "text": payload["message"]}],
                 "structuredContent": payload,
                 "isError": True,
             })
         extra: list[Mapping[str, Any]] = []
         if isinstance(result, ToolOutput):
             extra, result = result.content, result.result
+        # The text block is what a client shows a person, so it says the result
+        # in words. The structured half is unchanged and still carries
+        # everything, including what the assistant needs for the next call.
         return _result(msg_id, {
-            "content": [{"type": "text",
-                         "text": json.dumps(result, ensure_ascii=False, default=str)},
-                        *extra],
+            "content": [{"type": "text", "text": phrasing.say(name, result)}, *extra],
             "structuredContent": result,
             "isError": False,
         })

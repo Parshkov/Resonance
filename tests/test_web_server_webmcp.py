@@ -643,5 +643,46 @@ class WebServerWebMCPTests(unittest.TestCase):
         self.assertEqual(op["result"], first)
 
 
+    def test_the_browser_surface_answers_in_words_too(self):
+        """An assistant driving the page is as much in a conversation as one
+        driving the chat connector, and it was handed a bare object to render.
+
+        The sentence comes from the same module the MCP bridge uses, so the
+        two surfaces cannot drift into describing one result differently.
+        """
+        client = Client(self.base)
+        client.guest()
+        thought = {
+            "topic": "Slow consumer hides behind queue depth",
+            "domain": "distributed-systems",
+            "nodes": [
+                {"id": "c0", "label": "slow consumer", "role": "problem"},
+                {"id": "c1", "label": "growing queue depth", "role": "state"},
+                {"id": "c2", "label": "delayed alerting", "role": "outcome"},
+            ],
+            "relations": [
+                {"source": "c0", "target": "c1", "type": "causes"},
+                {"source": "c1", "target": "c2", "type": "causes"},
+            ],
+        }
+        _, prepared, _ = client.request("POST", "/api/webmcp/prepare", {
+            "authorship": "their_own_words", "request_id": "say-1",
+            "thought": thought})
+        said = prepared.get("say")
+        self.assertTrue(said, prepared)
+        self.assertFalse(said.lstrip().startswith("{"), said)
+        self.assertNotIn("contract_version", said)
+        # Everything that was on the wire before is still on it.
+        self.assertFalse(prepared["discoverable"])
+        self.assertEqual(prepared["source_retention"], "not_retained")
+
+        _, preview, _ = client.request("GET", "/api/webmcp/preview")
+        _, shared, _ = client.request("POST", "/api/webmcp/share", {
+            "request_id": "say-2", "confirm": True,
+            "confirmation_token": preview["confirmation_token"]})
+        self.assertTrue(shared["discoverable"])
+        self.assertIn("discoverable", shared["say"])
+        self.assertNotIn("session_id", shared["say"])
+
 if __name__ == "__main__":
     unittest.main()
