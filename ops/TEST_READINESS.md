@@ -112,8 +112,15 @@ PYTHONPATH=. python3 archive/hackathon/submission/evidence/abc_mcp_test.py http:
 ```
 
 Completing the hosted flow **on production** requires a human to sign in with
-Google or GitHub. That is the outstanding "human execution of the hosted-client
-cards" item in `docs/STATUS.md`, and no script can close it.
+Google or GitHub. **That was done on 2026-09-06** and is recorded in
+`docs/STATUS.md` under "The hosted flow, completed on production": DCR ->
+authorize with a real signed-in account -> code -> token -> MCP `initialize` ->
+21 tools -> `resonance_whoami` -> RFC 7009 revoke -> `401`. Read-only; nothing
+was written to the live corpus.
+
+So the flow is proven. What no script can close is re-running it: each
+execution needs a human at the consent screen. Cards B (claude.ai connector)
+and C (ChatGPT developer mode) also remain unexecuted by a person.
 
 ### The archived A/B/C harness predates the authorship rule
 
