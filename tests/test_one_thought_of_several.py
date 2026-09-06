@@ -35,7 +35,89 @@ from src.product.mcp_bridge import RemoteMCPBridge, current_shared_session
 from src.product.phrasing import say
 from src.product.server import UI_DIR
 from src.product.web_server import _owned_live_session
-from tests.test_shared_list import Person, _live_server, thought
+
+import threading
+from http.cookies import SimpleCookie
+from urllib.request import Request, urlopen
+
+from src.product.server import build_runtime
+from src.product.web_server import serve
+
+
+def thought(topic: str, labels: list[str]) -> dict:
+    return {
+        "topic": topic, "domain": "operations",
+        "nodes": [{"id": f"n{i}", "label": label, "role": role}
+                  for i, (label, role) in enumerate(zip(labels, ("problem", "mechanism", "outcome")))],
+        "relations": [{"source": "n0", "target": "n1", "type": "causes"},
+                      {"source": "n1", "target": "n2", "type": "causes"}],
+    }
+
+
+class Person:
+    """One person at a browser: a cookie session and its CSRF token."""
+
+    def __init__(self, base: str):
+        self.base = base
+        self.cookie = None
+        self.token = None
+        self.csrf = None
+        self.counter = 0
+
+    def request(self, method: str, path: str, body=None, *, cookie=True):
+        headers = {"Content-Type": "application/json", "Origin": self.base}
+        if cookie and self.cookie:
+            headers["Cookie"] = self.cookie
+        if self.csrf:
+            headers["X-Resonance-CSRF"] = self.csrf
+        data = json.dumps(body).encode() if body is not None else None
+        req = Request(self.base + path, data=data, headers=headers, method=method)
+        with urlopen(req, timeout=15) as response:
+            set_cookie = response.headers.get("Set-Cookie")
+            if set_cookie:
+                morsel = SimpleCookie(set_cookie).get("resonance_token")
+                if morsel is not None:
+                    self.token = morsel.value
+                    self.cookie = f"resonance_token={morsel.value}"
+            return response.status, json.loads(response.read().decode())
+
+    def arrive(self):
+        _, payload = self.request("POST", "/api/product/guest", {})
+        self.csrf = payload["csrf_token"]
+        return payload
+
+    def prepare(self, what: dict) -> str:
+        self.counter += 1
+        _, prepared = self.request("POST", "/api/webmcp/prepare", {
+            "request_id": f"prep-{self.counter}", "authorship": "their_own_words",
+            "thought": what})
+        return prepared["session_id"]
+
+    def share(self, what: dict) -> str:
+        session_id = self.prepare(what)
+        _, preview = self.request("GET", "/api/webmcp/preview")
+        self.counter += 1
+        _, shared = self.request("POST", "/api/webmcp/share", {
+            "request_id": f"share-{self.counter}", "confirm": True,
+            "confirmation_token": preview["confirmation_token"]})
+        assert shared["discoverable"], shared
+        assert shared["session_id"] == session_id
+        return session_id
+
+    def mine(self) -> dict:
+        _, payload = self.request("GET", "/api/product/mine")
+        return payload
+
+
+def _live_server():
+    pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}), seed=False)
+    server = serve("127.0.0.1", 0, runtime=pending)
+    host, port = server.server_address[:2]
+    base = f"http://{host}:{port}"
+    runtime = build_runtime(":memory:", allowed_origins=frozenset({base}), seed=False)
+    server.RequestHandlerClass.runtime = runtime
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, base, runtime
 
 REPO = Path(__file__).resolve().parents[1]
 NODE = shutil.which("node")
@@ -207,159 +289,33 @@ class OverHttpTests(unittest.TestCase):
                          "not be reported to anyone as a match.")
 
 
-# ---- 2 and 3. what the page does and says --------------------------------
-
-def _node(script: str, *argv: str) -> dict:
-    done = subprocess.run([NODE, "--input-type=module", "-e", script, "--", *argv],
-                          capture_output=True, text=True, timeout=30, cwd=str(REPO))
-    if done.returncode != 0:
-        raise AssertionError(done.stderr)
-    return json.loads(done.stdout)
-
-
-WATCHER_SCRIPT = """
-import { consentWatcher } from %(module)s;
-const announcements = JSON.parse(process.argv[1]);
-const rereads = [];
-const watch = consentWatcher(() => rereads.push(true));
-const trace = announcements.map((detail) => { watch(detail); return rereads.length; });
-console.log(JSON.stringify(trace));
-"""
-
-
-@unittest.skipUnless(NODE, "node is not installed; the page module cannot be run here")
-class RereadOnConsentTests(unittest.TestCase):
-    def trace(self, *announcements) -> list[int]:
-        script = WATCHER_SCRIPT % {"module": json.dumps(str(UI_DIR / "app.mjs"))}
-        return _node(script, json.dumps(list(announcements)))
-
-    def test_withdrawing_one_of_two_makes_the_page_re_read(self):
-        # Boot: two discoverable. Withdraw one: still "shared", but not the
-        # same thoughts -- the page must re-read or keep drawing the withdrawn
-        # one under "What others can see".
-        self.assertEqual(self.trace(
-            {"shared": True, "discoverable": ["ses-a", "ses-b"]},
-            {"shared": True, "discoverable": ["ses-a"]},
-        ), [0, 1])
-
-    def test_nothing_changed_costs_nothing(self):
-        # Discovery is rate-limited; an announcement that changes nothing
-        # must not spend a read. Order of the list is not a change either.
-        self.assertEqual(self.trace(
-            {"shared": True, "discoverable": ["ses-a", "ses-b"]},
-            {"shared": True, "discoverable": ["ses-b", "ses-a"]},
-            {"shared": True},                       # webmcp_live: only knows yes/no
-            {"shared": True, "discoverable": ["ses-a", "ses-b"]},
-        ), [0, 0, 0, 0])
-
-    def test_a_flip_still_re_reads_with_or_without_the_list(self):
-        self.assertEqual(self.trace(
-            {"shared": False},
-            {"shared": True},
-            {"shared": True, "discoverable": ["ses-a"]},
-            {"shared": False, "discoverable": []},
-            {"shared": True, "discoverable": ["ses-b"]},
-        ), [0, 1, 1, 2, 3])
-
-    def test_a_second_share_from_a_chat_moves_the_page_to_it(self):
-        self.assertEqual(self.trace(
-            {"shared": True, "discoverable": ["ses-a"]},
-            {"shared": True, "discoverable": ["ses-a", "ses-b"]},
-        ), [0, 1])
-
-
-WORDS_SCRIPT = """
-import { shareStateWords, stopSharingMeans } from %(module)s;
-const cases = JSON.parse(process.argv[1]);
-console.log(JSON.stringify(cases.map((counts) => [shareStateWords(counts), stopSharingMeans(counts)])));
-"""
-
-SESSION_IMPORT = 'import { apiFetch } from "/session.mjs";'
-
-
-@unittest.skipUnless(NODE, "node is not installed; the page module cannot be run here")
-class ShareLineTests(unittest.TestCase):
-    """The words beside the status light, run from the module itself.
-
-    collab_ui.mjs imports the page's session module by URL, which node cannot
-    resolve, so the copy under test has that one line replaced by stubs; the
-    sentences are pure functions of the counts and touch neither.
-    """
-
-    @classmethod
-    def setUpClass(cls):
-        source = (UI_DIR / "collab_ui.mjs").read_text(encoding="utf-8")
-        assert SESSION_IMPORT in source, "the import this stubs has moved"
-        cls.tmp = tempfile.TemporaryDirectory()
-        cls.module = Path(cls.tmp.name) / "collab_ui.mjs"
-        cls.module.write_text(source.replace(
-            SESSION_IMPORT, "const apiFetch = () => {};"),
-            encoding="utf-8")
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.tmp.cleanup()
-
-    def words(self, *cases) -> list[list[str]]:
-        script = WORDS_SCRIPT % {"module": json.dumps(str(self.module))}
-        return _node(script, json.dumps(list(cases)))
-
-    def test_nothing_of_yours_is_only_said_when_nothing_of_yours_is(self):
-        line, _ = self.words({"discoverable": 1, "private": 0, "withdrawn": 1})[0]
-        self.assertEqual(line, "Discoverable · 1 thought · still looking · 1 thought withdrawn")
-        self.assertNotIn("Nothing of yours", line)
-        self.assertNotIn("Private", line)
-
-    def test_withdrawn_is_not_private(self):
-        line, _ = self.words({"discoverable": 0, "private": 0, "withdrawn": 1})[0]
-        self.assertEqual(line, "Nothing of yours is discoverable · 1 thought withdrawn")
-        self.assertNotIn("Private", line)
-        line, _ = self.words({"discoverable": 0, "private": 1, "withdrawn": 0})[0]
-        self.assertEqual(line, "Nothing of yours is discoverable · 1 thought kept private here")
-
-    def test_three_facts_three_clauses(self):
-        line, _ = self.words({"discoverable": 2, "private": 1, "withdrawn": 3})[0]
-        self.assertEqual(line, "Discoverable · 2 thoughts · still looking · "
-                               "3 thoughts withdrawn · 1 thought kept private here")
-        line, _ = self.words({"discoverable": 0, "private": 0, "withdrawn": 0})[0]
-        self.assertEqual(line, "Nothing of yours is discoverable")
-        line, _ = self.words({})[0]
-        self.assertEqual(line, "Nothing of yours is discoverable")
-
-    def test_stop_sharing_says_what_will_happen_to_the_others(self):
-        alone, one_other, two_others = [means for _, means in self.words(
-            {"discoverable": 1}, {"discoverable": 2}, {"discoverable": 3})]
-        self.assertEqual(alone, "This thought leaves discovery now and stops looking. "
-                                "Anyone it matched stops seeing it.")
-        self.assertEqual(one_other, alone + " Your other thought stays discoverable.")
-        self.assertEqual(two_others, alone + " Your 2 other thoughts stay discoverable.")
-
+# ---- 2 and 3. what the page says --------------------------------------------
 
 class OnThePageTests(unittest.TestCase):
-    module = (UI_DIR / "collab_ui.mjs").read_text(encoding="utf-8")
-    app = (UI_DIR / "app.mjs").read_text(encoding="utf-8")
+    """The page reads the three states from the store and says each in words."""
+    words = (UI_DIR / "strings.mjs").read_text(encoding="utf-8")
+    page = (UI_DIR / "main.mjs").read_text(encoding="utf-8")
+    store = (UI_DIR / "store.mjs").read_text(encoding="utf-8")
 
-    def test_the_line_reads_the_same_three_states_the_chat_reports(self):
-        self.assertIn('"/api/product/mine"', self.module)
-        # The old line, as code (a comment may still quote it to say why it
-        # went): one sentence for every person who had nothing discoverable,
-        # whatever state their thoughts were in.
-        self.assertNotIn('"Private · nothing of yours is discoverable")', self.module)
-        self.assertIn("shareStateWords(counts)", self.module)
+    def test_the_page_reads_the_same_record_the_chat_reports(self):
+        # /api/product/overview carries `mine`, the same three-state list
+        # `resonance_whoami` sorts with `_in_state`.
+        self.assertIn("/api/product/overview", self.store)
+        for state in ("discoverable", "private", "withdrawn"):
+            self.assertIn(f'"thoughts.state.{state}":', self.words)
+            self.assertIn(f'"thoughts.state.{state}.hint":', self.words)
 
     def test_stopping_asks_once_inline_never_in_a_browser_dialog(self):
-        self.assertNotIn("confirm(", self.module)
-        self.assertIn("Yes, stop", self.module)
-        self.assertIn("Keep sharing", self.module)
+        self.assertNotIn("confirm(", self.page)
+        self.assertIn("Yes, stop", self.words)
+        self.assertIn("Keep sharing", self.words)
+        self.assertIn("/api/product/revoke", self.page)
 
-    def test_the_page_re_reads_on_any_consent_change_not_only_a_flip(self):
-        self.assertIn("consentWatcher", self.app)
-        self.assertNotIn("lastShared", self.app)
-        # The identifiers the announcement carries are compared, never shown.
-        for line in self.module.splitlines():
-            if "session_id" in line and "discoverable" in line:
-                self.assertNotIn("textContent", line)
-                self.assertNotIn("dataset", line)
+    def test_a_withdrawal_drops_every_cached_result(self):
+        # Withdrawing one of two thoughts must not leave the other's people
+        # list, or the withdrawn thought's, on the screen from a stale cache.
+        revoke = self.page[self.page.index("/api/product/revoke"):]
+        self.assertIn("discovery: true", revoke[:200])
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@ import json
 import sys
 import tempfile
 import unittest
+
+from src.semantics import neural
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -101,7 +103,8 @@ class RequiredDemoTests(unittest.TestCase):
         pair = pair_of("cross_domain_analogy")
         r = self._verify(pair, "analogical")
         self.assertEqual(r.classification, "analogical")
-        self.assertLess(r.components.semantic, 0.3)
+        if neural.active() is None:   # the lexicon is blind across domains; an encoder is not
+            self.assertLess(r.components.semantic, 0.3)
         self.assertGreaterEqual(r.components.structural, 0.85)
         # and through the live find() path. The v0.1 corpus holds ~64
         # structurally identical clones of every query (its known defect), so

@@ -180,6 +180,12 @@ _UNCOMPARABLE_SCRIPT = re.compile(
 
 
 def _refuse_uncomparable_labels(labels: list[str]) -> None:
+    # With a label encoder active (ADR-0006) the index reads these scripts:
+    # a Russian label is compared as meaning, not as English text, so the
+    # refusal below would exclude exactly the people it was written to serve.
+    from src.semantics import neural
+    if neural.active() is not None:
+        return
     offending = sorted({label for label in labels if _UNCOMPARABLE_SCRIPT.search(label)})
     if not offending:
         return
@@ -615,6 +621,25 @@ TOOLS: list[dict[str, Any]] = [
         "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": False},
     },
     {
+        "name": "resonance_post_in_topic",
+        "title": "Say something to everyone in a shared topic",
+        "description": (
+            "Post a short plain-text message to every member of a shared topic (a group of "
+            "people around one idea). This is the group's conversation, next to the "
+            "structure it accumulates: use it for questions, coordination and replies that "
+            "are not a change in understanding. Requires confirm=true; the text is the "
+            "person's own words, shown to the others as theirs."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"workspace_id": {"type": "string"},
+                           "body": {"type": "string", "minLength": 1, "maxLength": 4000},
+                           "confirm": _CONFIRM, "request_id": _REQUEST_ID},
+            "required": ["workspace_id", "body", "confirm"],
+            "additionalProperties": False,
+        },
+        "annotations": {"readOnlyHint": False, "destructiveHint": False, "openWorldHint": True, "idempotentHint": False},
+    },
+    {
         "name": "resonance_invite_to_topic",
         "title": "Invite a connected person into a shared topic",
         "description": (
@@ -659,6 +684,7 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 TOOL_NAMES = frozenset(t["name"] for t in TOOLS)
+MAX_POSTS_IN_READ = 20
 
 
 # ---------------------------------------------------------------------------
@@ -1282,10 +1308,33 @@ class RemoteMCPBridge:
         return {"contract_version": BRIDGE_CONTRACT, "topics": topics}
 
     def tool_read_topic(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        workspace_id = str(arguments.get("workspace_id", ""))
         answer = self.product.read_topic(
-            token, str(arguments.get("workspace_id", "")),
-            advance=arguments.get("advance", True) is not False)
-        return {"contract_version": BRIDGE_CONTRACT, **answer}
+            token, workspace_id, advance=arguments.get("advance", True) is not False)
+        # The group's conversation and its parts ride along, so one read says
+        # what the group is doing and not only what it now understands.
+        posts: list[dict[str, Any]] = []
+        parts: list[dict[str, Any]] = []
+        try:
+            full = self.product.get_workspace(token, workspace_id)
+            posts = [{"author_pseudonym": n.get("author_display"), "body": n.get("body"),
+                      "untrusted": True, "created_at": n.get("created_at")}
+                     for n in (full.get("notes") or [])[-MAX_POSTS_IN_READ:]]
+            parts = [{"title": t.get("title"), "state": t.get("state"), "untrusted": True}
+                     for t in (full.get("tasks") or [])]
+        except Exception:  # noqa: BLE001 - the understanding is the answer; the rest is extra
+            pass
+        return {"contract_version": BRIDGE_CONTRACT, **answer, "posts": posts, "parts": parts}
+
+    def tool_post_in_topic(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        self._require_confirm(arguments)
+        body = str(arguments.get("body", "") or "").strip()
+        if not body:
+            raise BridgeError("validation_failed", "the message must not be empty")
+        posted = self.product.workspace_add_note(
+            token, self._required_id(arguments, "workspace_id"), body,
+            confirmed=True, **self._security())
+        return {"contract_version": BRIDGE_CONTRACT, "posted": True, **dict(posted or {})}
 
     def tool_contribute_to_topic(self, token: str, arguments: dict[str, Any]) -> dict[str, Any]:
         self._require_confirm(arguments)

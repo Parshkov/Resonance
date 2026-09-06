@@ -7,6 +7,8 @@ import importlib.util
 import json
 import sys
 import unittest
+
+from src.semantics import neural
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -63,6 +65,8 @@ class EngineGateTests(unittest.TestCase):
         self.assertEqual(self.report["gate"]["analogy_over_coincidence"], 1.0)
         self.assertEqual(self.report["gate"]["negative_false_positive_rate"], 0.0)
 
+    @unittest.skipIf(neural.active() is not None,
+                     "the frozen report is the lexicon-only engine; an encoder is a different one")
     def test_frozen_report_matches_live_engine(self):
         frozen = json.loads((REPO / "src/engine/reports/r0-v0.2-e2e.json").read_text())
         for split in ("calibration", "gate"):

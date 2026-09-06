@@ -388,45 +388,26 @@ class ProductHttpTests(unittest.TestCase):
         request = Request(self.base + "/", headers={"Origin": self.origin})
         with urlopen(request, timeout=10) as response:
             html = response.read().decode("utf-8")
-        # The former inline `window.RESONANCE_MODE` marker was refused by the
-        # page's own CSP (default-src 'self') and had no readers.
+        # The page is one module (main.mjs, linked from index.html) over one
+        # state store; the browser WebMCP tools ride along as extra modules so
+        # an agent living in the browser gets the same product.
         self.assertNotIn("<script>window.RESONANCE_MODE", html)
+        self.assertIn('src="/main.mjs"', html)
         self.assertIn('src="/webmcp.mjs"', html)
-        self.assertIn('src="/deeplink.mjs"', html)
-        self.assertIn('src="/session.mjs"', html)
-        self.assertIn('src="/collab.mjs"', html)
-        self.assertIn('src="/collab_ui.mjs"', html)
-        self.assertIn('src="/workspaces.mjs"', html)
-        # The half of the product that waits has a surface of its own: what the
-        # standing search found while the person was away is read by
-        # resonances.mjs and shown at the top of the page.
-        self.assertIn('src="/resonances.mjs"', html)
-        with urlopen(Request(self.base + "/resonances.mjs"), timeout=10) as response:
-            self.assertTrue(response.headers["Content-Type"].startswith("text/javascript"))
-            waiting = response.read().decode("utf-8")
-        self.assertIn("/api/product/resonances", waiting)
-        self.assertIn("they_arrived", waiting)
-        self.assertNotIn(".innerHTML", waiting)
-        # R16 Chrome audit: the collaboration surfaces are styled by a linked
-        # stylesheet (CSP default-src 'self' forbids inline styles) and the page
-        # ships a favicon, both injected into <head>; served with proper types.
-        self.assertIn('href="/live_ui.css"', html)
+        self.assertIn('href="/app.css"', html)
         self.assertIn('href="/favicon.svg"', html)
-        self.assertLess(html.index('href="/live_ui.css"'), html.index("</head>"))
-        self.assertLess(html.index("</head>"), html.index('src="/collab_ui.mjs"'))
-        with urlopen(Request(self.base + "/live_ui.css"), timeout=10) as response:
-            self.assertTrue(response.headers["Content-Type"].startswith("text/css"))
-            css = response.read().decode("utf-8")
-        # Those surfaces used to be a right-hand "Collaboration" drawer. Finding
-        # people is pointless if reaching them is hidden behind an overlay, so
-        # the requests inbox, the thread and the introduction composer are now
-        # sections of the page, and the stylesheet styles their parts only.
-        self.assertIn(".intro-composer", css)
-        self.assertIn(".collab-thread", css)
-        self.assertNotIn(".collab-drawer", css)
-        self.assertNotIn(".collab-toggle", css)
-        self.assertIn('id="conversations"', html)
-        self.assertIn('id="news"', html)
+        self.assertLess(html.index('href="/app.css"'), html.index("</head>"))
+        for path, kind in (("/main.mjs", "text/javascript"), ("/store.mjs", "text/javascript"),
+                           ("/strings.mjs", "text/javascript"), ("/app.css", "text/css")):
+            with urlopen(Request(self.base + path), timeout=10) as response:
+                self.assertTrue(response.headers["Content-Type"].startswith(kind), path)
+                body = response.read().decode("utf-8")
+            self.assertNotIn(".innerHTML", body, path)
+        # Every screen is served the same document, so a link to one of them
+        # can be opened directly.
+        for screen in ("/thoughts", "/people", "/talk", "/groups", "/groups/ws-1", "/connect"):
+            with urlopen(Request(self.base + screen), timeout=10) as response:
+                self.assertIn('src="/main.mjs"', response.read().decode("utf-8"), screen)
         for icon in ("/favicon.svg", "/favicon.ico"):
             with urlopen(Request(self.base + icon), timeout=10) as response:
                 self.assertEqual(response.headers["Content-Type"], "image/svg+xml")
@@ -435,20 +416,10 @@ class ProductHttpTests(unittest.TestCase):
         # and live_shell.mjs existed only to rewrite the page when that route
         # was missing. Both went with the replay source they served.
         self.assertNotIn("live_shell", html)
-        for gone in ("/api/config", "/live_shell.mjs"):
+        for gone in ("/api/config", "/live_shell.mjs", "/app.mjs", "/collab_ui.mjs", "/deeplink.mjs"):
             with self.assertRaises(HTTPError) as ctx:
                 urlopen(Request(self.base + gone), timeout=10)
             self.assertEqual(ctx.exception.code, 404, gone)
-        # the human-UI collaboration module is committed and served
-        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
-            ui = response.read().decode("utf-8")
-        # the control is worded as what it is; the old "Request intro" label
-        # went with the drawer it lived in
-        self.assertIn("Ask for an introduction", ui)
-        self.assertIn("/api/product/intro/request", ui)
-        self.assertIn("textContent", ui)  # UGC displayed, never assigned to innerHTML
-        self.assertNotIn(".innerHTML =", ui)
-        self.assertNotIn(".innerHTML=", ui)
 
     def test_session_bootstrap_csrf_survives_reload_without_injection(self):
         # A committed page flow: establish a session, then a "reload" that only
@@ -521,88 +492,47 @@ class ProductHttpTests(unittest.TestCase):
             "presentation": dict(PRES)})
         self.assertEqual(prepared["status"], "prepared_private")
 
-    def test_collab_ui_has_intro_initiation_and_the_page_no_longer_lies(self):
-        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+    def test_the_page_offers_an_introduction_on_every_person_and_never_lies(self):
+        with urlopen(Request(self.base + "/main.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")
-        # human intro initiation exists and drives the live discover+request
-        # path. It is the action on every person shown — card, roster row or
-        # waiting resonance — not a separate "Start an introduction" list, and
-        # the message is composed inline, not in a window.prompt().
-        self.assertIn("Ask for an introduction", ui)
-        self.assertIn("/api/product/rich_discover", ui)
-        self.assertIn("querySession", ui)
-        self.assertIn("function introComposer(", ui)
+        with urlopen(Request(self.base + "/strings.mjs"), timeout=10) as response:
+            words = response.read().decode("utf-8")
+        # Asking for an introduction is the action on every person shown, the
+        # message is composed inline, and a seeded example (which the backend
+        # refuses to introduce) is never offered one.
+        self.assertIn("Ask for an introduction", words)
+        self.assertIn("/api/product/intro/request", ui)
         self.assertNotIn("window.prompt(", ui)
-        # A seeded example cannot accept an introduction (the backend refuses),
-        # so the page must not offer one.
         self.assertIn("demo_persona", ui)
-        # The page used to carry a static "Introductions unavailable — not
-        # exposed by the accepted R8 MCP" chip, which stopped being true at
-        # R13/R14, and this module hid it at runtime. Hiding a false statement
-        # is not the same as not making it: the markup now states the rule that
-        # IS true, so both the claim and the workaround are gone.
-        with urlopen(Request(self.base + "/"), timeout=10) as response:
-            html = response.read().decode("utf-8")
-        # match the element, not the phrase: the phrase survives on purpose in
-        # the comment that records what the chip used to claim.
-        self.assertNotIn('class="intro-unavailable"', html)
-        self.assertIn("Introductions need both sides", html)
-        self.assertNotIn('querySelector(".intro-unavailable")', ui)
+        # Introductions need both sides, and the page says so where it matters.
+        self.assertIn("Introductions need both sides", words)
+        self.assertNotIn("intro-unavailable", ui)
 
-    def test_connect_panel_leads_with_the_url_not_a_key(self):
-        # The panel used to lead with "Create MCP key" and hand out
-        # `Authorization: Bearer <key>` plus a `…/mcp/<key>` capability URL for
-        # "clients that only take a URL". ops/CONNECT_MCP.md calls the key a
-        # developer fallback, "debug only, not the normal path", and
-        # submission/HUMAN_TEST_CARDS.md tells a tester that being asked for a
-        # key is a FAIL. The product's own UI was teaching the failing path.
-        with urlopen(Request(self.base + "/collab_ui.mjs"), timeout=10) as response:
+    def test_connect_screen_leads_with_the_url_not_a_key(self):
+        # The old panel led with "Create MCP key" and handed out a bearer key
+        # plus a `/mcp/<key>` capability URL -- exactly the path
+        # ops/CONNECT_MCP.md calls debug-only and the human test cards call a
+        # FAIL. The Connect screen shows one address and no key at all.
+        with urlopen(Request(self.base + "/main.mjs"), timeout=10) as response:
             ui = response.read().decode("utf-8")
-        with urlopen(Request(self.base + "/"), timeout=10) as response:
-            html = response.read().decode("utf-8")
-        # The connect instructions live once, in the page: the URL row leads,
-        # and the key sits in a disclosure that collab_ui.mjs renders into
-        # #connect-advanced AFTER it. Anchor on the markup and on code, not on
-        # prose: "Create MCP key" also appears in the comment explaining why it
-        # no longer leads.
-        url_block = html.index('id="mcp-url"')
-        key_slot = html.index('id="connect-advanced"')
-        self.assertLess(url_block, key_slot, "the canonical URL must lead")
-        self.assertIn('actionButton("Create MCP key"', ui)
-        self.assertIn('byId("connect-advanced")', ui)
-        self.assertIn("collab-advanced", ui)
-        self.assertIn("Advanced: mint a key (debug only)", ui)
-        # kept inside one string literal: the source wraps this sentence
-        self.assertIn("You will not be asked to paste a", ui)
-        self.assertIn("You will never be asked to paste a", html)
-        # the capability URL (a secret inside a path) is no longer advertised
+        with urlopen(Request(self.base + "/strings.mjs"), timeout=10) as response:
+            words = response.read().decode("utf-8")
+        self.assertIn("/mcp", ui)
+        self.assertNotIn("Create MCP key", ui)
         self.assertNotIn("endpoint_with_key", ui)
-        # The collaboration surfaces render into named sections of the page
-        # (never a drawer, never a 4th item of the workspace grid), refresh
-        # after any successful write made through session.mjs, and offer the
-        # human share path: words in, the structure back, an explicit share.
-        self.assertNotIn("collab-toggle", ui)
-        self.assertNotIn("collab-drawer", ui)
-        self.assertNotIn('getElementById("main-workspace")', ui)
-        self.assertIn('byId("collab-requests")', ui)
-        self.assertIn('byId("share-control")', ui)
-        self.assertIn("resonance:write", ui)
+        self.assertNotIn("/api/product/mcp_key", ui)
+        self.assertIn("never asked to paste a key", words)
+        # The human share path: words in, the structure back, an explicit share.
         self.assertIn("/api/webmcp/prepare", ui)
         self.assertIn("/api/webmcp/preview", ui)
         self.assertIn("/api/webmcp/share", ui)
-        self.assertNotIn("style.cssText", ui)  # presentation lives in live_ui.css
-        with urlopen(Request(self.base + "/session.mjs"), timeout=10) as response:
-            self.assertIn("resonance:write", response.read().decode("utf-8"))
+        self.assertNotIn("style.cssText", ui)
         # session bootstrap shares the token across tabs (F4) and self-heals
         with urlopen(Request(self.base + "/session.mjs"), timeout=10) as response:
             session = response.read().decode("utf-8")
+        self.assertIn("resonance:write", session)
         self.assertIn("localStorage", session)
         self.assertIn("csrf_rejected", session)
-        with urlopen(Request(self.base + "/deeplink.mjs"), timeout=10) as response:
-            script = response.read().decode("utf-8")
-        self.assertIn("FRAGMENT_RE", script)
-        self.assertIn("hashchange", script)
-        self.assertIn("/api/product/match", script)
 
     def test_ui_ref_deep_link_round_trip_with_fail_closed_rejections(self):
         import re

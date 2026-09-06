@@ -106,36 +106,33 @@ STATIC = {
     # The type scale and the radii, linked by the product page and by the
     # documentation pages, which do not share a stylesheet.
     "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
-    "/styles.css": ("styles.css", "text/css; charset=utf-8"),
-    "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
-    "/webmcp.mjs": ("webmcp.mjs", "text/javascript; charset=utf-8"),
-    "/deeplink.mjs": ("deeplink.mjs", "text/javascript; charset=utf-8"),
-    "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
+    # The page: one stylesheet, one router with every screen, one state
+    # store, and every sentence in one place (two languages).
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/main.mjs": ("main.mjs", "text/javascript; charset=utf-8"),
+    "/store.mjs": ("store.mjs", "text/javascript; charset=utf-8"),
+    "/strings.mjs": ("strings.mjs", "text/javascript; charset=utf-8"),
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
-    "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
-    "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
-    "/account.mjs": ("account.mjs", "text/javascript; charset=utf-8"),
-    # One file per piece of work, so several people can build at once without
-    # meeting in the middle of styles.css.
-    "/topics.mjs": ("topics.mjs", "text/javascript; charset=utf-8"),
-    "/topics.css": ("topics.css", "text/css; charset=utf-8"),
-    "/geo.mjs": ("geo.mjs", "text/javascript; charset=utf-8"),
-    "/geo.css": ("geo.css", "text/css; charset=utf-8"),
-    "/shared_list.mjs": ("shared_list.mjs", "text/javascript; charset=utf-8"),
-    "/shared_list.css": ("shared_list.css", "text/css; charset=utf-8"),
-    # The frame: colour scheme (applied before first paint), navigation built
-    # from the sections that are on the page, notices. Loaded by index.html.
     "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
-    "/shell.mjs": ("shell.mjs", "text/javascript; charset=utf-8"),
-    # What the standing search found while the person was away.
-    "/resonances.mjs": ("resonances.mjs", "text/javascript; charset=utf-8"),
-    # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
-    # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
-    "/live_ui.css": ("live_ui.css", "text/css; charset=utf-8"),
+    # The browser WebMCP tools: the same product, the same tools, for an
+    # agent living in the browser. The module reads the tool list from
+    # /api/product/tools and executes through /api/product/tool, so the
+    # browser and the remote MCP server can never carry two vocabularies.
+    "/webmcp.mjs": ("browser_tools.mjs", "text/javascript; charset=utf-8"),
     "/legal.css": ("legal.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/favicon.ico": ("favicon.svg", "image/svg+xml"),
 }
+
+# The screens the page routes to on the client. Each is served the same
+# document; main.mjs reads the path and shows that screen, so a link to
+# /people or /groups/<id> can be opened, bookmarked and shared.
+APP_PATHS = {"/", "/index.html", "/thoughts", "/people", "/talk", "/groups", "/connect"}
+
+
+def is_app_path(path: str) -> bool:
+    return path in APP_PATHS or path.startswith("/groups/") or path.startswith("/talk/")
+
 
 def _mcp_path_token(path: str) -> str | None:
     """`/mcp` -> "" (key must come in the Authorization header);
@@ -146,12 +143,6 @@ def _mcp_path_token(path: str) -> str | None:
         key = path[len("/mcp/"):]
         return key if key and "/" not in key else None
     return None
-
-
-HEAD_INJECTION = (
-    '  <link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-    '  <link rel="stylesheet" href="/live_ui.css">\n</head>'
-)
 
 
 @dataclass
@@ -170,6 +161,7 @@ def engine_identity(runtime: "ProductRuntime") -> dict[str, str]:
     from src.fingerprint.keys import FEATURE_VERSION
     from src.index import INDEX_VERSION
     from src.semantics import SEMANTICS_VERSION
+    from src.semantics import neural as _neural
     engine = runtime.live.engine
     return {
         "engine_version": ENGINE_VERSION,
@@ -178,6 +170,7 @@ def engine_identity(runtime: "ProductRuntime") -> dict[str, str]:
         "index_version": INDEX_VERSION,
         "feature_version": FEATURE_VERSION,
         "semantics_version": SEMANTICS_VERSION,
+        "label_encoder": (_neural.active().name if _neural.active() else None),
         "extractor_version": EXTRACTOR_VERSION,
         "verifier_config_hash": engine.verifier.config_hash,
     }
@@ -582,6 +575,13 @@ class ProductHandler(BaseHTTPRequestHandler):
             raise IngestionError("request body must be a JSON object") from exc
         if not isinstance(parsed, dict):
             raise IngestionError("request body must be a JSON object")
+        # One word for consent on every door. The HTTP routes read `confirmed`
+        # and the MCP tools read `confirm`; a client that learned one spelling
+        # was refused by the other with "explicit confirmation required".
+        if "confirm" in parsed and "confirmed" not in parsed:
+            parsed["confirmed"] = parsed["confirm"]
+        elif "confirmed" in parsed and "confirm" not in parsed:
+            parsed["confirm"] = parsed["confirmed"]
         return parsed
 
     def _token(self) -> str:
@@ -943,30 +943,17 @@ class ProductHandler(BaseHTTPRequestHandler):
             self._send_bytes(_unsubscribe_page(stopped).encode("utf-8"),
                              "text/html; charset=utf-8")
             return
-        if path in {"/", "/index.html"}:
+        if is_app_path(path):
             html = (UI_DIR / "index.html").read_text(encoding="utf-8")
-            # Stamp the state the page will end up in, so the browser paints it
-            # once. Left at "loading", a first-time visitor saw the results
-            # dashboard — skeleton cards, "Resonance map", "Useful matches" —
-            # and only then the onboarding that replaces it, which reads as the
-            # page changing its mind. `_initial_app_state` knows the answer
-            # before any JavaScript runs.
             html = html.replace('data-state="loading"',
                                 f'data-state="{self._initial_app_state(params)}"', 1)
             html = self._stamp_account(html)
-            injected = html.replace("</head>", HEAD_INJECTION, 1).replace(
+            # The browser WebMCP tools ride on the page as extra modules so an
+            # agent living in the browser gets the same product; the page
+            # itself is main.mjs, linked from index.html.
+            injected = html.replace(
                 "</body>",
-                '  <script type="module" src="/webmcp.mjs"></script>\n'
-                '  <script type="module" src="/deeplink.mjs"></script>\n'
-                '  <script type="module" src="/session.mjs"></script>\n'
-                '  <script type="module" src="/collab.mjs"></script>\n'
-                '  <script type="module" src="/collab_ui.mjs"></script>\n'
-                '  <script type="module" src="/workspaces.mjs"></script>\n'
-                '  <script type="module" src="/account.mjs"></script>\n'
-                '  <script type="module" src="/resonances.mjs"></script>\n'
-                '  <script type="module" src="/topics.mjs"></script>\n'
-                '  <script type="module" src="/geo.mjs"></script>\n'
-                '  <script type="module" src="/shared_list.mjs"></script>\n</body>',
+                '  <script type="module" src="/webmcp.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return
@@ -1459,7 +1446,24 @@ def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
     return None
 
 
+def startup_label_encoder() -> str | None:
+    """Load the label encoder named by RESONANCE_EMBEDDER, or say there is none.
+
+    A misnamed directory is a refusal to start rather than a quiet fallback:
+    a deployment told to read more than English must not run reading less.
+    """
+    from src.semantics import neural
+    try:
+        name = neural.activate_from_environment()
+    except neural.NeuralUnavailable as error:
+        raise SystemExit(f"label encoder: {error}") from error
+    print(f"label encoder: {name or 'none (lexicon only; set RESONANCE_EMBEDDER to add one)'}",
+          flush=True)
+    return name
+
+
 def main(argv: list[str] | None = None) -> None:
+    startup_label_encoder()
     parser = argparse.ArgumentParser(description="Resonance live product server")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)

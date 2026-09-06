@@ -35,6 +35,7 @@ from src.ingestion.service import ShareIntent
 from src.product import authorship as authorship_rule
 from src.product import phrasing
 from src.product.mcp_bridge import (
+    BRIDGE_CONTRACT, TOOLS, RemoteMCPBridge,
     BridgeError, _PRIVATE, _SHARED, _WITHDRAWN, _coarse_location,
     _has_usable_structure, _in_state, current_shared_session, when_last_shared,
     _insufficient_structure_message, _slug, _structure_summary, build_thought_dna,
@@ -42,7 +43,7 @@ from src.product.mcp_bridge import (
 from src.product.service import LOCATION_NOTE
 from src.identity.models import AuthenticationError
 from src.persistence.errors import PersistenceConflictError
-from src.product import oauth_mount
+from src.product import auth_mount, oauth_mount
 from src.workspaces.topics import CONTRIBUTIONS_TABLE
 from src.product.server import (
     DEFAULT_HOST,
@@ -57,6 +58,7 @@ from src.product.server import (
     startup_purge_sessions,
     startup_assign_pseudonyms,
     startup_purge_unsigned,
+    startup_label_encoder,
 )
 
 WEBMCP_CONTRACT = "resonance-webmcp/0.1"
@@ -576,6 +578,65 @@ def _topic_read(product, token: str, viewer_id: str, workspace_id: str,
     }
 
 
+class BrowserToolBridge(RemoteMCPBridge):
+    """The remote MCP bridge, executing under a browser session.
+
+    The security facts come from the request (cookie, CSRF proof, origin)
+    rather than from an OAuth bearer, and the client id names the browser so
+    the audit trail says which door a write came through.
+    """
+
+    def __init__(self, product, security: Mapping[str, Any]) -> None:
+        super().__init__(product)
+        self._browser_security = {**dict(security), "client_id": "live-browser-webmcp"}
+
+    def _security(self) -> dict[str, Any]:
+        return dict(self._browser_security)
+
+
+def _discoverable_sessions(product, token: str) -> list[str]:
+    """The visitor's own thoughts that are discoverable right now."""
+    rows = list(product.owned_sessions(token))
+    return [str(sid) for sid in _in_state(rows, _SHARED)]
+
+
+def _overview(handler, product) -> dict[str, Any]:
+    """One read for the whole page (see `/api/product/overview`)."""
+    token = handler._visitor_token()
+    base: dict[str, Any] = {
+        "contract_version": "resonance-overview/0.1",
+        "authenticated": False,
+        "sign_in_required": handler._sign_in_required(),
+        "sign_in_url": auth_mount.SIGN_IN_PATH,
+    }
+    if token is None:
+        return base
+    try:
+        state = dict(product.state(token))
+    except AuthenticationError:
+        return base
+    base.update({
+        "authenticated": bool(state.get("authenticated")),
+        "account": state.get("account") or {},
+        "freshness": state.get("freshness"),
+    })
+    if not base["authenticated"]:
+        return base
+    subject = handler._subject(token)
+
+    def part(name, reader):
+        try:
+            base[name] = reader()
+        except Exception as error:  # noqa: BLE001 - one missing part must not blank the page
+            base[name] = {"error": str(error)}
+
+    part("mine", lambda: _everything_here(product, token))
+    part("resonances", lambda: product.pending_resonances(token, include_seen=True))
+    part("intros", lambda: product.list_requests(token))
+    part("topics", lambda: _topic_listing(product, token, subject))
+    return base
+
+
 def _topic_listing(product, token: str, viewer_id: str) -> dict[str, Any]:
     """Every topic this person is in, and every one they are invited to.
 
@@ -736,6 +797,22 @@ class WebHandler(ProductHandler):
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 
+        # Everything the page needs in one read: who you are, your thoughts,
+        # what the standing search found, your introductions and your groups.
+        # One request instead of five, and no 401s racing a fresh session:
+        # a visitor without an account gets the answer "not signed in" as a
+        # 200, which is a page state rather than a fault.
+        if path == "/api/product/overview":
+            self._send_json(_overview(self, product))
+            return
+
+        # The tool list the browser registers: the remote MCP server's own,
+        # byte for byte, so an agent in the browser and an agent in a chat
+        # speak one vocabulary.
+        if path == "/api/product/tools":
+            self._send_json({"contract_version": BRIDGE_CONTRACT, "tools": TOOLS})
+            return
+
         # These two routes translate the page's presentation contract to the
         # live product without any shadow DB.
         if path == "/api/context":
@@ -758,6 +835,12 @@ class WebHandler(ProductHandler):
         if path == "/api/discover":
             token = self._visitor_token()
             session_id = _owned_live_session(product, token) if token else None
+            # The page shows people per thought: `session_id` names one of the
+            # visitor's own discoverable thoughts, and anything else falls
+            # back to the most recently shared one rather than to a refusal.
+            asked = (params.get("session_id") or [""])[0]
+            if token and asked and asked in set(_discoverable_sessions(product, token)):
+                session_id = asked
             if not session_id:
                 # Not an error in the product: the visitor simply has not shared
                 # a thought yet. PermissionError was unmapped and surfaced as a
@@ -784,13 +867,6 @@ class WebHandler(ProductHandler):
                 self._send_share_required()
                 return
             self._send_json(_geo_view(product, token, session_id))
-            return
-
-        # The browser tools are the live implementation of the same tool names
-        # the standalone demo server under demo/ui/ registers from webmcp.mjs.
-        if path == "/webmcp.mjs":
-            self._send_bytes((UI_DIR / "webmcp_live.mjs").read_bytes(),
-                             "text/javascript; charset=utf-8")
             return
 
         if path == "/api/webmcp/state":
@@ -918,6 +994,26 @@ class WebHandler(ProductHandler):
 
         super()._route_get(path, params)
 
+    def _route_tool_call(self) -> None:
+        """One remote-MCP tool, called from the browser under the cookie session.
+
+        The browser tools are the remote server's tools: same names, same
+        schemas, same handlers. The only difference is the door -- a cookie
+        plus the CSRF proof instead of a bearer token -- so the bridge is
+        given the security facts of this request and everything else is the
+        code the chat already runs.
+        """
+        token = self._token()
+        body = self._body()
+        security = self._security_kwargs()
+        name = str(body.get("name") or "")
+        arguments = body.get("arguments") or {}
+        bridge = BrowserToolBridge(self.runtime.product, security)
+        answer = bridge._tool_call("browser", {"name": name, "arguments": arguments}, token)  # noqa: SLF001
+        if "error" in answer:
+            raise ValueError(str(answer["error"].get("message") or "unknown tool"))
+        self._send_json(answer["result"])
+
     def _route_topic_post(self, path: str) -> None:
         """The writes a topic takes from the page.
 
@@ -992,6 +1088,9 @@ class WebHandler(ProductHandler):
         self._send_error_json(HTTPStatus.NOT_FOUND, "not_found", "unknown path")
 
     def _route_post(self, path: str) -> None:
+        if path == "/api/product/tool":
+            self._route_tool_call()
+            return
         if path.startswith("/api/product/topic/"):
             self._route_topic_post(path)
             return
@@ -1143,6 +1242,7 @@ def serve(host: str, port: int, *, runtime: ProductRuntime) -> ThreadingHTTPServ
 
 
 def main(argv: list[str] | None = None) -> None:
+    startup_label_encoder()
     parser = argparse.ArgumentParser(
         description="Resonance: live product + browser WebMCP")
     parser.add_argument("--host", default=DEFAULT_HOST)

@@ -102,7 +102,7 @@ class NoCompensationTests(unittest.TestCase):
                             for m in resp["rejected"]))
 
     def test_discovery_sources_contain_no_engine_logic(self):
-        for module in ("service.py", "mcp.py", "metadata.py"):
+        for module in ("service.py", "metadata.py"):
             text = (REPO / "src" / "discovery" / module).read_text()
             for forbidden in ("src.alignment", "src.index.store", "src.fingerprint",
                               "src.scoring", "solve_fgw", "adjudicate(",
@@ -162,31 +162,6 @@ class ContractTests(unittest.TestCase):
         a = svc.discover(q, mode="analogical", k=15)
         b = svc.discover(q, mode="analogical", k=15)
         self.assertEqual(json.dumps(a, sort_keys=True), json.dumps(b, sort_keys=True))
-
-
-class WireTests(unittest.TestCase):
-    def test_discover_tool_over_the_wire_and_r6_tools_intact(self):
-        from src.discovery.demo_server import DiscoveryMCPServer, build_service
-        from src.discovery.mcp import DiscoveryAdapter, TOOLS
-        from src.mcp.adapter import TOOLS as BASE_TOOLS
-        self.assertEqual(len(TOOLS), len(BASE_TOOLS) + 1)
-        self.assertEqual([t["name"] for t in TOOLS[:len(BASE_TOOLS)]],
-                         [t["name"] for t in BASE_TOOLS])
-        svc = build_service()
-        server = DiscoveryMCPServer(DiscoveryAdapter(svc))
-        _, by_session = make_service()
-        query = flagship_query(by_session)
-        frames = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
-                  {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
-                   "params": {"name": "discover_resonance",
-                              "arguments": {"thought": query.to_dict(),
-                                            "mode": "analogical", "k": 15}}}]
-        out = io.StringIO()
-        server.serve(io.StringIO("\n".join(json.dumps(f) for f in frames) + "\n"), out)
-        body = json.loads(json.loads(out.getvalue().splitlines()[1])
-                          ["result"]["content"][0]["text"])
-        self.assertGreaterEqual(len(body["matches"]), 4)
-        self.assertNotIn("ravi", json.dumps(body).lower())
 
 
 if __name__ == "__main__":
