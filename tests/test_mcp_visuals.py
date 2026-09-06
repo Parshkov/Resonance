@@ -84,7 +84,10 @@ class VisualsTests(unittest.TestCase):
         alice, _ = self._share("alice", ALICE)
         self._share("bob", BOB)                      # no location consented
         result = self._call(alice.access_token, "resonance_discover")
-        self.assertEqual([b["type"] for b in result["content"]], ["text"])
+        # No drawing. The reply carries two text blocks by design -- one in
+        # words for the person, one serialized for the client -- so what this
+        # asserts is the absence of an image, not a block count.
+        self.assertNotIn("image", [b["type"] for b in result["content"]])
 
     def test_the_structure_drawing_rides_with_the_evidence(self):
         alice, _ = self._share("alice", ALICE)
@@ -137,12 +140,12 @@ class VisualsTests(unittest.TestCase):
             pictures.render_map_png = broken
         self.assertFalse(result["isError"])
         self.assertTrue(result["structuredContent"]["matches_in_backend_order"])
-        self.assertEqual([b["type"] for b in result["content"]], ["text"])
+        self.assertNotIn("image", [b["type"] for b in result["content"]])
 
     def test_a_plain_tool_still_returns_plain_json(self):
         creds = self.runtime.product.register_guest()
         result = self._call(creds.access_token, "resonance_whoami")
-        self.assertEqual([b["type"] for b in result["content"]], ["text"])
+        self.assertNotIn("image", [b["type"] for b in result["content"]])
         self.assertIn("user_id", result["structuredContent"])
 
 

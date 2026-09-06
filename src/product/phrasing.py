@@ -74,6 +74,34 @@ def _whoami(r: Result) -> str:
     return " ".join(lines)
 
 
+def _preview_lines(r: Result) -> list[str]:
+    """The preview itself, in words: every link that would become visible.
+
+    This has to be in the text and not only in `structuredContent`. A client
+    that reads only the content blocks -- Claude does -- otherwise sees
+    "5 ideas and 4 links between them" and nothing else: it cannot show the
+    person what they are approving, and without the identifiers it cannot
+    share at all even after they approve. Measured in Claude, which said so
+    plainly: the server "didn't echo the exact node labels or a draft ID /
+    confirmation token back to me, so I can't ... proceed to sharing".
+
+    So this is not a convenience for machines. The whole consent promise is
+    that a person sees exactly what would become discoverable before it does,
+    and in that client they could not.
+    """
+    will = r.get("will_become_discoverable") or {}
+    dna = will.get("thought_dna") or {}
+    labels = {str(n.get("id")): str(n.get("label") or n.get("id") or "").strip()
+              for n in (dna.get("nodes") or [])}
+    lines = []
+    for relation in dna.get("relations") or []:
+        source = labels.get(str(relation.get("source")), str(relation.get("source")))
+        target = labels.get(str(relation.get("target")), str(relation.get("target")))
+        kind = str(relation.get("type") or "relates to")
+        lines.append(f"  {source} — {kind} → {target}")
+    return lines
+
+
 def _prepare_thought(r: Result) -> str:
     s = r.get("structure") or {}
     nodes, relations = s.get("nodes", 0), s.get("relations", 0)
@@ -86,9 +114,22 @@ def _prepare_thought(r: Result) -> str:
     warnings = [str(w) for w in (r.get("warnings") or [])]
     if warnings:
         lines.append("Worth saying first: " + "; ".join(warnings) + ".")
-    lines.append("Show them exactly what would become visible, and share only if "
-                 "they say so.")
-    return " ".join(lines)
+
+    preview = _preview_lines(r)
+    presentation = (r.get("will_become_discoverable") or {}).get("presentation") or {}
+    topic = str(presentation.get("topic") or "").strip()
+    domain = str(presentation.get("domain") or "").strip()
+    body = " ".join(lines)
+    if preview:
+        shown = "\n".join(preview)
+        body += "\n\nThis is all that would become visible:\n" + shown
+        if topic:
+            named = f'\n\nOther people would see it named "{topic}"'
+            body += named + (f" in {domain}." if domain else ".")
+        body += ("\n\nThe words themselves are not kept — only these ideas and the "
+                 "links between them.")
+    body += ("\n\nIt is shared only after the person has read those lines and says so.")
+    return body
 
 
 def _share_thought(r: Result) -> str:

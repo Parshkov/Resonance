@@ -175,3 +175,70 @@ class WithdrawnIsNotPrivateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TextOnlyClientTests(unittest.TestCase):
+    """A client that reads only the content blocks must still be able to act.
+
+    Claude reads content blocks and not `structuredContent`. With the answer
+    in words and nothing else, it said so itself: the server "didn't echo the
+    exact node labels or a draft ID / confirmation token back to me, so I
+    can't show you the literal label text it stored or proceed to sharing".
+
+    Two things were broken by that, and only one of them is an integration
+    detail. The person could not see the labels they were being asked to
+    approve -- which is the consent promise, not a convenience -- and after
+    approving, nothing could be shared, introduced or withdrawn.
+
+    So the reply carries two text blocks. The first is for the person and
+    holds no identifier; the second is the same result serialized, for the
+    client. The tests above pin the first; this pins the second.
+    """
+
+    def setUp(self):
+        self.runtime = build_runtime(":memory:",
+                                     allowed_origins=frozenset({"http://127.0.0.1"}),
+                                     seed=False)
+        self.bridge = RemoteMCPBridge(self.runtime.product)
+
+    def _call(self, token, name, arguments=None):
+        return self.bridge.handle(
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+             "params": {"name": name, "arguments": arguments or {}}}, token)["result"]
+
+    def test_a_thought_can_be_shared_reading_only_the_text_blocks(self):
+        creds = self.runtime.product.register_guest()
+        prepared = self._call(creds.access_token, "resonance_prepare_thought", {
+            "authorship": "their_own_words",
+            "context": ("Deadline pressure causes the code review to be rushed. "
+                        "A rushed review causes the same defects to be fixed again. "
+                        "Repeat fixes prevent the release being shipped on time."),
+            "topic": "Deadline pressure repeats the fixes",
+            "domain": "software-delivery"})
+
+        spoken = prepared["content"][0]["text"]
+        # The person sees what they are approving, in words, with no engine ids.
+        self.assertIn("would become visible", spoken)
+        self.assertIn("Deadline pressure", spoken)
+        self.assertNotIn("draft-", spoken)
+
+        # And the client can find what the next call needs, without ever
+        # looking at structuredContent.
+        machine = json.loads(prepared["content"][-1]["text"])
+        shared = self._call(creds.access_token, "resonance_share_thought", {
+            "draft_id": machine["draft_id"],
+            "confirmation_token": machine["confirmation_token"],
+            "confirm": True, "request_id": "text-only-1"})
+        self.assertFalse(shared["isError"])
+        self.assertTrue(json.loads(shared["content"][-1]["text"])["discoverable"])
+
+    def test_every_answer_carries_the_serialized_result_last(self):
+        creds = self.runtime.product.register_guest()
+        for name in ("resonance_whoami", "resonance_my_thoughts",
+                     "resonance_list_intros", "resonance_topics"):
+            with self.subTest(name):
+                blocks = self._call(creds.access_token, name)["content"]
+                self.assertEqual(blocks[0]["type"], "text")
+                self.assertFalse(blocks[0]["text"].lstrip().startswith(("{", "[")),
+                                 "the first block is for a person")
+                self.assertIsInstance(json.loads(blocks[-1]["text"]), dict)
