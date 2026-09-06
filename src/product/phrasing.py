@@ -32,7 +32,17 @@ Result = Mapping[str, Any]
 CLASSIFICATION_IN_WORDS = {
     "analogical": "same shape, different subject",
     "approximate": "close — some of it lines up",
-    "literal": "the same thing, said the same way",
+    # Two people on the same subject, reasoning the same way. This had no
+    # words at all: the table carried "literal", which the engine has never
+    # returned, so anyone matched inside their own field was handed the bare
+    # verdict "direct". Same-subject is not a lesser result -- someone else
+    # already working on your problem is the plainest reason to meet.
+    "direct": "the same thing, and they are working on it too",
+    "literal": "the same thing, and they are working on it too",
+    # What one of them needs is what the other already works on. This is the
+    # strongest reason the engine can give for an introduction, and it was
+    # printed as the word "complementary".
+    "complementary": "what you are missing is what they work on",
     "negative": "not called a resonance",
 }
 
@@ -196,12 +206,21 @@ def _discover(r: Result) -> str:
     first = people[0]
     who = first.get("person_pseudonym") or "someone"
     kind = str(first.get("mode_classification") or "").strip()
-    lead = (f"{_count(len(people), 'person', 'people')} whose reasoning has the same "
-            f"shape as yours." if len(people) != 1 else
-            f"One person, {who}, whose reasoning has the same shape as yours.")
+    # "whose reasoning has the same shape as yours" described one of the five
+    # verdicts and was said about all of them -- so the person working on a
+    # piece of your problem, and the person who wants what you want and is
+    # aiming elsewhere, were both announced as a shape coincidence. Say that
+    # people were found; the line for each one says in what way.
+    lead = (f"{_count(len(people), 'person', 'people')} thinking about what you are "
+            "thinking about." if len(people) != 1 else
+            f"One person, {who}, thinking about what you are thinking about.")
     if kind == "analogical":
-        lead += (" The subject is different; the structure is the same — that is what "
-                 "this service is for.")
+        lead += (" In a different subject entirely — the structure of the reasoning is "
+                 "what lines up, which is the kind nobody could have searched for.")
+    elif kind in {"direct", "literal"}:
+        lead += " On the same thing, and already working on it."
+    elif kind == "complementary":
+        lead += " What you are missing is what they work on."
     said = (f"{lead} The match is computed, not judged: no language model decided it, "
             "and you can be shown the working. None of them knows about you unless you "
             "ask for an introduction and they agree.")
