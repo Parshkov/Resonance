@@ -5,9 +5,9 @@ Six screens, one document:
 
 | path | screen |
 | --- | --- |
-| `/` | Home: what is new (arrivals, requests, invitations, new group posts), and the introduction for a first-time visitor |
-| `/thoughts` | My thoughts: everything you have here in one of three states, and the composer |
-| `/people` | People: who resonates with a thought of yours, and why; ask for an introduction |
+| `/` | Home: what is new (arrivals, requests, invitations, new group posts), the people found so far, and your thoughts, groups and conversations at a glance; the introduction for a first-time visitor |
+| `/thoughts` | My thoughts: every thought in one of three states; share, edit (name, field, ideas, links), share again, stop sharing, delete |
+| `/people` | People: who resonates with you, across all your thoughts or one of them; a constellation (how close), a world map (where) and a matrix (which thought); each person opens a drawer with the correspondence diagram and the ask-for-introduction composer |
 | `/talk`, `/talk/<intro>` | Conversations: requests to answer, and the relay chat with each connected person |
 | `/groups`, `/groups/<id>` | Groups: people around one idea; discussion, parts of the work, shared understanding, members |
 | `/connect` | Connect a chat: the one address a Claude, ChatGPT, Grok or Cursor client needs |
@@ -20,6 +20,7 @@ Signed out, only Home and Connect exist; every other address opens Home.
 | --- | --- |
 | `index.html` | the frame: masthead, navigation, `#view`, footer |
 | `main.mjs` | the router and every screen; pure functions of the store and a little screen-local state |
+| `maps.mjs` | the drawings: constellation (force layout of people around your thoughts), world map, correspondence diagram (which of their ideas answers which of yours, which links are kept), heat matrix |
 | `store.mjs` | the one state: `/api/product/overview` in one read, discovery and group details on demand, one slow poll while the tab is visible, one refresh after any write |
 | `strings.mjs` | every sentence the page says, English only, one key per sentence |
 | `session.mjs` | cookie session and CSRF bootstrap, shared by the page and the browser tools |

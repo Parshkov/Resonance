@@ -561,6 +561,10 @@ class ProductHandler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        # The page and its modules change with every deploy; a browser that
+        # kept yesterday's main.mjs showed yesterday's page (no map) on top of
+        # today's API. Revalidate every time; the bytes are small.
+        self.send_header("Cache-Control", "no-cache")
         self._security_headers()
         self.end_headers()
         self.wfile.write(body)
