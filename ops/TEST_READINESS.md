@@ -72,12 +72,65 @@ python3 benchmark/r0-v0.2/runner.py                  # engine gates, exit 0
 python3 benchmark/extraction-v0.2/runner.py          # extractor gates, exit 0
 
 # public origin, discovery-driven OAuth onboarding exactly as a hosted client does it
+# READ THE NOTE BELOW FIRST: neither of these can complete on production any more.
 python3 ops/hosted_onboarding_probe.py --base https://resonance.parshkov.com --smoke --refresh --revoke --json
 python3 ops/oauth_smoke.py https://resonance.parshkov.com/mcp
 
 # real three-person structural test over /mcp (A retry storm, B panic buying analog, C same words weaker structure)
-python3 archive/hackathon/submission/evidence/abc_mcp_test.py https://resonance.parshkov.com/mcp --out <your evidence dir>/abc.json
+# Runs only where guest accounts are enabled, and needs an `authorship` argument the
+# archived copy does not send -- see below.
+python3 archive/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
 ```
+
+### These scripts cannot finish against production, and that is correct
+
+Production has real sign-in providers configured, so **anonymous guest creation
+is refused by design** (`POST /api/product/guest` -> `403 sign_in_required`,
+and the consent page offers no anonymous option; see `ops/DEPLOY.md`). Every
+one of these scripts mints a guest to get an access token, so on production
+they stop at exactly one step:
+
+| script | against production | against a guest-enabled origin |
+| --- | --- | --- |
+| `ops/oauth_smoke.py` | **16/17** — everything through `consent POST redirects`, `exact redirect_uri`, `exact state round-trip`; then `[FAIL] 5 code returned`, because there is no signed-in account to issue a code to | **27/27** |
+| `ops/hosted_onboarding_probe.py --smoke` | **4/5 required** — fails `authorize approve -> code + state` with `error=access_denied&error_description=sign+in+to+Resonance+before+connecting+a+client` | 9/9 required |
+| `abc_mcp_test.py` | cannot start — needs three guest identities | 36/36 |
+
+**That single failure is the sign-in policy working, not a fault.** The freeze
+evidence figures (27/27, 9/9, 36/36) were recorded when guest accounts were
+still enabled on production; they are not reproducible there today and should
+not be quoted as if they were.
+
+To exercise the full flow, run a guest-enabled origin locally and point the
+scripts at it:
+
+```bash
+python3 -m src.product.web_server --host 127.0.0.1 --port 8901 \
+        --db :memory: --origin http://127.0.0.1:8901 &
+python3 ops/oauth_smoke.py http://127.0.0.1:8901/mcp --auto-consent
+PYTHONPATH=. python3 archive/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
+```
+
+Completing the hosted flow **on production** requires a human to sign in with
+Google or GitHub. That is the outstanding "human execution of the hosted-client
+cards" item in `docs/STATUS.md`, and no script can close it.
+
+### The archived A/B/C harness predates the authorship rule
+
+`archive/hackathon/submission/evidence/abc_mcp_test.py` calls
+`resonance_prepare_thought` without `authorship`, which
+`src/product/authorship.py` (2026-09-05) made mandatory. Run as-is it now stops
+at `5/6` with `validation_failed: state authorship: ...` — **the product
+refusing correctly**, not a regression.
+
+It is deliberately **not** patched: the freeze evidence records a 36/36 run of
+*that* file, and editing it would break the correspondence between the record
+and the artifact. To run the scenario against current code, copy it and add
+`"authorship": "their_own_words"` to the `resonance_prepare_thought` call.
+Verified on `85eeaba` that way: **36/36**, including `A ranks above C`
+(rank 0 vs rank 14), subject-bound `result_id`, intro -> accept -> relay,
+revocation removing A from a fresh discovery immediately, and a revoked bearer
+being refused on `/mcp`.
 
 Expected under engine 0.2: B's discover ranks A (analogical, concept-aligned)
 above C; C is `negative` or `approximate` with a `label_identity` /
