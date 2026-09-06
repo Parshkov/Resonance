@@ -1,6 +1,6 @@
 # Resonance — Status
 
-Updated: 2026-09-06
+Updated: 2026-09-06 (audit corrections)
 
 ## Where the project actually is
 
@@ -11,8 +11,9 @@ Updated: 2026-09-06
 | Retrieval | structural + concept + content channels, IDF, verified re-ranking | `src/fingerprint`, `src/index`, `src/engine/reports/r0-v0.2-e2e.json` |
 | Verification / scoring | FGW conditional gradient + scoring policy v0.2 | `src/alignment`, `src/scoring`, ADR-0004 |
 | Extraction from prose | cue extractor v0.2, edge F1 0.94 on 22 prose cases | `src/extraction`, `benchmark/extraction-v0.2` |
-| Benchmark | v0.2: 8 skeletons × 4 domains × 18 families, gate split untouched by tuning | `benchmark/r0-v0.2` |
+| Benchmark | v0.2: 8 skeletons × 4 domains × 18 families; S5–S8 gate split never used to fit thresholds, but see the caveat under "What is not validated" | `benchmark/r0-v0.2` |
 | Product (MCP, WebMCP, OAuth, persistence) | deployed; one vocabulary of 21 tools for the chat and the browser (`src/product/mcp_bridge.py`, `/api/product/tools`) | `src/product`, `ops/DEPLOY.md` |
+| Native browser WebMCP | demonstrated behind a flag: Chrome 152.0.7977.83 with `--enable-features=WebMCP`, Card A **24/24, `mode: NATIVE`** | `archive/hackathon/submission/evidence/public-origin-8670568/card-a-browser/` |
 | The page | six screens over one state store (`demo/ui/main.mjs`, `store.mjs`, `strings.mjs`); groups with discussion, parts and shared understanding | `demo/ui/README.md`, `tests/test_product_http.py` |
 | Release freeze | engine 0.2 freeze taken 2026-09-04 on `0aea577` (deployment `834818b1`) | `archive/hackathon/submission/RELEASE_MANIFEST.md` §0, `archive/hackathon/submission/evidence/public-origin-0aea577/` |
 
@@ -31,7 +32,7 @@ non-passes are in `archive/hackathon/submission/evidence/public-origin-0aea577/S
 The audit of 2026-09-05 (PR #195) rebuilt the page as separate screens over one
 state, gave groups a conversation and parts of the work, unified the browser
 and chat tool vocabularies, retired the stdio adapter and the replay demo, and
-added the opt-in label encoder. On that branch: 677 tests pass (lexicon only)
+added the opt-in label encoder. On that branch: 679 tests pass (lexicon only)
 and the engine gates pass with the encoder on. Production runs the encoder once
 `RESONANCE_EMBEDDER_MODEL` (build) and `RESONANCE_EMBEDDER` (run) are set on the
 service.
@@ -47,9 +48,20 @@ service.
 ## What is not validated
 
 - Real user thoughts at scale: every benchmark graph is authored (by agents), not extracted from real conversations. Independent human review of the v0.2 gold is pending.
-- Corpus scale 10^4–10^6: no replay beyond a few hundred graphs.
+- Corpus scale 10^4–10^6: no replay beyond a few hundred graphs. Measured on the
+  v0.2 corpus replicated in memory, mean query time is **148 ms at 176 graphs,
+  170 ms at 352, 283 ms at 704 and 580 ms at 1408** — linear from 352 upward, not
+  sub-linear, which is exactly the condition ADR-0004 names for reconsidering the
+  concept channel. (Replicated graphs inflate posting lists, so treat this as an
+  upper bound.) `ResonanceEngine._require_bound()` additionally re-hashes the whole
+  corpus on every query by design.
 - Extraction of implicit causation (no connective) is abstained by design.
-- Native WebMCP browser discovery: stock Chromium 141 exposes no `document.modelContext`, so a WebMCP-enabled Chrome run is still outstanding and native discovery is **not claimed**.
+- Native WebMCP **without a flag**: `document.modelContext` appears in Chrome 152 only under `--enable-features=WebMCP`, and not at all in stock Chromium 141. The flagged run passed 24/24 (see above), so native discovery is no longer unclaimed — what is unvalidated is a browser exposing WebMCP by default. The page reports the browser's real capability rather than faking it. One honest limitation through the native surface: Chrome wraps a failing tool as `UnknownError`, so an agent does not receive the product's own error code the way remote MCP delivers it.
+- The **same-subject floor** (`T_STRUCTURE_SAME_SUBJECT`, `T_SAME_SUBJECT_SEMANTIC`,
+  policy `/0.3`) was fitted to a single real pair, with the v0.2 gate used only as a
+  regression check. For that branch the gate is therefore no longer a held-out
+  measurement, and the honest reading of `classification_accuracy = 1.0` is "no
+  regression", not "generalises". 13 thresholds against 72 gold pairs.
 - Whether a same-vocabulary cross-domain pair should be `approximate` or `analogical`: Benchmark v0.2 has no gold case for "same words, different domain, same structure". Recorded as **open** in ADR-0005 rather than settled by moving a threshold.
 - Human execution of the hosted-client cards (B in claude.ai, C in ChatGPT developer mode); agents have executed B, a person has not.
 
@@ -60,6 +72,60 @@ service.
 - The second remote MCP server and its 15-tool vocabulary were removed; `src/remote/server.py` is a thin factory over the product server.
 - Persistent databases are no longer seeded with demo personas by default (`--seed-demo` / `RESONANCE_SEED_DEMO=1` opt in; `python3 -m src.persistence --db <DSN> purge-demo` cleans an already seeded production). Production has never been seeded: the one `purge-demo` run deleted 0 rows.
 - Acceptance scripts now revoke the guest thoughts they share, so a test run leaves the live corpus as it found it. Rows left by earlier runs are real `volunteer` records and are listed for owner deletion in the freeze evidence, not deleted by an agent.
+
+## 2026-09-06 audit corrections
+
+A full read of the repository against the deployed product found four defects
+and a set of documents that had drifted from the code. All are fixed on this
+branch; the findings are recorded here rather than only in a commit message.
+
+**Code**
+
+- `/.well-known/oauth-protected-resource/mcp` and the matching
+  authorization-server path returned **404 in production**. RFC 9728 §3.1 and
+  RFC 8414 §3.1 build the metadata URL by inserting the well-known segment
+  before the resource path, and MCP clients try that form first. The OAuth core
+  had always answered it; `oauth_mount.is_oauth_path` admitted only the bare
+  paths, so nothing reached the core. Only clients that fall back to the root
+  form worked. Fixed, with a test that asserts both forms without fallback.
+- `CLASSIFY_POLICY` did not move when `classify()`'s decision boundary moved in
+  #193, and it is carried in `verifier_config_hash`. The frozen `0aea577`
+  evidence and every run after it therefore reported the same hash
+  `12998d45…` for two different classifiers. The policy is now
+  `scoring-v0.2-concept-aligned-analogy+same-subject-floor/0.3`
+  (`e093d77f…`); gate values are unchanged, so this is provenance only.
+- Cyrillic labels were refused as "not in the script the index compares" for a
+  release after lexicon 0.3.0 gave **all 90 concept classes** Russian surface
+  forms — a refusal whose stated reason had become false, turning away exactly
+  the people it was written to protect. The script list is now derived from the
+  lexicon's own terms (`semantics.lexicon.COVERED_SCRIPTS`), so it cannot drift
+  again; the scripts the lexicon genuinely cannot read are still refused.
+- No `Strict-Transport-Security` on the HTTPS origin. Added, gated on the same
+  all-origins-are-https test the `Secure` cookie flag uses.
+
+**Documents that contradicted the code** — `PROJECT_STRUCTURE.md` (described
+`src/` as an engine plus a `src/mcp/` adapter that does not exist, and omitted
+13 of 19 packages), `src/scoring/README.md` (documented the v0.1 classification
+policy as current), `ops/TEST_READINESS.md` (pinned a deployed commit 100+
+commits stale; now points at `/api/product/health`), this file and `README.md`
+(understated native WebMCP, and claimed semantics never come from a model while
+the hosted deployment runs the ADR-0006 encoder), `docs/decisions/README.md`
+(omitted ADR-0006; ADR-0001 is still unwritten and now says so),
+`docs/THREAT_MODEL.md` (named PostgreSQL as the hosted store; it is SQLite),
+`src/discovery/fixtures/example_response.json` (two generations stale and
+carrying a `metadata` block from the retired stdio adapter — regenerated).
+
+**Known gaps not closed here**
+
+- No CI existed for 396 commits; a workflow is added on this branch, but it has
+  never run on a pull request yet.
+- `src/persistence/{sqlite,postgres}_store.py` are two independent
+  implementations of a 53-method protocol with no shared base; the PostgreSQL
+  path is skipped unless `RESONANCE_TEST_POSTGRES_URL` is set, and production
+  runs SQLite.
+- `agents/SCOREBOARD.md` was never operated.
+- The whole-thought embedding baseline that `WHY_NOT.md` and ADR-0004 both name
+  as the falsification target still does not exist.
 
 ## Next falsification targets
 

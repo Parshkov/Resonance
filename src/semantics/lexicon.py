@@ -876,3 +876,55 @@ PHRASE_INDEX, LONGEST_PHRASE, ROLE_HINTS = _build()
 
 def is_domain_concept(concept: str) -> bool:
     return concept.startswith(DOMAIN_PREFIX)
+
+
+# Which scripts this lexicon can actually read, derived from its own terms
+# rather than declared next to it. A label in a script absent here is not
+# "matched less well" -- it is matched against nothing, so a caller that
+# promises discoverability for it is lying. That refusal lives in the product
+# (`src/product/mcp_bridge.py`), and it used to carry its own hard-coded list:
+# Cyrillic stayed on it after lexicon 0.3.0 gave all 90 concept classes
+# Russian forms, so real Russian thoughts were refused with a reason that had
+# become false. Computed here so a language can only ever be added once.
+_SCRIPT_RANGES = (
+    ("latin", 0x0041, 0x024F),
+    ("cyrillic", 0x0400, 0x04FF),
+    ("greek", 0x0370, 0x03FF),
+    ("hebrew", 0x0590, 0x05FF),
+    ("arabic", 0x0600, 0x06FF),
+    ("devanagari", 0x0900, 0x097F),
+    ("cjk", 0x4E00, 0x9FFF),
+    ("kana", 0x3040, 0x30FF),
+    ("hangul", 0xAC00, 0xD7AF),
+)
+
+
+def script_of(char: str) -> str | None:
+    """Name the script of one character, or None for punctuation/digits and
+    for any range this lexicon has never been asked about."""
+    code = ord(char)
+    for name, low, high in _SCRIPT_RANGES:
+        if low <= code <= high:
+            return name
+    return None
+
+
+def _covered_scripts() -> frozenset[str]:
+    found = set()
+    for _role_hint, terms in CONCEPTS.values():
+        for term in terms:
+            for char in term:
+                name = script_of(char)
+                if name:
+                    found.add(name)
+    return frozenset(found)
+
+
+COVERED_SCRIPTS = _covered_scripts()
+
+
+def uncomparable_scripts(text: str) -> frozenset[str]:
+    """The named scripts in `text` that this lexicon carries no terms in."""
+    return frozenset(
+        name for name in (script_of(c) for c in text)
+        if name and name not in COVERED_SCRIPTS)

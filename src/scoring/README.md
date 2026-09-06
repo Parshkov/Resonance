@@ -1,4 +1,13 @@
-# R4 scoring — exact adjudicator (RESONANCE_SCORING_v0.1)
+# R4 scoring — exact adjudicator
+
+The current classification policy is
+`CLASSIFY_POLICY = scoring-v0.2-concept-aligned-analogy+same-subject-floor/0.3`
+(ADR-0004, extended by #193). **Read "Scoring policy v0.2" at the bottom for
+what the code does today.** The section immediately below records the
+original v0.1 adjudicator and is kept for provenance: its component formulas
+still stand, its classification rule does not.
+
+## v0.1 adjudicator (RESONANCE_SCORING_v0.1) — historical
 
 Evaluates a discrete partial injective mapping; a relaxation objective is
 never the final decision. Implements the contract's component formulas
@@ -19,9 +28,11 @@ Deliberate implementation decisions, all recorded in the verifier config hash:
 - **Effective relation evidence diminishes for repeated patterns** (first
   occurrence 1.0, repeats 0.25) — a monotype generic chain cannot buy the
   evidence of diverse preserved structure.
-- **Classification is knowledge-first with a versioned fallback**
+- **Classification was knowledge-first with a versioned fallback**
   (`CLASSIFY_POLICY = scoring-v0.1-knowledge-first+semantic-fallback/0.1`,
-  carried in the config hash). The Scoring v0.1 knowledge branch fires
+  carried in the config hash). **Superseded by v0.2 below**; the knowledge
+  branch survives inside it, the `T_ANALOGICAL_STRUCTURE = 0.85` threshold
+  quoted here does not (it is 0.80 today). The Scoring v0.1 knowledge branch fires
   verbatim whenever both graphs carry `about` ids. The contract's
   knowledge-absent outcome is `direct_or_analogical_unknown`, which the
   benchmark wire enum cannot express, so the fallback resolves the unknown by
@@ -43,7 +54,7 @@ Deliberate implementation decisions, all recorded in the verifier config hash:
   IDs from R0-E/R2 extraction will activate the knowledge branch and retire
   the fallback for annotated corpora.
 
-## Scoring policy v0.2 (ADR-0004)
+## Scoring policy v0.2 (ADR-0004) — current
 
 * `semantic` is lexicon similarity; `extras` carry `surface_semantic`,
   `concept_alignment` (mean over lexicon-covered pairs × sqrt(coverage)),
@@ -56,4 +67,17 @@ Deliberate implementation decisions, all recorded in the verifier config hash:
   surface/domain overlap ⇒ direct/approximate → concept alignment >= 0.25 ⇒
   analogical → rare skeleton (corpus present) with weak concept support ⇒
   analogical → negative. Thresholds calibrated on Benchmark v0.2 S1–S4 only.
+* **Same-subject floor** (#193, policy `/0.3`): when `semantic >= 0.40`,
+  `contradiction == 0` and at least one relation is directly preserved, the
+  structural bar drops from `T_STRUCTURE = 0.25` to
+  `T_STRUCTURE_SAME_SUBJECT = 0.15`. `structural` compares whole graphs, so it
+  falls as one person's picture grows, and the person working on one piece of
+  your problem was being refused for knowing their own problem better. These
+  two thresholds were fitted to a single real pair rather than to the
+  calibration split; the v0.2 gate was used only as a regression check, so it
+  is no longer a fully held-out measurement of this branch. Recorded here
+  rather than left implicit.
 * `confidence()` returns high / medium / low.
+* The policy string is carried in the verifier config hash and is the only way
+  a recorded verdict can be traced to the rule that produced it, so it moves
+  whenever the decision boundary moves.

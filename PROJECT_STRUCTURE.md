@@ -50,7 +50,14 @@ Resonance/
 │   └── decisions/            accepted ADRs
 │
 ├── benchmark/                frozen falsification/regression fixtures
-└── src/                      engine + thin MCP adapter after their gates
+├── demo/
+│   ├── corpus/               the accepted R7 demo corpus
+│   └── ui/                   the page: screens, state store, browser tools
+├── ops/                      deployment, migrations, acceptance probes
+├── schemas/                  published JSON Schemas
+├── brand/                    logo assets
+├── archive/hackathon/        the WebMCP Challenge build record and its evidence
+└── src/                      the engine, and the product built on it
 ```
 
 ## Artifact lifecycle
@@ -125,11 +132,47 @@ Executable or inspectable cases designed to falsify claims. Gate fixtures are ve
 
 ### `src/`
 
-Implementation after the relevant gates. R2 extraction, R3 retrieval and R4 verification communicate through accepted R1 interfaces. R5 integrates them as an MCP-independent engine. `src/mcp/` is only a thin adapter after R5 acceptance.
+Implementation after the relevant gates, in two layers.
+
+**The engine** — protocol-free and product-free. R2 extraction, R3 retrieval
+and R4 verification communicate through accepted R1 interfaces; R5 integrates
+them behind one facade.
+
+```text
+graph/        Thought DNA model, validation, canonical hashing
+semantics/    lexicon, stemmer, similarity, optional local label encoder
+extraction/   prose -> Thought Graph (cue extractor, no LLM)
+fingerprint/  structural and concept keys
+index/        inverted multi-channel candidate index
+alignment/    FGW / RRWM structural verification
+scoring/      component formulas, classification policy, confidence
+interfaces/   the frozen boundaries the above talk through
+engine/       the composed facade
+```
+
+**The product** — everything that turns the engine into something people use.
+It depends on the engine; the engine never depends on it.
+
+```text
+discovery/     consented, visualization-ready read model over engine results
+ingestion/     private prepare -> preview -> explicit share
+identity/      accounts, sessions, consent, federation, pseudonyms
+persistence/   SQLite and PostgreSQL repositories, migrations, projection
+security/      fail-closed authorization kernel, audit, rate limits
+collaboration/ intro state machine and private relay
+workspaces/    multi-person workspaces and shared topics
+product/       the HTTP server, the MCP tool vocabulary, presentation
+remote/        OAuth 2.1 core and the remote MCP entry point
+```
+
+There is **no** `src/mcp/`. The classic stdio adapter and the second remote
+server with its own divergent tool vocabulary were both retired; one
+vocabulary of `resonance_*` tools now lives in `src/product/mcp_bridge.py`
+and is served to the browser and to chat clients alike.
 
 ### `work/queue.yaml`
 
-The complete machine-readable mission/dependency map through R6-E2E. It is not an exclusive lock and does not by itself prove that a mission is available; prerequisites and issue state must be resolved first.
+The complete machine-readable mission/dependency map. It is not an exclusive lock and does not by itself prove that a mission is available; prerequisites and issue state must be resolved first.
 
 ### `work/STATE_MACHINE.md`
 

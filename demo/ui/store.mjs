@@ -231,7 +231,7 @@ export function startPolling() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && state.phase === "ready") refresh();
   });
-  // Writes made by an assistant through the browser tools (webmcp_live.mjs,
+  // Writes made by an assistant through the browser tools (browser_tools.mjs,
   // collab.mjs, workspaces.mjs) go through session.mjs, which announces them.
   document.addEventListener("resonance:write", (event) => {
     const path = String(event.detail?.path || "");

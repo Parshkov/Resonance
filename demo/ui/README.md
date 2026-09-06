@@ -26,7 +26,7 @@ Signed out, only Home and Connect exist; every other address opens Home.
 | `session.mjs` | cookie session and CSRF bootstrap, shared by the page and the browser tools |
 | `theme.mjs` | colour scheme before first paint |
 | `app.css`, `tokens.css` | the stylesheet and the type/radius scale; `legal.css` styles the privacy, terms and support pages |
-| `webmcp_live.mjs`, `collab.mjs`, `workspaces.mjs` | the browser WebMCP tools (`document.modelContext.registerTool`), for an agent living in the browser; they register tools and render only a status pill on the Connect screen |
+| `browser_tools.mjs` | the browser WebMCP tools (`document.modelContext.registerTool`), for an agent living in the browser; served at `/webmcp.mjs`, it registers the one shared tool vocabulary and renders only a status pill on the Connect screen. It replaces the former `webmcp_live.mjs` / `collab.mjs` / `workspaces.mjs` trio, which had three separate registration paths for one vocabulary |
 
 Nothing in the browser matches, ranks or rescores. Every number on screen is a
 number the engine returned, and every order is the engine's order.

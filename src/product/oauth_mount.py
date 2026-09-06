@@ -89,8 +89,23 @@ def www_authenticate(issuer: str, *, error: str | None = None) -> str:
     return "Bearer " + ", ".join(parts)
 
 
+# RFC 9728 §3.1 and RFC 8414 §3.1 build the metadata URL by inserting the
+# well-known segment BEFORE the resource's path, so a resource at `/mcp` is
+# described at `/.well-known/oauth-protected-resource/mcp`. MCP clients try
+# that form first. The core has always answered it (`src/remote/oauth.py`),
+# but this gate admitted only the bare paths, so the suffixed forms never
+# reached it and production returned 404 for the discovery URL the spec
+# names first -- surviving only on clients that fall back to the root form.
+_WELL_KNOWN_PATHS = frozenset({
+    PROTECTED_RESOURCE_PATH,
+    AUTH_SERVER_PATH,
+    PROTECTED_RESOURCE_PATH + RESOURCE_PATH,
+    AUTH_SERVER_PATH + RESOURCE_PATH,
+})
+
+
 def is_oauth_path(path: str) -> bool:
-    return path in {PROTECTED_RESOURCE_PATH, AUTH_SERVER_PATH} or path.startswith(OAUTH_PREFIX)
+    return path in _WELL_KNOWN_PATHS or path.startswith(OAUTH_PREFIX)
 
 
 class MountResponse:

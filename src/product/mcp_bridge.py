@@ -1,11 +1,13 @@
 """Remote MCP bridge for real chat clients (R17).
 
-The accepted stdio adapter (`src/mcp/server.py`) drives the bare engine on a
-developer machine and the WebMCP page tools only exist inside Chrome.  Neither
-lets a person sitting in their own chat (Claude, Cursor, ChatGPT with a
-connector, ...) hand *their* conversation to Resonance.  This module exposes the
-live product — identity, consent gates, durable sessions, discovery, intros,
-relay channels — as a stateless MCP server over Streamable HTTP:
+The WebMCP page tools only exist inside a browser, and the stdio adapter that
+once drove the bare engine on a developer machine (`src/mcp/server.py`) has
+been retired.  Neither let a person sitting in their own chat (Claude, Cursor,
+ChatGPT with a connector, ...) hand *their* conversation to Resonance.  This
+module is now the single `resonance_*` tool vocabulary -- served to the browser
+and to chat clients alike -- and it exposes the live product — identity,
+consent gates, durable sessions, discovery, intros, relay channels — as a
+stateless MCP server over Streamable HTTP:
 
     POST /mcp            JSON-RPC 2.0 request or notification
     Authorization: Bearer <mcp key>      (or POST /mcp/<mcp key> for clients
@@ -32,11 +34,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import re
 import secrets
 from typing import Any, Callable, Mapping, Sequence
 
 from src.semantics import scrub as _scrub
+from src.semantics.lexicon import COVERED_SCRIPTS, uncomparable_scripts
 from src.collaboration import CollaborationError
 from src.graph.validation import NODE_ROLES, RELATION_TYPES
 from src.graph.versioning import SCHEMA_VERSION
@@ -155,46 +157,44 @@ def _insufficient_structure_message(structure: Mapping[str, int], abstentions: A
             f"{sorted(NODE_ROLES)} and relations typed {sorted(RELATION_TYPES)}.")
 
 
-# Scripts the semantic layer cannot compare. The lexicon is English, so a label
-# in another script is not "matched less well" -- it is matched against nothing
-# at all, forever, and the person is told their thought is discoverable.
+# Scripts the semantic layer cannot compare. A label in one of them is not
+# "matched less well" -- it is matched against nothing at all, forever, while
+# the person is told their thought is discoverable.
 #
 # Found on a real Russian conversation: the server accepted Cyrillic labels
 # without a word, reported "shared", and that thought could never have reached
-# anybody. The measured behaviour behind it is recorded in test_shared_topics:
-# English against Russian scores semantic 0.0000, and Russian against Russian
-# in different words 0.1111 -- both NEGATIVE. Silence about that is worse than
-# a refusal, because a refusal can be acted on.
+# anybody. Silence about that is worse than a refusal, because a refusal can
+# be acted on.
+#
+# Which scripts those are is NOT decided here. It is derived from the terms
+# the lexicon actually carries (`src.semantics.lexicon.COVERED_SCRIPTS`),
+# because this list was hard-coded once and then went stale: lexicon 0.3.0
+# gave all 90 concept classes Russian forms, and Cyrillic stayed on the
+# refusal list for a further release, so real Russian thoughts were turned
+# away with a reason that had stopped being true.
 #
 # Presentation is not affected: `topic` and `domain` are shown, never matched,
 # so they stay in whatever language the person speaks.
-_UNCOMPARABLE_SCRIPT = re.compile(
-    r"[\u0400-\u04FF"      # Cyrillic
-    r"\u0370-\u03FF"       # Greek
-    r"\u0590-\u05FF"       # Hebrew
-    r"\u0600-\u06FF"       # Arabic
-    r"\u0900-\u097F"       # Devanagari
-    r"\u4E00-\u9FFF"       # CJK
-    r"\u3040-\u30FF"       # kana
-    r"\uAC00-\uD7AF]")     # Hangul
 
 
 def _refuse_uncomparable_labels(labels: list[str]) -> None:
-    # With a label encoder active (ADR-0006) the index reads these scripts:
-    # a Russian label is compared as meaning, not as English text, so the
-    # refusal below would exclude exactly the people it was written to serve.
+    # With a label encoder active (ADR-0006) the index reads every script: a
+    # label is compared as meaning, not as text, so the refusal below would
+    # exclude exactly the people it was written to serve.
     from src.semantics import neural
     if neural.active() is not None:
         return
-    offending = sorted({label for label in labels if _UNCOMPARABLE_SCRIPT.search(label)})
+    offending = sorted({label for label in labels if uncomparable_scripts(label)})
     if not offending:
         return
+    scripts = sorted({s for label in offending for s in uncomparable_scripts(label)})
+    languages = ", ".join(sorted(COVERED_SCRIPTS))
     raise BridgeError(
         "validation_failed",
-        "these labels are not in the script the index compares, so this thought "
-        f"would be searched for and match nobody, ever: {offending}. Node labels "
-        "are compared as English text across every account. Translate the labels "
-        "to English and send it again -- `topic` and `domain` are shown to people "
+        f"these labels are written in a script the index cannot compare ({', '.join(scripts)}), "
+        f"so this thought would be searched for and match nobody, ever: {offending}. "
+        f"Node labels are compared through a lexicon that currently reads {languages} script. "
+        "Translate the labels and send it again -- `topic` and `domain` are shown to people "
         "rather than matched, so those can stay as they are, and the conversation "
         "itself is unaffected.")
 

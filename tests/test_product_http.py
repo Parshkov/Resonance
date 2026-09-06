@@ -140,6 +140,34 @@ class ProductHttpTests(unittest.TestCase):
         self.assertIn("index_current", state["freshness"])
         self.assertEqual(headers.get("Permissions-Policy"), "tools=(self)")
         self.assertIn("default-src 'self'", headers.get("Content-Security-Policy", ""))
+        # This deployment's allowed origin is http://, so HSTS must NOT be
+        # sent: it would pin a developer's browser to a scheme this origin
+        # cannot serve. The https case is asserted below.
+        self.assertIsNone(headers.get("Strict-Transport-Security"))
+
+    def test_hsts_is_sent_when_the_deployment_contract_is_https(self):
+        """A production origin is https, and without HSTS the first request of
+        every session is strippable. Derived from the same allowed-origin test
+        the Secure cookie flag uses, so the two can never disagree."""
+        from http.server import ThreadingHTTPServer
+        from src.product.server import ProductHandler, build_runtime
+
+        class Handler(ProductHandler):
+            runtime = build_runtime(":memory:",
+                                    allowed_origins=frozenset({"https://resonance.example"}))
+
+        httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{httpd.server_address[1]}"
+            with urlopen(Request(base + "/api/product/health"), timeout=10) as response:
+                value = response.headers.get("Strict-Transport-Security")
+            self.assertIsNotNone(value)
+            self.assertIn("max-age=31536000", value)
+            self.assertIn("includeSubDomains", value)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
     def test_unauthenticated_mutation_is_401(self):
         client = self.client()

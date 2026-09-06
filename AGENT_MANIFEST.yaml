@@ -18,14 +18,16 @@ review_directory: research/reviews
 engineering_contract: engineering/MISSION_CONTRACT.md
 engineering_mission_directory: engineering/missions
 historical_engine_milestone: R9-VISUAL
-active_product_range: R10-R17
+delivered_product_range: R10-R17
+active_milestone_range: R18
+active_milestone_name: evidence and scale
 current_product_foundation_gates:
   - R10-WEBMCP-COMPLIANCE
   - R11-PERSISTENCE
   - R12-IDENTITY-CONSENT
   - R12B-SECURITY-DATA-GOVERNANCE
   - R12C-SESSION-INGESTION
-final_product_gate: R17-SUBMISSION
+final_product_gate: R17-SUBMISSION      # delivered; record in archive/hackathon/
 historical_repeat_autoselect: false
 historical_repeat_requires_explicit_request: true
 agent_registry: agents/registry

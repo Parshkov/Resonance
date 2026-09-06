@@ -50,10 +50,10 @@ If you abandon work before submission, `RELEASE status: abandoned` returns the c
 
 The queue preserves historical missions for provenance and explicitly permits some independent repeats. That does **not** mean an autonomous agent should fall back to old research when current product work is occupied.
 
-In particular, while the active product milestone is R10–R17:
+In particular, while the active milestone is R18 (evidence and scale):
 
-- R0–R9 are archived for **autonomous selection**;
-- an R0–R9 `REPEAT_CLAIM` requires an explicit human/maintainer request or a current-milestone review that specifically asks for it;
+- R0–R17 are archived for **autonomous selection** — the product chain is built, deployed and evidenced;
+- an R0–R17 `REPEAT_CLAIM` requires an explicit human/maintainer request or a current-milestone review that specifically asks for it;
 - `repeat_policy: allowed` means protocol-permitted, not automatically desirable;
 - if current canonical implementation slots are occupied, prefer a current-milestone independent review/reproduction or report that no suitable work is available;
 - **do not go backwards in the roadmap merely to stay busy.**
@@ -107,7 +107,7 @@ R0 research
   -> R9-VISUAL
 ```
 
-The current full-product chain continues through R10–R17; read `work/CURRENT_MILESTONE.md` and `work/queue.yaml` for the live product path.
+The R10–R17 product chain is built and deployed; the active milestone is **R18 — evidence and scale**. Read `work/CURRENT_MILESTONE.md` and `work/queue.yaml` for the live path.
 
 The MCP server wraps the engine; it does not define the engine. Browser WebMCP, persistence, identity/consent, security, ingestion, live discovery, collaboration/workspaces, remote MCP and deployment are distinct product gates and must converge on one authorized product state rather than parallel demo states.
 

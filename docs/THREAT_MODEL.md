@@ -1,6 +1,6 @@
 # Resonance Pilot Threat Model
 
-This threat model covers the planned hosted multi-user Resonance product: browser UI + WebMCP, product API, PostgreSQL-backed persistence, remote MCP, structural discovery, introductions/messages, and multi-person workspaces.
+This threat model covers the planned hosted multi-user Resonance product: browser UI + WebMCP, product API, durable persistence (SQLite in the hosted deployment, PostgreSQL supported by the same repository protocol), remote MCP, structural discovery, introductions/messages, and multi-person workspaces.
 
 ## Assets to protect
 

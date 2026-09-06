@@ -65,15 +65,30 @@ class WouldMatchNobodyTests(unittest.TestCase):
         return self.bridge.tool_prepare_thought(
             self.token, {"authorship": "their_own_words", "thought": thought})
 
+    def test_russian_is_comparable_now_that_the_lexicon_reads_it(self):
+        """Lexicon 0.3.0 gave all 90 concept classes Russian surface forms, so
+        a Russian thought is compared, not stranded. The refusal used to name
+        Cyrillic from a hard-coded list and kept turning these people away
+        with a reason that had stopped being true; the list is now derived
+        from the lexicon's own terms, so it cannot drift again."""
+        prepared = self._prepare(RUSSIAN)
+        self.assertEqual(prepared["structure"]["nodes"], 2)
+
     def test_labels_the_index_cannot_compare_are_refused(self):
+        thought = {
+            "nodes": [{"label": "熱の蓄積", "role": "problem"},
+                      {"label": "冷却の失敗", "role": "mechanism"}],
+            "relations": [{"source": "冷却の失敗", "target": "熱の蓄積", "type": "causes"}],
+        }
         with self.assertRaises(BridgeError) as caught:
-            self._prepare(RUSSIAN)
+            self._prepare(thought)
         said = str(caught.exception)
         self.assertIn("match nobody", said)
         # It names the labels, so the caller does not have to guess which.
-        self.assertIn("адаптивная топология", said)
-        # And says what to do instead.
-        self.assertIn("English", said)
+        self.assertIn("熱の蓄積", said)
+        # And says what the index can read instead of guessing for the caller.
+        self.assertIn("cyrillic", said)
+        self.assertIn("latin", said)
 
     def test_the_title_a_person_reads_stays_in_their_language(self):
         prepared = self._prepare(ENGLISH_LABELS_RUSSIAN_TITLE)

@@ -146,6 +146,19 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertEqual(doc["authorization_servers"], [self.issuer])
         self.assertIn("resonance", doc["scopes_supported"])
 
+    def test_metadata_is_served_at_the_path_inserted_form_too(self):
+        """RFC 9728 §3.1 / RFC 8414 §3.1: for a resource with a path (`/mcp`),
+        the metadata URL inserts the well-known segment BEFORE that path. MCP
+        clients try this form first. It used to 404 in production -- the core
+        answered it, but the mount's path gate admitted only the bare paths,
+        so nothing reached the core and only clients that fall back to the
+        root form worked. Asserted here without any fallback."""
+        for suffix, key, want in (("oauth-protected-resource", "resource", f"{self.issuer}/mcp"),
+                                  ("oauth-authorization-server", "issuer", self.issuer)):
+            status, _, body = self.c().get(f"/.well-known/{suffix}/mcp")
+            self.assertEqual(status, 200, f"/.well-known/{suffix}/mcp")
+            self.assertEqual(json.loads(body)[key], want)
+
     def test_authorization_server_metadata(self):
         _, _, body = self.c().get("/.well-known/oauth-authorization-server")
         doc = json.loads(body)

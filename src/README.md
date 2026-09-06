@@ -32,7 +32,7 @@ R1-SCHEMA
   -> R6-E2E
 ```
 
-R2/R3/R4 should communicate only through the accepted public interfaces, not each other's internals. `src/mcp/` must delegate to the accepted engine facade rather than duplicating extraction, retrieval, verification or scoring logic.
+R2/R3/R4 should communicate only through the accepted public interfaces, not each other's internals. The rule that once named `src/mcp/` still holds and now applies to `src/product/`: **every protocol surface delegates to the accepted engine facade** rather than duplicating extraction, retrieval, verification or scoring logic. There is no `src/mcp/` — the stdio adapter was retired and the one `resonance_*` tool vocabulary lives in `src/product/mcp_bridge.py`, served to the browser and to chat clients alike.
 
 `src/extraction/` implements R2: cue-grounded extraction plus a manual non-LLM ingest path through the same Thought DNA validator.
 
