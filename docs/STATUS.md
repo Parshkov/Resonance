@@ -1,19 +1,20 @@
 # Resonance — Status
 
-Updated: 2026-09-04
+Updated: 2026-09-06
 
 ## Where the project actually is
 
 | layer | state | evidence |
 |---|---|---|
 | Thought DNA schema v0.1 | frozen, validated, canonical hashing | `src/graph`, `tests/test_thought_dna_schema.py` |
-| Deterministic semantics (no LLM) | engine 0.2: lexicon + stems + relatedness | `src/semantics`, `tests/test_semantics.py` |
+| Deterministic semantics (no LLM) | engine 0.2: lexicon + stems + relatedness; optional local label encoder (ADR-0006, `RESONANCE_EMBEDDER`) | `src/semantics`, `tests/test_semantics.py`, `tests/test_label_encoder.py` |
 | Retrieval | structural + concept + content channels, IDF, verified re-ranking | `src/fingerprint`, `src/index`, `src/engine/reports/r0-v0.2-e2e.json` |
 | Verification / scoring | FGW conditional gradient + scoring policy v0.2 | `src/alignment`, `src/scoring`, ADR-0004 |
 | Extraction from prose | cue extractor v0.2, edge F1 0.94 on 22 prose cases | `src/extraction`, `benchmark/extraction-v0.2` |
 | Benchmark | v0.2: 8 skeletons × 4 domains × 18 families, gate split untouched by tuning | `benchmark/r0-v0.2` |
-| Product (MCP, WebMCP, OAuth, persistence) | deployed; one MCP vocabulary (`src/product/mcp_bridge.py`) | `src/product`, `ops/DEPLOY.md` |
-| Release freeze | engine 0.2 freeze taken 2026-09-04 on `0aea577` (deployment `834818b1`) | `submission/RELEASE_MANIFEST.md` §0, `submission/evidence/public-origin-0aea577/` |
+| Product (MCP, WebMCP, OAuth, persistence) | deployed; one vocabulary of 21 tools for the chat and the browser (`src/product/mcp_bridge.py`, `/api/product/tools`) | `src/product`, `ops/DEPLOY.md` |
+| The page | six screens over one state store (`demo/ui/main.mjs`, `store.mjs`, `strings.mjs`); groups with discussion, parts and shared understanding | `demo/ui/README.md`, `tests/test_product_http.py` |
+| Release freeze | engine 0.2 freeze taken 2026-09-04 on `0aea577` (deployment `834818b1`) | `archive/hackathon/submission/RELEASE_MANIFEST.md` §0, `archive/hackathon/submission/evidence/public-origin-0aea577/` |
 
 ## Release state
 
@@ -23,8 +24,17 @@ unedited, and the full acceptance set ran directly against the public origin —
 the engine 0.2 identity and `demo_personas_present: false`, onboarding probe 9/9 required,
 OAuth smoke 27/27, the three-person A/B/C test over `/mcp` 36/36, Card A in a real browser
 16/18, Card B through a real Claude custom connector. Evidence and the two Card A
-non-passes are in `submission/evidence/public-origin-0aea577/SUMMARY.md`; what a human still
-has to do is listed in `submission/RELEASE_FREEZE_CHECKLIST.md` §13.
+non-passes are in `archive/hackathon/submission/evidence/public-origin-0aea577/SUMMARY.md`.
+
+## 2026-09-06 rework
+
+The audit of 2026-09-05 (PR #195) rebuilt the page as separate screens over one
+state, gave groups a conversation and parts of the work, unified the browser
+and chat tool vocabularies, retired the stdio adapter and the replay demo, and
+added the opt-in label encoder. On that branch: 677 tests pass (lexicon only)
+and the engine gates pass with the encoder on. Production runs the encoder once
+`RESONANCE_EMBEDDER_MODEL` (build) and `RESONANCE_EMBEDDER` (run) are set on the
+service.
 
 ## What is validated
 
