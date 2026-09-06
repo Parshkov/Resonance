@@ -467,3 +467,81 @@ export function heatmap({thoughts, people, cell}, {onSelect = null, selected = n
   table.append(tbody);
   return table;
 }
+
+// ---- radar: several people over the same axes ---------------------------------------
+//
+// The chart a football scout reads: one polygon per person over a fixed set
+// of axes, drawn on top of each other, so the shape says at a glance who is
+// strong where and where two people cover different parts of the same
+// thing. Two uses here: the engine's own dimensions (structure, meaning,
+// direct links, systematicity, coverage, absence of contradiction, same
+// direction) and, for one thought, your ideas themselves: how much of each
+// idea a person's thought answers.
+
+export function hueOf(name) {
+  let hash = 0;
+  for (const ch of String(name || "")) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash % 360;
+}
+
+export function radar({axes, series, rings = [0.25, 0.5, 0.75, 1]}, {selected = null, onSelect = null, width = 640, height = 480, labelChars = 18} = {}) {
+  const n = Math.max(3, axes.length);
+  const cx = width / 2, cy = height / 2;
+  // Room for a two-line label outside the rim on every side.
+  const R = Math.min(width, height) / 2 - 78;
+  const angle = (i) => -Math.PI / 2 + (i / n) * Math.PI * 2;
+  const point = (i, v) => [cx + Math.cos(angle(i)) * R * v, cy + Math.sin(angle(i)) * R * v];
+  const svg = svgEl("svg", {class: "radar", viewBox: `0 0 ${width} ${height}`, role: "img"});
+  const title = svgEl("title"); title.textContent = "How each person measures on every axis";
+  svg.append(title);
+  // grid
+  for (const r of rings) {
+    const d = axes.map((_, i) => point(i, r)).map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ") + " Z";
+    svg.append(svgEl("path", {d, class: `radar__ring ${r === 1 ? "radar__ring--outer" : ""}`}));
+    if (r < 1) { const tn = svgEl("text", {x: cx + 4, y: cy - R * r - 3, class: "radar__tick"}); tn.textContent = r.toFixed(2); svg.append(tn); }
+  }
+  axes.forEach((axis, i) => {
+    const [x, y] = point(i, 1);
+    svg.append(svgEl("line", {x1: cx, y1: cy, x2: x, y2: y, class: "radar__spoke"}));
+    const [lx, ly] = point(i, 1 + 22 / R);
+    const cos = Math.cos(angle(i));
+    const anchor = cos > 0.2 ? "start" : cos < -0.2 ? "end" : "middle";
+    const label = svgEl("text", {x: lx, y: ly + 4, class: "radar__axis", "text-anchor": anchor});
+    const words = String(axis.label || "");
+    if (words.length > labelChars) {
+      // two lines, broken at a space where possible
+      const cut = words.lastIndexOf(" ", labelChars) > 6 ? words.lastIndexOf(" ", labelChars) : labelChars;
+      const first = svgEl("tspan", {x: lx, dy: "-0.55em"}); first.textContent = words.slice(0, cut);
+      const rest = words.slice(cut).trim();
+      const second = svgEl("tspan", {x: lx, dy: "1.1em"}); second.textContent = rest.length > labelChars ? rest.slice(0, labelChars - 1) + "…" : rest;
+      label.append(first, second);
+    } else label.textContent = words;
+    const hint = svgEl("title"); hint.textContent = axis.hint || axis.label;
+    label.append(hint);
+    svg.append(label);
+  });
+  // series, the selected one drawn last so it sits on top
+  const ordered = [...series].sort((a, b) => (a.id === selected) - (b.id === selected));
+  for (const s of ordered) {
+    const pts = axes.map((_, i) => point(i, Math.max(0, Math.min(1, Number(s.values[i]) || 0))));
+    const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ") + " Z";
+    const g = svgEl("g", {class: `radar__series ${s.id === selected ? "is-selected" : ""} ${selected && s.id !== selected ? "is-dim" : ""}`, tabindex: onSelect ? "0" : "-1", role: onSelect ? "button" : "img"});
+    g.style.setProperty("--hue", String(s.hue ?? hueOf(s.name)));
+    g.dataset.id = s.id;
+    g.append(svgEl("path", {d, class: "radar__poly"}));
+    pts.forEach(([x, y], i) => {
+      const dot = svgEl("circle", {cx: x, cy: y, r: 3.5, class: "radar__dot"});
+      const hint = svgEl("title"); hint.textContent = `${s.name} · ${axes[i].label}: ${(Number(s.values[i]) || 0).toFixed(2)}`;
+      dot.append(hint);
+      g.append(dot);
+    });
+    const hint = svgEl("title"); hint.textContent = s.name;
+    g.append(hint);
+    if (onSelect) {
+      g.addEventListener("click", () => onSelect(s.id));
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(s.id); } });
+    }
+    svg.append(g);
+  }
+  return svg;
+}

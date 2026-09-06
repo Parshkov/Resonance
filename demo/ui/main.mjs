@@ -3,7 +3,7 @@
  *
  *   /            what is new, who resonates, your thoughts and groups at a glance
  *   /thoughts    the thoughts you have here: share, edit, share again, withdraw, delete
- *   /people      who resonates with you, drawn as a constellation, a map and a matrix; why
+ *   /people      who resonates with you: a profile radar, your ideas as a radar, a map, a matrix; why
  *   /talk        introductions and conversations
  *   /groups      groups around one idea; /groups/<id> is one of them
  *   /connect     the same product from the chat you already use
@@ -15,7 +15,7 @@
 
 import * as store from "/store.mjs";
 import { t } from "/strings.mjs";
-import { constellation, correspondence, heatmap, worldMap } from "/maps.mjs";
+import { correspondence, heatmap, hueOf, radar, worldMap } from "/maps.mjs";
 
 // ---- tiny DOM helpers --------------------------------------------------------------
 
@@ -84,10 +84,8 @@ function relationWord(type) {
 function avatar(name, size = "") {
   const words = String(name || "?").split(/\s+/).filter(Boolean);
   const initials = (words[0]?.[0] || "?") + (words[1]?.[0] || "");
-  let hash = 0;
-  for (const ch of String(name || "")) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
   const node = el("span", {class: `avatar ${size}`.trim(), "aria-hidden": "true"}, initials.toUpperCase());
-  node.style.setProperty("--hue", String(hash % 360));
+  node.style.setProperty("--hue", String(hueOf(name)));
   return node;
 }
 
@@ -142,13 +140,25 @@ function menu(id, items) {
   const trigger = el("button", {type: "button", class: "kebab__button", "aria-label": t("more"), "aria-haspopup": "true", "aria-expanded": String(open)}, "···");
   const panel = el("div", {class: "kebab__panel", hidden: !open}, items.filter(Boolean).map(([label, action, danger]) =>
     el("button", {type: "button", class: `kebab__item ${danger ? "is-danger" : ""}`, onclick: () => { ui.menuOpen = null; action(); }}, label)));
-  trigger.addEventListener("click", (e) => { e.stopPropagation(); ui.menuOpen = open ? null : id; render(); });
+  // Toggled in place: redrawing the screen to open a menu made every card
+  // jump under the pointer.
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = panel.hidden;
+    closeMenus();
+    ui.menuOpen = willOpen ? id : null;
+    panel.hidden = !willOpen;
+    trigger.setAttribute("aria-expanded", String(willOpen));
+  });
   wrap.append(trigger, panel);
   return wrap;
 }
-document.addEventListener("click", (event) => {
-  if (ui.menuOpen && !event.target.closest(".kebab")) { ui.menuOpen = null; render(); }
-});
+function closeMenus() {
+  ui.menuOpen = null;
+  for (const panel of document.querySelectorAll(".kebab__panel:not([hidden])")) { panel.hidden = true; panel.previousElementSibling?.setAttribute("aria-expanded", "false"); }
+}
+document.addEventListener("click", (event) => { if (ui.menuOpen && !event.target.closest(".kebab")) closeMenus(); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && ui.menuOpen) closeMenus(); });
 
 function disclosure(id, summary, body) {
   const node = el("details", {class: "disclosure", open: ui.unfolded.has(id)}, [el("summary", {}, summary), body]);
@@ -203,7 +213,7 @@ const ui = {
   deleteAsk: null,
   thoughtsFilter: "all",
   peopleFilter: "all",       // "all" | session_id
-  peopleView: "constellation", // constellation | where | matrix
+  peopleView: "profile",     // profile | ideas | where | matrix
   peopleSelected: null,
   drawer: null,              // {kind: "person", id} | null
   askOpen: null,
@@ -693,9 +703,10 @@ function peopleView() {
   if (loading && !people.length) { frag.append(el("div", {class: "skeleton-grid"}, [el("div", {class: "skeleton skeleton--map"}), el("div", {class: "skeleton"}), el("div", {class: "skeleton"})])); return frag; }
   const resonating = people.filter((p) => p.mode_classification !== "negative");
   const near = people.filter((p) => p.mode_classification === "negative");
-  if (error && !people.length) {
-    frag.append(el("div", {class: "status status--error"}, [t("people.error", {message: error}), " ", button(t("error.retry"), () => { store.retryDiscovery(active.map((r) => r.session_id)); render(); }, {variant: "btn--small"})]));
-  } else if (!resonating.length) {
+  // A thought whose discovery failed is said so, above whatever the others
+  // returned: silence here read as "nobody".
+  if (error) frag.append(el("div", {class: "status status--error"}, [t("people.error", {message: error}), " ", button(t("error.retry"), () => { store.retryDiscovery(active.map((r) => r.session_id)); render(); }, {variant: "btn--small"})]));
+  if (!resonating.length) {
     frag.append(empty(t("people.empty.title"), t("people.empty.body")));
   } else {
     frag.append(el("div", {class: "people-layout"}, [
@@ -728,33 +739,93 @@ function selectPerson(id) {
   render();
 }
 
+// The engine's own dimensions, as radar axes. Two are inverted so that
+// "more" always means "closer": the absence of contradiction, and links
+// running the same way.
+const PROFILE_AXES = [
+  ["structural", "structure", (s) => s.structural],
+  ["semantic", "meaning", (s) => s.semantic],
+  ["r_direct", "direct_links", (s) => s.r_direct],
+  ["y_systematicity", "systematic", (s) => s.y_systematicity],
+  ["coverage_containment", "coverage", (s) => s.coverage_containment],
+  ["contradiction", "no_contradiction", (s) => 1 - (Number(s.contradiction) || 0)],
+  ["h_sign_conflict", "same_direction", (s) => 1 - (Number(s.h_sign_conflict) || 0)],
+];
+
+function profileAxes() {
+  return PROFILE_AXES.map(([key, word]) => ({key, label: t(`axis.${word}`), hint: t(`axis.${word}.hint`)}));
+}
+
+function profileValues(scores = {}) {
+  return PROFILE_AXES.map(([, , read]) => Math.max(0, Math.min(1, Number(read(scores)) || 0)));
+}
+
+// Your ideas as axes, and for one match how much of each idea the other
+// person answers: the idea corresponds (0.7), and a link of yours through
+// that idea is kept by them too (up to 1.0).
+function ideaAxes(thoughtId) {
+  const ctx = store.getState().context.get(thoughtId);
+  if (!ctx) store.context(thoughtId);
+  const nodes = ctx?.payload?.active_thought?.nodes;
+  if (nodes?.length) return {axes: nodes.map((n) => ({id: n.id, label: n.label})), relations: ctx.payload.active_thought.relations || []};
+  const row = store.thoughts().find((r) => r.session_id === thoughtId);
+  return {axes: (row?.nodes || []).map((n) => ({id: null, label: n.label})), relations: []};
+}
+
+function ideaValues(m, {axes, relations}) {
+  const pairs = m.evidence?.top_correspondences || [];
+  const kept = new Set((m.evidence?.preserved_relations || []).map((r) => r.query_relation));
+  const touched = new Set();
+  for (const r of relations) if (kept.has(r.id)) { touched.add(r.source); touched.add(r.target); }
+  return axes.map((axis) => {
+    const answered = pairs.some((c) => (axis.id && c.query_node === axis.id) || c.query_label === axis.label);
+    if (!answered) return 0;
+    return axis.id && touched.has(axis.id) ? 1 : 0.7;
+  });
+}
+
+function seriesLegend(series) {
+  return el("ul", {class: "series-legend"}, series.map((s) => {
+    const item = el("li", {}, el("button", {type: "button", class: `series-legend__item ${s.id === ui.peopleSelected ? "is-on" : ""}`, "aria-pressed": String(s.id === ui.peopleSelected),
+      onclick: () => { ui.peopleSelected = ui.peopleSelected === s.id ? null : s.id; render(); }}, [el("span", {class: "series-legend__swatch"}), s.name]));
+    item.firstChild.style.setProperty("--hue", String(s.hue));
+    return item;
+  }));
+}
+
 function vizPanel(people, near, thoughts) {
   const panel = el("section", {class: "panel viz", "aria-label": t("people.map")});
-  const views = [["constellation", t("people.map.strength")], ["where", t("people.map.where")]];
-  if (thoughts.length > 1) views.push(["matrix", "Matrix"]);
-  if (ui.peopleView === "matrix" && thoughts.length < 2) ui.peopleView = "constellation";
+  const single = thoughts.length === 1;
+  const views = [["profile", t("people.map.profile")]];
+  if (single) views.push(["ideas", t("people.map.ideas")]);
+  views.push(["where", t("people.map.where")]);
+  if (thoughts.length > 1) views.push(["matrix", t("people.map.matrix")]);
+  if (!views.some(([key]) => key === ui.peopleView)) ui.peopleView = "profile";
   panel.append(el("div", {class: "tabs", role: "tablist"}, views.map(([key, label]) =>
     el("button", {type: "button", role: "tab", class: "tab", "aria-selected": String(ui.peopleView === key), onclick: () => { ui.peopleView = key; render(); }}, label))));
-  if (ui.peopleView === "constellation") {
-    const centres = thoughts.map((r) => ({id: r.session_id, label: thoughtTitle(r)}));
-    const nodes = [...people, ...near].map((p) => ({id: p.session_id, name: p.person_pseudonym, kind: p.mode_classification, strength: Number(p.scores?.structural) || 0, depth: p.evidence?.mapped_node_count || 0, topic: p.display?.topic || "", links: p.evidence?.preserved_relation_count || 0}));
-    const links = [];
-    for (const p of [...people, ...near]) {
-      links.push({source: p.for_session_id, target: p.session_id, strength: Number(p.scores?.structural) || 0, kind: p.mode_classification, contradictions: p.evidence?.contradiction_count || 0});
-      for (const o of p.others || []) links.push({source: o.for_session_id, target: p.session_id, strength: Number(o.scores?.structural) || 0, kind: o.mode_classification, contradictions: o.evidence?.contradiction_count || 0});
-    }
-    panel.append(el("div", {class: "map-frame"}, constellation({centres, people: nodes, links}, {selected: ui.peopleSelected, onSelect: selectPerson})));
-    const kinds = new Map();
-    for (const p of [...people, ...near]) kinds.set(p.mode_classification, (kinds.get(p.mode_classification) || 0) + 1);
-    panel.append(el("ul", {class: "map-legend"}, [...kinds].map(([kind, n]) => el("li", {}, [el("span", {class: `swatch swatch--${kind}`}), `${verdict(kind)} · ${n}`]))));
-    panel.append(el("p", {class: "hint"}, t("people.map.strength.hint")));
+  const select = (id) => { ui.peopleSelected = id; render(); };
+  if (ui.peopleView === "profile") {
+    const series = people.map((p) => ({id: p.session_id, name: p.person_pseudonym, hue: hueOf(p.person_pseudonym), values: profileValues(p.scores)}));
+    panel.append(el("div", {class: "map-frame"}, radar({axes: profileAxes(), series}, {selected: ui.peopleSelected, onSelect: select})));
+    panel.append(seriesLegend(series));
+    panel.append(el("p", {class: "hint"}, t("people.map.profile.hint")));
+  } else if (ui.peopleView === "ideas") {
+    const shape = ideaAxes(thoughts[0].session_id);
+    const series = people.map((p) => {
+      const m = [p, ...(p.others || [])].find((x) => x.for_session_id === thoughts[0].session_id) || p;
+      return {id: p.session_id, name: p.person_pseudonym, hue: hueOf(p.person_pseudonym), values: ideaValues(m, shape)};
+    });
+    if (shape.axes.length < 3) panel.append(el("p", {class: "quiet"}, t("people.map.ideas.few")));
+    else panel.append(el("div", {class: "map-frame"}, radar({axes: shape.axes, series, rings: [0.7, 1]}, {selected: ui.peopleSelected, onSelect: select, labelChars: 16})));
+    panel.append(seriesLegend(series));
+    panel.append(el("p", {class: "hint"}, t("people.map.ideas.hint")));
   } else if (ui.peopleView === "where") {
     const first = thoughts[0]?.session_id;
     const entry = store.getState().geo.get(first);
     if (!entry) store.geo(first);
     if (!entry || (entry.loading && !entry.payload)) { panel.append(el("div", {class: "skeleton skeleton--map"})); return panel; }
     if (!entry.payload) { panel.append(el("p", {class: "status status--error"}, entry.error || "")); return panel; }
-    const {svg, placed, unplaced} = worldMap(entry.payload, {selected: ui.peopleSelected, onSelect: selectPerson});
+    const {svg, placed, unplaced} = worldMap(entry.payload, {selected: ui.peopleSelected, onSelect: select});
     panel.append(el("div", {class: "map-frame map-frame--world"}, svg));
     const lines = [];
     if (!entry.payload.you) lines.push(t("people.map.you_unplaced"));
@@ -770,7 +841,8 @@ function vizPanel(people, near, thoughts) {
     const rows = people.map((p) => ({id: p.session_id, name: p.person_pseudonym, all: [p, ...(p.others || [])]}));
     panel.append(el("div", {class: "heat-wrap"}, heatmap({thoughts: thoughts.map((r) => ({id: r.session_id, label: thoughtTitle(r)})), people: rows,
       cell: (p, th) => { const m = p.all.find((x) => x.for_session_id === th.id); return m ? {strength: Number(m.scores?.structural) || 0, kind: verdict(m.mode_classification), near: m.mode_classification === "negative"} : null; }},
-      {selected: ui.peopleSelected, onSelect: selectPerson})));
+      {selected: ui.peopleSelected, onSelect: select})));
+    panel.append(el("p", {class: "hint"}, t("people.map.matrix.hint")));
   }
   return panel;
 }
@@ -825,6 +897,12 @@ function evidenceBlock(m, named) {
   const theirs = pairs.map((c) => ({id: c.theirs, label: c.theirsLabel}));
   const keptIds = new Set((m.evidence?.preserved_relations || []).map((r) => r.query_relation));
   const kept = mineRelations.filter((r) => keptIds.has(r.id)).map((r) => ({source: r.source, target: r.target, type: r.type}));
+  const shape = ideaAxes(m.for_session_id);
+  if (shape.axes.length >= 3) {
+    const series = [{id: m.session_id, name: m.person_pseudonym, hue: hueOf(m.person_pseudonym), values: ideaValues(m, shape)}];
+    box.append(el("p", {class: "label"}, t("people.map.ideas")), el("div", {class: "map-frame"}, radar({axes: shape.axes, series, rings: [0.7, 1]}, {width: 480, height: 400, labelChars: 16})),
+      el("p", {class: "hint"}, t("people.map.ideas.hint")));
+  }
   box.append(el("p", {class: "label"}, t("people.correspond")), el("div", {class: "corr-frame"}, correspondence({mine, theirs, pairs, keptRelations: kept})));
   return box;
 }
@@ -1151,6 +1229,7 @@ function connectView() {
 
 let rendering = false;
 let deferred = false;
+let lastPath = null;
 
 function typing() {
   const active = document.activeElement;
@@ -1179,7 +1258,10 @@ export function render() {
     const status = document.getElementById("tool-status");
     if (status && route.nav !== "connect") { status.hidden = true; document.getElementById("tool-home")?.append(status); }
     main.replaceChildren(route.view());
-    main.classList.remove("view--in"); void main.offsetWidth; main.classList.add("view--in");
+    // The entry fade only when the screen changes, never on a redraw of the
+    // same screen: a redraw must be invisible.
+    const here = window.location.pathname;
+    if (here !== lastPath) { lastPath = here; main.classList.remove("view--in"); void main.offsetWidth; main.classList.add("view--in"); }
     const footClaim = document.getElementById("foot-claim");
     if (footClaim) footClaim.textContent = t("footer.claim");
   } finally {
