@@ -218,7 +218,7 @@ class FakeR11Backend:
         self.events.append(event)
 
     def list_identity_events(self):
-        # Mirror R11 SQLite ordering: ORDER BY created_at, event_id.
+        # Mirror the R11 store's ordering: ORDER BY created_at, event_id.
         return sorted(self.events, key=lambda e: (e.created_at, e.event_id))
 
     def _sync_index(self, session):

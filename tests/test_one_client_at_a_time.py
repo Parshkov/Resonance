@@ -30,7 +30,7 @@ from src.remote.oauth import GrantStore, OAuthCore  # noqa: E402
 
 class OneClientAtATimeTests(unittest.TestCase):
     def setUp(self):
-        self.runtime = build_runtime(":memory:",
+        self.runtime = build_runtime(":ephemeral:",
                                      allowed_origins=frozenset({"http://127.0.0.1"}),
                                      seed=False)
         self.store = GrantStore()

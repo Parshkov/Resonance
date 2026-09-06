@@ -154,7 +154,7 @@ class AuthorizationTests(unittest.TestCase):
 
     def setUp(self):
         from src.product.server import build_runtime
-        runtime = build_runtime(":memory:",
+        runtime = build_runtime(":ephemeral:",
                                 allowed_origins=frozenset({"http://127.0.0.1"}),
                                 seed=False)
         self.identity = runtime.identity

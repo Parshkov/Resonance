@@ -1,7 +1,7 @@
 """Authoritative R12 identity/R11 persistence adapter for the R12B policy.
 
 The adapter derives every decision from the identity backend on each call.  If
-the backend is :class:`R11IdentityBackend`, this state is durable SQLite or
+the backend is :class:`R11IdentityBackend`, this state is durable
 PostgreSQL state; no parallel authorization database is introduced.
 """
 

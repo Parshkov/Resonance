@@ -160,7 +160,7 @@ class DiscoveryTests(unittest.TestCase):
     """The rule where it acts: a row is dropped from discovery, or it is not."""
 
     def setUp(self):
-        self.runtime = build_runtime(":memory:",
+        self.runtime = build_runtime(":ephemeral:",
                                      allowed_origins=frozenset({"http://127.0.0.1"}),
                                      seed=False)
         self.product = self.runtime.product

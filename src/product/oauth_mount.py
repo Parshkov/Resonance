@@ -172,7 +172,7 @@ def attach_core(runtime: Any, *, issuer: str) -> Any | None:
         return None
     # The core's bearer IS the R12 access token (durable in the identity event
     # log). Codes / refresh grants / client registrations are durable too when
-    # the runtime carries a repository (PostgreSQL/SQLite, migration 0005), so
+    # the runtime carries a repository (PostgreSQL, migration 0005), so
     # a redeploy no longer forces hosted clients to re-authorize; the
     # in-memory store remains the fallback for runtimes without one.
     repository = getattr(getattr(runtime, "live", None), "repo", None)

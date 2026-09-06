@@ -39,7 +39,7 @@ BOB = ([{"id": "m0", "label": "yield pressure", "role": "problem"},
 
 class VisualsTests(unittest.TestCase):
     def setUp(self):
-        self.runtime = build_runtime(":memory:",
+        self.runtime = build_runtime(":ephemeral:",
                                      allowed_origins=frozenset({"http://127.0.0.1"}),
                                      seed=False)
         self.bridge = RemoteMCPBridge(self.runtime.product)

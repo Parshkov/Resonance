@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import sqlite3
 import sys
 import tempfile
 import unittest
@@ -30,10 +29,11 @@ from src.persistence import (
     PersistenceOwnershipError,
     PersistenceStaleIndexError,
     PersistenceValidationError,
-    SQLiteRepository,
     postgres_available,
 )
-from src.persistence.factory import open_repository
+from src.persistence import PostgresRepository
+from src.persistence.factory import ephemeral_dsn, open_repository
+from tests.support import repository
 from src.persistence.seed import minimal_thought, seed_pilot_scale, seed_r7
 from src.persistence.service import session_to_r7
 
@@ -65,11 +65,11 @@ PRESENTATION = {"domain": "d", "topic": "t", "cluster_id": "c"}
 
 
 def file_service(path: Path) -> LiveCorpusService:
-    return LiveCorpusService(SQLiteRepository(path))
+    return LiveCorpusService(repository(path))
 
 
-def single_service(path=":memory:") -> tuple[LiveCorpusService, object]:
-    service = LiveCorpusService(SQLiteRepository(path))
+def single_service(path=":ephemeral:") -> tuple[LiveCorpusService, object]:
+    service = LiveCorpusService(repository(path))
     service.create_user("person-a", display_label="A")
     session = service.create_session(
         session_id="ses-a",
@@ -83,11 +83,11 @@ def single_service(path=":memory:") -> tuple[LiveCorpusService, object]:
 
 
 class MigrationAndHealthTests(unittest.TestCase):
-    def test_clean_sqlite_applies_versioned_recovery_migrations(self):
-        repo = SQLiteRepository(":memory:")
+    def test_clean_database_applies_versioned_recovery_migrations(self):
+        repo = repository(":ephemeral:")
         health = repo.health()
         self.assertTrue(health["ok"])
-        self.assertEqual(health["backend"], "sqlite")
+        self.assertEqual(health["backend"], "postgres")
         self.assertEqual(health["migrations"], ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants",
                  "0006_shared_topics"])
         self.assertEqual(health["corpus_generation"], 0)
@@ -96,81 +96,70 @@ class MigrationAndHealthTests(unittest.TestCase):
         self.assertEqual(service.health().db_generation, service.health().serving_generation)
         repo.close()
 
+    MIGRATIONS = ["0001_init", "0002_recovery_generation", "0003_collaboration",
+                  "0004_workspaces", "0005_oauth_grants", "0006_shared_topics"]
+
+    def _bare_0001_schema(self, schema: str):
+        """A database as it was at 0001, with only that marker recorded --
+        the state a long-lived deployment upgrades from."""
+        import psycopg
+        conn = psycopg.connect(ephemeral_dsn())
+        cur = conn.cursor()
+        cur.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+        cur.execute(f'CREATE SCHEMA "{schema}"')
+        cur.execute(f'SET search_path TO "{schema}"')
+        cur.execute("CREATE TABLE IF NOT EXISTS schema_migrations ("
+                    "version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)")
+        for statement in (REPO / "ops" / "migrations" / "0001_init.sql").read_text().split(";"):
+            if statement.strip():
+                cur.execute(statement)
+        cur.execute("INSERT INTO schema_migrations(version, applied_at) VALUES (%s, %s)",
+                    ("0001_init", "old"))
+        conn.commit()
+        conn.close()
+
+    def _columns(self, repo, table="sessions"):
+        return {r["column_name"] for r in repo._fetchall_map(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = ? AND table_name = ?", (repo.schema, table))}
+
     def test_old_0001_database_upgrades_without_rewriting_history(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "old.sqlite"
-            conn = sqlite3.connect(path)
-            old_sql = (REPO / "ops" / "migrations" / "0001_init.sql").read_text()
-            conn.executescript(old_sql)
-            conn.execute(
-                "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
-                ("0001_init", "old"),
-            )
-            conn.commit()
-            conn.close()
-            repo = SQLiteRepository(path)
-            self.assertEqual(
-                repo.health()["migrations"],
-                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants",
-                 "0006_shared_topics"],
-            )
-            columns = {
-                row[1] for row in repo._conn.execute("PRAGMA table_info(sessions)").fetchall()
-            }
-            self.assertIn("version", columns)
+        schema = "eph_upgrade_from_0001"
+        self._bare_0001_schema(schema)
+        repo = PostgresRepository(ephemeral_dsn(), schema=schema)
+        try:
+            self.assertEqual(repo.health()["migrations"], self.MIGRATIONS)
+            self.assertIn("version", self._columns(repo))
             self.assertEqual(repo.get_corpus_generation(), 0)
-            repo.close()
+        finally:
+            repo.drop_schema()
 
-    def test_interrupted_sqlite_migration_rolls_back_schema_and_marker(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "interrupted.sqlite"
-            conn = sqlite3.connect(path)
-            conn.executescript(
-                (REPO / "ops" / "migrations" / "0001_init.sql").read_text()
-            )
-            conn.execute(
-                "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
-                ("0001_init", "old"),
-            )
-            conn.commit()
-            conn.close()
+    def test_interrupted_migration_rolls_back_schema_and_marker(self):
+        """A migration that dies before its marker is written must leave the
+        database exactly as it was -- not half-migrated with no record of it."""
+        schema = "eph_interrupted_migration"
+        self._bare_0001_schema(schema)
+        real_execute = PostgresRepository._execute
 
-            original = SQLiteRepository._record_migration
+        def fail_before_marker(repo, sql, params=()):
+            if "INSERT INTO schema_migrations" in sql and params and params[0] == "0002_recovery_generation":
+                raise RuntimeError("simulated loss before migration marker")
+            return real_execute(repo, sql, params)
 
-            def fail_before_marker(repo, version):
-                if version == "0002_recovery_generation":
-                    raise RuntimeError("simulated loss before migration marker")
-                return original(repo, version)
+        with patch.object(PostgresRepository, "_execute", fail_before_marker):
+            with self.assertRaisesRegex(RuntimeError, "before migration marker"):
+                PostgresRepository(ephemeral_dsn(), schema=schema)
 
-            with patch.object(SQLiteRepository, "_record_migration", fail_before_marker):
-                with self.assertRaisesRegex(RuntimeError, "before migration marker"):
-                    SQLiteRepository(path)
-
-            conn = sqlite3.connect(path)
-            columns = {
-                row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()
-            }
-            markers = {
-                row[0] for row in conn.execute("SELECT version FROM schema_migrations")
-            }
-            conn.close()
-            self.assertNotIn("version", columns)
-            self.assertEqual(markers, {"0001_init"})
-
-            recovered = SQLiteRepository(path)
-            self.assertIn(
-                "version",
-                {row[1] for row in recovered._conn.execute("PRAGMA table_info(sessions)")},
-            )
-            self.assertEqual(
-                recovered.health()["migrations"],
-                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants",
-                 "0006_shared_topics"],
-            )
-            recovered.close()
+        stalled = PostgresRepository(ephemeral_dsn(), schema=schema)
+        try:
+            # It rolled back cleanly, so reopening simply completes the upgrade.
+            self.assertEqual(stalled.health()["migrations"], self.MIGRATIONS)
+            self.assertIn("version", self._columns(stalled))
+        finally:
+            stalled.drop_schema()
 
     def test_invalid_thought_dna_is_rejected_before_storage(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         service.create_user("person-bad", display_label="Bad")
         before = service.repo.get_corpus_generation()
         with self.assertRaises(PersistenceValidationError):
@@ -186,7 +175,7 @@ class MigrationAndHealthTests(unittest.TestCase):
         self.assertTrue(service.health().ok)
 
     def test_rebuild_false_makes_readiness_fail_until_rebuilt(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         service.create_user("person-stale", display_label="Stale", rebuild=False)
         health = service.health()
         self.assertFalse(health.ok)
@@ -204,7 +193,7 @@ class R7SeedAndRankingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.sessions = load_sessions()
-        cls.service = LiveCorpusService(SQLiteRepository(":memory:"))
+        cls.service = LiveCorpusService(repository(":ephemeral:"))
         seed_r7(cls.service)
         cls.by_id = {s["session_id"]: s for s in cls.sessions}
         cls.query = ThoughtGraph.from_dict(cls.by_id[FLAGSHIP]["thought_dna"])
@@ -367,11 +356,11 @@ class GenerationFailClosedTests(unittest.TestCase):
 class OwnershipConcurrencyAndRetryTests(unittest.TestCase):
     def test_stale_profile_upsert_cannot_clear_committed_user_revocation(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "user-revoke-race.sqlite"
+            path = Path(tmp) / "user-revoke-race"
             first = file_service(path)
             first.create_user("person-race", display_label="Before")
             stale = first.get_user("person-race")
-            second = SQLiteRepository(path)
+            second = repository(path)
             second.put_user(
                 replace(stale, revoked_at="committed-revoke", updated_at="newer")
             )
@@ -393,7 +382,7 @@ class OwnershipConcurrencyAndRetryTests(unittest.TestCase):
             first.repo.close()
 
     def test_user_create_request_id_replays_one_committed_mutation(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         first = service.create_user(
             "person-retry-user",
             display_label="Retry User",
@@ -516,7 +505,7 @@ class OwnershipConcurrencyAndRetryTests(unittest.TestCase):
 
     def test_idempotent_result_survives_process_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "retry.sqlite"
+            path = Path(tmp) / "retry"
             first, stored = single_service(path)
             result = first.revoke_session(
                 stored.session_id,
@@ -545,7 +534,7 @@ class OwnershipConcurrencyAndRetryTests(unittest.TestCase):
 class RestartBackupAndScaleTests(unittest.TestCase):
     def test_100_users_sessions_survive_restart_with_identical_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "pilot.sqlite"
+            path = Path(tmp) / "pilot"
             first = file_service(path)
             seed_pilot_scale(first, n=100)
             health = first.health()
@@ -566,7 +555,7 @@ class RestartBackupAndScaleTests(unittest.TestCase):
 
     def test_revoke_disappears_after_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "pilot.sqlite"
+            path = Path(tmp) / "pilot"
             service = file_service(path)
             seed_r7(service)
             by_id = {s["session_id"]: s for s in load_sessions()}
@@ -601,7 +590,7 @@ class RestartBackupAndScaleTests(unittest.TestCase):
             restarted.repo.close()
 
     def test_hidden_user_absent_from_views_and_rebuilt_index(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         seed_r7(service)
         user_id = next(
             s["person"]["person_id"] for s in load_sessions() if s["session_id"] == FLAGSHIP
@@ -616,8 +605,8 @@ class RestartBackupAndScaleTests(unittest.TestCase):
 
     def test_backup_round_trip_preserves_versions_and_structural_snapshot(self):
         with tempfile.TemporaryDirectory() as tmp:
-            src = Path(tmp) / "a.sqlite"
-            dst = Path(tmp) / "b.sqlite"
+            src = Path(tmp) / "a"
+            dst = Path(tmp) / "b"
             backup = Path(tmp) / "backup.json"
             a = file_service(src)
             seed_r7(a)
@@ -642,7 +631,7 @@ class RestartBackupAndScaleTests(unittest.TestCase):
             b.repo.close()
 
     def test_concurrent_create_and_discover_smoke(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         for i in range(12):
             service.create_user(f"person-c-{i:03d}", display_label=f"C{i}", rebuild=False)
         service.rebuild_index()
@@ -688,7 +677,7 @@ class IsolationAndBackendTests(unittest.TestCase):
                 self.assertNotIn(banned, text, path.name)
 
     def test_r7_converter_keeps_metadata_outside_thought_dna(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         seed_r7(service)
         session = service.get_session(FLAGSHIP)
         user = service.get_user(session.user_id)
@@ -705,7 +694,7 @@ class IsolationAndBackendTests(unittest.TestCase):
         ):
             self.assertNotIn(key, record["thought_dna"])
 
-    def test_postgres_dsn_never_silently_falls_back_to_sqlite(self):
+    def test_a_non_postgres_target_is_refused_not_silently_substituted(self):
         if postgres_available():
             self.skipTest("PostgreSQL driver installed; live connection needs test DSN")
         with self.assertRaises(RuntimeError):

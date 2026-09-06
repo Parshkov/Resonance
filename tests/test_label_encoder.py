@@ -119,7 +119,7 @@ class DeploymentTests(unittest.TestCase):
 
     def test_the_engine_identity_names_the_encoder(self):
         from src.product.server import build_runtime, engine_identity
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"x"}), seed=False)
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"x"}), seed=False)
         with _Patched({}):
             self.assertEqual(engine_identity(runtime)["label_encoder"], "stub-encoder/test")
         self.assertIsNone(engine_identity(runtime)["label_encoder"])

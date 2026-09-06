@@ -1,11 +1,11 @@
 """Operational commands for R11 persistence.
 
 Examples:
-  python -m src.persistence --db var/resonance-pilot.sqlite health
-  python -m src.persistence --db var/resonance-pilot.sqlite seed-r7
-  python -m src.persistence --db var/resonance-pilot.sqlite purge-demo
-  python -m src.persistence --db var/resonance-pilot.sqlite seed-pilot --count 100
-  python -m src.persistence --db var/resonance-pilot.sqlite export --out var/backup.json
+  python -m src.persistence --db "$RESONANCE_DATABASE_URL" health
+  python -m src.persistence --db "$RESONANCE_DATABASE_URL" seed-r7
+  python -m src.persistence --db "$RESONANCE_DATABASE_URL" purge-demo
+  python -m src.persistence --db "$RESONANCE_DATABASE_URL" seed-pilot --count 100
+  python -m src.persistence --db "$RESONANCE_DATABASE_URL" export --out var/backup.json
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ def _health_payload(service: LiveCorpusService) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="resonance-persist")
-    parser.add_argument("--db", default=None, help="SQLite path or postgres:// DSN")
+    parser.add_argument("--db", default=None, help="postgresql:// DSN, or :ephemeral:")
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("migrate")
     sub.add_parser("health")

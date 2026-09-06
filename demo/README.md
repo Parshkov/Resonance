@@ -10,7 +10,7 @@ served by `src.product.web_server`. See [`ui/README.md`](ui/README.md).
 ## `demo/corpus/` — the labelled demo corpus
 
 Twenty-five labelled personas wrapping accepted Thought DNA with consent and
-presentation metadata. Seeded into an ephemeral `:memory:` database by default
+presentation metadata. Seeded into an ephemeral PostgreSQL schema by default
 (so a local run has people in it) and into a persistent one only with
 `--seed-demo` / `RESONANCE_SEED_DEMO=1`. Demo personas are shown as examples,
 never introduced, and never told about anyone. See

@@ -194,8 +194,3 @@ def seed_pilot_scale(service: LiveCorpusService, n: int = 100) -> int:
         )
     service.rebuild_index()
     return n
-
-
-def default_sqlite_path(root: Path | None = None) -> Path:
-    base = root or Path.cwd()
-    return base / "var" / "resonance-pilot.sqlite"

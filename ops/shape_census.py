@@ -7,7 +7,7 @@ and they err permissive, because a real match wrongly set aside is invisible
 to everyone. This is the measurement an operator runs on a real corpus before
 anyone tightens them:
 
-    python3 ops/shape_census.py var/resonance-pilot.sqlite
+    python3 ops/shape_census.py "$RESONANCE_DATABASE_URL"
     python3 ops/shape_census.py postgresql://...
 
 It prints counts only, over real participants (seeded demo personas are not

@@ -44,7 +44,7 @@ GOOGLE_ENV = {
 
 
 def _identity() -> IdentityService:
-    runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}),
+    runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}),
                             seed=False)
     return runtime.identity
 
@@ -396,7 +396,7 @@ class HttpSurfaceTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.runtime = build_runtime(":memory:",
+        cls.runtime = build_runtime(":ephemeral:",
                                     allowed_origins=frozenset({"http://127.0.0.1"}),
                                     seed=False)
         cls.httpd = serve("127.0.0.1", 0, runtime=cls.runtime)
@@ -453,7 +453,7 @@ class RetiringAccountsNobodySignedIntoTests(unittest.TestCase):
     def setUp(self):
         from src.product.server import build_runtime as _build
         from tests.test_standing_search import ORIGIN as SHARE_ORIGIN
-        self.runtime = _build(":memory:",
+        self.runtime = _build(":ephemeral:",
                               allowed_origins=frozenset({SHARE_ORIGIN}),
                               seed=False)
         self.product = self.runtime.product

@@ -103,7 +103,7 @@ class WhatOthersSeeTests(unittest.TestCase):
     def setUp(self):
         from src.product.server import build_runtime
         self.runtime = build_runtime(
-            ":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
+            ":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
         self.identity = self.runtime.identity
 
     def test_the_provider_name_never_becomes_the_display_label(self):
@@ -176,7 +176,7 @@ class BackfillTests(unittest.TestCase):
     def setUp(self):
         from src.product.server import build_runtime
         self.runtime = build_runtime(
-            ":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
+            ":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
         self.identity = self.runtime.identity
 
     def _label(self, user_id):

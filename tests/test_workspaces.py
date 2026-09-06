@@ -18,7 +18,7 @@ def sec(creds):
 
 
 def build():
-    rt = build_runtime(":memory:", allowed_origins=frozenset({ORIGIN}))
+    rt = build_runtime(":ephemeral:", allowed_origins=frozenset({ORIGIN}))
     return rt, rt.product
 
 

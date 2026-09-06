@@ -110,11 +110,11 @@ class Person:
 
 
 def _live_server():
-    pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}), seed=False)
+    pending = build_runtime(":ephemeral:", allowed_origins=frozenset({"pending"}), seed=False)
     server = serve("127.0.0.1", 0, runtime=pending)
     host, port = server.server_address[:2]
     base = f"http://{host}:{port}"
-    runtime = build_runtime(":memory:", allowed_origins=frozenset({base}), seed=False)
+    runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({base}), seed=False)
     server.RequestHandlerClass.runtime = runtime
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server, base, runtime

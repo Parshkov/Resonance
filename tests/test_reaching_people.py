@@ -53,7 +53,7 @@ class Remembering(notify.Sender):
 
 class WhatAnEmailSaysTests(unittest.TestCase):
     def setUp(self):
-        self.runtime = build_runtime(":memory:",
+        self.runtime = build_runtime(":ephemeral:",
                                      allowed_origins=frozenset({"http://127.0.0.1"}),
                                      seed=False)
         self.bridge = RemoteMCPBridge(self.runtime.product)
@@ -317,7 +317,7 @@ class WhereTheLinkPointsTests(unittest.TestCase):
 
     def test_links_use_the_host_people_actually_visit(self):
         runtime = build_runtime(
-            ":memory:", allowed_origins=self.ORIGINS, seed=False,
+            ":ephemeral:", allowed_origins=self.ORIGINS, seed=False,
             declared_origins=["https://resonance.parshkov.com",
                               "https://resonance-production-cfe3.up.railway.app"])
         self.assertEqual(runtime.product.notifier.origin,
@@ -325,7 +325,7 @@ class WhereTheLinkPointsTests(unittest.TestCase):
 
     def test_the_unsubscribe_link_goes_to_the_same_place(self):
         runtime = build_runtime(
-            ":memory:", allowed_origins=self.ORIGINS, seed=False,
+            ":ephemeral:", allowed_origins=self.ORIGINS, seed=False,
             declared_origins=["https://resonance.parshkov.com",
                               "https://resonance-production-cfe3.up.railway.app"])
         url = runtime.product.notifier.unsubscribe_url("person-abc")

@@ -19,7 +19,8 @@ from src.ingestion import (
     ShareIntent,
     WebMCPIngestionAdapter,
 )
-from src.persistence import LiveCorpusService, PersistenceConflictError, SQLiteRepository
+from src.persistence import LiveCorpusService, PersistenceConflictError
+from tests.support import repository
 from src.persistence.seed import minimal_thought
 
 
@@ -37,8 +38,8 @@ LOCATION = {
 class DurableIngestionIntegrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self.tmp.name) / "ingestion.sqlite"
-        self.live = LiveCorpusService(SQLiteRepository(self.path))
+        self.path = Path(self.tmp.name) / "ingestion"
+        self.live = LiveCorpusService(repository(self.path))
         self.identity = IdentityService(
             R11IdentityBackend(self.live),
             allowed_origins=frozenset({ORIGIN}),
@@ -75,7 +76,7 @@ class DurableIngestionIntegrationTests(unittest.TestCase):
 
     def _restart(self) -> None:
         self.live.repo.close()
-        self.live = LiveCorpusService(SQLiteRepository(self.path))
+        self.live = LiveCorpusService(repository(self.path))
         self.identity = IdentityService(
             R11IdentityBackend(self.live),
             allowed_origins=frozenset({ORIGIN}),

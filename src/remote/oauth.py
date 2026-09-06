@@ -225,7 +225,7 @@ class GrantStore:
 
 
 class RepositoryGrantStore(GrantStore):
-    """GrantStore backed by the product repository (PostgreSQL/SQLite).
+    """GrantStore backed by the product repository (PostgreSQL).
 
     Same record shapes and single-use semantics as the in-memory store, but
     codes, refresh grants and client registrations survive a redeploy, so a

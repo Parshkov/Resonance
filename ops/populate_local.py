@@ -7,7 +7,7 @@ and that ambiguity is what let real defects sit unnoticed. Walking the site on
 a populated instance found, in one pass, an introduction that declined itself
 by default and engine identifiers printed to people.
 
-    python3 -m src.product.web_server --db :memory: --host 127.0.0.1 \
+    python3 -m src.product.web_server --db :ephemeral: --host 127.0.0.1 \
         --port 8830 --origin http://127.0.0.1:8830 &
     python3 ops/populate_local.py http://127.0.0.1:8830 /tmp/people.json
 

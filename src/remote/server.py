@@ -21,7 +21,7 @@ def build_httpd(host: str = "127.0.0.1", port: int = 8899, *, runtime=None, issu
     from src.product.server import build_runtime, serve
 
     if runtime is None:
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({f"http://{host}:{port}"}))
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({f"http://{host}:{port}"}))
     if getattr(runtime, "oauth_core", None) is None:
         oauth_mount.attach_core(runtime, issuer=issuer or oauth_mount.public_issuer(runtime.allowed_origins))
     return serve(host, port, runtime=runtime)

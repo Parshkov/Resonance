@@ -100,7 +100,7 @@ class Client:
 class OAuthCoreTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        cls.runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}))
         cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
         cls.issuer = cls.base
@@ -434,7 +434,7 @@ class DurableGrantStoreTests(unittest.TestCase):
         from src.remote.oauth import RepositoryGrantStore
 
         with tempfile.TemporaryDirectory() as tmp:
-            db = str(Path(tmp) / "grants.sqlite3")
+            db = ":ephemeral:" + Path(tmp).name
             runtime = build_runtime(db, allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
             runtime.remote_auth = RepositoryGrantStore(runtime.live.repo)
             httpd = build_httpd("127.0.0.1", 0, runtime=runtime)
