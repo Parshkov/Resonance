@@ -29,7 +29,9 @@ function el(tag, props = {}, children = []) {
     else if (key in node && key !== "style") node[key] = value;
     else node.setAttribute(key, value);
   }
-  for (const child of [].concat(children)) {
+  // Children may be nested arrays (a conditional group of nodes); a nested
+  // array must not be stringified into "a,b" -- it printed ",1 contradiction".
+  for (const child of [].concat(children).flat(Infinity)) {
     if (child === null || child === undefined || child === false) continue;
     node.append(child?.nodeType ? child : document.createTextNode(String(child)));
   }
