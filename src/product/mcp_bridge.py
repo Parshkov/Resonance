@@ -32,6 +32,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import secrets
 from typing import Any, Callable, Mapping, Sequence
 
@@ -154,6 +155,44 @@ def _insufficient_structure_message(structure: Mapping[str, int], abstentions: A
             f"{sorted(NODE_ROLES)} and relations typed {sorted(RELATION_TYPES)}.")
 
 
+# Scripts the semantic layer cannot compare. The lexicon is English, so a label
+# in another script is not "matched less well" -- it is matched against nothing
+# at all, forever, and the person is told their thought is discoverable.
+#
+# Found on a real Russian conversation: the server accepted Cyrillic labels
+# without a word, reported "shared", and that thought could never have reached
+# anybody. The measured behaviour behind it is recorded in test_shared_topics:
+# English against Russian scores semantic 0.0000, and Russian against Russian
+# in different words 0.1111 -- both NEGATIVE. Silence about that is worse than
+# a refusal, because a refusal can be acted on.
+#
+# Presentation is not affected: `topic` and `domain` are shown, never matched,
+# so they stay in whatever language the person speaks.
+_UNCOMPARABLE_SCRIPT = re.compile(
+    r"[\u0400-\u04FF"      # Cyrillic
+    r"\u0370-\u03FF"       # Greek
+    r"\u0590-\u05FF"       # Hebrew
+    r"\u0600-\u06FF"       # Arabic
+    r"\u0900-\u097F"       # Devanagari
+    r"\u4E00-\u9FFF"       # CJK
+    r"\u3040-\u30FF"       # kana
+    r"\uAC00-\uD7AF]")     # Hangul
+
+
+def _refuse_uncomparable_labels(labels: list[str]) -> None:
+    offending = sorted({label for label in labels if _UNCOMPARABLE_SCRIPT.search(label)})
+    if not offending:
+        return
+    raise BridgeError(
+        "validation_failed",
+        "these labels are not in the script the index compares, so this thought "
+        f"would be searched for and match nobody, ever: {offending}. Node labels "
+        "are compared as English text across every account. Translate the labels "
+        "to English and send it again -- `topic` and `domain` are shown to people "
+        "rather than matched, so those can stay as they are, and the conversation "
+        "itself is unaffected.")
+
+
 def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str, Any]:
     """Turn `{nodes:[{label, role, id?}], relations:[{source, target, type}]}`
     into canonical manual-provenance Thought DNA.  `source`/`target` may name a
@@ -193,6 +232,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
             "atomic": True, "extract_conf": 1.0, "spans": [],
         }
         nodes.append(node)
+    _refuse_uncomparable_labels([n["label"] for n in nodes])
     relations: list[dict[str, Any]] = []
     for index, item in enumerate(raw_relations):
         if not isinstance(item, Mapping):
