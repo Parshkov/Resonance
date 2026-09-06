@@ -127,6 +127,38 @@ carrying a `metadata` block from the retired stdio adapter — regenerated).
 - The whole-thought embedding baseline that `WHY_NOT.md` and ADR-0004 both name
   as the falsification target still does not exist.
 
+## Production verification of the audit corrections (2026-09-06)
+
+Merged as #206 (`85eeaba`) and auto-deployed to Railway deployment
+`b922ca19`, SUCCESS. Verified directly against
+<https://resonance.parshkov.com>:
+
+| check | result |
+| --- | --- |
+| CI, first run in the repository's history | 3/3 jobs green on a clean machine — suite, both gates, lexicon additivity |
+| `classify_policy` | `scoring-v0.2-concept-aligned-analogy+same-subject-floor/0.3` |
+| `verifier_config_hash` | `12998d451e632759…` → `e093d77f8cd987c8…` — the two classifiers are now distinguishable |
+| `/.well-known/oauth-protected-resource/mcp` | **404 → 200**, `resource: https://resonance.parshkov.com/mcp` |
+| `/.well-known/oauth-authorization-server/mcp` | **404 → 200**, `issuer` matches, S256 advertised |
+| root discovery forms | still 200, unchanged |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`, on the canonical origin and the platform alias |
+| other security headers | CSP, COOP, Permissions-Policy, nosniff, Referrer-Policy — unchanged |
+| unauthenticated `/mcp` | 401 with the RFC 9728 challenge |
+| health | `ok: true`, `mode: live`, `index_current: true`, `demo_personas_present: false`, encoder active |
+| page and legal routes | `/`, `/webmcp.mjs`, `/privacy`, `/terms`, `/support`, `/auth/sign-in` all 200 |
+
+Full-flow acceptance was run on the merged commit against a guest-enabled
+local origin, because production refuses anonymous guests by design:
+**OAuth smoke 27/27** and the **three-person A/B/C test over `/mcp` 36/36**
+(A ranked above C at rank 0 vs 14, subject-bound `result_id`, intro → accept →
+relay, revocation removing A from a fresh discovery immediately, revoked bearer
+refused). What those scripts can and cannot prove against production is now
+written down in `ops/TEST_READINESS.md` rather than left as a trap.
+
+Not closed: completing the hosted flow **on production** needs a human to sign
+in with Google or GitHub. No script can do it, and that remains the outstanding
+hosted-client item below.
+
 ## Next falsification targets
 
 1. A corpus of real extracted thoughts (consented) with two-human gold; compare engine 0.2 against a whole-thought embedding baseline.
