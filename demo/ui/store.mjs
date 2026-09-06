@@ -105,6 +105,15 @@ export function refresh() {
   refreshTimer = setTimeout(() => { load(); }, 150);
 }
 
+// A group is other people's work too: posts, parts and contributions arrive
+// without any write of ours, so a group on screen is re-read on the slow poll.
+export const GROUP_STALE_MS = 15000;
+
+export function groupIsStale(workspaceId) {
+  const entry = state.groups.get(workspaceId);
+  return !!entry && !entry.loading && Date.now() - (entry.fetched_at || 0) > GROUP_STALE_MS;
+}
+
 export async function discover(sessionId, {force = false} = {}) {
   if (!sessionId) return null;
   const cached = state.discovery.get(sessionId);
@@ -132,9 +141,9 @@ export async function group(workspaceId, {force = false} = {}) {
       readJson(`/api/product/workspace?workspace_id=${encodeURIComponent(workspaceId)}`),
       readJson(`/api/product/topic?workspace_id=${encodeURIComponent(workspaceId)}&advance=0`),
     ]);
-    state.groups.set(workspaceId, {loading: false, error: "", detail, topic});
+    state.groups.set(workspaceId, {loading: false, error: "", detail, topic, fetched_at: Date.now()});
   } catch (error) {
-    state.groups.set(workspaceId, {loading: false, error: error.message, detail: null, topic: null});
+    state.groups.set(workspaceId, {loading: false, error: error.message, detail: null, topic: null, fetched_at: Date.now()});
   }
   emit();
   return state.groups.get(workspaceId);

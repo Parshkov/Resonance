@@ -167,7 +167,19 @@ const ui = {
   groupTab: "discussion",
   newGroup: null,            // {introId, title, brief}
   contribute: null,          // {text, note, preview, busy}
+  drafts: {},                // field id -> what is typed, kept across re-renders
 };
+
+// A text field the page rebuilds on every render must not lose what was typed:
+// the poll, or any write elsewhere, re-renders the screen. What is typed lives
+// in ui.drafts under the field's id until it is sent.
+function draftField(tag, id, props = {}) {
+  const node = el(tag, {...props, id, value: ui.drafts[id] || ""});
+  node.addEventListener("input", () => { ui.drafts[id] = node.value; });
+  return node;
+}
+
+function clearDraft(id) { delete ui.drafts[id]; }
 
 // ---- header ---------------------------------------------------------------------
 
@@ -572,7 +584,7 @@ function introAction(m, thought) {
     wrap.append(button(t("people.ask"), () => { ui.askOpen = m.session_id; render(); }, {variant: "btn--primary"}));
     return wrap;
   }
-  const area = el("textarea", {rows: 4, maxLength: 500, id: "ask-text", placeholder: t("people.ask.placeholder")});
+  const area = draftField("textarea", "ask-text", {rows: 4, maxLength: 500, placeholder: t("people.ask.placeholder")});
   const status = el("p", {class: "status", role: "status"});
   wrap.append(el("label", {for: "ask-text", class: "label"}, t("people.ask.label", {who: m.person_pseudonym})), area,
     el("div", {class: "row"}, [
@@ -581,7 +593,7 @@ function introAction(m, thought) {
         if (!message) { area.focus(); return; }
         const done = await attempt(() => store.write("/api/product/intro/request", {request_id: store.requestId("intro"), confirmed: true,
           from_session_id: thought.session_id, target_session_id: m.session_id, message}));
-        if (done) { ui.askSent.add(m.session_id); ui.askOpen = null; toast(t("people.ask.sent")); render(); }
+        if (done) { clearDraft("ask-text"); ui.askSent.add(m.session_id); ui.askOpen = null; toast(t("people.ask.sent")); render(); }
       }, {variant: "btn--primary"}),
       button(t("thoughts.composer.cancel"), () => { ui.askOpen = null; render(); }, {variant: "btn--quiet"})]), status);
   return wrap;
@@ -645,14 +657,14 @@ function threadPanel(intro) {
       el("span", {class: "message__who"}, m.author === "me" ? t("talk.you") : m.author_display), el("p", {class: "message__body"}, m.body), el("span", {class: "message__when"}, timeAgo(m.created_at))]));
   }
   box.append(list);
-  const area = el("textarea", {rows: 2, maxLength: 2000, placeholder: t("talk.placeholder", {who: intro.counterpart_display}), id: "talk-text"});
+  const area = draftField("textarea", `talk-${intro.channel_id}`, {rows: 2, maxLength: 2000, placeholder: t("talk.placeholder", {who: intro.counterpart_display})});
   const send = button(t("talk.send"), async () => {
     const body = area.value.trim();
     if (!body) return;
     send.disabled = true;
     const done = await attempt(() => store.write("/api/product/channel/send", {channel_id: intro.channel_id, body, confirmed: true, request_id: store.requestId("msg")}));
     send.disabled = false;
-    if (done) { area.value = ""; loadThread(intro.channel_id); }
+    if (done) { clearDraft(`talk-${intro.channel_id}`); area.value = ""; loadThread(intro.channel_id); }
   }, {variant: "btn--primary"});
   area.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send.click(); });
   box.append(el("div", {class: "compose-row"}, [area, send]));
@@ -725,6 +737,7 @@ function groupView() {
   const id = current().param;
   const entry = store.getState().groups.get(id);
   if (!entry) store.group(id);
+  else if (store.groupIsStale(id)) store.group(id, {force: true});
   const listed = store.topics().topics.find((g) => g.workspace_id === id);
   frag.append(el("p", {class: "crumbs"}, link("/groups", `← ${t("group.back")}`)));
   if (!entry || (entry.loading && !entry.detail)) { frag.append(el("h1", {}, listed?.title || ""), el("p", {class: "quiet"}, t("loading"))); return frag; }
@@ -752,14 +765,14 @@ function discussionTab(d) {
   for (const note of d.notes) {
     list.append(el("li", {class: "message"}, [el("span", {class: "message__who"}, note.author_display), el("p", {class: "message__body"}, note.body), el("span", {class: "message__when"}, timeAgo(note.created_at))]));
   }
-  const area = el("textarea", {rows: 2, maxLength: 4000, placeholder: t("group.post.placeholder"), id: "post-text"});
+  const area = draftField("textarea", `post-${d.workspace_id}`, {rows: 2, maxLength: 4000, placeholder: t("group.post.placeholder")});
   const send = button(t("group.post.send"), async () => {
     const body = area.value.trim();
     if (!body) return;
     send.disabled = true;
     const done = await attempt(() => store.write("/api/product/workspace/note", {workspace_id: d.workspace_id, body, confirmed: true, request_id: store.requestId("note")}, {invalidate: {group: d.workspace_id}}));
     send.disabled = false;
-    if (done) { area.value = ""; store.group(d.workspace_id, {force: true}); }
+    if (done) { clearDraft(`post-${d.workspace_id}`); area.value = ""; store.group(d.workspace_id, {force: true}); }
   }, {variant: "btn--primary"});
   area.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send.click(); });
   box.append(list, el("div", {class: "compose-row"}, [area, send]));
@@ -778,12 +791,12 @@ function partsTab(d) {
     if (task.state === "done") actions.append(button(t("group.parts.reopen"), () => setState("todo"), {variant: "btn--small btn--quiet"}));
     list.append(el("li", {class: `part part--${task.state}`}, [el("span", {class: `chip chip--${task.state}`}, t(`group.parts.${task.state}`)), el("span", {class: "part__title"}, task.title), actions]));
   }
-  const input = el("input", {type: "text", maxLength: 300, placeholder: t("group.parts.placeholder"), id: "part-text"});
+  const input = draftField("input", `part-${d.workspace_id}`, {type: "text", maxLength: 300, placeholder: t("group.parts.placeholder")});
   const add = button(t("group.parts.add"), async () => {
     const title = input.value.trim();
     if (!title) return;
     const done = await attempt(() => store.write("/api/product/workspace/task", {workspace_id: d.workspace_id, title, confirmed: true}, {invalidate: {group: d.workspace_id}}));
-    if (done) { input.value = ""; store.group(d.workspace_id, {force: true}); }
+    if (done) { clearDraft(`part-${d.workspace_id}`); input.value = ""; store.group(d.workspace_id, {force: true}); }
   }, {variant: "btn--primary"});
   box.append(list, el("div", {class: "compose-row"}, [input, add]));
   return box;
