@@ -219,4 +219,4 @@ is authoritative and must be reproducible without an LLM.
 - [Invariance Specification](INVARIANCE_SPECIFICATION_v0.1.md)
 - [Verification ADR](decisions/ADR-0003-structural-verification.md)
 - [Benchmark v0.1](../benchmark/R0_BENCHMARK_v0.1.md)
-- [R0 Synthesis](../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+- [R0 Synthesis](../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)

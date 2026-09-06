@@ -40,7 +40,7 @@ logged `purge-demo: sessions_deleted=0 users_revoked=0`, and the variable was
 cleared again (`357dd391`, no purge line). The production database held **no**
 seeded demo personas (every live session is `volunteer`; `db_generation`
 stayed at 348), so `corpus.demo_personas_present` is `false` on `c66951b`.
-Evidence: `archive/hackathon/submission/evidence/public-origin-c66951b/`.
+Evidence: `history/hackathon/submission/evidence/public-origin-c66951b/`.
 
 The procedure stays valid for a future re-seeded environment:
 `RESONANCE_PURGE_DEMO=1` → redeploy → read the log line → clear the variable.
@@ -79,7 +79,7 @@ python3 ops/oauth_smoke.py https://resonance.parshkov.com/mcp
 # real three-person structural test over /mcp (A retry storm, B panic buying analog, C same words weaker structure)
 # Runs only where guest accounts are enabled, and needs an `authorship` argument the
 # archived copy does not send -- see below.
-python3 archive/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
+python3 history/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
 ```
 
 ### These scripts cannot finish against production, and that is correct
@@ -108,7 +108,7 @@ scripts at it:
 python3 -m src.product.web_server --host 127.0.0.1 --port 8901 \
         --db :memory: --origin http://127.0.0.1:8901 &
 python3 ops/oauth_smoke.py http://127.0.0.1:8901/mcp --auto-consent
-PYTHONPATH=. python3 archive/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
+PYTHONPATH=. python3 history/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
 ```
 
 Completing the hosted flow **on production** requires a human to sign in with
@@ -124,7 +124,7 @@ and C (ChatGPT developer mode) also remain unexecuted by a person.
 
 ### The archived A/B/C harness predates the authorship rule
 
-`archive/hackathon/submission/evidence/abc_mcp_test.py` calls
+`history/hackathon/submission/evidence/abc_mcp_test.py` calls
 `resonance_prepare_thought` without `authorship`, which
 `src/product/authorship.py` (2026-09-05) made mandatory. Run as-is it now stops
 at `5/6` with `validation_failed: state authorship: ...` — **the product
@@ -146,9 +146,9 @@ contradiction explanation; polarity flips are hard-rejected; `confidence` is
 
 ## Human test cards
 
-`archive/hackathon/submission/HUMAN_TEST_CARDS.md` (Cards A–C: ChatGPT custom app, Claude custom
+`history/hackathon/submission/HUMAN_TEST_CARDS.md` (Cards A–C: ChatGPT custom app, Claude custom
 connector, browser WebMCP). Card B was executed on engine 0.1 (`#156`); repeat
-it on 0.2 and record the result under `archive/hackathon/submission/evidence/public-origin-c66951b/`
+it on 0.2 and record the result under `history/hackathon/submission/evidence/public-origin-c66951b/`
 (the connector-driven `whoami`/`discover`/`explain_match` run recorded there is
 Card B steps 1–6 executed by an agent; a human still has to do it once).
 
@@ -158,7 +158,7 @@ Card B steps 1–6 executed by an agent; a human still has to do it once).
   `c66951b`; re-check after any re-seed);
 - the three automated public-origin scripts above pass;
 - at least one human card executed on 0.2;
-- `archive/hackathon/submission/RELEASE_MANIFEST.md` §0 re-pinned to the new SHA / deployment id
+- `history/hackathon/submission/RELEASE_MANIFEST.md` §0 re-pinned to the new SHA / deployment id
   and the 0.1 banner replaced by the 0.2 evidence.
 
 ## Known open items (not blockers for testing)
@@ -166,9 +166,9 @@ Card B steps 1–6 executed by an agent; a human still has to do it once).
 - The live corpus carries duplicated guest sessions left by repeated acceptance
   runs (4× panic buying, 4× retry observability, 2× "Shared thought" as of
   generation 348). They are real `volunteer` rows, so `purge-demo` leaves them.
-  **New runs no longer add to the pile:** `archive/hackathon/submission/evidence/abc_mcp_test.py` and
+  **New runs no longer add to the pile:** `history/hackathon/submission/evidence/abc_mcp_test.py` and
   `hosted_onboarding_probe.py --smoke` now revoke their own guests before
-  exiting (#161), and `archive/hackathon/submission/evidence/browser_harness.py` already did. Deleting the rows that
+  exiting (#161), and `history/hackathon/submission/evidence/browser_harness.py` already did. Deleting the rows that
   accumulated before that fix is still an owner action.
 - On production the classical A/A' pair (irrigation retry storm vs delivery
   retry storm) is `approximate`, not `analogical`. The earlier reading — that a

@@ -18,4 +18,4 @@ never introduced, and never told about anyone. See
 
 The stdio MCP client and server that first proved the engine end to end (R6)
 were retired once the remote MCP server and the page existed; their record is
-under [`archive/hackathon/`](../archive/hackathon/).
+under [`history/hackathon/`](../history/hackathon/).

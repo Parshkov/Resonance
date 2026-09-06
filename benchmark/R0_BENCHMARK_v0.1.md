@@ -351,7 +351,7 @@ versions—not reasons to replace the gate with an unreviewed aggregate.
 
 ## Related Documents
 
-- [R0 Synthesis](../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+- [R0 Synthesis](../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
 - [Thought DNA v0.1](../docs/THOUGHT_DNA_v0.1.md)
 - [Invariance Specification](../docs/INVARIANCE_SPECIFICATION_v0.1.md)
 - [Retrieval ADR](../docs/decisions/ADR-0002-retrieval-candidate-generation.md)

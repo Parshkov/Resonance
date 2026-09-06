@@ -1,9 +1,9 @@
-# Claude / Claude Code Entry Point
+# Claude / Claude Code entry point
 
-This repository uses one vendor-neutral agent protocol.
+This repository uses one vendor-neutral document for agents: [`AGENTS.md`](AGENTS.md).
 
-Before substantive work, follow `AGENTS.md`, then `START_HERE.md` and `AGENT_PROTOCOL.md`.
+Read it, then [`README.md`](README.md) and [`docs/STATUS.md`](docs/STATUS.md).
 
-Do not invent a Claude-specific workflow that bypasses mission claims, provenance, blind-run constraints, or pull-request handoff.
-
-Canonical machine-readable work is in `work/queue.yaml`.
+Do not invent a Claude-specific workflow. In particular there is no mission
+queue and no claim protocol any more — the project is past group development
+and is now individually maintained.

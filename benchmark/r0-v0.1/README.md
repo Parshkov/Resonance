@@ -39,7 +39,7 @@ relabelled to make an engine pass.
 - `runner.py`: fixture validator and evaluator for external predictions.
 
 The legacy E1 script remains unchanged at
-`../../research/experiments/R0_E1_fingerprint_discrimination.py`. Its published
+`../../history/research/experiments/R0_E1_fingerprint_discrimination.py`. Its published
 timings and thin ~0.009 rich-world margin are provenance, not thresholds. The
 DNA-native companion here uses only the seven accepted relation enums. R3 must
 still emit the actual E1 and 10^3–10^6 scale-replay measurements through the
