@@ -328,9 +328,9 @@ progress::-moz-progress-bar { background: var(--accent); }
 .map-frame--world svg { width: 100%; }
 .rmap__ring { fill: none; stroke: var(--line); stroke-dasharray: 2 4; }
 .rmap__ring-label { fill: var(--ink-3); font-family: var(--mono); font-size: var(--text-xs); }
-.rmap__sector { fill: var(--paper-3); opacity: 0.45; }
-.rmap__sector--direct, .rmap__sector--approximate { fill: var(--sage-soft); opacity: 1; }
-.rmap__sector--analogical, .rmap__sector--complementary { fill: var(--accent-soft); opacity: 1; }
+.rmap__sector { fill: var(--paper-3); opacity: 0.35; }
+.rmap__sector--direct, .rmap__sector--approximate { fill: var(--sage); opacity: 0.07; }
+.rmap__sector--analogical, .rmap__sector--complementary { fill: var(--accent); opacity: 0.07; }
 .rmap__link { stroke: var(--line-2, var(--line)); }
 .rmap__link.is-dashed { stroke-dasharray: 4 4; stroke: var(--rust); }
 .rmap__hit { fill: transparent; }

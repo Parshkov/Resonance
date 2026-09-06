@@ -32,7 +32,9 @@ export function resonanceMap(items, {selected = null, onSelect = null, kindLabel
   for (const step of RING_STEPS) {
     const radius = r0 + (R - r0) * (1 - step);
     svg.append(svgEl("circle", {cx, cy, r: radius, class: "rmap__ring"}));
-    const label = svgEl("text", {x: cx + radius + 4, y: cy - 4, class: "rmap__ring-label"});
+    // Ring labels climb the vertical axis, where no person is drawn (the
+    // first sector starts at twelve o'clock), so they never sit on a name.
+    const label = svgEl("text", {x: cx + 5, y: cy - radius - 3, class: "rmap__ring-label"});
     label.textContent = step.toFixed(2);
     svg.append(label);
   }
