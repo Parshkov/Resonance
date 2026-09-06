@@ -43,7 +43,7 @@
     "intensity": 0.1111
    },
    {
-    "bucket_id": "Île-de-France",
+    "bucket_id": "\u00cele-de-France",
     "count": 1,
     "intensity": 0.1111
    }
@@ -96,6 +96,26 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -128,11 +148,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "lock loss",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "hartmann spots",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "deformable mirror",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "ao operator",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "vibration path",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "49e699e0b77e002854f4a186",
+   "match_id": "55acfda69cda7015aa19dff2",
    "mode_classification": "complementary",
    "person_pseudonym": "Yuki T.",
    "scores": {
@@ -140,7 +190,7 @@
     "coverage_containment": 1.0,
     "h_sign_conflict": false,
     "r_direct": 1.0,
-    "semantic": 0.34511857892036907,
+    "semantic": 0.3451185789203691,
     "structural": 1.0,
     "y_systematicity": 1.0
    },
@@ -191,6 +241,26 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -223,11 +293,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "run abort",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "thermocouple log",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "chiller capacity",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "thermal engineer",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "pump-cavitation loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "befbcc9430fc41c12628dafb",
+   "match_id": "921b49b523ad8d9156acc92d",
    "mode_classification": "complementary",
    "person_pseudonym": "Diego R.",
    "scores": {
@@ -286,6 +386,26 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -318,11 +438,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "gridlock",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "loop-detector counts",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "offset plan",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "traffic operator",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "turn-pocket overflow",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "1478d8d77fed5175fe5f4013",
+   "match_id": "b27d9f3d791c35ac069ff2ba",
    "mode_classification": "analogical",
    "person_pseudonym": "Kwame A.",
    "scores": {
@@ -330,7 +480,7 @@
     "coverage_containment": 1.0,
     "h_sign_conflict": false,
     "r_direct": 1.0,
-    "semantic": 0.27987705377891375,
+    "semantic": 0.2798770537789137,
     "structural": 1.0,
     "y_systematicity": 1.0
    },
@@ -381,6 +531,26 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -413,11 +583,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "delivery collapse",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "cycle-time chart",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "staffing buffer",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "ops lead",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "status-meeting loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "9685396119e554c5aa649077",
+   "match_id": "20d47c2bdad17f27fe94e00d",
    "mode_classification": "analogical",
    "person_pseudonym": "Noah R.",
    "scores": {
@@ -476,6 +676,26 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -508,11 +728,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "capacity fade",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "impedance log",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "cooling plate",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "pack controller",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "side-reaction loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "bde41c073e5dc1671bda5da1",
+   "match_id": "134ce42ef960a7bdd7ab79b9",
    "mode_classification": "analogical",
    "person_pseudonym": "Mei L.",
    "scores": {
@@ -563,6 +813,26 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r5",
+      "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -595,11 +865,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "missed SLA",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "scanner log",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "overtime pool",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "shift lead",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "recirculation loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "618122ecbff487c9e59c23b7",
+   "match_id": "d1b4105cfa4da6324ec67ee0",
    "mode_classification": "analogical",
    "person_pseudonym": "Gabe S.",
    "scores": {
@@ -607,7 +907,7 @@
     "coverage_containment": 1.0,
     "h_sign_conflict": false,
     "r_direct": 1.0,
-    "semantic": 0.28909746403820685,
+    "semantic": 0.2890974640382068,
     "structural": 1.0,
     "y_systematicity": 1.0
    },
@@ -658,6 +958,22 @@
      {
       "candidate_relation": "r5",
       "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -690,11 +1006,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "focal collapse",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "interferometry",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "coolant loop",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "optics operator",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "recombination loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "d8956ad14cda857547eb5c4f",
+   "match_id": "7911ce35f7c9fa4e7220140c",
    "mode_classification": "approximate",
    "person_pseudonym": "Theo M.",
    "scores": {
@@ -753,6 +1099,18 @@
      {
       "candidate_relation": "r4",
       "query_relation": "r4"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -785,11 +1143,29 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "focal collapse",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "optics operator",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "recombination loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "0d25e2712e97ec1ce57de6f1",
+   "match_id": "9d8ff362a69eb8b6a1392b25",
    "mode_classification": "approximate",
    "person_pseudonym": "Sora N.",
    "scores": {
@@ -848,6 +1224,18 @@
      {
       "candidate_relation": "r6",
       "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -880,11 +1268,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "focal collapse",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "interferometry",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "coolant loop",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "optics operator",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "recombination loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "fbbbe74de82572e8ef2d9952",
+   "match_id": "4b40f4a756bc7383deed55e3",
    "mode_classification": "negative",
    "person_pseudonym": "Sam D.",
    "scores": {
@@ -914,7 +1332,7 @@
      "lat": 48.9,
      "lon": 2.3,
      "precision": "city",
-     "region": "Île-de-France"
+     "region": "\u00cele-de-France"
     },
     "share_state": "discoverable",
     "topic": "portrait lens choice"
@@ -959,11 +1377,29 @@
       "candidate_node": "n7",
       "query_label": "interferometry",
       "query_node": "n6"
+     },
+     {
+      "candidate_label": "studio strobe",
+      "candidate_node": "n5",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "photographer",
+      "candidate_node": "n6",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "contest win",
+      "candidate_node": "n0",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": null,
-   "match_id": "95f103f4c6702ed93b80d142",
+   "match_id": "a95283411e9aebf0039dfea4",
    "mode_classification": "negative",
    "person_pseudonym": "Camille B.",
    "scores": {
@@ -978,13 +1414,6 @@
    "session_id": "ses-camille-portrait"
   }
  ],
- "metadata": {
-  "adapter_version": "resonance-mcp/0.1",
-  "corpus_snapshot": "5868db42ffdc385bd59f30dc2d3761292ff5e0ee7af777527a0b2ac8dbca222f",
-  "engine_version": "resonance-engine/0.2",
-  "interface_version": "resonance-interfaces/0.1",
-  "verifier_config_hash": "12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77"
- },
  "query": {
   "mode": "analogical",
   "provenance": {
@@ -993,7 +1422,7 @@
    "engine_version": "resonance-engine/0.2",
    "interface_version": "resonance-interfaces/0.1",
    "metadata_schema_version": "resonance-demo-corpus/0.1",
-   "verifier_config_hash": "12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77"
+   "verifier_config_hash": "e093d77f8cd987c8fbad663c7e8bca68e2e8025b659a1c500ea49792bba2c8f3"
   },
   "thought_id": "thought-aria-plasma-lens"
  },
@@ -1043,6 +1472,22 @@
      {
       "candidate_relation": "r5",
       "query_relation": "r5"
+     },
+     {
+      "candidate_relation": "r6",
+      "query_relation": "r6"
+     },
+     {
+      "candidate_relation": "r7",
+      "query_relation": "r7"
+     },
+     {
+      "candidate_relation": "r8",
+      "query_relation": "r8"
+     },
+     {
+      "candidate_relation": "r9",
+      "query_relation": "r9"
      }
     ],
     "top_correspondences": [
@@ -1075,11 +1520,41 @@
       "candidate_node": "n4",
       "query_label": "adaptive cooling",
       "query_node": "n4"
+     },
+     {
+      "candidate_label": "focal collapse",
+      "candidate_node": "n5",
+      "query_label": "focal collapse",
+      "query_node": "n5"
+     },
+     {
+      "candidate_label": "interferometry",
+      "candidate_node": "n6",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "coolant loop",
+      "candidate_node": "n7",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "optics operator",
+      "candidate_node": "n8",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "recombination loop",
+      "candidate_node": "n9",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": "relation_type:r0->r0",
-   "match_id": "a303a0b5b503f2b27cce793c",
+   "match_id": "bd4086c7661198de98b98cc7",
    "mode_classification": "negative",
    "person_pseudonym": "Lea V.",
    "scores": {
@@ -1166,11 +1641,29 @@
       "candidate_node": "n5",
       "query_label": "focal collapse",
       "query_node": "n5"
+     },
+     {
+      "candidate_label": "pathology slide",
+      "candidate_node": "n3",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "biobank",
+      "candidate_node": "n2",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "clinician",
+      "candidate_node": "n6",
+      "query_label": "optics operator",
+      "query_node": "n8"
      }
     ]
    },
    "hard_rejection": "relation_type:r4->r4",
-   "match_id": "79251a050c314c52d57bb31b",
+   "match_id": "d574a94f24ec00df249899ca",
    "mode_classification": "negative",
    "person_pseudonym": "Jonas H.",
    "scores": {
@@ -1257,11 +1750,29 @@
       "candidate_node": "n5",
       "query_label": "focal collapse",
       "query_node": "n5"
+     },
+     {
+      "candidate_label": "p99 dashboard",
+      "candidate_node": "n3",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "span store",
+      "candidate_node": "n2",
+      "query_label": "coolant loop",
+      "query_node": "n7"
+     },
+     {
+      "candidate_label": "sre oncall",
+      "candidate_node": "n6",
+      "query_label": "optics operator",
+      "query_node": "n8"
      }
     ]
    },
    "hard_rejection": "relation_type:r4->r4",
-   "match_id": "7135b9ae24f4392391c0e3c4",
+   "match_id": "cce035ceefbc924e66f21035",
    "mode_classification": "negative",
    "person_pseudonym": "Priya S.",
    "scores": {
@@ -1344,11 +1855,29 @@
       "candidate_node": "n5",
       "query_label": "focal collapse",
       "query_node": "n5"
+     },
+     {
+      "candidate_label": "reanalysis field",
+      "candidate_node": "n1",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "climate scientist",
+      "candidate_node": "n7",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "station record",
+      "candidate_node": "n2",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": "relation_type:r4->r6",
-   "match_id": "4d88fd386782832f776243f1",
+   "match_id": "67386920f9c18957d227ecfb",
    "mode_classification": "negative",
    "person_pseudonym": "Wei C.",
    "scores": {
@@ -1409,8 +1938,8 @@
       "query_node": "n0"
      },
      {
-      "candidate_label": "call record",
-      "candidate_node": "n3",
+      "candidate_label": "bank record",
+      "candidate_node": "n2",
       "query_label": "beam wander",
       "query_node": "n2"
      },
@@ -1431,11 +1960,29 @@
       "candidate_node": "n5",
       "query_label": "focal collapse",
       "query_node": "n5"
+     },
+     {
+      "candidate_label": "witness statement",
+      "candidate_node": "n1",
+      "query_label": "interferometry",
+      "query_node": "n6"
+     },
+     {
+      "candidate_label": "counsel",
+      "candidate_node": "n7",
+      "query_label": "optics operator",
+      "query_node": "n8"
+     },
+     {
+      "candidate_label": "call record",
+      "candidate_node": "n3",
+      "query_label": "recombination loop",
+      "query_node": "n9"
      }
     ]
    },
    "hard_rejection": "relation_type:r4->r6",
-   "match_id": "bac11b57b1c0fae04256e86f",
+   "match_id": "6ed3357ffad46a91898505ad",
    "mode_classification": "negative",
    "person_pseudonym": "Elena M.",
    "scores": {

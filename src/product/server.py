@@ -6,9 +6,10 @@ issuance, CSRF header relay, Origin relay, body bounds, security headers, and
 JSON shaping. All authorization, consent, freshness, and discovery semantics
 stay in the accepted layers underneath.
 
-The accepted R10 browser tool surface (`demo/ui/webmcp.mjs`) is served as-is
-and its `/api/webmcp/*` wire contract is exposed here backed by the live
-service, so the exact accepted tools operate on real authenticated state.
+The accepted R10 browser tool surface (`demo/ui/browser_tools.mjs`, served at
+`/webmcp.mjs`) is served as-is and its `/api/webmcp/*` wire contract is
+exposed here backed by the live service, so the exact accepted tools operate
+on real authenticated state.
 """
 
 from __future__ import annotations
@@ -540,6 +541,14 @@ class ProductHandler(BaseHTTPRequestHandler):
         self.send_header("Permissions-Policy", "tools=(self)")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        # HSTS only where the deployment contract is HTTPS, on the same test
+        # the Secure cookie flag uses. Sending it from a local http:// run
+        # would pin a developer's browser to a scheme that origin cannot
+        # serve; withholding it in production leaves the first request of
+        # every session strippable.
+        if self._secure_cookies():
+            self.send_header("Strict-Transport-Security",
+                             "max-age=31536000; includeSubDomains")
 
     def _send_json(self, payload: Mapping[str, Any],
                    status: HTTPStatus = HTTPStatus.OK,

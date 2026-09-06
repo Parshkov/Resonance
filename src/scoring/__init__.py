@@ -411,7 +411,13 @@ T_STRUCTURE_SAME_SUBJECT = 0.15
 T_SAME_SUBJECT_SEMANTIC = 0.40
 T_DIRECT_COVERAGE = 0.80
 
-CLASSIFY_POLICY = "scoring-v0.2-concept-aligned-analogy/0.2"
+# The policy string is carried in the verifier config hash, so it is the only
+# thing that lets a recorded verdict be traced to the rule that produced it.
+# It must move whenever `classify()`'s decision boundary moves. It did not when
+# the same-subject floor below was added (#193), so the frozen `0aea577`
+# evidence and every run after it report the same `verifier_config_hash`
+# 12998d45... for two different classifiers. Bumped here to end that.
+CLASSIFY_POLICY = "scoring-v0.2-concept-aligned-analogy+same-subject-floor/0.3"
 
 # Every verdict `classify` can return, declared once so that the places which
 # have to put these into words cannot fall behind the engine.

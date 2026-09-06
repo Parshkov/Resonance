@@ -744,7 +744,7 @@ class WebHandler(ProductHandler):
     def _visitor_token(self) -> str | None:
         """The visitor's bearer, or None when this browser has no session yet.
 
-        A first load has no session cookie: `webmcp_live.mjs` creates the guest
+        A first load has no session cookie: `browser_tools.mjs` creates the guest
         session, and the page's own boot fetches race it. "No session" and "no
         shared thought" are the same fact to a reader — nothing of theirs is
         discoverable — so the read routes answer with the same product state

@@ -751,7 +751,7 @@ FGW alignment + scoring policy v0.2 (src/alignment, src/scoring)
 explanation: mapping, preserved relations, contradictions, confidence
 ```
 
-Semantics come from a deterministic, inspectable lexicon of abstract relational concepts (`src/semantics`), not from a model.
+Semantics come from a deterministic, inspectable lexicon of abstract relational concepts (`src/semantics`), and the matching itself is never a model's opinion: alignment, scoring and classification stay in code you can read. Beside the lexicon sits an **optional local label encoder** ([ADR-0006](docs/decisions/ADR-0006-label-encoder.md), `RESONANCE_EMBEDDER`) — a small sentence encoder run on the CPU that compares *labels* in scripts and vocabularies the hand-written lexicon does not reach. It raises signals the lexicon already gives and can never manufacture an analogy on its own. **The hosted deployment runs with it on**; without it the engine reads labels through the lexicon alone.
 
 ---
 

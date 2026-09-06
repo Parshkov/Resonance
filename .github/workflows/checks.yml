@@ -1,0 +1,103 @@
+# The repository reached 396 commits with no CI: every "the suite passes" was a
+# claim about one contributor's machine, and no external pull request was ever
+# checked automatically. This runs exactly what the protocol already asks a
+# contributor to run, and nothing it cannot reproduce locally.
+#
+# Pure standard library: no requirements file, no build step, no network.
+# `psycopg` is deliberately absent, so the PostgreSQL smoke test skips here the
+# same way it skips locally -- see work/queue.yaml R18-E.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: unittest discover
+        run: python3 -m unittest discover -s tests
+
+  gates:
+    name: benchmark gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Both runners exit non-zero on a gate failure, which is the check.
+      - name: engine gate (Benchmark v0.2)
+        run: python3 benchmark/r0-v0.2/runner.py
+      - name: extraction gate (extraction-v0.2)
+        run: python3 benchmark/extraction-v0.2/runner.py
+
+      # Gold is frozen: a branch may not make itself pass by editing fixtures.
+      # The runners rewrite nothing, so any diff here means gold was touched.
+      - name: benchmark fixtures are unmodified
+        run: |
+          git diff --exit-code -- benchmark/ \
+            || { echo "::error::benchmark fixtures changed during the gate run"; exit 1; }
+
+      # The recorded report must describe the engine that is actually
+      # committed, so a policy or threshold change cannot land carrying a
+      # stale provenance hash -- the defect this workflow was written after.
+      # Compared field by field rather than byte for byte: the report also
+      # carries `build_seconds` and `query_latency_mean_seconds`, which differ
+      # on every run and would make a diff check flaky.
+      - name: recorded gate report matches the committed engine
+        run: |
+          python3 - <<'PY'
+          import json, subprocess, sys, tempfile
+          recorded = json.load(open("src/engine/reports/r0-v0.2-e2e.json"))
+          # The runner prints its own summary to stdout, so the report has to
+          # go to a file rather than to /dev/stdout.
+          with tempfile.NamedTemporaryFile(suffix=".json") as tmp:
+              subprocess.run([sys.executable, "benchmark/r0-v0.2/runner.py",
+                              "--output", tmp.name],
+                             capture_output=True, text=True, check=True)
+              fresh = json.load(open(tmp.name))
+          stale = [k for k in ("engine", "gate", "gates", "overall_status",
+                               "benchmark_version", "corpus_n", "fixture_files")
+                   if recorded.get(k) != fresh.get(k)]
+          if stale:
+              for k in stale:
+                  print(f"::error::{k} is stale in src/engine/reports/r0-v0.2-e2e.json")
+                  print(f"  recorded: {json.dumps(recorded.get(k))[:300]}")
+                  print(f"  fresh:    {json.dumps(fresh.get(k))[:300]}")
+              print("::error::re-run: python3 benchmark/r0-v0.2/runner.py "
+                    "--output src/engine/reports/r0-v0.2-e2e.json  and commit it")
+              raise SystemExit(1)
+          print("recorded report matches the committed engine")
+          PY
+
+  lexicon:
+    name: lexicon is additive
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Changing the lexicon changes fingerprint and config hashes, so a change
+      # is only safe if English scoring is provably where it was.
+      - name: English scoring is untouched
+        run: python3 ops/lexicon_check.py

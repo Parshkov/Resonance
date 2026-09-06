@@ -1,6 +1,6 @@
 {
  "benchmark_version": "r0-v0.2",
- "build_seconds": 0.2077,
+ "build_seconds": 0.1768,
  "calibration": {
   "analogy_over_coincidence": 1.0,
   "analogy_over_generic_motif": 1.0,
@@ -179,8 +179,8 @@
  "corpus_n": 176,
  "engine": {
   "engine_version": "resonance-engine/0.2",
-  "index_config_hash": "fe4e295af0a15a3a5ed0bf1fd9bc0aebe65d024e87bcc1aab529287e2df5013b",
-  "verifier_config_hash": "12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77"
+  "index_config_hash": "9fb9994bddb12f0b191f71fb38d4bdf521ae82934b17cb10214edd16c76d4f3e",
+  "verifier_config_hash": "e093d77f8cd987c8fbad663c7e8bca68e2e8025b659a1c500ea49792bba2c8f3"
  },
  "fixture_files": {
   "graphs.jsonl": "0458b44f113951d8f0b46fe1e78541fb4fcc9669ca458e84c8262db95decbb42",
@@ -404,7 +404,7 @@
   }
  },
  "overall_status": "pass",
- "query_latency_mean_seconds": 0.7771,
+ "query_latency_mean_seconds": 0.6726,
  "rows": [
   {
    "case_id": "S1-C01",
