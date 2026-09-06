@@ -666,7 +666,10 @@ async function loadThread(channelId) {
     const payload = await store.messages(channelId);
     if (ui.talkThread?.channel_id === channelId) { ui.talkThread.messages = payload.messages || []; ui.talkThread.loading = false; render(); }
   } catch (error) {
-    if (ui.talkThread?.channel_id === channelId) { ui.talkThread.messages = []; ui.talkThread.loading = false; }
+    // A read that failed must not leave "Loading…" on the screen for good:
+    // say so, and show the empty thread, which the next poll will fill.
+    if (ui.talkThread?.channel_id === channelId) { ui.talkThread.messages = []; ui.talkThread.loading = false; render(); }
+    notice(t("error.generic", {message: error.message}));
   }
 }
 
