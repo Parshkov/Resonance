@@ -61,7 +61,7 @@ const STRINGS = {
   "home.summary.people": "{n} person found|{n} people found",
   "home.summary.talks": "{n} conversation|{n} conversations",
   "home.summary.groups": "{n} group|{n} groups",
-  "home.news.arrived": "Someone new resonates with “{topic}”",
+  "home.news.arrived": "{who} arrived and resonates with “{topic}”",
   "home.news.existing": "{who} was already here when you shared “{topic}”",
   "home.news.request": "{who} asks to be introduced",
   "home.news.invite": "{who} invites you to the group “{title}”",

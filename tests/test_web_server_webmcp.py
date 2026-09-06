@@ -76,7 +76,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=5)
 
-    def test_root_serves_the_live_webmcp_transport(self):
+    def test_root_serves_the_browser_tools_module(self):
         with urlopen(self.base + "/", timeout=10) as response:
             html = response.read().decode()
             self.assertIn('src="/webmcp.mjs"', html)
@@ -86,18 +86,18 @@ class WebServerWebMCPTests(unittest.TestCase):
         self.assertIn("document.modelContext", source)
         self.assertIn('from "/session.mjs"', source)
         self.assertIn("apiFetch", source)
-        self.assertNotIn("STATE =", source)
-        # The page cannot ask for anything but the visitor's own state: the
-        # route that used to hand it a default source is gone along with the
-        # fixture that source selected.
-        with self.assertRaises(HTTPError) as ctx:
-            urlopen(self.base + "/api/config", timeout=10)
-        self.assertEqual(ctx.exception.code, 404)
+        self.assertIn("/api/product/tools", source)
+        self.assertIn("/api/product/tool", source)
+        # the old, second vocabulary is gone for good
+        for old in ("resonance_get_share_preview", "resonance_share_prepared_thought",
+                    "resonance_update_consent", "resonance_create_workspace", "STATE ="):
+            self.assertNotIn(old, source, old)
+        for gone in ("/api/config", "/collab.mjs", "/workspaces.mjs"):
+            with self.assertRaises(HTTPError) as ctx:
+                urlopen(self.base + gone, timeout=10)
+            self.assertEqual(ctx.exception.code, 404, gone)
 
     def test_discovery_without_a_shared_thought_is_409_not_500(self):
-        # R16 Chrome audit: a fresh visitor used to get a 500 ("unexpected
-        # product error") because the unshared case raised an unmapped
-        # PermissionError. It is a product state, not a server fault.
         client = Client(self.base)
         client.guest()
         with self.assertRaises(HTTPError) as ctx:
@@ -107,44 +107,47 @@ class WebServerWebMCPTests(unittest.TestCase):
         self.assertEqual(payload["error"], "share_required")
         self.assertIn("resonance_prepare_thought", payload["message"])
 
-    def test_header_consent_pill_is_truthful_without_native_webmcp(self):
-        # R17 acceptance finding (public-origin browser run): in a browser
-        # without document.modelContext the page labelled a fresh,
-        # never-shared guest "Shared with Resonance". The live module must
-        # apply the visitor's authoritative consent state even when no agent
-        # surface exists.
-        with urlopen(self.base + "/webmcp.mjs", timeout=10) as response:
-            live = response.read().decode()
-        unavailable = live.index('setStatus("WebMCP · unavailable")')
-        self.assertIn("applyAuthoritativeState(await readAuthoritativeState())",
-                      live[unavailable:unavailable + 600])
+    def test_the_browser_registers_the_remote_tools_and_executes_them(self):
+        # One vocabulary: the list the page registers is the remote server's
+        # own, and a call from the page runs the same handler under the cookie.
+        from src.product.mcp_bridge import TOOLS
+        client = Client(self.base)
+        me = client.guest()
+        _, listed, _ = client.request("GET", "/api/product/tools")
+        self.assertEqual([t["name"] for t in listed["tools"]], [t["name"] for t in TOOLS])
+        _, answer, _ = client.request("POST", "/api/product/tool",
+                                      {"name": "resonance_whoami", "arguments": {}})
+        self.assertFalse(answer["isError"])
+        self.assertEqual(answer["structuredContent"]["user_id"], me["user_id"])
+        self.assertEqual(answer["content"][0]["type"], "text")
+        # a refusal is an answer in words, not a server fault
+        _, refused, _ = client.request("POST", "/api/product/tool",
+                                       {"name": "resonance_discover", "arguments": {}})
+        self.assertTrue(refused["isError"])
+        self.assertEqual(refused["structuredContent"]["error"], "share_required")
+        # an unknown tool is a 400, and a cross-site write is refused
+        with self.assertRaises(HTTPError) as ctx:
+            client.request("POST", "/api/product/tool", {"name": "resonance_nothing", "arguments": {}})
+        self.assertEqual(ctx.exception.code, 400)
 
-    def test_webmcp_pill_reports_the_browser_not_the_consent_state(self):
-        # Regression for the fix above. Making the header consent pill truthful
-        # also routed applyAuthoritativeState() through the WebMCP *capability*
-        # pill, so a browser with no document.modelContext showed
-        # "WebMCP · private" — byte-identical to a browser where registration
-        # succeeded. Observed on the public origin in Chrome 152 (stock).
-        # Card A step 1 asks a tester to stop when the pill says "unavailable",
-        # so this pill has to keep saying it.
-        with urlopen(self.base + "/webmcp.mjs", timeout=10) as response:
-            live = response.read().decode()
-        unavailable = live.index('setStatus("WebMCP · unavailable")')
-        # the capability is recorded before the status is written …
-        self.assertIn("agentSurface = false", live[unavailable - 200:unavailable])
-        # … and the consent updater must not write the capability pill then.
-        apply_at = live.index("function applyAuthoritativeState")
-        # Window sized for the function plus its comments, which carry the
-        # reasoning for both the capability guard and the consent event. What
-        # is asserted below is the ORDER of three statements inside it, not
-        # their distance from the top.
-        body = live[apply_at:apply_at + 2200]
-        self.assertIn("if (agentSurface === false) return;", body)
-        self.assertLess(body.index("if (agentSurface === false) return;"),
-                        body.index('setStatus("WebMCP · LIVE shared")'))
-        # setConsentVisible still runs first: the header keeps telling the truth.
-        self.assertLess(body.index("setConsentVisible(state.shared === true)"),
-                        body.index("if (agentSurface === false) return;"))
+    def test_confirm_and_confirmed_are_one_word(self):
+        # The HTTP routes read `confirmed`, the MCP tools `confirm`; a client
+        # that learned one spelling was refused by the other.
+        client = Client(self.base)
+        client.guest()
+        thought = {"topic": "One word", "domain": "operations",
+                   "nodes": [{"id": "n0", "label": "queue backlog", "role": "problem"},
+                             {"id": "n1", "label": "synchronized retries", "role": "mechanism"}],
+                   "relations": [{"source": "n0", "target": "n1", "type": "causes"}]}
+        _, prepared, _ = client.request("POST", "/api/webmcp/prepare",
+                                        {"authorship": "their_own_words", "request_id": "w-1", "thought": thought})
+        _, preview, _ = client.request("GET", "/api/webmcp/preview")
+        _, shared, _ = client.request("POST", "/api/webmcp/share", {
+            "request_id": "w-2", "confirmed": True, "confirmation_token": preview["confirmation_token"]})
+        self.assertTrue(shared["discoverable"])
+        _, revoked, _ = client.request("POST", "/api/product/revoke",
+                                       {"session_id": prepared["session_id"], "confirm": True})
+        self.assertEqual(revoked["session_id"], prepared["session_id"])
 
     def test_landing_page_of_a_fresh_visitor_has_no_fixture_personas(self):
         # The product opens on the visitor's own state. Nothing a first-time

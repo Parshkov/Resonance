@@ -35,6 +35,7 @@ from src.ingestion.service import ShareIntent
 from src.product import authorship as authorship_rule
 from src.product import phrasing
 from src.product.mcp_bridge import (
+    BRIDGE_CONTRACT, TOOLS, RemoteMCPBridge,
     BridgeError, _PRIVATE, _SHARED, _WITHDRAWN, _coarse_location,
     _has_usable_structure, _in_state, current_shared_session, when_last_shared,
     _insufficient_structure_message, _slug, _structure_summary, build_thought_dna,
@@ -577,6 +578,22 @@ def _topic_read(product, token: str, viewer_id: str, workspace_id: str,
     }
 
 
+class BrowserToolBridge(RemoteMCPBridge):
+    """The remote MCP bridge, executing under a browser session.
+
+    The security facts come from the request (cookie, CSRF proof, origin)
+    rather than from an OAuth bearer, and the client id names the browser so
+    the audit trail says which door a write came through.
+    """
+
+    def __init__(self, product, security: Mapping[str, Any]) -> None:
+        super().__init__(product)
+        self._browser_security = {**dict(security), "client_id": "live-browser-webmcp"}
+
+    def _security(self) -> dict[str, Any]:
+        return dict(self._browser_security)
+
+
 def _discoverable_sessions(product, token: str) -> list[str]:
     """The visitor's own thoughts that are discoverable right now."""
     rows = list(product.owned_sessions(token))
@@ -789,6 +806,13 @@ class WebHandler(ProductHandler):
             self._send_json(_overview(self, product))
             return
 
+        # The tool list the browser registers: the remote MCP server's own,
+        # byte for byte, so an agent in the browser and an agent in a chat
+        # speak one vocabulary.
+        if path == "/api/product/tools":
+            self._send_json({"contract_version": BRIDGE_CONTRACT, "tools": TOOLS})
+            return
+
         # These two routes translate the page's presentation contract to the
         # live product without any shadow DB.
         if path == "/api/context":
@@ -843,13 +867,6 @@ class WebHandler(ProductHandler):
                 self._send_share_required()
                 return
             self._send_json(_geo_view(product, token, session_id))
-            return
-
-        # The browser tools are the live implementation of the same tool names
-        # the standalone demo server under demo/ui/ registers from webmcp.mjs.
-        if path == "/webmcp.mjs":
-            self._send_bytes((UI_DIR / "webmcp_live.mjs").read_bytes(),
-                             "text/javascript; charset=utf-8")
             return
 
         if path == "/api/webmcp/state":
@@ -977,6 +994,26 @@ class WebHandler(ProductHandler):
 
         super()._route_get(path, params)
 
+    def _route_tool_call(self) -> None:
+        """One remote-MCP tool, called from the browser under the cookie session.
+
+        The browser tools are the remote server's tools: same names, same
+        schemas, same handlers. The only difference is the door -- a cookie
+        plus the CSRF proof instead of a bearer token -- so the bridge is
+        given the security facts of this request and everything else is the
+        code the chat already runs.
+        """
+        token = self._token()
+        body = self._body()
+        security = self._security_kwargs()
+        name = str(body.get("name") or "")
+        arguments = body.get("arguments") or {}
+        bridge = BrowserToolBridge(self.runtime.product, security)
+        answer = bridge._tool_call("browser", {"name": name, "arguments": arguments}, token)  # noqa: SLF001
+        if "error" in answer:
+            raise ValueError(str(answer["error"].get("message") or "unknown tool"))
+        self._send_json(answer["result"])
+
     def _route_topic_post(self, path: str) -> None:
         """The writes a topic takes from the page.
 
@@ -1051,6 +1088,9 @@ class WebHandler(ProductHandler):
         self._send_error_json(HTTPStatus.NOT_FOUND, "not_found", "unknown path")
 
     def _route_post(self, path: str) -> None:
+        if path == "/api/product/tool":
+            self._route_tool_call()
+            return
         if path.startswith("/api/product/topic/"):
             self._route_topic_post(path)
             return

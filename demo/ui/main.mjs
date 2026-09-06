@@ -85,8 +85,7 @@ function structure(nodes = [], relations = []) {
   for (const node of nodes) labels.set(node.id ?? node.label, node.label);
   const box = el("div", {class: "structure"});
   const ideas = el("ul", {class: "ideas"}, nodes.map((node) =>
-    el("li", {class: "idea"}, [el("span", {class: "idea__label"}, node.label),
-      node.role ? el("span", {class: "idea__role"}, node.role) : null])));
+    el("li", {class: "idea"}, [el("span", {class: "idea__label"}, node.label)])));
   const links = el("ul", {class: "links"}, relations.map((rel) => {
     const from = rel.from ?? labels.get(rel.source) ?? rel.source;
     const to = rel.to ?? labels.get(rel.target) ?? rel.target;
@@ -324,14 +323,15 @@ function newsSection() {
   const section = el("section", {class: "news"}, [el("h2", {class: "section__title"}, t("home.whats_new"))]);
   const items = [];
   for (const alert of store.alerts().filter((a) => !a.seen_at)) {
-    const who = alert.display?.topic ? `“${alert.display.topic}”` : "";
+    const who = alert.person_pseudonym || "Someone";
     const text = alert.reason === "they_arrived"
-      ? t("home.news.arrived", {topic: topicOf(alert.my_session_id)})
-      : t("home.news.existing", {who: who || "…", topic: topicOf(alert.my_session_id)});
+      ? t("home.news.arrived", {who, topic: topicOf(alert.my_session_id)})
+      : t("home.news.existing", {who, topic: topicOf(alert.my_session_id)});
+    const about = alert.display?.topic ? el("p", {class: "news__meta"}, `“${alert.display.topic}”`) : null;
     const meta = [alert.display?.domain ? t("home.news.in", {domain: alert.display.domain}) : null,
       t("home.news.match", {score: score(alert.scores_at_detection?.structural)}), timeAgo(alert.detected_at)].filter(Boolean).join(" · ");
     items.push(el("li", {class: "news__item"}, [
-      el("p", {class: "news__text"}, text), el("p", {class: "news__meta"}, meta),
+      el("p", {class: "news__text"}, text), about, el("p", {class: "news__meta"}, meta),
       el("div", {class: "news__actions"}, [
         link(`/people?thought=${encodeURIComponent(alert.my_session_id)}&select=${encodeURIComponent(alert.their_session_id)}`, t("home.news.see"), {class: "btn btn--small btn--primary",
           onclick: () => { store.write("/api/product/resonances/seen", {alert_keys: [alert.alert_key]}); }}),
@@ -370,13 +370,24 @@ function thoughtsView() {
   return frag;
 }
 
+// A draft is named by the server the moment it is shared. Until then the
+// page names it the same way: the first idea and the last one.
+function thoughtTitle(row) {
+  const topic = String(row.topic || "").trim();
+  if (topic && topic !== "Shared thought") return topic;
+  const nodes = row.nodes || [];
+  if (!nodes.length) return t("thoughts.structure");
+  const last = row.relations?.length ? row.relations[row.relations.length - 1].to : nodes[nodes.length - 1].label;
+  return last && last !== nodes[0].label ? `${nodes[0].label} → ${last}` : nodes[0].label;
+}
+
 function thoughtCard(row) {
   const when = row.state === "discoverable" ? t("thoughts.shared_at", {when: timeAgo(row.shared_at)})
     : row.state === "withdrawn" ? t("thoughts.withdrawn_at", {when: timeAgo(row.withdrawn_at)})
     : t("thoughts.prepared_at", {when: timeAgo(row.prepared_at)});
   const card = el("li", {class: "card thought"}, [
     el("div", {class: "card__head"}, [stateChip(row.state), el("span", {class: "card__when"}, when)]),
-    el("h2", {class: "card__title"}, row.topic || t("thoughts.structure")),
+    el("h2", {class: "card__title"}, thoughtTitle(row)),
     el("p", {class: "card__meta"}, [row.domain ? `${t("thoughts.field")}: ${row.domain} · ` : "",
       t("thoughts.ideas", {n: row.nodes?.length || 0}), " · ", t("thoughts.links", {n: row.relations?.length || 0})]),
     el("p", {class: "hint"}, t(`thoughts.state.${row.state}.hint`)),
@@ -470,9 +481,9 @@ function peopleView() {
   if (shared.length > 1) {
     frag.append(el("div", {class: "picker"}, [el("span", {class: "label"}, t("people.for")),
       el("select", {onchange: (e) => navigate(`/people?thought=${encodeURIComponent(e.target.value)}`)},
-        shared.map((r) => el("option", {value: r.session_id, selected: r.session_id === chosen.session_id}, r.topic || r.session_id)))]));
+        shared.map((r) => el("option", {value: r.session_id, selected: r.session_id === chosen.session_id}, thoughtTitle(r))))]));
   } else {
-    frag.append(el("p", {class: "picker"}, [el("span", {class: "label"}, t("people.for")), " ", el("strong", {}, chosen.topic)]));
+    frag.append(el("p", {class: "picker"}, [el("span", {class: "label"}, t("people.for")), " ", el("strong", {}, thoughtTitle(chosen))]));
   }
   const entry = store.getState().discovery.get(chosen.session_id);
   if (!entry) { store.discover(chosen.session_id); }

@@ -114,11 +114,11 @@ STATIC = {
     "/strings.mjs": ("strings.mjs", "text/javascript; charset=utf-8"),
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
     "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
-    # The browser WebMCP tools: the same product for an agent living in the
-    # browser. They register tools and render only a status pill.
-    "/webmcp.mjs": ("webmcp_live.mjs", "text/javascript; charset=utf-8"),
-    "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
-    "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
+    # The browser WebMCP tools: the same product, the same tools, for an
+    # agent living in the browser. The module reads the tool list from
+    # /api/product/tools and executes through /api/product/tool, so the
+    # browser and the remote MCP server can never carry two vocabularies.
+    "/webmcp.mjs": ("browser_tools.mjs", "text/javascript; charset=utf-8"),
     "/legal.css": ("legal.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/favicon.ico": ("favicon.svg", "image/svg+xml"),
@@ -575,6 +575,13 @@ class ProductHandler(BaseHTTPRequestHandler):
             raise IngestionError("request body must be a JSON object") from exc
         if not isinstance(parsed, dict):
             raise IngestionError("request body must be a JSON object")
+        # One word for consent on every door. The HTTP routes read `confirmed`
+        # and the MCP tools read `confirm`; a client that learned one spelling
+        # was refused by the other with "explicit confirmation required".
+        if "confirm" in parsed and "confirmed" not in parsed:
+            parsed["confirmed"] = parsed["confirm"]
+        elif "confirmed" in parsed and "confirm" not in parsed:
+            parsed["confirm"] = parsed["confirmed"]
         return parsed
 
     def _token(self) -> str:
@@ -946,9 +953,7 @@ class ProductHandler(BaseHTTPRequestHandler):
             # itself is main.mjs, linked from index.html.
             injected = html.replace(
                 "</body>",
-                '  <script type="module" src="/webmcp.mjs"></script>\n'
-                '  <script type="module" src="/collab.mjs"></script>\n'
-                '  <script type="module" src="/workspaces.mjs"></script>\n</body>',
+                '  <script type="module" src="/webmcp.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
             return

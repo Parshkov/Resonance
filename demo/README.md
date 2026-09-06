@@ -1,67 +1,21 @@
-# R6-E2E — clean-client MCP demo
+# demo/
 
-A stdlib-only MCP client talks to the accepted Resonance stdio server. It does
-not import `src.engine`, `src.mcp`, or any matching internals. All five
-acceptance scenarios use frozen Benchmark v0.1 Thought DNA documents as JSON.
+Two things live here.
 
-## Run
+## `demo/ui/` — the page
 
-From the repository root (Python ≥ 3.10, no extra packages):
+The browser interface of the live product: six screens over one state store,
+served by `src.product.web_server`. See [`ui/README.md`](ui/README.md).
 
-```bash
-python3 demo/run.py
-```
+## `demo/corpus/` — the labelled demo corpus
 
-This launches `python3 -m src.mcp.server`, performs MCP `initialize` / `ping` /
-`tools/list`, then `compare_thoughts` (and one `find_resonance`) over NDJSON.
-It writes `demo/report.json` and `demo/transcript.jsonl`.
+Twenty-five labelled personas wrapping accepted Thought DNA with consent and
+presentation metadata. Seeded into an ephemeral `:memory:` database by default
+(so a local run has people in it) and into a persistent one only with
+`--seed-demo` / `RESONANCE_SEED_DEMO=1`. Demo personas are shown as examples,
+never introduced, and never told about anyone. See
+[`corpus/README.md`](corpus/README.md).
 
-```bash
-python3 -m src.mcp.server          # optional: speak the wire yourself
-```
-
-Framing is newline-delimited JSON-RPC 2.0 (MCP 2024-11-05). Do not send
-LSP-style `Content-Length` headers.
-
-## Scenarios
-
-Pinned in `scenarios.json` against `benchmark/r0-v0.1/graphs.jsonl`
-(`sha256 b749f10e4178a5b21a9bab03f01defbbb35f2688faa8103b952135c63ee1c9cd`):
-
-| id | case | expected |
-|---|---|---|
-| S1 | C01-Q vs C01-C10 structural | `negative` (same words, structural_score < 0.85) |
-| S2 | C01-Q vs C01-C09 analogical | `analogical` with mapping + find hit |
-| S3a | C01-Q vs C01-C04 structural | `approximate` (containment > symmetric) |
-| S3b | C01-Q vs C01-C05 structural | `approximate` with R_path > 0 |
-| S4 | C01-Q vs C01-C16 complementary | `complementary` with directional K_comp |
-| S5 | G01-Q vs G01-C10 structural | `negative`, hard_rejection, H_sign_conflict |
-| U1 | mode=`semantic` | engine-stage `isError` (unsupported mode) |
-| T1 | unknown JSON-RPC method | transport `-32601` |
-
-Results must carry the accepted identity:
-
-```
-adapter_version:        resonance-mcp/0.1
-engine_version:         resonance-engine/0.2
-interface_version:      resonance-interfaces/0.1
-verifier_config_hash:   12998d451e632759b828ccfb5d781587041bce7f740027b98fe528ecd966bd77
-```
-
-This is the first working Resonance MCP milestone. It is not a corpus-scale or
-production claim. Retrieval recall on the full frozen v0.1 gate remains the
-R5-recorded 0.727 failure; this demo does not rerank or compensate.
-
-## R7 corpus
-
-`demo/corpus/` is the consented multi-session demo corpus. It wraps accepted
-Thought DNA with consent/presentation metadata and does not implement
-retrieval, alignment, or scoring. See `demo/corpus/README.md`.
-
-## R9 visual client
-
-`demo/ui/` is the presentation-only discovery client.
-It supports deterministic REPLAY from the accepted R8 fixture and LIVE through
-the accepted `discover_resonance` MCP path, both pinned to `analogical / k=15`.
-See [`ui/README.md`](ui/README.md) for launch, recording, privacy, and
-validation instructions.
+The stdio MCP client and server that first proved the engine end to end (R6)
+were retired once the remote MCP server and the page existed; their record is
+under [`archive/hackathon/`](../archive/hackathon/).

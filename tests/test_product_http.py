@@ -394,8 +394,6 @@ class ProductHttpTests(unittest.TestCase):
         self.assertNotIn("<script>window.RESONANCE_MODE", html)
         self.assertIn('src="/main.mjs"', html)
         self.assertIn('src="/webmcp.mjs"', html)
-        self.assertIn('src="/collab.mjs"', html)
-        self.assertIn('src="/workspaces.mjs"', html)
         self.assertIn('href="/app.css"', html)
         self.assertIn('href="/favicon.svg"', html)
         self.assertLess(html.index('href="/app.css"'), html.index("</head>"))

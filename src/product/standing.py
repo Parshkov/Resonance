@@ -361,8 +361,16 @@ class StandingSearch:
                 connection = collaboration.connection_state(viewer_id, their_owner)
             except Exception:  # noqa: BLE001 - presentation only
                 connection = None
+        # The pseudonym is the one name anyone here may see; an alert that
+        # said only "someone" made the news card nameless.
+        pseudonym = ""
+        try:
+            pseudonym = self.product.collaboration._display(their_owner)  # noqa: SLF001
+        except Exception:  # noqa: BLE001 - presentation only
+            pseudonym = ""
         return {
             "alert_key": row.get("alert_key"),
+            "person_pseudonym": pseudonym,
             "my_session_id": row.get("my_session_id"),
             "their_session_id": theirs,
             "mode": row.get("mode"),
