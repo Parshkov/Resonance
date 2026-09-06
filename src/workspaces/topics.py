@@ -131,7 +131,8 @@ class SharedTopicService:
 
     # -- reading --------------------------------------------------------
     def read(self, access_token: str, workspace_id: str, *,
-             advance: bool = True, mode: str = "analogical") -> dict[str, Any]:
+             advance: bool = True, mode: str = "analogical",
+             from_start: bool = False) -> dict[str, Any]:
         """What is new for this reader, and what the topic now says.
 
         `advance` moves this reader's cursor to the end of what it returns. An
@@ -144,10 +145,12 @@ class SharedTopicService:
         rows = sorted(
             self.repo.list_workspace_rows(CONTRIBUTIONS_TABLE, workspace_id),
             key=_order_key)
-        cursor = self._get_cursor(workspace_id, actor.user_id)
+        # A page shows the whole topic, not what is new since a chat last
+        # looked: `from_start` reads every contribution and moves no cursor.
+        cursor = "" if from_start else self._get_cursor(workspace_id, actor.user_id)
         after = self._after(rows, cursor)
         delta = [self._present(row) for row in after[-MAX_DELTA:]]
-        if advance and after:
+        if advance and after and not from_start:
             self._set_cursor(workspace_id, actor.user_id,
                              str(after[-1]["contribution_id"]))
         return {

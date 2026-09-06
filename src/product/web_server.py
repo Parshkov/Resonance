@@ -550,9 +550,9 @@ def _readable_standing(product, workspace_id: str, viewer_id: str,
 
 
 def _topic_read(product, token: str, viewer_id: str, workspace_id: str,
-                *, advance: bool) -> dict[str, Any]:
+                *, advance: bool, from_start: bool = False) -> dict[str, Any]:
     """One topic as the page reads it: the service's answer, in words."""
-    answer = product.read_topic(token, workspace_id, advance=advance)
+    answer = product.read_topic(token, workspace_id, advance=advance, from_start=from_start)
     return {
         "workspace_id": workspace_id,
         "contributions_total": answer.get("contributions_total", 0),
@@ -988,8 +988,10 @@ class WebHandler(ProductHandler):
             token = self._token()
             workspace_id = (params.get("workspace_id") or [""])[0]
             advance = (params.get("advance") or ["1"])[0] not in ("0", "false", "no")
+            full = (params.get("full") or ["0"])[0] in ("1", "true", "yes")
             self._send_json(_topic_read(product, token, self._subject(token),
-                                        workspace_id, advance=advance))
+                                        workspace_id, advance=advance and not full,
+                                        from_start=full))
             return
 
         super()._route_get(path, params)

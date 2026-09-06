@@ -139,7 +139,7 @@ export async function group(workspaceId, {force = false} = {}) {
   try {
     const [detail, topic] = await Promise.all([
       readJson(`/api/product/workspace?workspace_id=${encodeURIComponent(workspaceId)}`),
-      readJson(`/api/product/topic?workspace_id=${encodeURIComponent(workspaceId)}&advance=0`),
+      readJson(`/api/product/topic?workspace_id=${encodeURIComponent(workspaceId)}&advance=0&full=1`),
     ]);
     state.groups.set(workspaceId, {loading: false, error: "", detail, topic, fetched_at: Date.now()});
   } catch (error) {
