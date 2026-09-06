@@ -114,9 +114,12 @@ def render_structure_png(match: Mapping[str, Any]) -> bytes:
 
     middle = width // 2
     for pair in pairs:
-        canvas.text(_MARGIN, y, fit(str(pair.get("query_label", "")), 26), ACCENT, 1)
+        # A column is as wide as the glyphs allow (8 px each at scale 1), so a
+        # label of ordinary length is not cut to an ellipsis and misquoted.
+        column = (middle - 40 - 2 * _MARGIN) // 8
+        canvas.text(_MARGIN, y, fit(str(pair.get("query_label", "")), column), ACCENT, 1)
         canvas.line(middle - 40, y + 6, middle + 24, y + 6, INK_3, 2)
-        canvas.text(middle + 36, y, fit(str(pair.get("candidate_label", "")), 26),
+        canvas.text(middle + 36, y, fit(str(pair.get("candidate_label", "")), column),
                     INK, 1)
         y += 34
     if not pairs:
@@ -174,3 +177,71 @@ def render_map_png(rich: Mapping[str, Any]) -> bytes:
         canvas.text(_MARGIN, y, label, INK_2, 1)
         y += _LINE
     return canvas.to_png()
+
+
+# Kinds of match, coloured the way the page colours them: the same subject in
+# the sage, another subject in the accent, not a resonance in grey.
+_SAGE = (0x3F, 0x75, 0x48)
+
+
+def render_resonance_png(rich: Mapping[str, Any]) -> bytes:
+    """How closely each person found matches, drawn.
+
+    Your thought is the centre. Each person is placed at a distance given by
+    the engine's structural score (the inner ring is a perfect match, the rim
+    is none) and coloured by the kind of match. Nothing is ranked here: every
+    number is one the engine returned, and the picture only places it.
+    """
+    matches = [row for row in (rich.get("matches") or rich.get("matches_in_backend_order") or [])
+               if (row.get("display") or {}).get("share_state", "discoverable") == "discoverable"
+               and row.get("hard_rejection") is None]
+    width, height = 720, 460
+    canvas = Canvas(width, height)
+    y = _heading(canvas, "how closely each person's reasoning matches yours",
+                 "centre: your thought · inner ring: perfect · rim: none")
+    cx, cy = 250, 60 + 180
+    radius_max, radius_min = 170, 22
+    for step in (1.0, 0.75, 0.5, 0.25):
+        r = int(radius_min + (radius_max - radius_min) * (1 - step))
+        _ring(canvas, cx, cy, r, (0xD8, 0xD2, 0xC6))
+        canvas.text(cx + 6, cy - r - 8, f"{step:.2f}", INK_3, 1)
+    canvas.disc(cx, cy, 6, INK)
+    canvas.text(cx - 44, cy + 12, "your thought", INK_2, 1)
+    import math
+    count = max(1, len(matches))
+    legend_y = 60
+    for index, row in enumerate(matches[:12]):
+        scores = row.get("scores") or {}
+        try:
+            structural = max(0.0, min(1.0, float(scores.get("structural", 0))))
+        except (TypeError, ValueError):
+            structural = 0.0
+        kind = str(row.get("mode_classification") or "")
+        colour = _SAGE if kind in ("direct", "approximate") else (INK_3 if kind == "negative" else ACCENT)
+        theta = -math.pi / 2 + 2 * math.pi * (index + 0.5) / count
+        r = radius_min + (radius_max - radius_min) * (1 - structural)
+        x, yy = int(cx + r * math.cos(theta)), int(cy + r * math.sin(theta))
+        canvas.line(cx, cy, x, yy, (0xC9, 0xC2, 0xB5), 1)
+        canvas.disc(x, yy, 6, colour)
+        # the list on the right says who each dot is, in the same order
+        canvas.disc(470, legend_y + 7, 5, colour)
+        canvas.text(482, legend_y, fit(f"{row.get('person_pseudonym', '')}  {structural:.2f}", 29), INK, 1)
+        canvas.text(482, legend_y + 15, fit(phrasing.classification(kind), 29), INK_2, 1)
+        legend_y += 34
+        if legend_y > height - 40:
+            break
+    if not matches:
+        canvas.text(_MARGIN, y, "nobody has matched yet; the thought keeps looking", INK_2, 1)
+    return canvas.to_png()
+
+
+def _ring(canvas: Canvas, cx: int, cy: int, r: int, colour) -> None:
+    import math
+    steps = max(24, r)
+    last = None
+    for i in range(steps + 1):
+        a = 2 * math.pi * i / steps
+        point = (int(cx + r * math.cos(a)), int(cy + r * math.sin(a)))
+        if last is not None:
+            canvas.line(last[0], last[1], point[0], point[1], colour, 1)
+        last = point

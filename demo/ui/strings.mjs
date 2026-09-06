@@ -42,8 +42,8 @@ const STRINGS = {
 
   // home
   "home.title": "Find the people already thinking about what you are thinking about.",
-  "home.lede": "Describe the idea, project or question you are working on. Resonance compares the reasoning behind it with what other people have shared, and finds the ones whose thinking overlaps with yours: the same problem, one piece of it, or the same shape in a different field.",
-  "home.then": "Then you can talk, think it through together, and form a group around one idea, where everyone works on the whole or on their own part of it.",
+  "home.lede": "Describe the idea, project or question you are working on. Resonance compares the reasoning behind it with what other people have shared and finds the ones whose thinking overlaps with yours.",
+  "home.then": "Then you talk, think it through together, and gather a group around the idea.",
   "home.step1.title": "Share a thought",
   "home.step1.body": "In your own words, here or from the chat you already use. Only the structure of the reasoning becomes visible, never your text or your name.",
   "home.step2.title": "See who resonates",
@@ -77,12 +77,12 @@ const STRINGS = {
 
   // thoughts
   "thoughts.title": "My thoughts",
-  "thoughts.lede": "Each thought is searched on its own. You can share several and withdraw any of them without touching the others.",
+  "thoughts.lede": "Each thought looks for people on its own. Share several; withdraw any of them at any time.",
   "thoughts.empty": "You have not shared anything yet.",
   "thoughts.new": "Share a new thought",
   "thoughts.composer.label": "What are you working on, and what is hard about it?",
   "thoughts.composer.placeholder": "Say what causes what, what prevents what, what requires what. For example: “A partial outage causes synchronized client retries. The retries cause request amplification. Jittered backoff prevents the amplification.”",
-  "thoughts.composer.hint": "Write in English for now: thoughts are compared in one index, and other languages are not read yet. Your text is not kept; only the structure below is.",
+  "thoughts.composer.hint": "Your text is not kept. Only the structure it contains becomes visible, and you will see it before anyone else can.",
   "thoughts.composer.extract": "Show what would be shared",
   "thoughts.composer.reading": "Reading the structure…",
   "thoughts.composer.preview": "This is all anyone will ever see",
@@ -111,11 +111,24 @@ const STRINGS = {
 
   // people
   "people.title": "People",
-  "people.lede": "Everyone found for a thought of yours, with the reason. Nobody here knows about you until you ask for an introduction and they agree.",
+  "people.map": "Map of the people found",
+  "people.map.strength": "How close",
+  "people.map.where": "Where they are",
+  "people.map.strength.hint": "Your thought is the centre. The closer a person is drawn to it, the more of your reasoning theirs preserves; the number on each ring is the structural score. Sectors group people by the kind of match. Click a person to see why.",
+  "people.map.where.hint": "A place is a city rounded to about ten kilometres, shown only when that person agreed to it. Where someone is never affects whether they are found.",
+  "people.map.you_unplaced": "You have not shared where you are, so no distances are shown.",
+  "people.map.unplaced": "{n} person chose not to say where they are: {names}.|{n} people chose not to say where they are: {names}.",
+  "people.map.nobody": "Nobody here has shared a location yet.",
+  "thoughts.place.offer": "Also share roughly where I am (a city, rounded)",
+  "thoughts.place.city": "City",
+  "thoughts.place.region": "Region or country",
+  "thoughts.place.hint": "Rounded to {lat}, {lon}. Other people see only the city name and, if they also shared theirs, the rough distance.",
+  "thoughts.place.denied": "The browser did not share a location, so none is attached.",
+  "people.lede": "Who resonates with a thought of yours, and why. Nobody knows about you until you ask for an introduction and they agree.",
   "people.for": "For the thought",
   "people.none_shared": "Share a thought first, and the people whose reasoning overlaps with it appear here.",
   "people.empty.title": "Nobody yet, and that is usual at the start.",
-  "people.empty.body": "Your thought stays out there. Everyone who arrives after you is checked against it, and you will find them here and in any chat you have connected.",
+  "people.empty.body": "Your thought keeps looking. Everyone who arrives after you is checked against it, and you will be told here and in any chat you have connected.",
   "people.found": "{n} person|{n} people",
   "people.near": "{n} near miss|{n} near misses",
   "people.near.hint": "Similar skeletons the engine will not call a resonance, or the same link running the other way.",
@@ -127,6 +140,7 @@ const STRINGS = {
   "people.kept": "{n} link both of you keep|{n} links both of you keep",
   "people.contradictions": "{n} contradiction|{n} contradictions",
   "people.strength": "Structural match",
+  "people.depth": "{nodes} of your {total} ideas correspond · {links} links kept",
   "people.confidence.high": "high confidence",
   "people.confidence.medium": "medium confidence",
   "people.confidence.low": "low confidence",
@@ -157,7 +171,7 @@ const STRINGS = {
 
   // talk
   "talk.title": "Conversations",
-  "talk.lede": "Introductions need both sides. Nothing opens until the other person agrees, and no contact details are ever exchanged.",
+  "talk.lede": "Introductions need both sides: a conversation opens only when both people agree. No contact details are ever exchanged.",
   "talk.requests": "Requests",
   "talk.incoming": "{who} asks to be introduced",
   "talk.outgoing": "You asked {who}",
@@ -180,7 +194,7 @@ const STRINGS = {
 
   // groups
   "groups.title": "Groups",
-  "groups.lede": "A group gathers people around one idea. Everyone can talk, split the work into parts, and add what they now understand, so the group can see where it agrees and where it still disagrees.",
+  "groups.lede": "A group gathers people around one idea: talk, split the work into parts, and build one understanding.",
   "groups.empty": "No groups yet. A group starts from a conversation: open one with someone you are connected to.",
   "groups.invitations": "Invitations",
   "groups.invite.line": "{who} invites you to “{title}”",
@@ -217,7 +231,7 @@ const STRINGS = {
   "group.parts.take": "Take it",
   "group.parts.finish": "Mark done",
   "group.parts.reopen": "Reopen",
-  "group.understanding.lede": "Each member adds the structure of what they now understand. The group then shows where the accounts agree, where they contradict each other, and what is still unanswered.",
+  "group.understanding.lede": "Each member adds what they now understand. The group shows where the accounts agree, where they contradict each other, and what is still unanswered.",
   "group.understanding.add": "Add what you now understand",
   "group.understanding.placeholder": "In your own words: what causes what, what prevents what.",
   "group.understanding.note": "A short note for the others (optional)",
@@ -240,7 +254,7 @@ const STRINGS = {
 
   // connect
   "connect.title": "Connect a chat",
-  "connect.lede": "Resonance works from the conversation you are already having. Give your assistant one address, and it can share your thought, look for people, ask for introductions and read replies, always with your approval.",
+  "connect.lede": "Give your assistant one address, and Resonance works from the chat you already use: sharing, finding people, introductions and replies, always with your approval.",
   "connect.address": "The address",
   "connect.copy": "Copy",
   "connect.note": "This is the only thing a client needs; it finds the sign-in by itself. You are never asked to paste a key.",

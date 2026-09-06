@@ -15,6 +15,7 @@
 
 import * as store from "/store.mjs";
 import { t } from "/strings.mjs";
+import { resonanceMap, worldMap } from "/maps.mjs";
 
 // ---- tiny DOM helpers ---------------------------------------------------------
 
@@ -165,6 +166,7 @@ const ui = {
   talkThread: null,          // {channel_id, messages, loading}
   talkPoll: null,
   groupTab: "discussion",
+  peopleMap: "strength",     // strength | where
   newGroup: null,            // {introId, title, brief}
   contribute: null,          // {text, note, preview, busy}
   drafts: {},                // field id -> what is typed, kept across re-renders
@@ -425,7 +427,7 @@ function thoughtCard(row) {
 
 function composer() {
   if (!ui.composer) {
-    return el("div", {class: "composer-offer"}, [button(t("thoughts.new"), () => { ui.composer = {step: "write", text: "", preview: null, busy: false}; render(); }, {variant: "btn--primary"})]);
+    return el("div", {class: "composer-offer"}, [button(t("thoughts.new"), () => { ui.composer = {step: "write", text: "", preview: null, busy: false, place: null}; render(); }, {variant: "btn--primary"})]);
   }
   const c = ui.composer;
   const box = el("section", {class: "panel composer", "aria-label": t("thoughts.new")});
@@ -438,7 +440,13 @@ function composer() {
       if (!c.text.trim()) { area.focus(); return; }
       c.busy = true; c.error = ""; render();
       try {
-        await store.write("/api/webmcp/prepare", {request_id: store.requestId("prep"), context: c.text, authorship: "their_own_words"});
+        const where = c.place && (ui.drafts["compose-city"] || "").trim()
+          ? {lat: c.place.lat, lon: c.place.lon, city: (ui.drafts["compose-city"] || "").trim(), region: (ui.drafts["compose-region"] || "").trim() || "—"}
+          : undefined;
+        // This is the person, typing into their own page: there is no
+        // assistant between the words and the author, so the page states it.
+        await store.write("/api/webmcp/prepare", {request_id: store.requestId("prep"), context: c.text,
+          authorship: "their_own_words", coarse_location: where});
         const preview = await fetch("/api/webmcp/preview", {credentials: "same-origin", cache: "no-store"}).then((r) => r.json());
         if (!preview?.confirmation_token) throw new Error(preview?.message || t("thoughts.composer.nothing"));
         c.preview = preview; c.step = "preview";
@@ -447,8 +455,24 @@ function composer() {
       }
       c.busy = false; render();
     }, {variant: "btn--primary", disabled: c.busy});
+    const place = el("div", {class: "place-row"});
+    const placeToggle = el("input", {type: "checkbox", id: "compose-place", checked: !!c.place});
+    placeToggle.addEventListener("change", async () => {
+      if (!placeToggle.checked) { c.place = null; render(); return; }
+      try {
+        const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 8000}));
+        c.place = {lat: Math.round(pos.coords.latitude * 10) / 10, lon: Math.round(pos.coords.longitude * 10) / 10, city: c.place?.city || "", region: c.place?.region || ""};
+      } catch { c.place = null; placeToggle.checked = false; notice(t("thoughts.place.denied")); }
+      render();
+    });
+    place.append(el("label", {for: "compose-place", class: "check"}, [placeToggle, " ", t("thoughts.place.offer")]));
+    if (c.place) {
+      place.append(draftField("input", "compose-city", {type: "text", maxLength: 80, placeholder: t("thoughts.place.city")}),
+        draftField("input", "compose-region", {type: "text", maxLength: 80, placeholder: t("thoughts.place.region")}),
+        el("p", {class: "hint"}, t("thoughts.place.hint", {lat: c.place.lat, lon: c.place.lon})));
+    }
     box.append(el("label", {for: "compose-text", class: "label"}, t("thoughts.composer.label")), area,
-      el("p", {class: "hint"}, t("thoughts.composer.hint")),
+      el("p", {class: "hint"}, t("thoughts.composer.hint")), place,
       el("div", {class: "row"}, [submit, button(t("thoughts.composer.cancel"), () => { ui.composer = null; render(); }, {variant: "btn--quiet"})]), status);
     return box;
   }
@@ -516,9 +540,11 @@ function peopleView() {
   if (!people.length) {
     frag.append(empty(t("people.empty.title"), t("people.empty.body")));
   } else {
+    frag.append(el("p", {class: "count"}, t("people.found", {n: people.length})));
+    frag.append(mapPanel(people, near, chosen));
     const list = el("ol", {class: "match-list"}, people.map((m) => matchCard(m, chosen)));
     const detail = el("aside", {class: "detail"}, evidencePanel(people.find((m) => m.session_id === ui.peopleSelected), chosen));
-    frag.append(el("p", {class: "count"}, t("people.found", {n: people.length})), el("div", {class: "split"}, [list, detail]));
+    frag.append(el("div", {class: "split"}, [list, detail]));
   }
   if (payload.shape_note) frag.append(el("p", {class: "hint"}, payload.shape_note));
   if (near.length) {
@@ -529,6 +555,40 @@ function peopleView() {
   return frag;
 }
 
+// The two maps of the same result: how close each person is, and where the
+// ones who said so are. A click on either selects the person below.
+function mapPanel(people, near, thought) {
+  const panel = el("section", {class: "panel map-panel", "aria-label": t("people.map")});
+  const tabs = el("div", {class: "tabs", role: "tablist"}, [["strength", t("people.map.strength")], ["where", t("people.map.where")]].map(([key, label]) =>
+    el("button", {type: "button", role: "tab", class: "tab", "aria-selected": String(ui.peopleMap === key), onclick: () => { ui.peopleMap = key; render(); }}, label)));
+  panel.append(tabs);
+  const select = (id) => { ui.peopleSelected = id; render(); document.querySelector(".detail")?.scrollIntoView({block: "nearest"}); };
+  if (ui.peopleMap === "strength") {
+    const items = [...people, ...near.filter((m) => !m.hard_rejection)].map((m) => ({
+      id: m.session_id, name: m.person_pseudonym, topic: m.display?.topic || "", kind: m.mode_classification,
+      strength: Number(m.scores?.structural) || 0, links: m.evidence?.preserved_relation_count || 0,
+      contradictions: m.evidence?.contradiction_count || 0}));
+    const {svg, legend} = resonanceMap(items, {selected: ui.peopleSelected, onSelect: select, kindLabel: verdict});
+    panel.append(el("div", {class: "map-frame"}, svg));
+    panel.append(el("ul", {class: "map-legend"}, legend.map((row) => el("li", {}, [el("span", {class: `swatch swatch--${row.kind}`}), `${row.label} · ${row.count}`]))));
+    panel.append(el("p", {class: "hint"}, t("people.map.strength.hint")));
+  } else {
+    const entry = store.getState().geo.get(thought.session_id);
+    if (!entry) store.geo(thought.session_id);
+    if (!entry || (entry.loading && !entry.payload)) { panel.append(el("p", {class: "quiet"}, t("loading"))); return panel; }
+    if (!entry.payload) { panel.append(el("p", {class: "status status--error"}, entry.error || "")); return panel; }
+    const {svg, placed, unplaced} = worldMap(entry.payload, {selected: ui.peopleSelected, onSelect: select});
+    panel.append(el("div", {class: "map-frame map-frame--world"}, svg));
+    const lines = [];
+    if (!entry.payload.you) lines.push(t("people.map.you_unplaced"));
+    if (unplaced.length) lines.push(t("people.map.unplaced", {n: unplaced.length, names: unplaced.map((p) => p.name).join(", ")}));
+    if (!placed.length && !unplaced.length) lines.push(t("people.map.nobody"));
+    lines.push(t("people.map.where.hint"));
+    panel.append(el("p", {class: "hint"}, lines.join(" ")));
+  }
+  return panel;
+}
+
 function rejectionWords(reason) {
   const kind = String(reason || "").split(":")[0];
   if (kind === "direction") return t("people.reject.direction");
@@ -536,7 +596,7 @@ function rejectionWords(reason) {
   return t("people.reject.other");
 }
 
-function matchCard(m) {
+function matchCard(m, thought) {
   const selected = m.session_id === ui.peopleSelected;
   const first = m.evidence?.top_correspondences?.[0];
   const card = el("li", {class: `match ${selected ? "is-selected" : ""}`});
@@ -547,6 +607,9 @@ function matchCard(m) {
     first ? el("p", {class: "match__why"}, [first.query_label, el("span", {class: "arrow"}, " ↔ "), first.candidate_label]) : null,
     el("div", {class: "strength"}, [el("progress", {max: 1, value: Math.max(0, Math.min(1, Number(m.scores?.structural) || 0)), "aria-hidden": "true"}),
       el("span", {}, strengthWord(m.scores?.structural)), el("span", {class: "quiet"}, score(m.scores?.structural))]),
+    // The depth of the match, so a person with many matches can tell which
+    // go deepest: how many of their ideas correspond, and how many links hold.
+    el("p", {class: "match__depth"}, t("people.depth", {nodes: m.evidence?.mapped_node_count || 0, total: thought?.nodes?.length || 0, links: m.evidence?.preserved_relation_count || 0})),
     m.display?.demo_persona ? el("p", {class: "quiet"}, t("people.example")) : null,
   ]);
   card.append(open);

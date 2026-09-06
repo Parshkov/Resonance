@@ -135,9 +135,11 @@ def fit(value: str, characters: int) -> str:
     """Cut a label to what will fit, with an ellipsis so nobody is misquoted."""
     if len(value) <= characters:
         return value
-    if characters <= 1:
+    if characters <= 3:
         return value[:characters]
-    return value[:characters - 1] + "…"
+    # Three dots, not the ellipsis glyph: the bitmap font has no "…", and a
+    # missing glyph was drawn as a box at the end of every cut label.
+    return value[:characters - 3] + "..."
 
 
 def wrap(value: str, characters: int, lines: int) -> Sequence[str]:

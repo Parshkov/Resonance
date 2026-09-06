@@ -70,7 +70,7 @@ class VisualsTests(unittest.TestCase):
         result = self._call(alice.access_token, "resonance_discover")
         kinds = [block["type"] for block in result["content"]]
         self.assertEqual(kinds[0], "text", "the text block must come first")
-        self.assertIn("image", kinds)
+        self.assertEqual(kinds.count("image"), 2, "the strength picture and the map")
         drawing = next(b for b in result["content"] if b["type"] == "image")
         # PNG, because that is what a chat client renders. It used to be an
         # SVG resource, which no client drew and which Claude printed into the
@@ -80,14 +80,16 @@ class VisualsTests(unittest.TestCase):
 
     def test_no_map_is_sent_when_there_is_nothing_on_it(self):
         """An empty map is worse than no map: it says "nobody is anywhere"
-        when the truth is that nobody consented to say where they are."""
+        when the truth is that nobody consented to say where they are. The
+        picture of how closely each person matches does not depend on any
+        location, so that one still rides along: one image, not two."""
         alice, _ = self._share("alice", ALICE)
         self._share("bob", BOB)                      # no location consented
         result = self._call(alice.access_token, "resonance_discover")
-        # No drawing. The reply carries two text blocks by design -- one in
-        # words for the person, one serialized for the client -- so what this
-        # asserts is the absence of an image, not a block count.
-        self.assertNotIn("image", [b["type"] for b in result["content"]])
+        images = [b for b in result["content"] if b["type"] == "image"]
+        self.assertEqual(len(images), 1, "the strength picture, and no map")
+        located = self._call(alice.access_token, "resonance_discover")
+        self.assertEqual(len([b for b in located["content"] if b["type"] == "image"]), 1)
 
     def test_the_structure_drawing_rides_with_the_evidence(self):
         alice, _ = self._share("alice", ALICE)
@@ -140,7 +142,9 @@ class VisualsTests(unittest.TestCase):
             pictures.render_map_png = broken
         self.assertFalse(result["isError"])
         self.assertTrue(result["structuredContent"]["matches_in_backend_order"])
-        self.assertNotIn("image", [b["type"] for b in result["content"]])
+        # the map failed and is simply absent; the strength picture, drawn by
+        # another renderer, still rides along
+        self.assertEqual([b["type"] for b in result["content"]].count("image"), 1)
 
     def test_a_plain_tool_still_returns_plain_json(self):
         creds = self.runtime.product.register_guest()

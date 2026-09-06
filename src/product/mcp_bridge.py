@@ -281,7 +281,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 # ---------------------------------------------------------------------------
 
 from src.product import authorship as authorship_rule
-from src.product import phrasing
+from src.product import names, phrasing
 from src.product import pictures
 from src.product import rich
 
@@ -360,7 +360,10 @@ TOOLS: list[dict[str, Any]] = [
         "name": "resonance_whoami",
         "title": "Who am I in Resonance",
         "description": "Return the connected Resonance account (pseudonymous id, display label) and "
-                       "what is currently shared. Call first to confirm the key works.",
+                       "what is currently shared. Call first to confirm the key works. The "
+                       "pseudonym and the share state are what a person hears; identifiers "
+                       "(user ids, session ids, workspace ids) exist for subsequent calls and "
+                       "carry no meaning for a person.",
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True},
     },
@@ -371,11 +374,12 @@ TOOLS: list[dict[str, Any]] = [
             "Step 1 of 2. Builds a private draft and returns both the exact preview of what "
             "would become discoverable and a one-time confirmation_token. Nothing becomes "
             "discoverable at this step, and the conversation text is not retained. "
-            "`context` is the preferred input: the person's sentences (≤ 4000 chars) are "
-            "converted to a Thought Graph by a deterministic cue extractor with no model in "
-            "the loop, and contact details are scrubbed. `thought` (a labelled causal graph) "
-            "is for text carrying no explicit connectives (because, leads to, prevents, "
-            "requires). `topic` and `domain` name the thought for other people in place of "
+            "Prefer `thought`: a small labelled causal graph of what the person actually "
+            "reasoned (their claims, their causes and effects, in English labels), extracted "
+            "from their own words. `context` (their raw sentences, ≤ 4000 chars) is "
+            "the fallback for text that already carries explicit connectives (because, leads "
+            "to, prevents, requires); a rule-based extractor reads it and abstains on prose "
+            "without them. `topic` and `domain` name the thought for other people in place of "
             "the placeholder \"Shared thought\"; both are presentation only and never affect "
             "matching. The server requires `authorship` and rejects the value `i_proposed_it`. "
             "resonance_share_thought accepts only the confirmation_token returned here, once."),
@@ -558,9 +562,10 @@ TOOLS: list[dict[str, Any]] = [
         "name": "resonance_open_topic",
         "title": "Open a shared topic with someone who accepted",
         "description": (
-            "Opens a shared topic on top of an accepted introduction, where both sides build "
-            "one understanding rather than trading messages. Requires confirm=true. The title "
-            "is shown to every member of the topic."),
+            "Opens a shared topic (a group around one idea) on top of an accepted "
+            "introduction, where members talk, split the work into parts and build one "
+            "understanding. Requires confirm=true. The title is shown to every member and is "
+            "the name a person knows the topic by; the workspace id is not."),
         "inputSchema": {
             "type": "object",
             "properties": {"intro_id": {"type": "string"},
@@ -576,8 +581,10 @@ TOOLS: list[dict[str, Any]] = [
         "name": "resonance_topics",
         "title": "List the shared topics this person is part of",
         "description": (
-            "List the shared topics this account belongs to, with the number of contributions "
-            "waiting to be read in each. A topic can hold more than two people."),
+            "List the shared topics (groups around one idea) this account belongs to, with "
+            "the number of contributions waiting to be read in each. A topic can hold more "
+            "than two people. A topic is known to a person by its title; the workspace id "
+            "exists for subsequent calls and carries no meaning for a person."),
         "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         "annotations": {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": False, "idempotentHint": True, "untrustedContentHint": True},
     },
@@ -1033,11 +1040,20 @@ class RemoteMCPBridge:
         actor = self._actor(token)
         user = self.product.identity.backend.get_user(actor.user_id)
         owned = self._owned(token)
+        by_id = {str(s.get("session_id")): s for s in owned}
+        def named(ids):
+            return [{"name": names.thought_name(by_id.get(str(i), {"session_id": i})),
+                     "session_id": i} for i in ids]
         return {
             "contract_version": BRIDGE_CONTRACT,
             "user_id": actor.user_id,
             "display_label": getattr(user, "display_label", None) if user is not None else None,
             "actor_type": actor.actor_type,
+            # Every thought by name, the way a person knows it; the ids beside
+            # them are for the next call.
+            "thoughts": {"shared": named(_in_state(owned, _SHARED)),
+                         "private": named(_in_state(owned, _PRIVATE)),
+                         "withdrawn": named(_in_state(owned, _WITHDRAWN))},
             "shared_thoughts": _in_state(owned, _SHARED),
             # Withdrawn is not private. Everything that was not discoverable
             # fell into one bucket, so a thought this person had already taken
@@ -1165,10 +1181,17 @@ class RemoteMCPBridge:
         wondering what they actually shared. The page has drawn it since the
         redesign; a chat could only describe it.
         """
-        sessions = self._owned(token)
+        sessions = [dict(s, name=names.thought_name(s)) for s in self._owned(token)]
         result = {"contract_version": BRIDGE_CONTRACT, "sessions": sessions}
         drawings: list[Mapping[str, Any]] = []
-        for index, session in enumerate(sessions[:3]):
+        # The thoughts a person is asking about first: what is discoverable,
+        # newest first. The store's order is by id, which drew a withdrawn
+        # thought and skipped the one shared a minute ago.
+        discoverable = [s for s in sessions if s.get("share_state") == "discoverable"]
+        others = [s for s in sessions if s.get("share_state") != "discoverable"]
+        by_newest = lambda s: str(s.get("created_at") or "")  # noqa: E731
+        ordered = sorted(discoverable, key=by_newest, reverse=True) + sorted(others, key=by_newest, reverse=True)
+        for index, session in enumerate(ordered[:4]):
             dna = session.get("thought_dna") or {}
             if not (dna.get("nodes") and dna.get("relations")):
                 continue
@@ -1203,6 +1226,8 @@ class RemoteMCPBridge:
         result = {
             "contract_version": BRIDGE_CONTRACT,
             "result_id": response["result_id"],
+            # The search by name, for a person; the id beside it, for the next call.
+            "search_name": names.name_for(str(response["result_id"]), prefix="Search"),
             "query_session_id": session_id,
             "source": response.get("source"),
             "discovery_contract": response.get("discovery_contract"),
@@ -1231,12 +1256,19 @@ class RemoteMCPBridge:
         """
         if not str(response.get("result_id") or ""):
             return []
-        located = any((row.get("display") or {}).get("location")
-                      for row in response.get("matches") or [])
+        matches = [row for row in response.get("matches") or []
+                   if row.get("hard_rejection") is None]
+        drawings: list[dict[str, Any]] = []
+        # How closely each person matches: the picture a person asks for
+        # first, and the one that exists whether or not anyone said where
+        # they are.
+        if matches:
+            drawings.extend(_drawing(pictures.render_resonance_png, response))
+        located = any((row.get("display") or {}).get("location") for row in matches)
         buckets = (response.get("aggregation") or {}).get("buckets") or []
-        if not located and not buckets:
-            return []
-        return _drawing(pictures.render_map_png, response)
+        if located or buckets:
+            drawings.extend(_drawing(pictures.render_map_png, response))
+        return drawings
 
     def tool_explain_match(self, token: str, arguments: dict[str, Any]) -> Any:
         result_id = self._required_id(arguments, "result_id")
