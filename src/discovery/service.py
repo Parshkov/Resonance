@@ -22,7 +22,11 @@ from .metadata import METADATA_SCHEMA_VERSION, ConsentRegistry, SessionProfile
 
 DISCOVERY_CONTRACT_VERSION = "resonance-discovery/0.1"
 ACTIONS = ("compare", "explain", "request_intro")
-MAX_EVIDENCE_ITEMS = 5
+# Every correspondence and every kept link, not a sample: the page draws
+# which of your ideas the other person answers, and a cap of five made the
+# sixth idea look unanswered when it was the count that had been cut. A
+# thought has a handful of ideas, so the bound is only against the absurd.
+MAX_EVIDENCE_ITEMS = 40
 
 
 def _sha(value: Any) -> str:
