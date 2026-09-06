@@ -392,9 +392,33 @@ T_CONCEPT_ANALOGY = 0.25     # abstract-concept alignment required for analogy (
 T_CONCEPT_WEAK = 0.12        # minimal concept support for a rare-skeleton analogy
 T_RARE_SKELETON = 0.55       # corpus rarity above which structure alone may argue
 T_ANALOGICAL_STRUCTURE = 0.80
+# Same subject, nothing contradicted: a lower bar on whole-graph structure.
+#
+# `structural` compares wholes, so it falls as one person's picture grows --
+# which is how someone working on one piece of your problem came back
+# "negative". Measured on that pair: structural 0.228, semantic 0.561,
+# contradiction 0.0, one relation of three preserved.
+#
+# Containment was tried first and is the wrong signal: the demo corpus's
+# vocabulary trap -- same words, wrong structure, which must stay negative --
+# also has coverage_containment 1.0. Semantic agreement is what separates
+# them, 0.561 against 0.082, and it is what this reads.
+T_STRUCTURE_SAME_SUBJECT = 0.15
+T_SAME_SUBJECT_SEMANTIC = 0.40
 T_DIRECT_COVERAGE = 0.80
 
 CLASSIFY_POLICY = "scoring-v0.2-concept-aligned-analogy/0.2"
+
+# Every verdict `classify` can return, declared once so that the places which
+# have to put these into words cannot fall behind the engine.
+#
+# They did. The chat and the page carried a phrase for "literal", which this
+# module never returns, and none for "direct" or "complementary", which it
+# does -- so two people working on the same subject were told they were a
+# "direct", and the pair where each holds what the other lacks was told
+# "complementary". The one verdict with human words was "analogical", which is
+# why the product read as though it only wanted people from another field.
+CLASSIFICATIONS = ("direct", "approximate", "analogical", "complementary", "negative")
 
 
 def _direct_or_approximate(components: dict) -> str:
@@ -412,11 +436,20 @@ def classify(components: dict) -> str:
         return "complementary"
     if components["h_sign_conflict"]:
         return "negative"
-    if components["structural"] < T_STRUCTURE or components["contradiction"] > T_CONTRADICTION:
-        return "negative"
     surface = components.get("surface_semantic", components["semantic"])
     domain = components.get("domain_overlap", 0.0)
     concept = components.get("concept_alignment", 0.0)
+    floor = T_STRUCTURE
+    if (components["semantic"] >= T_SAME_SUBJECT_SEMANTIC
+            and components["contradiction"] == 0.0
+            and components["r_direct"] > 0.0):
+        # Two people plainly on the same subject, with a relation in common and
+        # nothing contradicted. Whole-graph structure is the wrong ruler here:
+        # it measures how alike the pictures are, and the person working on one
+        # part of your problem necessarily has a smaller one.
+        floor = T_STRUCTURE_SAME_SUBJECT
+    if components["structural"] < floor or components["contradiction"] > T_CONTRADICTION:
+        return "negative"
     # Corpus rarity is a claim about a corpus: without one (pairwise compare)
     # structure alone may not argue analogy, whatever the default value says.
     rarity = components.get("rarity", 0.0) if components.get("rarity_weighting") else 0.0

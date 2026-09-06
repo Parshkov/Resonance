@@ -190,7 +190,14 @@ function setShellState(value) {
 const CLASSIFICATION_IN_WORDS = {
   analogical: "same shape, different subject",
   approximate: "close — some of it lines up",
-  literal: "the same thing, said the same way",
+  // The engine returns "direct" and "complementary"; it never returns
+  // "literal". This table had words only for the one it never sends, so a
+  // person matched inside their own field read the word "direct" about
+  // themselves, and the pair where each holds what the other lacks read
+  // "complementary". See src/scoring.CLASSIFICATIONS.
+  direct: "the same thing, and they are working on it too",
+  literal: "the same thing, and they are working on it too",
+  complementary: "what you are missing is what they work on",
   negative: "not called a resonance",
 };
 
