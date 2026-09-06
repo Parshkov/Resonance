@@ -243,8 +243,8 @@ def _name_after_its_structure(product, token: str, session_id: Any,
         pass
 
 
-def _live_context(product, token: str) -> dict[str, Any] | None:
-    session_id = _owned_live_session(product, token)
+def _live_context(product, token: str, *, session_id: str | None = None) -> dict[str, Any] | None:
+    session_id = session_id or _owned_live_session(product, token)
     if not session_id:
         return None
     session = product.identity.backend.get_session(session_id)
@@ -818,9 +818,13 @@ class WebHandler(ProductHandler):
         if path == "/api/context":
             context = None
             token = self._visitor_token()
+            asked = (params.get("session_id") or [""])[0]
             if token is not None:
                 try:
-                    context = _live_context(product, token)
+                    if asked and asked in set(_discoverable_sessions(product, token)):
+                        context = _live_context(product, token, session_id=asked)
+                    else:
+                        context = _live_context(product, token)
                 except Exception:
                     context = None
             if context is None:

@@ -239,3 +239,231 @@ export function worldMap(geo, {selected = null, onSelect = null} = {}) {
   }
   return {svg, placed, unplaced};
 }
+
+// ---- the constellation ----------------------------------------------------------
+//
+// Every thought of yours is a centre; every person found is a body drawn
+// towards the thoughts they resonate with. The pull is the structural score
+// (a strong match sits close), the size is the depth of the match (how many
+// of your ideas theirs answers), and the colour is the kind of match. A
+// small force layout places them; nothing is ranked here, only placed.
+
+function forceLayout(nodes, links, {width, height, iterations = 260} = {}) {
+  const cx = width / 2, cy = height / 2;
+  nodes.forEach((n, i) => {
+    if (n.fixed) return;
+    const a = (i / Math.max(1, nodes.length)) * Math.PI * 2;
+    n.x = cx + Math.cos(a) * width * 0.3; n.y = cy + Math.sin(a) * height * 0.3;
+    n.vx = 0; n.vy = 0;
+  });
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  let alpha = 1;
+  for (let step = 0; step < iterations; step += 1) {
+    // repulsion
+    for (let i = 0; i < nodes.length; i += 1) {
+      for (let j = i + 1; j < nodes.length; j += 1) {
+        const a = nodes[i], b = nodes[j];
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d2 = dx * dx + dy * dy || 0.01;
+        const min = (a.r + b.r + 18);
+        const d = Math.sqrt(d2);
+        const force = (d < min ? (min - d) * 0.6 : 900 / d2) * alpha;
+        const fx = dx / d * force, fy = dy / d * force;
+        if (!a.fixed) { a.vx -= fx; a.vy -= fy; }
+        if (!b.fixed) { b.vx += fx; b.vy += fy; }
+      }
+    }
+    // springs: rest length shrinks with strength
+    for (const l of links) {
+      const a = byId.get(l.source), b = byId.get(l.target);
+      if (!a || !b) continue;
+      const rest = 60 + (1 - l.strength) * 220;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      const force = (d - rest) * 0.05 * alpha;
+      const fx = dx / d * force, fy = dy / d * force;
+      if (!a.fixed) { a.vx += fx; a.vy += fy; }
+      if (!b.fixed) { b.vx -= fx; b.vy -= fy; }
+    }
+    for (const n of nodes) {
+      if (n.fixed) continue;
+      n.vx += (cx - n.x) * 0.004 * alpha; n.vy += (cy - n.y) * 0.004 * alpha;
+      n.x += n.vx; n.y += n.vy; n.vx *= 0.6; n.vy *= 0.6;
+      n.x = Math.max(n.r + 8, Math.min(width - n.r - 8, n.x));
+      n.y = Math.max(n.r + 8, Math.min(height - n.r - 8, n.y));
+    }
+    alpha = Math.max(0.05, alpha * 0.985);
+  }
+}
+
+export function constellation({centres, people, links}, {selected = null, onSelect = null, kindLabel = (k) => k, width = 720, height = 460} = {}) {
+  const nodes = [];
+  const n = centres.length;
+  centres.forEach((c, i) => {
+    const angle = -Math.PI / 2 + (i / Math.max(1, n)) * Math.PI * 2;
+    const spread = n > 1 ? Math.min(width, height) * 0.34 : 0;
+    nodes.push({id: c.id, kind: "centre", label: c.label, r: 12, fixed: true,
+      x: width / 2 + Math.cos(angle) * spread, y: height / 2 + Math.sin(angle) * spread});
+  });
+  for (const p of people) {
+    const near = p.kind === "negative";
+    nodes.push({id: p.id, kind: p.kind, label: p.name, r: near ? 4 : 7 + Math.min(10, p.depth * 2), strength: p.strength, topic: p.topic, depth: p.depth, links: p.links, near});
+  }
+  forceLayout(nodes, links, {width, height});
+  const svg = svgEl("svg", {class: "cmap", viewBox: `0 0 ${width} ${height}`, role: "img"});
+  const title = svgEl("title"); title.textContent = "Who resonates with which of your thoughts, and how closely";
+  svg.append(title);
+  const byId = new Map(nodes.map((nd) => [nd.id, nd]));
+  for (const l of links) {
+    const a = byId.get(l.source), b = byId.get(l.target);
+    if (!a || !b) continue;
+    const line = svgEl("line", {x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: `cmap__link cmap__link--${l.kind || "other"} ${l.contradictions ? "is-dashed" : ""}`,
+      "stroke-width": String(1 + l.strength * 4), "stroke-opacity": String(0.25 + l.strength * 0.6)});
+    line.dataset.person = l.target; line.dataset.centre = l.source;
+    const hint = svgEl("title"); hint.textContent = `${b.label} ↔ ${a.label}: ${l.strength.toFixed(2)}`;
+    line.append(hint);
+    svg.append(line);
+  }
+  for (const nd of nodes) {
+    const g = svgEl("g", {class: `cmap__node cmap__node--${nd.kind} ${nd.id === selected ? "is-selected" : ""}`, tabindex: nd.kind === "centre" ? "-1" : "0", role: nd.kind === "centre" ? "img" : "button"});
+    g.dataset.id = nd.id;
+    if (nd.kind === "centre") {
+      g.append(svgEl("circle", {cx: nd.x, cy: nd.y, r: nd.r + 6, class: "cmap__halo"}));
+      g.append(svgEl("circle", {cx: nd.x, cy: nd.y, r: nd.r, class: "cmap__centre"}));
+    } else {
+      g.append(svgEl("circle", {cx: nd.x, cy: nd.y, r: nd.r + 10, class: "cmap__hit"}));
+      g.append(svgEl("circle", {cx: nd.x, cy: nd.y, r: nd.r, class: `cmap__dot cmap__dot--${nd.kind}`}));
+    }
+    if (!nd.near) {
+      const label = svgEl("text", {x: nd.x + nd.r + 5, y: nd.y + 4, class: `cmap__name ${nd.kind === "centre" ? "cmap__name--centre" : ""}`});
+      const most = nd.kind === "centre" ? 22 : 26;
+      label.textContent = nd.label.length > most ? nd.label.slice(0, most - 1) + "…" : nd.label;
+      g.append(label);
+    }
+    const hint = svgEl("title");
+    hint.textContent = nd.kind === "centre" ? nd.label : `${nd.label} · ${nd.topic || ""} · ${(nd.strength || 0).toFixed(2)} · ${nd.depth} ideas correspond`;
+    g.append(hint);
+    if (onSelect && nd.kind !== "centre") {
+      g.addEventListener("click", () => onSelect(nd.id));
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(nd.id); } });
+    }
+    g.addEventListener("mouseenter", () => svg.querySelectorAll(`[data-person="${nd.id}"], [data-centre="${nd.id}"]`).forEach((l) => l.classList.add("is-hot")));
+    g.addEventListener("mouseleave", () => svg.querySelectorAll(".is-hot").forEach((l) => l.classList.remove("is-hot")));
+    svg.append(g);
+  }
+  return svg;
+}
+
+// ---- what corresponds, drawn -------------------------------------------------------
+//
+// Your ideas in a column on the left, theirs on the right, a line between
+// each pair the engine put together. Links you both keep are drawn as arcs
+// on your side; hovering an idea lights its counterpart and its links.
+
+export function correspondence({mine, theirs, pairs, keptRelations = [], contradictions = []}, {width = 640} = {}) {
+  const rowH = 34, top = 30, margin = 34;
+  const rows = Math.max(mine.length, theirs.length, 1);
+  const height = top + rows * rowH + 16;
+  const leftX = margin, rightX = width - 12, colW = (width - margin - 12 - 60) / 2;
+  const svg = svgEl("svg", {class: "corr", viewBox: `0 0 ${width} ${height}`, role: "img"});
+  const title = svgEl("title"); title.textContent = "Which of their ideas answers which of yours";
+  svg.append(title);
+  const yOf = (i) => top + i * rowH + rowH / 2;
+  const widthOf = (item) => Math.min(colW, 7.2 * Math.min(item.label.length, 34) + 20);
+  const mineIndex = new Map(mine.map((m, i) => [m.id, i]));
+  const theirsIndex = new Map(theirs.map((m, i) => [m.id, i]));
+  const paired = new Map(pairs.map((p) => [p.mine, p.theirs]));
+  const answered = new Set(paired.values());
+  // Kept links: an arc between two of your ideas, in the margin to the left,
+  // meaning the other person keeps this link between the same two ideas.
+  for (const rel of keptRelations) {
+    const a = mineIndex.get(rel.source), b = mineIndex.get(rel.target);
+    if (a === undefined || b === undefined) continue;
+    const y1 = yOf(a), y2 = yOf(b), x = leftX;
+    const bend = Math.min(margin - 4, 12 + Math.abs(y2 - y1) * 0.25);
+    const path = svgEl("path", {d: `M${x} ${y1} C${x - bend} ${y1}, ${x - bend} ${y2}, ${x} ${y2}`, class: "corr__kept"});
+    path.dataset.nodes = `${rel.source} ${rel.target}`;
+    const hint = svgEl("title"); hint.textContent = `${mine[a].label} ${String(rel.type || "").replace(/_/g, " ")} ${mine[b].label}: they keep this link too`;
+    path.append(hint);
+    svg.append(path);
+  }
+  // Correspondences: a curve from the right edge of your idea to the left
+  // edge of theirs.
+  for (const [mid, tid] of paired) {
+    const a = mineIndex.get(mid), b = theirsIndex.get(tid);
+    if (a === undefined || b === undefined) continue;
+    const x1 = leftX + widthOf(mine[a]), x2 = rightX - widthOf(theirs[b]);
+    const mid_x = (x1 + x2) / 2;
+    const line = svgEl("path", {d: `M${x1} ${yOf(a)} C${mid_x} ${yOf(a)}, ${mid_x} ${yOf(b)}, ${x2} ${yOf(b)}`, class: "corr__pair"});
+    line.dataset.nodes = `${mid} ${tid}`;
+    const hint = svgEl("title"); hint.textContent = `${mine[a].label} ↔ ${theirs[b].label}`;
+    line.append(hint);
+    svg.append(line);
+  }
+  const contested = new Set(contradictions.flatMap((c) => [c.mine, c.theirs].filter(Boolean)));
+  const column = (items, x, anchor, side) => items.forEach((item, i) => {
+    const alone = side === "mine" ? !paired.has(item.id) : !answered.has(item.id);
+    const g = svgEl("g", {class: `corr__idea corr__idea--${side} ${alone ? "is-alone" : ""} ${contested.has(item.id) ? "is-contested" : ""}`, tabindex: "0"});
+    g.dataset.id = item.id;
+    const w = widthOf(item);
+    const bx = anchor === "start" ? x : x - w;
+    g.append(svgEl("rect", {x: bx, y: yOf(i) - 13, width: w, height: 26, rx: 6, class: "corr__box"}));
+    const text = svgEl("text", {x: bx + 10, y: yOf(i) + 4, class: "corr__label"});
+    text.textContent = item.label.length > 34 ? item.label.slice(0, 33) + "…" : item.label;
+    g.append(text);
+    const hint = svgEl("title"); hint.textContent = alone ? `${item.label}: nothing on the other side answers this` : item.label;
+    g.append(hint);
+    const light = (on) => {
+      const partner = side === "mine" ? paired.get(item.id) : [...paired].find(([, v]) => v === item.id)?.[0];
+      svg.querySelectorAll("[data-nodes]").forEach((n) => n.classList.toggle("is-hot", on && n.dataset.nodes.split(" ").includes(item.id)));
+      svg.querySelectorAll("[data-id]").forEach((n) => n.classList.toggle("is-hot", on && (n.dataset.id === item.id || n.dataset.id === partner)));
+    };
+    g.addEventListener("mouseenter", () => light(true));
+    g.addEventListener("mouseleave", () => light(false));
+    g.addEventListener("focus", () => light(true));
+    g.addEventListener("blur", () => light(false));
+    svg.append(g);
+  });
+  column(mine, leftX, "start", "mine");
+  column(theirs, rightX, "end", "theirs");
+  const head = (x, anchor, text) => { const tn = svgEl("text", {x, y: 16, class: "corr__head", "text-anchor": anchor}); tn.textContent = text; svg.append(tn); };
+  head(leftX, "start", "yours"); head(rightX, "end", "theirs");
+  return svg;
+}
+
+// ---- the heat matrix: thoughts × people ------------------------------------------------
+
+export function heatmap({thoughts, people, cell}, {onSelect = null, selected = null} = {}) {
+  const table = document.createElement("table");
+  table.className = "heat";
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.append(document.createElement("th"));
+  for (const th of thoughts) { const c = document.createElement("th"); c.className = "heat__col"; c.textContent = th.label.length > 28 ? th.label.slice(0, 27) + "…" : th.label; c.title = th.label; c.scope = "col"; hr.append(c); }
+  thead.append(hr); table.append(thead);
+  const tbody = document.createElement("tbody");
+  for (const p of people) {
+    const tr = document.createElement("tr");
+    if (p.id === selected) tr.classList.add("is-selected");
+    const name = document.createElement("th"); name.textContent = p.name; name.scope = "row"; tr.append(name);
+    for (const th of thoughts) {
+      const value = cell(p, th);
+      const td = document.createElement("td");
+      if (value === null || value === undefined) { td.className = "heat__none"; td.textContent = "·"; }
+      else {
+        // A near miss is drawn faint whatever its number: the engine did not
+        // call it a resonance, and a dark cell would say otherwise.
+        td.className = value.near ? "heat__cell heat__cell--near" : "heat__cell";
+        td.style.setProperty("--heat", String(value.near ? 0 : Math.max(0, Math.min(1, value.strength))));
+        td.textContent = value.near ? "·" : value.strength.toFixed(2);
+        td.title = `${p.name} × ${th.label}: ${value.strength.toFixed(2)} · ${value.kind}`;
+        td.dataset.kind = value.kind;
+      }
+      if (onSelect) td.addEventListener("click", () => onSelect(p.id));
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  return table;
+}
