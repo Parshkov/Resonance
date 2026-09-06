@@ -34,7 +34,7 @@ import src.alignment  # noqa: F401,E402  (import order: breaks a circular import
 from src.scoring import CLASSIFICATIONS  # noqa: E402
 from src.product.phrasing import CLASSIFICATION_IN_WORDS, classification  # noqa: E402
 
-PAGE = (REPO / "demo" / "ui" / "app.mjs").read_text(encoding="utf-8")
+PAGE = (REPO / "demo" / "ui" / "strings.mjs").read_text(encoding="utf-8")
 
 
 class EveryVerdictHasWordsTests(unittest.TestCase):
@@ -47,11 +47,10 @@ class EveryVerdictHasWordsTests(unittest.TestCase):
                 self.assertIn(" ", said, f"{verdict!r} is not a phrase a person would say")
 
     def test_the_page_can_say_all_of_them(self):
-        block = PAGE[PAGE.index("const CLASSIFICATION_IN_WORDS"):]
-        block = block[:block.index("};")]
+        # The page's words live in strings.mjs, one key per verdict.
         for verdict in CLASSIFICATIONS:
             with self.subTest(verdict):
-                self.assertIn(f"{verdict}:", block,
+                self.assertIn(f'"verdict.{verdict}":', PAGE,
                               f"the page has no words for {verdict!r}")
 
     def test_same_subject_is_not_described_as_a_lesser_match(self):

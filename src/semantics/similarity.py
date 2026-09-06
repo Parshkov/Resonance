@@ -22,8 +22,11 @@ from functools import lru_cache
 
 from .lexicon import LEXICON_VERSION, LONGEST_PHRASE, PHRASE_INDEX, ROLE_HINTS, class_weight, is_domain_concept, relatedness
 from .stem import stem
+from . import neural as _neural
 
 SEMANTICS_VERSION = "resonance-semantics/0.2.0+" + LEXICON_VERSION
+# Encoder relatedness at or above this reads as "the same words".
+NEURAL_SAME_WORDS = 0.6
 
 STOPWORDS = frozenset(
     "a an the of in on at to for from by with without and or but nor so yet as is are was were be been "
@@ -165,6 +168,15 @@ def compare(a: str, b: str) -> LabelSimilarity:
     concept = soft_overlap(ca, cb)
     da, db = domain_concepts(a), domain_concepts(b)
     domain = _jaccard(da, db)
+    # The label encoder (neural.py), when one is active: relatedness the
+    # lexicon could not see. A pair the encoder finds nearly the same counts
+    # as the same vocabulary; a pair it finds related counts as sharing a
+    # concept. It never lowers a signal the lexicon already gave.
+    neural = _neural.relatedness(a, b)
+    if neural > 0.0:
+        concept = max(concept, neural)
+        if neural >= NEURAL_SAME_WORDS:
+            surface = max(surface, neural)
     fused = max(surface, 0.9 * concept, 0.5 * domain, 0.5 * surface + 0.5 * concept)
     return LabelSimilarity(surface=surface, concept=concept, domain=domain, fused=min(1.0, fused))
 

@@ -14,6 +14,7 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 | browser origin allowlist | `--origin https://your.host` (repeatable) | must be the **exact** `https://` origin browsers will use; this is the CSRF/Origin check. Add a second `--origin` for a platform default host alongside a custom domain. |
 | bind address / port | `--host 0.0.0.0 --port $PORT` | the image reads `PORT` from the platform |
 | retire unsigned accounts | `RESONANCE_PURGE_UNSIGNED=report` counts and prints; `=1` carries it out. Tombstones every session whose owning account has no verified sign-in behind it, and revokes those accounts. `RESONANCE_PURGE_KEEP=<id>[,<id>…]` spares named sessions or accounts. A signed-in account is never touched, and a second run finds nothing left to do. Run `report` first, read the counts in the deploy log, then `=1`, then unset. | one-shot operator action |
+| label encoder | `RESONANCE_EMBEDDER=<directory>` holding `tokenizer.json` and `onnx/model_quantized.onnx` (multilingual-e5-small, exported to ONNX; ~135 MB) plus the `onnxruntime` and `tokenizers` packages | **recommended.** Without it the semantic layer is the hand-written English lexicon, which is blind to most real vocabulary and to every other language: the same trip described twice in different words came back "not a resonance". With it, each label is embedded locally on the CPU (about 6 ms a pair, cached), and the cosine adds relatedness the lexicon could not see; structure, contradiction and the verdict are unchanged. The server refuses to start if the variable names a directory it cannot load, and `/api/product/health` reports `engine.label_encoder`. Build the image with `--build-arg RESONANCE_EMBEDDER_MODEL=Xenova/multilingual-e5-small` to bake the model in. |
 | sign-in providers | `RESONANCE_AUTH_GOOGLE_CLIENT_ID` / `RESONANCE_AUTH_GOOGLE_CLIENT_SECRET`, and/or `RESONANCE_AUTH_GITHUB_CLIENT_ID` / `RESONANCE_AUTH_GITHUB_CLIENT_SECRET` | **required for a real deployment.** Setting either pair turns on sign-in, and sign-in then becomes the *only* way an account is created: `POST /api/product/guest` answers `403 sign_in_required`, and the OAuth consent page offers no anonymous option. With neither pair set the pseudonymous guest path stays on — that is the local-development and test configuration, not a production one. Callback URL to register with the provider: `https://<your origin>/auth/callback/google` (and `/auth/callback/github`). Scopes requested are only `openid email profile` / `read:user user:email`. |
 | how mail leaves | This platform blocks outbound SMTP below its Pro plan, and its own documentation says so: "SMTP is only available on the Pro plan and above... Free, Trial, and Hobby plans must use transactional email services with HTTPS APIs", with Resend named as the recommended one. Measured here before that was found: ports 587, 465 and 25 all time out on IPv4, and IPv6 is off by default so every AAAA answers "network is unreachable". So set `RESONANCE_MAIL_API_KEY` (and `RESONANCE_MAIL_FROM`) and mail goes out over 443, the same door the site is served from. `RESONANCE_MAIL_API_URL` defaults to Resend's endpoint; Postmark and Mailgun differ only in field names. The `RESONANCE_SMTP_*` path still works where SMTP is allowed, and an API key wins over it wherever both are set. | |
 | prove mail works | `RESONANCE_MAIL_SELFTEST=you@example.com` sends exactly one message to that address at startup and prints the outcome, then you unset it. `/api/product/health` can only say the variables are set; this says the message arrived. Run it before inviting anyone, because the alternative is finding out from someone who waited for a notification that never came. | one-shot operator action |
@@ -252,11 +253,10 @@ The manual MCP key path (Collaboration panel → **Create MCP key**, or
 
 ## Known limits at the time of writing
 
-- The visual discovery view (map, match cards) needs the `/api/context` and
-  `/api/discover` routes, which `src.product.web_server` serves and the
-  API-only `src.product.server` does not. On the API-only entrypoint the page
-  settles in its error state; the Collaboration panel and every product API
-  still work.
+- The page (`/thoughts`, `/people`, `/talk`, `/groups`, `/connect`) needs the
+  browser routes that `src.product.web_server` serves (`/api/product/overview`,
+  `/api/discover`, the topic routes); the API-only `src.product.server` serves
+  the document but the screens cannot load their data there.
 - One process, one machine: fine for the ≥100-user pilot on the accepted
   structural engine; scale-out would need sticky sessions or a shared
   idempotency store, neither of which the pilot requires.

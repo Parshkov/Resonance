@@ -23,6 +23,20 @@ ENV PYTHONUNBUFFERED=1 \
 # needs no compiler. SQLite deployments work without it.
 RUN pip install --no-cache-dir "psycopg[binary]==3.3.5"
 
+# The label encoder (src/semantics/neural.py): a small multilingual sentence
+# encoder run locally through onnxruntime. Optional at build time -- pass
+# --build-arg RESONANCE_EMBEDDER_MODEL=Xenova/multilingual-e5-small to bake
+# it in -- and switched on at run time with RESONANCE_EMBEDDER=/models/e5.
+# Without it the engine reads labels with the English lexicon only.
+ARG RESONANCE_EMBEDDER_MODEL=
+RUN if [ -n "$RESONANCE_EMBEDDER_MODEL" ]; then \
+      pip install --no-cache-dir "onnxruntime>=1.17" "tokenizers>=0.15" \
+   && mkdir -p /models/e5/onnx \
+   && python3 -c "import urllib.request,sys; base='https://huggingface.co/'+sys.argv[1]+'/resolve/main/'; \
+        [urllib.request.urlretrieve(base+p, '/models/e5/'+p) for p in ('tokenizer.json','onnx/model_quantized.onnx')]" \
+        "$RESONANCE_EMBEDDER_MODEL" \
+   && chmod -R a+rX /models; fi
+
 # Run as an unprivileged user; /data is the only writable location.
 RUN useradd --create-home --uid 10001 resonance \
  && mkdir -p /data \
@@ -45,7 +59,8 @@ USER resonance
 ENV PORT=8080 \
     RESONANCE_DB=/data/live-product.sqlite3 \
     PUBLIC_ORIGIN= \
-    RESONANCE_SEED_DEMO=
+    RESONANCE_SEED_DEMO= \
+    RESONANCE_EMBEDDER=
 
 EXPOSE 8080
 

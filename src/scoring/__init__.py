@@ -332,6 +332,10 @@ def adjudicate(
         # evidence, not evidence of difference, but low coverage still caps
         # what an analogy claim may rest on. Template coincidences (no
         # abstract classes at all) get coverage 0 and therefore 0.
+        # A label encoder (src/semantics/neural.py), when active, has already
+        # raised `concept` on these pairs inside compare(); coverage stays the
+        # lexicon's, so templated labels that an encoder finds alike cannot
+        # manufacture an analogy, and the frozen gates hold either way.
         covered = [x.concept for (i, j), x in zip(mapping_pairs, sims)
                    if _abstract(va.nodes[i].label) and _abstract(vb.nodes[j].label)]
         coverage = len(covered) / n_mapped

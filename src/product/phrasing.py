@@ -350,6 +350,10 @@ def _contribute_to_topic(r: Result) -> str:
     return f"{lead} {note}" if note else lead
 
 
+def _post_in_topic(r: Result) -> str:
+    return "Posted. Everyone in the group can read it, under your pseudonym."
+
+
 def _invite_to_topic(r: Result) -> str:
     return "Invited. They decide whether to join; nothing is shared with them until they do."
 
@@ -396,6 +400,7 @@ PHRASINGS: dict[str, Callable[[Result], str]] = {
     "resonance_topics": _topics,
     "resonance_read_topic": _read_topic,
     "resonance_contribute_to_topic": _contribute_to_topic,
+    "resonance_post_in_topic": _post_in_topic,
     "resonance_invite_to_topic": _invite_to_topic,
     "resonance_respond_topic_invite": _respond_topic_invite,
     "resonance_stop_sharing": _stop_sharing,

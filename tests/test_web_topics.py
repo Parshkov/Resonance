@@ -328,20 +328,21 @@ class WebTopicTests(unittest.TestCase):
         self.assertTrue(record["committed"])
 
     # -- the page itself ---------------------------------------------------------
-    def test_the_module_and_stylesheet_are_served_and_own_a_section(self):
-        with urlopen(self.base + "/topics.mjs", timeout=10) as response:
+    def test_the_page_has_a_groups_screen_over_the_same_routes(self):
+        with urlopen(self.base + "/main.mjs", timeout=10) as response:
             source = response.read().decode()
-        self.assertIn('data-nav-label', source)
-        self.assertIn("Topics", source)
-        self.assertIn('from "/session.mjs"', source)
+        for route in ("/api/product/topic/preview", "/api/product/topic/contribute",
+                      "/api/product/topic/invite", "/api/product/workspace/create",
+                      "/api/product/workspace/note", "/api/product/workspace/task"):
+            self.assertIn(route, source, route)
         self.assertNotIn("innerHTML", source)
-        with urlopen(self.base + "/topics.css", timeout=10) as response:
-            css = response.read().decode()
-        self.assertNotRegex(css, r"#[0-9a-fA-F]{3,8}\b", "raw colours; use the palette tokens")
-        with urlopen(self.base + "/", timeout=10) as response:
+        with urlopen(self.base + "/groups", timeout=10) as response:
             html = response.read().decode()
-        self.assertIn('id="topics-anchor"', html)
-        self.assertIn('src="/topics.mjs"', html)
+        self.assertIn('src="/main.mjs"', html)
+        with urlopen(self.base + "/app.css", timeout=10) as response:
+            css = response.read().decode()
+        self.assertNotRegex(css.split(":root")[0], r"#[0-9a-fA-F]{3,8}\b",
+                            "raw colours outside the palette blocks")
 
 
 if __name__ == "__main__":

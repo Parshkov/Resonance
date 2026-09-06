@@ -118,10 +118,6 @@ class WebServerWebMCPTests(unittest.TestCase):
         unavailable = live.index('setStatus("WebMCP · unavailable")')
         self.assertIn("applyAuthoritativeState(await readAuthoritativeState())",
                       live[unavailable:unavailable + 600])
-        with urlopen(self.base + "/app.mjs", timeout=10) as response:
-            app = response.read().decode()
-        shared = app.index('el("span", "", "Shared with Resonance")')
-        self.assertIn('window.__resonanceWebMCP?.mode !== "live-product"', app[shared - 400:shared])
 
     def test_webmcp_pill_reports_the_browser_not_the_consent_state(self):
         # Regression for the fix above. Making the header consent pill truthful
@@ -158,7 +154,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         client.guest()
         with urlopen(self.base + "/", timeout=10) as response:
             html = response.read().decode()
-        with urlopen(self.base + "/app.mjs", timeout=10) as response:
+        with urlopen(self.base + "/main.mjs", timeout=10) as response:
             app = response.read().decode()
         personas = ["Kwame A.", "Noah R.", "Mei L.", "Gabe S.", "Camille B.",
                     "Diego R.", "Sam D.", "Sora N.", "Theo M.", "Yuki T."]
@@ -173,12 +169,9 @@ class WebServerWebMCPTests(unittest.TestCase):
             self.assertEqual(ctx.exception.code, 409, path)
             self.assertEqual(
                 json.loads(ctx.exception.read().decode())["error"], "share_required", path)
-        # The page renders that as its own state, never through the error path.
-        self.assertIn('setShellState("unshared")', app)
-        self.assertIn("function renderUnshared()", app)
-        self.assertIn("clearActiveThought()", app)
-        # There is no second source to fall back to any more: the fixture
-        # thought is not reachable from the product at all.
+        # The page renders that as its own state (nothing shared yet), never
+        # through the error path, and there is no fixture to fall back to.
+        self.assertIn("people.none_shared", app)
         self.assertNotIn("thought-aria-plasma-lens", app)
 
     def test_index_is_served_in_the_state_it_will_settle_in(self):
@@ -214,9 +207,9 @@ class WebServerWebMCPTests(unittest.TestCase):
         # WebMCP. Resonance speaks both, and the OAuth consent page already
         # offers "Continue as your current account" so they can be one account —
         # the page never said so.
-        with urlopen(self.base + "/", timeout=10) as response:
+        with urlopen(self.base + "/strings.mjs", timeout=10) as response:
             html = response.read().decode()
-        self.assertIn("Resonance also speaks WebMCP", html)
+        self.assertIn("This browser has WebMCP", html)
         # This page once had to admit the surfaces were separate accounts, because
         # the session cookie was SameSite=Strict and a browser navigating from
         # claude.ai to /oauth/authorize did not send it — so the consent page saw
@@ -231,11 +224,10 @@ class WebServerWebMCPTests(unittest.TestCase):
                       / "src" / "product" / "server.py").read_text(encoding="utf-8")
         self.assertIn("SameSite=Lax", server_src)
         self.assertNotIn("SameSite=Strict", server_src)
-        with urlopen(self.base + "/app.mjs", timeout=10) as response:
-            app = response.read().decode()
+        app = html
         # both branches describe the BROWSER, and neither denies the capability
-        self.assertIn("Resonance also speaks WebMCP, and this browser has it", app)
-        self.assertIn("but this browser does not expose", app)
+        self.assertIn("This browser has WebMCP", app)
+        self.assertIn("This browser does not expose", app)
         self.assertNotIn("there is nothing to register here.", app)
         # The page promises the consent screen offers that option; keep the two
         # in step, so the promise cannot outlive the behaviour. (This runtime has
@@ -347,11 +339,12 @@ class WebServerWebMCPTests(unittest.TestCase):
         # tool that reaches a directory without these hints is a tool the host
         # cannot reason about. It caught the two standing-search tools, and then
         # the six shared-topic ones.
-        self.assertEqual(len(TOOLS), 20)
+        # ... and then the one that lets a group talk (resonance_post_in_topic).
+        self.assertEqual(len(TOOLS), 21)
         writes_visible_to_others = {
             "resonance_share_thought", "resonance_request_intro",
             "resonance_respond_intro", "resonance_send_message",
-            "resonance_stop_sharing",
+            "resonance_stop_sharing", "resonance_post_in_topic",
             # A shared topic is a place other people are looking at, so opening
             # one, contributing to it, and inviting or answering an invitation
             # all change what someone else can see. Reading it does not:
@@ -488,9 +481,6 @@ class WebServerWebMCPTests(unittest.TestCase):
                          {n["label"] for n in thought["nodes"]})
         self.assertEqual(live["presentation"]["topic"], "Panic buying after a shortage rumour")
         self.assertTrue(live["consent"]["shared_with_resonance"])
-        with urlopen(self.base + "/app.mjs", timeout=10) as response:
-            app = response.read().decode()
-        self.assertIn('fetch("/api/context", {cache: "no-store"})', app)
 
     def test_webmcp_prepare_raw_context_and_invalid_thought(self):
         client = Client(self.base)
@@ -702,7 +692,7 @@ class WebServerWebMCPTests(unittest.TestCase):
         the browser actually runs says so, since the server cannot tell the
         two callers apart.
         """
-        composer = (UI_DIR / "collab_ui.mjs").read_text(encoding="utf-8")
+        composer = (UI_DIR / "main.mjs").read_text(encoding="utf-8")
         prepare = composer[composer.index("/api/webmcp/prepare"):]
         self.assertIn("their_own_words", prepare[:400],
                       "the page's own share must declare authorship for the person")

@@ -42,7 +42,7 @@ from src.product.mcp_bridge import (
 from src.product.service import LOCATION_NOTE
 from src.identity.models import AuthenticationError
 from src.persistence.errors import PersistenceConflictError
-from src.product import oauth_mount
+from src.product import auth_mount, oauth_mount
 from src.workspaces.topics import CONTRIBUTIONS_TABLE
 from src.product.server import (
     DEFAULT_HOST,
@@ -57,6 +57,7 @@ from src.product.server import (
     startup_purge_sessions,
     startup_assign_pseudonyms,
     startup_purge_unsigned,
+    startup_label_encoder,
 )
 
 WEBMCP_CONTRACT = "resonance-webmcp/0.1"
@@ -576,6 +577,49 @@ def _topic_read(product, token: str, viewer_id: str, workspace_id: str,
     }
 
 
+def _discoverable_sessions(product, token: str) -> list[str]:
+    """The visitor's own thoughts that are discoverable right now."""
+    rows = list(product.owned_sessions(token))
+    return [str(sid) for sid in _in_state(rows, _SHARED)]
+
+
+def _overview(handler, product) -> dict[str, Any]:
+    """One read for the whole page (see `/api/product/overview`)."""
+    token = handler._visitor_token()
+    base: dict[str, Any] = {
+        "contract_version": "resonance-overview/0.1",
+        "authenticated": False,
+        "sign_in_required": handler._sign_in_required(),
+        "sign_in_url": auth_mount.SIGN_IN_PATH,
+    }
+    if token is None:
+        return base
+    try:
+        state = dict(product.state(token))
+    except AuthenticationError:
+        return base
+    base.update({
+        "authenticated": bool(state.get("authenticated")),
+        "account": state.get("account") or {},
+        "freshness": state.get("freshness"),
+    })
+    if not base["authenticated"]:
+        return base
+    subject = handler._subject(token)
+
+    def part(name, reader):
+        try:
+            base[name] = reader()
+        except Exception as error:  # noqa: BLE001 - one missing part must not blank the page
+            base[name] = {"error": str(error)}
+
+    part("mine", lambda: _everything_here(product, token))
+    part("resonances", lambda: product.pending_resonances(token, include_seen=True))
+    part("intros", lambda: product.list_requests(token))
+    part("topics", lambda: _topic_listing(product, token, subject))
+    return base
+
+
 def _topic_listing(product, token: str, viewer_id: str) -> dict[str, Any]:
     """Every topic this person is in, and every one they are invited to.
 
@@ -736,6 +780,15 @@ class WebHandler(ProductHandler):
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
 
+        # Everything the page needs in one read: who you are, your thoughts,
+        # what the standing search found, your introductions and your groups.
+        # One request instead of five, and no 401s racing a fresh session:
+        # a visitor without an account gets the answer "not signed in" as a
+        # 200, which is a page state rather than a fault.
+        if path == "/api/product/overview":
+            self._send_json(_overview(self, product))
+            return
+
         # These two routes translate the page's presentation contract to the
         # live product without any shadow DB.
         if path == "/api/context":
@@ -758,6 +811,12 @@ class WebHandler(ProductHandler):
         if path == "/api/discover":
             token = self._visitor_token()
             session_id = _owned_live_session(product, token) if token else None
+            # The page shows people per thought: `session_id` names one of the
+            # visitor's own discoverable thoughts, and anything else falls
+            # back to the most recently shared one rather than to a refusal.
+            asked = (params.get("session_id") or [""])[0]
+            if token and asked and asked in set(_discoverable_sessions(product, token)):
+                session_id = asked
             if not session_id:
                 # Not an error in the product: the visitor simply has not shared
                 # a thought yet. PermissionError was unmapped and surfaced as a
@@ -1143,6 +1202,7 @@ def serve(host: str, port: int, *, runtime: ProductRuntime) -> ThreadingHTTPServ
 
 
 def main(argv: list[str] | None = None) -> None:
+    startup_label_encoder()
     parser = argparse.ArgumentParser(
         description="Resonance: live product + browser WebMCP")
     parser.add_argument("--host", default=DEFAULT_HOST)

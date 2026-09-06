@@ -727,14 +727,15 @@ only `https://resonance.parshkov.com/mcp` and it completes
 standard OAuth onboarding (Cards B/C). Exact release SHA, deployment and
 executed evidence: [`submission/RELEASE_MANIFEST.md`](submission/RELEASE_MANIFEST.md).
 
-Local replay-only reproduction of the R10 surface (fixture-backed, no accounts):
+To see the product locally with people in it (no accounts, no fixtures on
+the page):
 
 ```bash
-python3 -m demo.ui.webmcp_server --source replay
+python3 -m src.product.web_server --db :memory: --host 127.0.0.1 --port 8830 \
+    --origin http://127.0.0.1:8830 &
+python3 ops/populate_local.py http://127.0.0.1:8830 /tmp/people.json
+open http://127.0.0.1:8830/
 ```
-
-Open `http://127.0.0.1:8765/` in current Chrome 149+ with WebMCP enabled, then
-inspect and invoke the tools through `document.modelContext`.
 
 ---
 
