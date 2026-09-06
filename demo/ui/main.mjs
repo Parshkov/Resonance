@@ -758,7 +758,9 @@ function vizPanel(people, near, thoughts) {
     panel.append(el("div", {class: "map-frame map-frame--world"}, svg));
     const lines = [];
     if (!entry.payload.you) lines.push(t("people.map.you_unplaced"));
-    if (unplaced.length) lines.push(t("people.map.unplaced", {n: unplaced.length, names: unplaced.map((p) => p.name).join(", ")}));
+    // One person can be found through two of their thoughts: name them once.
+    const names = [...new Set(unplaced.map((p) => p.name))];
+    if (names.length) lines.push(t("people.map.unplaced", {n: names.length, names: names.join(", ")}));
     if (!placed.length && !unplaced.length) lines.push(t("people.map.nobody"));
     lines.push(t("people.map.where.hint"));
     panel.append(el("p", {class: "hint"}, lines.join(" ")));
