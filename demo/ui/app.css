@@ -266,6 +266,7 @@ progress::-moz-progress-bar { background: var(--accent); }
 .match__topic { font-family: var(--serif); font-size: var(--text-lg); line-height: 1.25; }
 .match__verdict { color: var(--accent-ink); font-size: var(--text-md); }
 .match__why { color: var(--ink-2); font-size: var(--text-md); }
+.match__depth { color: var(--ink-3); font-size: var(--text-sm); }
 .strength { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; font-size: var(--text-sm); color: var(--ink-2); }
 .detail { position: sticky; top: 76px; }
 .evidence { display: grid; gap: 10px; padding: 20px; border: 1px solid var(--line-soft); border-radius: var(--radius); background: var(--paper-2); box-shadow: var(--shadow); }

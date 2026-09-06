@@ -140,6 +140,7 @@ const STRINGS = {
   "people.kept": "{n} link both of you keep|{n} links both of you keep",
   "people.contradictions": "{n} contradiction|{n} contradictions",
   "people.strength": "Structural match",
+  "people.depth": "{nodes} of your {total} ideas correspond · {links} links kept",
   "people.confidence.high": "high confidence",
   "people.confidence.medium": "medium confidence",
   "people.confidence.low": "low confidence",

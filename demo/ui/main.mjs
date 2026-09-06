@@ -596,7 +596,7 @@ function rejectionWords(reason) {
   return t("people.reject.other");
 }
 
-function matchCard(m) {
+function matchCard(m, thought) {
   const selected = m.session_id === ui.peopleSelected;
   const first = m.evidence?.top_correspondences?.[0];
   const card = el("li", {class: `match ${selected ? "is-selected" : ""}`});
@@ -607,6 +607,9 @@ function matchCard(m) {
     first ? el("p", {class: "match__why"}, [first.query_label, el("span", {class: "arrow"}, " ↔ "), first.candidate_label]) : null,
     el("div", {class: "strength"}, [el("progress", {max: 1, value: Math.max(0, Math.min(1, Number(m.scores?.structural) || 0)), "aria-hidden": "true"}),
       el("span", {}, strengthWord(m.scores?.structural)), el("span", {class: "quiet"}, score(m.scores?.structural))]),
+    // The depth of the match, so a person with many matches can tell which
+    // go deepest: how many of their ideas correspond, and how many links hold.
+    el("p", {class: "match__depth"}, t("people.depth", {nodes: m.evidence?.mapped_node_count || 0, total: thought?.nodes?.length || 0, links: m.evidence?.preserved_relation_count || 0})),
     m.display?.demo_persona ? el("p", {class: "quiet"}, t("people.example")) : null,
   ]);
   card.append(open);

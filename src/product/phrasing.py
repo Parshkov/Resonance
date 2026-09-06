@@ -221,9 +221,27 @@ def _discover(r: Result) -> str:
         lead += " On the same thing, and already working on it."
     elif kind == "complementary":
         lead += " What you are missing is what they work on."
-    said = (f"{lead} The match is computed, not judged: no language model decided it, "
-            "and you can be shown the working. None of them knows about you unless you "
-            "ask for an introduction and they agree.")
+    # Then every person, closest first, with the depth of the match: how much
+    # of the reasoning corresponds. Many people can match; the person has to
+    # see which of them match most, not only that they match.
+    lines = []
+    for index, row in enumerate(people[:8], start=1):
+        evidence = row.get("evidence") or {}
+        scores = row.get("scores") or {}
+        display = row.get("display") or {}
+        nodes = int(evidence.get("mapped_node_count") or 0)
+        links = int(evidence.get("preserved_relation_count") or 0)
+        conflicts = int(evidence.get("contradiction_count") or 0)
+        depth = f"{_count(nodes, 'idea corresponds', 'ideas correspond')}, {_count(links, 'link kept', 'links kept')}"
+        if conflicts:
+            depth += f", {_count(conflicts, 'contradiction', 'contradictions')}"
+        lines.append(f"{index}. {row.get('person_pseudonym') or 'someone'} — "
+                     f"{classification(row.get('mode_classification'))} — match {_round(scores.get('structural'))}: "
+                     f"{depth}" + (f" (“{display.get('topic')}”)" if display.get("topic") else ""))
+    said = (f"{lead} Closest first: " + " ".join(lines) +
+            " The match is computed, not judged: no language model decided it, and the "
+            "working can be shown. None of them knows about you unless you ask for an "
+            "introduction and they agree.")
     return f"{said} {aside}".strip()
 
 

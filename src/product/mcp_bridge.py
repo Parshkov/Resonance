@@ -281,7 +281,7 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
 # ---------------------------------------------------------------------------
 
 from src.product import authorship as authorship_rule
-from src.product import phrasing
+from src.product import names, phrasing
 from src.product import pictures
 from src.product import rich
 
@@ -1040,11 +1040,20 @@ class RemoteMCPBridge:
         actor = self._actor(token)
         user = self.product.identity.backend.get_user(actor.user_id)
         owned = self._owned(token)
+        by_id = {str(s.get("session_id")): s for s in owned}
+        def named(ids):
+            return [{"name": names.thought_name(by_id.get(str(i), {"session_id": i})),
+                     "session_id": i} for i in ids]
         return {
             "contract_version": BRIDGE_CONTRACT,
             "user_id": actor.user_id,
             "display_label": getattr(user, "display_label", None) if user is not None else None,
             "actor_type": actor.actor_type,
+            # Every thought by name, the way a person knows it; the ids beside
+            # them are for the next call.
+            "thoughts": {"shared": named(_in_state(owned, _SHARED)),
+                         "private": named(_in_state(owned, _PRIVATE)),
+                         "withdrawn": named(_in_state(owned, _WITHDRAWN))},
             "shared_thoughts": _in_state(owned, _SHARED),
             # Withdrawn is not private. Everything that was not discoverable
             # fell into one bucket, so a thought this person had already taken
@@ -1172,7 +1181,7 @@ class RemoteMCPBridge:
         wondering what they actually shared. The page has drawn it since the
         redesign; a chat could only describe it.
         """
-        sessions = self._owned(token)
+        sessions = [dict(s, name=names.thought_name(s)) for s in self._owned(token)]
         result = {"contract_version": BRIDGE_CONTRACT, "sessions": sessions}
         drawings: list[Mapping[str, Any]] = []
         # The thoughts a person is asking about first: what is discoverable,
@@ -1217,6 +1226,8 @@ class RemoteMCPBridge:
         result = {
             "contract_version": BRIDGE_CONTRACT,
             "result_id": response["result_id"],
+            # The search by name, for a person; the id beside it, for the next call.
+            "search_name": names.name_for(str(response["result_id"]), prefix="Search"),
             "query_session_id": session_id,
             "source": response.get("source"),
             "discovery_contract": response.get("discovery_contract"),
