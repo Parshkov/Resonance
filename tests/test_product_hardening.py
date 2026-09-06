@@ -54,6 +54,58 @@ class RegistrationLimitTests(unittest.TestCase):
             product_server._registration_hits.clear()
 
 
+class LimiterCountsOnlyWhatCanCreateTests(unittest.TestCase):
+    """A refusal is not a registration, and must not be charged as one.
+
+    The page asks `/api/product/guest` on every load by a signed-out visitor.
+    Where a sign-in provider is configured that endpoint creates nothing at all
+    -- it answers `sign_in_required` -- but the limiter used to be consulted
+    first, so each of those loads spent one of twenty tokens an hour for the
+    whole address. Twenty page loads later (one person reading, or two people
+    behind the same router, which is exactly what a second participant is)
+    everyone at that address was told "too many accounts created from this
+    address" about accounts that were never created, on a page that was only
+    refusing to load.
+
+    Reported from production by the owner the day a second person joined.
+    """
+
+    def _server_with_sign_in(self):
+        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}),
+                                seed=False)
+        httpd = serve("127.0.0.1", 0, runtime=runtime)
+        # A provider, so `_sign_in_required()` is true the way production's is.
+        handler = httpd.RequestHandlerClass
+        original = handler._sign_in_required
+        handler._sign_in_required = lambda self: True
+        return httpd, handler, original
+
+    def test_a_sign_in_refusal_spends_no_token(self):
+        httpd, handler, original = self._server_with_sign_in()
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        base = f"http://127.0.0.1:{httpd.server_address[1]}"
+        product_server._registration_hits.clear()
+        headers = {"Content-Type": "application/json", "X-Forwarded-For": "198.51.100.42"}
+        try:
+            # Far more loads than the limit; every one is a refusal to create.
+            for _ in range(product_server.REGISTRATION_LIMIT + 10):
+                try:
+                    urlopen(Request(base + "/api/product/guest", data=b"{}",
+                                    method="POST", headers=headers))
+                    self.fail("sign-in was required; this should not have created an account")
+                except HTTPError as exc:
+                    body = json.loads(exc.read())
+                    self.assertEqual(exc.code, 403, body)
+                    self.assertEqual(body["error"], "sign_in_required", body)
+            # And the address is still free to actually register.
+            self.assertTrue(product_server.registration_allowed("198.51.100.42"))
+        finally:
+            handler._sign_in_required = original
+            httpd.shutdown()
+            httpd.server_close()
+            product_server._registration_hits.clear()
+
+
 class AudienceBindingTests(unittest.TestCase):
     def test_access_token_bound_to_another_resource_is_refused(self):
         runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)

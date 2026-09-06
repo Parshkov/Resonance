@@ -1110,22 +1110,30 @@ class ProductHandler(BaseHTTPRequestHandler):
     def _route_post(self, path: str) -> None:
         product = self.runtime.product
         if path in ("/api/product/guest", "/api/product/register"):
+            # The order here is the whole point. Where a sign-in exists this
+            # endpoint creates nothing at all, and the page asks it on every
+            # load by a signed-out visitor -- so counting the request against
+            # the account limiter spends a token on a call that could never
+            # have made an account. Twenty page loads an hour from one address
+            # (one person reading, or two people behind the same router) and
+            # everybody there is told "too many accounts created from this
+            # address" about accounts nobody created, on a page that is simply
+            # refusing to load. Answer first, then count only what can create.
+            if self._sign_in_required():
+                # An anonymous account cannot be told that a match appeared,
+                # and cannot be recognised when the same person returns through
+                # another client. Where a sign-in exists, it is the only way an
+                # account is created.
+                self._send_json({"error": "sign_in_required",
+                                 "message": "Resonance accounts are created by signing in.",
+                                 "sign_in_url": auth_mount.SIGN_IN_PATH},
+                                status=HTTPStatus.FORBIDDEN)
+                return
             ip = _client_ip(self.headers, self.client_address[0] if self.client_address else "")
             if not registration_allowed(ip):
                 self._send_error_json(HTTPStatus.TOO_MANY_REQUESTS, "rate_limited",
                                       "too many accounts created from this address; try later")
                 return
-        if path in ("/api/product/guest", "/api/product/register") and \
-                self._sign_in_required():
-            # An anonymous account cannot be told that a match appeared, and
-            # cannot be recognised when the same person returns through another
-            # client. Where a sign-in exists, it is the only way an account is
-            # created.
-            self._send_json({"error": "sign_in_required",
-                             "message": "Resonance accounts are created by signing in.",
-                             "sign_in_url": auth_mount.SIGN_IN_PATH},
-                            status=HTTPStatus.FORBIDDEN)
-            return
         if path == "/api/product/guest":
             creds = product.register_guest()
             self._send_json(
