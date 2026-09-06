@@ -99,6 +99,9 @@ class IdentityBackend(Protocol):
     def append_identity_event(self, event: IdentityEvent) -> None:
         ...
 
+    def list_users(self) -> Sequence[Any]:
+        ...
+
     def list_identity_events(self) -> Sequence[IdentityEvent]:
         ...
 
@@ -134,6 +137,9 @@ class R11IdentityBackend:
 
     def get_session(self, session_id: str) -> Any | None:
         return self.live_corpus.get_session(session_id)
+
+    def list_users(self) -> Sequence[Any]:
+        return self.repo.list_users()
 
     def list_sessions(self) -> Sequence[Any]:
         return self.repo.list_sessions()

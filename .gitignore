@@ -8,3 +8,7 @@ demo/transcript.jsonl
 var/
 *.sqlite
 *.sqlite3
+
+# Local agent scratch: per-machine tool settings and the worktrees
+# subagents run in. Neither is part of the product.
+.claude/

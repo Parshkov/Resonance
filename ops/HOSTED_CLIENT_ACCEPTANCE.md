@@ -122,7 +122,22 @@ is captured.
 - [x] Automated onboarding probe built and validated end-to-end (9/9 required +
       7/7 optional) against a conformant OAuth core.
 - [x] Self-activating regression test committed (skips until R15A lands).
-- [ ] Probe run against the production origin — **WAITING_ON #136** (green deploy
-      of the reviewed #134 core).
-- [ ] Human card A (ChatGPT) executed — **sponsor developer-mode account required**.
-- [ ] Human card B (Claude) executed — where supported.
+- [x] Probe run against the production origin (2026-09-05). Discovery and
+      registration pass unchanged: 401 challenge with the `resource_metadata`
+      pointer, RFC 9728 metadata whose `resource` equals the canonical `/mcp`,
+      RFC 8414 metadata advertising S256, RFC 7591 registration, and the human
+      consent page rendered.
+- [x] Human cards A (ChatGPT) and B (Claude) executed live, plus Grok, against
+      production: connect, consent, tools, and PNG rendering in the chat.
+
+**The probe now stops at the consent approval on production, and that is
+correct.** Its automated approval walked the guest-continuation branch, and
+production has a sign-in provider configured, so `sign_in_required()` is true
+and that branch does not exist there — the server answers
+`access_denied: sign in to Resonance before connecting a client`. A client is
+bound to an account on purpose: an introduction has to have somebody to come
+back to. So the probe proves everything a client does *before* a human is
+asked, and the approval itself is a human step by design. Read a `4/5 required`
+result on production as "discovery and registration are conformant", not as a
+regression; pass `--user-id`/`--recovery` for an existing account to walk the
+rest, and never store those anywhere.

@@ -229,7 +229,7 @@ class RemoteMCPHttpTests(unittest.TestCase):
         self.assertEqual(payload["error"], "share_required")
 
         # Step 1: prepare real content -> preview + token, nothing discoverable.
-        err, prep_a = alice.call("resonance_prepare_thought", {"thought": THOUGHT_A})
+        err, prep_a = alice.call("resonance_prepare_thought", {"authorship": "their_own_words", "thought": THOUGHT_A})
         self.assertFalse(err, prep_a)
         self.assertFalse(prep_a["discoverable"])
         self.assertTrue(prep_a["requires_explicit_confirmation"])
@@ -251,7 +251,7 @@ class RemoteMCPHttpTests(unittest.TestCase):
 
         # Bob shares a structurally analogous thought from a different domain
         # through the URL-only transport.
-        err, prep_b = bob.call("resonance_prepare_thought", {"thought": THOUGHT_B})
+        err, prep_b = bob.call("resonance_prepare_thought", {"authorship": "their_own_words", "thought": THOUGHT_B})
         self.assertFalse(err, prep_b)
         err, shared_b = bob.call("resonance_share_thought", {
             "draft_id": prep_b["draft_id"], "confirmation_token": prep_b["confirmation_token"],
@@ -319,6 +319,7 @@ class RemoteMCPHttpTests(unittest.TestCase):
         browser.register("Cleo")
         chat = Chat(self.base, browser.mcp_key()["mcp_key"])
         err, prep = chat.call("resonance_prepare_thought", {
+            "authorship": "their_own_words",
             "context": "Slow code review causes merge queue pile-up, which leads to release delays. "
                        "A review SLA prevents the pile-up."})
         self.assertFalse(err, prep)
@@ -329,12 +330,39 @@ class RemoteMCPHttpTests(unittest.TestCase):
         # implicit prose: the extractor abstains, the bridge refuses to leave an
         # empty shareable draft and tells the model to pass `thought` instead
         err2, weak = chat.call("resonance_prepare_thought", {
-            "context": "Whenever the upstream degrades, thousands of clients notice timeouts "
-                       "at once and retry, and the whole tier ends up saturated."})
+            "authorship": "their_own_words",
+            "context": "The upstream was slow all week. Thousands of clients noticed timeouts. "
+                       "The whole tier ended up saturated by Friday."})
         self.assertTrue(err2, weak)
         self.assertIn("call again with `thought`", json.dumps(weak))
         _, mine = chat.call("resonance_my_thoughts", {})
         self.assertFalse([s for s in mine["sessions"] if s.get("discoverable")])
+        # the same sentences prepared again get a fresh Thought DNA id (per
+        # person and attempt), never "thought_id is already reserved"
+        err3, prep2 = chat.call("resonance_prepare_thought", {
+            "authorship": "their_own_words",
+            "context": "Slow code review causes merge queue pile-up, which leads to release delays. "
+                       "A review SLA prevents the pile-up."})
+        self.assertFalse(err3, prep2)
+        self.assertNotEqual(prep2["draft_id"], prep["draft_id"])
+        # the `context` path can name the thought: without topic/domain every
+        # raw-text share was displayed as the placeholder "Shared thought" in
+        # domain "general" and collapsed into a single cluster.
+        err4, named = chat.call("resonance_prepare_thought", {
+            "authorship": "their_own_words",
+            "context": "Slow code review causes merge queue pile-up, which leads to release delays. "
+                       "A review SLA prevents the pile-up.",
+            "topic": "Merge queue pile-up from slow review",
+            "domain": "release-engineering"})
+        self.assertFalse(err4, named)
+        presentation = named["will_become_discoverable"]["presentation"]
+        self.assertEqual(presentation["topic"], "Merge queue pile-up from slow review")
+        self.assertEqual(presentation["domain"], "release-engineering")
+        self.assertEqual(presentation["cluster_id"], "merge-queue-pile-up-from-slow-review")
+        # and the placeholder is still what an unnamed raw-text share gets
+        self.assertEqual(prep["will_become_discoverable"]["presentation"],
+                         {"topic": "Shared thought", "domain": "general",
+                          "cluster_id": "shared-thought"})
         bad = chat.rpc("tools/call", {"name": "resonance_nope", "arguments": {}})
         self.assertEqual(bad["error"]["code"], -32602)
         unknown = chat.rpc("frobnicate")

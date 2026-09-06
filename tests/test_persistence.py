@@ -88,7 +88,8 @@ class MigrationAndHealthTests(unittest.TestCase):
         health = repo.health()
         self.assertTrue(health["ok"])
         self.assertEqual(health["backend"], "sqlite")
-        self.assertEqual(health["migrations"], ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants"])
+        self.assertEqual(health["migrations"], ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants",
+                 "0006_shared_topics"])
         self.assertEqual(health["corpus_generation"], 0)
         service = LiveCorpusService(repo)
         self.assertTrue(service.health().ok)
@@ -110,7 +111,8 @@ class MigrationAndHealthTests(unittest.TestCase):
             repo = SQLiteRepository(path)
             self.assertEqual(
                 repo.health()["migrations"],
-                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants"],
+                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants",
+                 "0006_shared_topics"],
             )
             columns = {
                 row[1] for row in repo._conn.execute("PRAGMA table_info(sessions)").fetchall()
@@ -162,7 +164,8 @@ class MigrationAndHealthTests(unittest.TestCase):
             )
             self.assertEqual(
                 recovered.health()["migrations"],
-                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants"],
+                ["0001_init", "0002_recovery_generation", "0003_collaboration", "0004_workspaces", "0005_oauth_grants",
+                 "0006_shared_topics"],
             )
             recovered.close()
 

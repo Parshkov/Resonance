@@ -4,7 +4,7 @@
 Simulates exactly what a hosted MCP client (ChatGPT custom app, Claude custom
 connector) does when a tester supplies **only** the canonical resource URL:
 
-    https://resonance-production-cfe3.up.railway.app/mcp
+    https://resonance.parshkov.com/mcp
 
 and nothing else — no key, no bearer, no capability URL, no custom header.
 
@@ -107,6 +107,8 @@ class OnboardingProbe:
         self.access_token: str | None = None
         self.refresh_token: str | None = None
         self.session_id: str | None = None
+        self.tool_names: set[str] = set()
+        self.smoke_session_id: str | None = None   # guest share to revoke on exit
         self._mid = 0
 
     # -- low-level HTTP ---------------------------------------------------
@@ -352,7 +354,7 @@ class OnboardingProbe:
                 f"prevents the pileup and supports steadier ships.")
         try:
             _, res, sc = self._call("resonance_prepare_thought",
-                                    {"context": chat,
+                                    {"authorship": "their_own_words", "context": chat,
                                      "presentation": {"domain": "engineering",
                                                       "topic": "process",
                                                       "cluster_id": "c1"},
@@ -373,6 +375,7 @@ class OnboardingProbe:
                 return self._record(Step("post-connect smoke", False, False,
                                          f"share failed ({sc})"))
             session_id = sc["session_id"]
+            self.smoke_session_id = session_id
             _, res, sc = self._call("resonance_discover", {"session_id": session_id, "k": 5})
             ok = not res.get("isError")
             n = len(sc.get("matches", []))
@@ -380,6 +383,38 @@ class OnboardingProbe:
                                      ok, False, f"shared {session_id}, discover ok ({n} matches)"))
         except Exception as exc:  # noqa: BLE001
             return self._record(Step("post-connect smoke", False, False, f"exception: {exc}"))
+
+    def revoke_smoke_share(self) -> Step | None:
+        """Revoke the guest thought `smoke()` shared, so a probe run leaves the
+        live corpus as it found it.
+
+        The smoke share goes through the real consent flow and is stored as a
+        `volunteer` session, which `purge-demo` must not touch. Without this step
+        every probe run permanently adds one more duplicate guest row. Not a
+        required step: a probe that could not clean up still reports its
+        onboarding verdict, but the failure is visible in the report.
+        """
+        session_id = getattr(self, "smoke_session_id", None)
+        if not session_id:
+            return None
+        tools = getattr(self, "tool_names", set())
+        if "resonance_stop_sharing" in tools:
+            name, arguments = "resonance_stop_sharing", {"session_id": session_id, "confirm": True}
+        elif "resonance_update_consent" in tools:
+            name, arguments = "resonance_update_consent", {"shared": False, "confirm": True,
+                                                           "request_id": "probe-revoke-" + secrets.token_hex(6)}
+        else:
+            return self._record(Step("smoke cleanup (revoke own guest share)", False, False,
+                                     "no stop_sharing/update_consent tool on this surface"))
+        try:
+            status, res, sc = self._call(name, arguments)
+        except Exception as exc:  # noqa: BLE001 - cleanup must not mask the verdict
+            return self._record(Step("smoke cleanup (revoke own guest share)", False, False,
+                                     f"exception: {exc}"))
+        ok = status == 200 and not res.get("isError") and sc.get("discoverable") is not True
+        return self._record(Step("smoke cleanup (revoke own guest share)", ok, False,
+                                 f"{session_id} revoked={sc.get('revoked')} "
+                                 f"discoverable={sc.get('discoverable')}", status))
 
     def refresh(self) -> Step | None:
         if not self.refresh_token:
@@ -452,12 +487,21 @@ class OnboardingProbe:
             self.whoami()
             if smoke:
                 self.smoke()
+                # leave no discoverable guest behind (see revoke_smoke_share)
+                self.revoke_smoke_share()
             if refresh:
                 self.refresh()
             if revoke:
                 self.revoke_then_reuse()
         except ProbeFailure:
             pass  # required step failed; report reflects it
+        finally:
+            if smoke and getattr(self, "smoke_session_id", None) and not any(
+                    s.name == "smoke cleanup (revoke own guest share)" for s in self.steps):
+                try:
+                    self.revoke_smoke_share()
+                except Exception:  # noqa: BLE001
+                    pass
         required = [s for s in self.steps if s.required]
         passed = all(s.ok for s in required)
         return {

@@ -26,7 +26,33 @@ from src import scoring as _scoring
 from src.alignment.verifier import COMPONENT_VERSION as VERIFIER_VERSION, _config_hash
 from src.interfaces import INTERFACE_VERSION
 
-ENGINE_VERSION = "resonance-engine/0.1"
+ENGINE_VERSION = "resonance-engine/0.2"
+
+
+CLASS_RANK = {"direct": 0, "approximate": 1, "analogical": 2, "complementary": 3, "negative": 4}
+# Retrieval proposes, verification ranks (ADR-0004): fetch a larger candidate
+# pool than the caller asked for, verify all of it, and return the best k by
+# verified score. Hard-rejected candidates that sat inside the caller's
+# retrieval window are returned too, after the kept rows, as contradiction
+# evidence rather than silently dropped.
+RETRIEVAL_OVERFETCH = 4
+MIN_VERIFY_POOL = 24
+
+
+def _tie_key(hit: ResonanceHit):
+    """Boundary ties are decided on the verified score alone: candidates whose
+    structural score equals the k-th one are all returned (retrieval score is
+    only a stable order inside the tie, never a truncation key)."""
+    return (hit.verification.classification == "negative",
+            round(hit.verification.components.structural, 6))
+
+
+def _verified_sort_key(hit: ResonanceHit):
+    v = hit.verification
+    rejected = 1 if v.hard_rejection else 0
+    negative = 1 if v.classification == "negative" else 0
+    primary = hit.candidate.channel_scores.get("primary", 0.0)
+    return (rejected, negative, -round(v.components.structural, 6), -round(primary, 6), hit.candidate.candidate_id)
 
 
 class EngineIntegrityError(RuntimeError):
@@ -118,18 +144,36 @@ class ResonanceEngine:
         require_mode(mode)
         self._require_bound()
         hits: list[ResonanceHit] = []
-        for candidate in self.candidate_index.query(graph, mode=mode, k=k):
+        rarity = self.candidate_index.motif_rarity(graph)
+        pool = max(k * RETRIEVAL_OVERFETCH, MIN_VERIFY_POOL)
+        retrieval_position: dict[str, int] = {}
+        for position, candidate in enumerate(self.candidate_index.query(graph, mode=mode, k=pool), start=1):
+            retrieval_position[candidate.candidate_id] = position
             target = self.store.get(candidate.candidate_id)
             if target is None:
                 raise EngineIntegrityError(
                     f"index returned {candidate.candidate_id!r} which is absent "
                     "from the thought store; store/index snapshots have diverged")
             verification = self.verifier.verify(
-                graph, target, seeds=candidate.seed_correspondences)
+                graph, target, seeds=candidate.seed_correspondences, rarity=rarity)
             self._explanations[(graph.thought_id, candidate.candidate_id)] = verification
             hits.append(ResonanceHit(candidate=self._flag_synced(candidate, verification),
                                      verification=verification))
-        return tuple(hits)
+        ordered = sorted(hits, key=_verified_sort_key)
+        accepted = [h for h in ordered if not h.verification.hard_rejection]
+        kept = accepted[:k]
+        # Competition ties at the k boundary are not truncated by name or by
+        # retrieval score: every candidate whose verified score equals the
+        # k-th one is returned too (same policy as the index's TIE_POLICY).
+        if len(accepted) > k:
+            boundary = _tie_key(kept[-1])
+            for extra in accepted[k:]:
+                if _tie_key(extra) != boundary:
+                    break
+                kept.append(extra)
+        rejected = [h for h in ordered if h.verification.hard_rejection
+                    and retrieval_position.get(h.candidate.candidate_id, pool + 1) <= k]
+        return tuple(kept + rejected)
 
     def compare(self, a: ThoughtGraph, b: ThoughtGraph, *, mode: str) -> VerifierResult:
         require_mode(mode)

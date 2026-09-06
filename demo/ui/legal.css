@@ -1,0 +1,146 @@
+/* Documentation pages (privacy, terms, support). Same token vocabulary as the
+   product page, but a reading layout: one column, generous measure, no chrome.
+   CSP is `default-src 'self'` — system fonts only, no external anything. */
+
+:root {
+  color-scheme: light;
+  --paper: #faf8f5;
+  --ink: #1a1815;
+  --ink-2: #4a453e;
+  --ink-3: #7a736a;
+  --line: rgba(26, 24, 21, 0.13);
+  --line-soft: rgba(26, 24, 21, 0.07);
+  --accent: #8a6a45;
+  --code-bg: rgba(26, 24, 21, 0.05);
+  --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Light is the default; theme.mjs sets data-theme="dark" from the viewer's
+   own choice (made on the main page), so this follows the same preference. */
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #0f0e0d;
+    --ink: #f2eee8;
+    --ink-2: #b6afa5;
+    --ink-3: #8b857d;
+    --line: rgba(255, 255, 255, 0.13);
+    --line-soft: rgba(255, 255, 255, 0.07);
+    --accent: #c9b8a0;
+    --code-bg: rgba(255, 255, 255, 0.06);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; background: var(--paper); }
+
+body {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--text-body);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.doc { max-width: 68ch; margin: 0 auto; padding: 40px 22px 72px; }
+
+.doc-brand { margin: 0 0 30px; font-family: var(--serif); font-size: var(--text-lg); letter-spacing: -.01em; }
+.doc-brand a { display: inline-flex; align-items: center; min-height: 24px; color: var(--ink); text-decoration: none; }
+.doc-brand a:hover { color: var(--accent); }
+
+h1 {
+  margin: 0 0 14px;
+  font-family: var(--serif);
+  font-size: clamp(30px, 4.4vw, 40px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+}
+
+.doc-lede { margin: 0 0 34px; color: var(--ink-2); font-size: var(--text-body); line-height: 1.6; }
+
+h2 {
+  margin: 38px 0 10px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--serif);
+  font-size: var(--text-xl);
+  font-weight: 500;
+  letter-spacing: -.015em;
+}
+
+h3 { margin: 22px 0 6px; font-size: var(--text-base); font-weight: 650; letter-spacing: .01em; color: var(--ink); }
+
+p { margin: 0 0 12px; color: var(--ink-2); }
+p strong, li strong { color: var(--ink); font-weight: 600; }
+em { color: var(--ink); }
+
+ul { margin: 0 0 12px; padding-left: 20px; color: var(--ink-2); }
+li { margin: 0 0 7px; }
+
+.doc-list { margin: 14px 0 0; }
+.doc-list dt { margin-top: 15px; font-weight: 650; color: var(--ink); font-size: var(--text-base); }
+.doc-list dd { margin: 5px 0 0; color: var(--ink-2); }
+
+code {
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--code-bg);
+  font-family: var(--mono);
+  font-size: .88em;
+  overflow-wrap: anywhere;
+}
+
+.doc-code {
+  margin: 12px 0 14px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+}
+.doc-code code { padding: 0; background: none; font-size: var(--text-base); }
+
+.contact-value { font-family: var(--mono); font-size: .92em; overflow-wrap: anywhere; }
+
+a { color: var(--accent); text-underline-offset: 2px; }
+
+.doc-foot {
+  margin: 44px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
+/* One line of small text, but three of the words are links, and a link is a
+   control: padding carries the 24px target, the matching negative margin keeps
+   the line reading as a sentence rather than as three buttons. */
+.doc-foot a {
+  display: inline-block; min-height: 24px; padding: 3px 2px; margin: -3px -2px;
+}
+
+@media (max-width: 520px) {
+  .doc { padding: 28px 16px 56px; }
+}
+
+/* Sign-in page. The account is what makes an introduction possible later, so
+   the choice of provider is the page's only real content. */
+.doc-narrow { max-width: 34rem; }
+.signin-providers { display: flex; flex-direction: column; gap: .625rem; margin: 1.75rem 0 1.5rem; }
+/* Filled, using only tokens this sheet defines: `--ink` on `--paper` inverts
+   correctly in both schemes. An invented `--paper-2` fell back to white and
+   put near-white dark-mode text on a white pill. */
+.signin-provider {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 3rem; padding: 0 1.25rem; border-radius: var(--radius-pill);
+  border: 1px solid var(--ink); background: var(--ink);
+  color: var(--paper); font-weight: 500; text-decoration: none;
+}
+.signin-provider:hover { background: var(--accent); border-color: var(--accent); color: var(--paper); }
+.signin-provider:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.doc-notice {
+  margin: 1.25rem 0; padding: .75rem 1rem; border-radius: .5rem;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  background: var(--code-bg); font-size: .9375rem; color: var(--ink);
+}
+.doc-fine { font-size: .875rem; color: var(--ink-3); }

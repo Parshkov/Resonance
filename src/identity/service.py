@@ -26,6 +26,7 @@ from src.security import (
 )
 
 from .backend import IdentityBackend
+from .pseudonyms import generate as generate_pseudonym
 from .models import (
     ActorContext,
     AuthenticationError,
@@ -49,6 +50,7 @@ THOUGHT_REVOKED = "identity.thought.revoked"
 THOUGHT_DELETED = "identity.thought.deleted"
 ACCOUNT_REGISTERED = "identity.account.registered"
 ACCOUNT_REVOKED = "identity.account.revoked"
+ACCOUNT_IDENTITY_LINKED = "identity.account.identity_linked"
 
 
 def _now_dt() -> datetime:
@@ -81,6 +83,10 @@ def _mapping(value: Any) -> dict[str, Any]:
     if is_dataclass(value):
         return dict(asdict(value))
     raise IdentityValidationError(f"cannot project {type(value).__name__} as mapping")
+
+
+_LOCATION_KEYS = frozenset({"kind", "region", "city", "lat", "lon", "precision"})
+_LOCATION_KINDS = frozenset({"synthetic_coarse", "consented_coarse"})
 
 
 class IdentityService:
@@ -155,7 +161,173 @@ class IdentityService:
         return self._issue_session(user_id, actor_type=actor_type)
 
     def register_guest(self, *, actor_type: str = "human") -> SessionCredentials:
-        return self.register(f"guest-{secrets.token_hex(3)}", actor_type=actor_type)
+        return self.register(self.fresh_pseudonym(), actor_type=actor_type)
+
+    def fresh_pseudonym(self) -> str:
+        """A display name nobody else is using.
+
+        The display label is what other participants see, so it must be a
+        pseudonym and it must be unique. Existing labels are read from the
+        backend rather than assumed, because two people meeting under the same
+        name in a service built for introductions would be worse than an ugly
+        name.
+
+        A backend that cannot list its users is a wiring fault, not a runtime
+        hiccup, and it is raised. Swallowing it is what let this method hand
+        out names blind: every draw looked fine, and uniqueness was left to
+        luck until two people collided.
+        """
+        lister = getattr(self.backend, "list_users", None)
+        if lister is None:
+            raise AttributeError(
+                f"{type(self.backend).__name__} cannot list users, so a unique "
+                "pseudonym cannot be chosen")
+        try:
+            taken = {str(_field(user, "display_label") or "") for user in lister()}
+        except Exception as exc:  # noqa: BLE001 - a name is better than a failed sign-in
+            print(f"[identity] could not read existing names, naming blind: "
+                  f"{type(exc).__name__}: {exc}", flush=True)
+            taken = set()
+        return generate_pseudonym(taken)
+
+    # -- federated sign-in ----------------------------------------------
+    def find_user_by_identity(self, provider: str, subject: str) -> str | None:
+        """The account a provider subject already belongs to, if any.
+
+        The link is read from the identity event log, the same place the
+        account's own credential verifier lives, so a sign-in and a recovery
+        login are accounted for by one durable history.
+        """
+        if not provider or not subject:
+            return None
+        found: str | None = None
+        for event in self.backend.list_identity_events():
+            if event.event_type != ACCOUNT_IDENTITY_LINKED:
+                continue
+            if event.payload.get("provider") != provider:
+                continue
+            if str(event.payload.get("subject") or "") != subject:
+                continue
+            found = event.user_id
+        if found is None:
+            return None
+        user = self.backend.get_user(found)
+        if user is None or _field(user, "revoked_at") is not None:
+            return None
+        return found
+
+    def identity_claims(self, user_id: str) -> dict[str, Any]:
+        """What is known about who this account belongs to.
+
+        Returned to a connected client through the OAuth userinfo endpoint, and
+        used to reach the person when a resonance appears for them.
+        """
+        claims: dict[str, Any] = {}
+        for event in self.backend.list_identity_events():
+            if event.event_type != ACCOUNT_IDENTITY_LINKED or event.user_id != user_id:
+                continue
+            claims = {
+                "provider": str(event.payload.get("provider") or ""),
+                "email": str(event.payload.get("email") or ""),
+                "email_verified": bool(event.payload.get("email_verified")),
+                # The name the provider knows them by. Shown back to the person
+                # so they can confirm which account they are on; never exposed
+                # to another participant.
+                "name": str(event.payload.get("name") or ""),
+            }
+        return claims
+
+    def sign_in_federated(
+        self,
+        *,
+        provider: str,
+        subject: str,
+        email: str,
+        email_verified: bool,
+        display_label: str,
+        actor_type: str = "human",
+    ) -> SessionCredentials:
+        """Sign a person in behind a provider that has verified who they are.
+
+        An unverified address is refused rather than stored: the whole point of
+        an account here is that a match can be told to a real person later, and
+        an address nobody has proven cannot carry that.
+        """
+        if not provider or not subject:
+            raise IdentityValidationError("provider and subject are required")
+        if not email_verified or not email:
+            raise IdentityValidationError("a verified email address is required")
+        existing = self.find_user_by_identity(provider, subject)
+        if existing is not None:
+            return self._issue_session(existing, actor_type=actor_type)
+        # The provider's name is NOT the display label. The display label is
+        # what other participants see, and a structural match is not consent to
+        # learn someone's real name — so the account is given a pseudonym and
+        # the real name is kept beside the address, where only its owner and
+        # the clients they authorise can read it.
+        credentials = self.register(self.fresh_pseudonym(), actor_type=actor_type)
+        self._link_identity(
+            credentials.user_id,
+            provider=provider,
+            subject=subject,
+            email=email,
+            email_verified=email_verified,
+            name=display_label,
+        )
+        return credentials
+
+    def link_identity_to_account(
+        self,
+        user_id: str,
+        *,
+        provider: str,
+        subject: str,
+        email: str,
+        email_verified: bool,
+    ) -> None:
+        """Attach a provider identity to an account that already exists.
+
+        Refused when the subject already belongs to a different account, so one
+        person's provider login can never silently take over another account.
+        """
+        owner = self.find_user_by_identity(provider, subject)
+        if owner is not None and owner != user_id:
+            raise AuthorizationError("this provider identity belongs to another account")
+        user = self.backend.get_user(user_id)
+        if user is None or _field(user, "revoked_at") is not None:
+            raise AuthenticationError("account unavailable")
+        if owner == user_id:
+            return
+        self._link_identity(
+            user_id,
+            provider=provider,
+            subject=subject,
+            email=email,
+            email_verified=email_verified,
+        )
+
+    def _link_identity(
+        self,
+        user_id: str,
+        *,
+        provider: str,
+        subject: str,
+        email: str,
+        email_verified: bool,
+        name: str = "",
+    ) -> None:
+        self._append(
+            ACCOUNT_IDENTITY_LINKED,
+            user_id=user_id,
+            session_id=None,
+            payload={
+                "provider": provider,
+                "subject": subject,
+                "email": email,
+                "email_verified": bool(email_verified),
+                "name": str(name or ""),
+            },
+        )
 
     def authenticate(self, access_token: str, *, actor_type: str | None = None) -> ActorContext:
         if not access_token:
@@ -578,17 +750,33 @@ class IdentityService:
     ) -> list[dict[str, Any]]:
         actor = self.authenticate(access_token, actor_type=actor_type)
         result: list[dict[str, Any]] = []
+        authorized = False
         for session in self.backend.list_sessions():
             if _field(session, "user_id") != actor.user_id:
                 continue
-            self._authorize(
-                actor,
-                "session:read_private",
-                ResourceRef("session", str(_field(session, "session_id"))),
-                confirmed=True,
-                client_id=client_id,
-                protocol_session_id=protocol_session_id,
-            )
+            if not authorized:
+                # Once, for the act of reading your own record -- not once per
+                # thought you have.
+                #
+                # session:read_private is an owner action, so the policy check
+                # for each row asks exactly what the filter above has already
+                # answered: is this yours. What it also does is spend a
+                # rate-limit token, and the limiter holds ten with one back per
+                # second. A page load makes several of these calls, so someone
+                # with five thoughts hit "rate limit exceeded" on an ordinary
+                # load and was shown an empty map and "discovery could not be
+                # read" -- punished for using the product. The limiter is there
+                # to make enumerating OTHER people expensive; this list can
+                # only ever contain your own.
+                self._authorize(
+                    actor,
+                    "session:read_private",
+                    ResourceRef("session", str(_field(session, "session_id"))),
+                    confirmed=True,
+                    client_id=client_id,
+                    protocol_session_id=protocol_session_id,
+                )
+                authorized = True
             raw = _mapping(session)
             raw["consent_choices"] = self._consent_choices(session).to_corpus_consent() | {
                 "allow_intro_requests": self._consent_choices(session).allow_intro_requests
@@ -896,39 +1084,45 @@ class IdentityService:
 
     @staticmethod
     def _normalize_location(location: Mapping[str, Any]) -> dict[str, Any]:
-        # R7's current corpus shape represents city-level coarse location with
-        # a synthetic centroid.  Reject accidental exact-address/GPS fields;
-        # schema validation itself remains R11's responsibility.
-        forbidden = {"address", "street", "postal_code", "gps", "exact_lat", "exact_lon"}
-        overlap = forbidden.intersection(location)
-        if overlap:
-            raise IdentityValidationError(f"exact location fields are not allowed: {sorted(overlap)}")
-        precision = location.get("precision")
-        if precision is not None and precision != "city":
+        """Exact-allowlist city-level coarse location (R12 review hardening).
+
+        An empty object means no location was supplied. Otherwise the key set
+        must be exactly {kind, region, city, lat, lon, precision}: an arbitrary
+        extra field could smuggle precise data or create a durable row that
+        later breaks the R11 presentation projection. Coordinates are bounded,
+        finite and rounded to one decimal.
+        """
+        if not isinstance(location, Mapping):
+            raise IdentityValidationError("location must be an object")
+        if not location:
+            return {}
+        keys = set(location)
+        missing = sorted(_LOCATION_KEYS - keys)
+        unknown = sorted(keys - _LOCATION_KEYS)
+        if missing:
+            raise IdentityValidationError(f"location missing required fields: {missing}")
+        if unknown:
+            raise IdentityValidationError(f"location contains unknown fields: {unknown}")
+        if location.get("kind") not in _LOCATION_KINDS:
+            raise IdentityValidationError(f"location.kind must be one of {sorted(_LOCATION_KINDS)}")
+        if location.get("precision") != "city":
             raise IdentityValidationError("location precision must be city-level")
-        coarse = dict(location)
-        has_lat = "lat" in coarse
-        has_lon = "lon" in coarse
-        if has_lat != has_lon:
-            raise IdentityValidationError("coarse location requires both lat and lon")
-        if has_lat:
-            lat = coarse["lat"]
-            lon = coarse["lon"]
-            if (
-                isinstance(lat, bool)
-                or isinstance(lon, bool)
-                or not isinstance(lat, (int, float))
-                or not isinstance(lon, (int, float))
-                or not math.isfinite(float(lat))
-                or not math.isfinite(float(lon))
-                or not -90 <= float(lat) <= 90
-                or not -180 <= float(lon) <= 180
-            ):
-                raise IdentityValidationError("coarse location coordinates are invalid")
-            coarse["lat"] = round(float(lat), 1)
-            coarse["lon"] = round(float(lon), 1)
-            coarse["precision"] = "city"
-        return coarse
+        for field in ("region", "city"):
+            value = location.get(field)
+            if not isinstance(value, str) or not value.strip():
+                raise IdentityValidationError(f"location.{field} must be a non-empty string")
+        lat, lon = location["lat"], location["lon"]
+        if (
+            isinstance(lat, bool) or isinstance(lon, bool)
+            or not isinstance(lat, (int, float)) or not isinstance(lon, (int, float))
+            or not math.isfinite(float(lat)) or not math.isfinite(float(lon))
+            or not -90 <= float(lat) <= 90 or not -180 <= float(lon) <= 180
+        ):
+            raise IdentityValidationError("coarse location coordinates are invalid")
+        return {
+            "kind": location["kind"], "region": location["region"], "city": location["city"],
+            "lat": round(float(lat), 1), "lon": round(float(lon), 1), "precision": "city",
+        }
 
     def _append_intro_consent(
         self,

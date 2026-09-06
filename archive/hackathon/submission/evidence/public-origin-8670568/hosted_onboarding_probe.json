@@ -1,0 +1,157 @@
+{
+  "base": "https://resonance-production-cfe3.up.railway.app",
+  "canonical_mcp": "https://resonance-production-cfe3.up.railway.app/mcp",
+  "required_all_passed": true,
+  "required_passed": 9,
+  "required_total": 9,
+  "steps": [
+    {
+      "step": "unauthenticated /mcp challenge",
+      "ok": true,
+      "required": true,
+      "http_status": 401,
+      "detail": "401 with resource_metadata pointer",
+      "www_authenticate": "Bearer realm=\"resonance\", resource_metadata=\"https://resonance-production-cfe3.up.railway.app/.well-known/oauth-protected-resource\"",
+      "resource_metadata": "https://resonance-production-cfe3.up.railway.app/.well-known/oauth-protected-resource"
+    },
+    {
+      "step": "protected-resource metadata (RFC 9728)",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "resource=https://resonance-production-cfe3.up.railway.app/mcp",
+      "authorization_servers": [
+        "https://resonance-production-cfe3.up.railway.app"
+      ]
+    },
+    {
+      "step": "resource == canonical /mcp",
+      "ok": true,
+      "required": false,
+      "http_status": null,
+      "detail": "advertised https://resonance-production-cfe3.up.railway.app/mcp vs given https://resonance-production-cfe3.up.railway.app/mcp"
+    },
+    {
+      "step": "authorization-server metadata (RFC 8414)",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "S256=True",
+      "authorization_endpoint": "https://resonance-production-cfe3.up.railway.app/oauth/authorize",
+      "token_endpoint": "https://resonance-production-cfe3.up.railway.app/oauth/token",
+      "registration_endpoint": "https://resonance-production-cfe3.up.railway.app/oauth/register",
+      "scopes_supported": [
+        "resonance",
+        "offline_access"
+      ]
+    },
+    {
+      "step": "dynamic client registration (RFC 7591)",
+      "ok": true,
+      "required": false,
+      "http_status": 201,
+      "detail": "client_id=resonance-client-844336a9190de5e6"
+    },
+    {
+      "step": "authorize consent page (GET)",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "human consent screen rendered"
+    },
+    {
+      "step": "authorize approve -> code + state",
+      "ok": true,
+      "required": true,
+      "http_status": 302,
+      "detail": "302 to redirect_uri with code + exact state",
+      "state_round_trip": true
+    },
+    {
+      "step": "token exchange (authorization_code + PKCE)",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "aud=None refresh=yes",
+      "aud": null,
+      "scope": "resonance.read resonance.write offline_access"
+    },
+    {
+      "step": "MCP initialize (Bearer)",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "protocol 2025-03-26; stateless (bearer per request)"
+    },
+    {
+      "step": "tools/list",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "12 tools",
+      "tool_names": [
+        "resonance_whoami",
+        "resonance_prepare_thought",
+        "resonance_share_thought",
+        "resonance_my_thoughts",
+        "resonance_discover",
+        "resonance_explain_match",
+        "resonance_request_intro",
+        "resonance_list_intros",
+        "resonance_respond_intro",
+        "resonance_send_message",
+        "resonance_read_messages",
+        "resonance_stop_sharing"
+      ]
+    },
+    {
+      "step": "resonance_whoami",
+      "ok": true,
+      "required": true,
+      "http_status": 200,
+      "detail": "user_id=person-78053b65f3294a60"
+    },
+    {
+      "step": "post-connect smoke (prepare\u2192share\u2192discover)",
+      "ok": true,
+      "required": false,
+      "http_status": null,
+      "detail": "shared ses-417f5cf492d0c25d, discover ok (0 matches)"
+    },
+    {
+      "step": "smoke cleanup (revoke own guest share)",
+      "ok": true,
+      "required": false,
+      "http_status": 200,
+      "detail": "ses-417f5cf492d0c25d revoked=True discoverable=False"
+    },
+    {
+      "step": "refresh grant -> new access token",
+      "ok": true,
+      "required": false,
+      "http_status": 200,
+      "detail": "rotated=True"
+    },
+    {
+      "step": "old refresh token reuse rejected",
+      "ok": true,
+      "required": false,
+      "http_status": 400,
+      "detail": "reuse returned 400"
+    },
+    {
+      "step": "revoke refresh token (RFC 7009)",
+      "ok": true,
+      "required": false,
+      "http_status": 200,
+      "detail": "revocation endpoint accepted"
+    },
+    {
+      "step": "refresh after revoke rejected",
+      "ok": true,
+      "required": false,
+      "http_status": 400,
+      "detail": "reuse of revoked token returned 400"
+    }
+  ]
+}

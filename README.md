@@ -693,95 +693,65 @@ explain_resonance(a, b)
 get_thought(id)
 ```
 
-The accepted v0.1 stdio adapter implements those six operations plus explicit
-snapshot tools. A clean external client can exercise the five milestone
-scenarios without importing the engine:
+Those operations live behind the product's remote MCP server today
+(`src/product/mcp_bridge.py`, 21 `resonance_*` tools over Streamable HTTP with
+OAuth), and the same tools are registered in the browser through WebMCP
+(`document.modelContext`) by the page itself, so a chat and a browser agent
+speak one vocabulary. The original stdio adapter (R6) and the WebMCP Challenge
+package were retired once the live product existed; their record is under
+[`archive/hackathon/`](archive/hackathon/).
+
+To see the product locally with people in it (no accounts, no fixtures on
+the page):
 
 ```bash
-python3 -m src.mcp.server
-python3 demo/run.py
+python3 -m src.product.web_server --db :memory: --host 127.0.0.1 --port 8830 \
+    --origin http://127.0.0.1:8830 &
+python3 ops/populate_local.py http://127.0.0.1:8830 /tmp/people.json
+open http://127.0.0.1:8830/
 ```
-
-See `demo/README.md`. This is the first working Resonance MCP milestone, not a
-corpus-scale or production claim. The exact API follows the accepted engine
-facade rather than defining the engine.
-
-### WebMCP Challenge judge test
-
-The challenge build exposes six **browser-native WebMCP** tools through
-`document.modelContext.registerTool(...)`: `resonance_prepare_thought`,
-`resonance_get_share_preview`, `resonance_share_prepared_thought`,
-`resonance_discover`, `resonance_get_match`, and
-`resonance_update_consent`. This browser API is distinct from Resonance's stdio
-and remote MCP transports. See [`HACKATHON.md`](HACKATHON.md) for the build
-record and [`demo/ui/README.md`](demo/ui/README.md) for the complete judge flow.
-
-**Hosted judge path (the submitted product):** open
-`https://resonance-production-cfe3.up.railway.app` in a WebMCP-capable Chrome
-(a guest account is created for you; no sign-up), then follow **Card A** in
-[`submission/HUMAN_TEST_CARDS.md`](submission/HUMAN_TEST_CARDS.md):
-prepare → preview → explicit share → discover → evidence → revoke, each step a
-`document.modelContext` tool call with a visible page update. The same origin
-is also a remote MCP server for the chat you already use — hand your client
-only `https://resonance-production-cfe3.up.railway.app/mcp` and it completes
-standard OAuth onboarding (Cards B/C). Exact release SHA, deployment and
-executed evidence: [`submission/RELEASE_MANIFEST.md`](submission/RELEASE_MANIFEST.md).
-
-Local replay-only reproduction of the R10 surface (fixture-backed, no accounts):
-
-```bash
-python3 -m demo.ui.webmcp_server --source replay
-```
-
-Open `http://127.0.0.1:8765/` in current Chrome 149+ with WebMCP enabled, then
-inspect and invoke the tools through `document.modelContext`.
 
 ---
 
 ## Where the project is now
 
-Resonance is being built now.
+Resonance has a working, LLM-free matching engine (engine 0.2) and a deployed product around it. The honest state is kept in [`docs/STATUS.md`](docs/STATUS.md); the decision that produced engine 0.2 is [ADR-0004](docs/decisions/ADR-0004-concept-aligned-analogy-and-benchmark-v0.2.md).
 
-The current phase is selecting the mathematical machinery required before freezing Thought DNA and the production matching pipeline.
+The current release freeze is **engine 0.2 on `0aea577`** (2026-09-04), live at
+<https://resonance.parshkov.com> with the canonical MCP endpoint at `/mcp`.
+On that commit 463 tests pass, both v0.2 benchmark gates pass with gold unedited, and the full
+acceptance set was executed directly against the public origin: OAuth onboarding 9/9 required
+steps, OAuth smoke 27/27, a real three-person structural test over `/mcp` 36/36, a browser run
+against the live page, and a hosted-client run through a real Claude custom connector. The
+release identity is [`archive/hackathon/submission/RELEASE_MANIFEST.md`](archive/hackathon/submission/RELEASE_MANIFEST.md) §0; the
+executed evidence, including what did **not** pass, is
+[`archive/hackathon/submission/evidence/public-origin-0aea577/`](archive/hackathon/submission/evidence/public-origin-0aea577/).
 
-We are **not** trying to determine whether structured signals can be compared in principle. They can.
+What is validated today, on Benchmark v0.2 (eight distinct reasoning skeletons, four domains each, eighteen case families, gate split never used for tuning):
 
-The engineering question is harder and more useful:
+- same words, different structure → rejected;
+- different words, same abstract structure → `analogical`;
+- same skeleton with concept-free labels (a template coincidence) → `negative`;
+- partial, paraphrased, permuted, granular and extraction-noisy variants → retrieved and classified correctly;
+- prose with explicit connectives → a grounded Thought Graph without any LLM.
 
-> What representation and family of algorithms preserve enough of human thought structure to make the resulting matches robust, scalable, explainable, and genuinely useful?
+What is **not** validated: real user thoughts at scale, corpus sizes beyond a few hundred graphs, implicit causation in prose, and native WebMCP discovery in a WebMCP-enabled browser — stock Chromium exposes no `document.modelContext`, so that claim is not made. Benchmark gold is agent-authored and awaits independent human review. One classification question is deliberately left open rather than tuned: whether two thoughts that share vocabulary but sit in different domains should be `approximate` or `analogical` ([ADR-0005](docs/decisions/ADR-0005-same-vocabulary-cross-domain-verdict.md)).
 
-Current work includes independent investigation of:
-
-1. cognitive analogy and Structure Mapping,
-2. Shazam-style relational fingerprinting,
-3. approximate graph alignment,
-4. multiscale / granularity invariance,
-5. Knowledge DNA,
-6. context-to-Thought-Graph extraction,
-7. falsification benchmarks,
-8. adversarial review of the entire architecture.
-
-Those results feed directly into:
+The pipeline in code:
 
 ```text
-Research
-   ↓
-Decision Matrix
-   ↓
-Invariance Specification
-   ↓
-Algorithm ADRs
-   ↓
+prose or agent-supplied graph
+   ↓  src/extraction (cue extractor v0.2) / manual ingest
 Thought DNA v0.1
-   ↓
-Benchmark
-   ↓
-Prototype
-   ↓
-MCP
+   ↓  src/fingerprint (structural + concept keys)
+inverted index with IDF (src/index)
+   ↓  over-fetched candidates
+FGW alignment + scoring policy v0.2 (src/alignment, src/scoring)
+   ↓  verified ranking
+explanation: mapping, preserved relations, contradictions, confidence
 ```
 
-Research is therefore a **state of the project**, not the definition of the project.
+Semantics come from a deterministic, inspectable lexicon of abstract relational concepts (`src/semantics`), not from a model.
 
 ---
 

@@ -40,3 +40,16 @@ python3 -m src.extraction.evaluate_v0_1
 
 A non-vacuous repeat is the same cued sentence extracted under two
 `source_id` values. The frozen gate is not claimed from empty/empty F1.
+
+## v0.2 (ADR-0004)
+
+~90 connectives in seven relation types with direction and confidence;
+sentence/clause segmentation; noun-vs-verb disambiguation of ambiguous cues
+("the speed limit" vs "backoff limits retries") with number agreement;
+subject resolution for relative clauses, pronouns and coordinated predicates;
+coordinated objects; sentence-initial "Because X, Y"; node unification by stem
+set; roles from the lexicon then from graph position; clause-scoped negation
+and modality; the context is PII-scrubbed before extraction. Evaluated on
+`benchmark/extraction-v0.2` (`src/extraction/reports/extraction-v0.2-prose.json`).
+Cue-free prose still yields an empty graph with an abstention, never invented
+structure.

@@ -1,239 +1,60 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-choice="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0a0a0a">
-  <title>Resonance — Visual Discovery</title>
-  <link rel="stylesheet" href="/styles.css">
+  <title>Resonance</title>
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <!-- Applies the viewer's colour scheme before the first paint. -->
+  <script src="/theme.mjs"></script>
 </head>
 <body>
-  <a class="skip-link" href="#main-workspace">Skip to discovery</a>
-  <div class="ambient ambient-one" aria-hidden="true"></div>
-  <div class="ambient ambient-two" aria-hidden="true"></div>
+  <a class="skip-link" href="#view">Skip to content</a>
 
+  <!-- The frame is static. What changes is #view, one screen at a time:
+       Home, My thoughts, People, Conversations, Groups, Connect a chat.
+       main.mjs owns the navigation and every screen; store.mjs owns the
+       state; strings.mjs owns every sentence, in two languages. -->
   <div class="app-shell" id="app-shell" data-state="loading">
-    <header class="topbar">
-      <div class="identity" aria-label="Resonance visual discovery">
-        <span class="identity-orbit" aria-hidden="true"><i></i></span>
-        <div>
-          <p class="wordmark">Resonance</p>
-          <p class="eyebrow">Visual discovery · R9</p>
-        </div>
-      </div>
-
-      <div class="system-status">
-        <div class="consent-status" id="header-consent" role="status">
-          <span class="status-light" aria-hidden="true"></span>
-          <span>Checking consent</span>
-        </div>
-        <button class="snapshot-button" id="snapshot-button" type="button" aria-label="Copy corpus snapshot" disabled>
-          <span class="eyebrow">Corpus</span>
-          <code id="snapshot-short">────────</code>
-        </button>
-        <div class="source-switch" aria-label="Discovery source">
-          <button class="source-option is-active" id="source-replay" type="button" data-source="replay" aria-pressed="true">
-            <span class="source-dot"></span>Replay fixture
-          </button>
-          <button class="source-option" id="source-live" type="button" data-source="live" aria-pressed="false">
-            <span class="source-dot"></span>Live MCP
-          </button>
-        </div>
-        <span class="offline-badge" id="runtime-badge">Deterministic · offline</span>
+    <header class="masthead">
+      <h1 class="brand-title">
+        <a class="brand" href="/" data-link="1" aria-label="Resonance">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="wordmark">Resonance</span>
+        </a>
+      </h1>
+      <nav class="page-nav" id="page-nav" aria-label="Sections"></nav>
+      <div class="masthead-tools">
+        <!-- Stamped by the server so the first paint already shows who you are. -->
+        <div class="account-slot" id="account-slot"></div>
       </div>
     </header>
 
-    <main class="workspace" id="main-workspace">
-      <aside class="surface thought-surface" aria-labelledby="thought-heading">
-        <div class="surface-heading">
-          <div>
-            <p class="eyebrow accent-text">Active thought</p>
-            <p class="microcopy" id="thought-id">Loading accepted context…</p>
-          </div>
-          <span class="thought-index">01 / 01</span>
-        </div>
+    <div class="notice" id="notice" role="alert" hidden></div>
 
-        <h1 class="thought-title" id="thought-heading">
-          <span class="loading-line wide"></span>
-          <span class="loading-line medium"></span>
-        </h1>
-        <p class="thought-caption" id="thought-caption">Preparing the shared Thought DNA.</p>
+    <main class="view" id="view" tabindex="-1"></main>
 
-        <section class="conversation" aria-labelledby="conversation-heading">
-          <div class="section-title-row">
-            <h2 class="eyebrow" id="conversation-heading">Live conversation</h2>
-            <span class="conversation-state"><i></i>Active now</span>
-          </div>
-          <div class="message user-message">
-            <span class="message-author">Shared thinker</span>
-            <p id="user-message">Loading the current reasoning chain…</p>
-          </div>
-          <div class="message agent-message">
-            <span class="agent-mark" aria-hidden="true">R</span>
-            <div>
-              <span class="message-author">AI agent</span>
-              <p id="agent-message">Waiting for consent state.</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="thought-dna" aria-labelledby="dna-heading">
-          <div class="section-title-row">
-            <h2 class="eyebrow" id="dna-heading">Thought DNA · causal chain</h2>
-            <span class="verified-copy">Accepted context</span>
-          </div>
-          <div class="dna-chain" id="dna-chain" aria-live="polite"></div>
-          <div class="declared-context" id="declared-context"></div>
-        </section>
-
-        <section class="request-summary" aria-labelledby="request-heading">
-          <h2 class="eyebrow" id="request-heading">Discovery request</h2>
-          <dl>
-            <div><dt>Mode</dt><dd id="request-mode">analogical</dd></div>
-            <div><dt>Requested</dt><dd id="request-k">k=15</dd></div>
-            <div><dt>Response</dt><dd id="response-summary">Loading…</dd></div>
-          </dl>
-        </section>
-      </aside>
-
-      <section class="surface discovery-surface" aria-labelledby="map-heading">
-        <div class="map-header">
-          <div>
-            <p class="eyebrow">Offline structural field</p>
-            <h2 id="map-heading">Resonance map</h2>
-          </div>
-          <div class="map-legend" aria-label="Map legend">
-            <span><i class="legend-dot query-dot"></i>Active thought</span>
-            <span><i class="legend-dot resonance-dot"></i>Resonance</span>
-            <span><i class="legend-dot contradiction-dot"></i>Contradiction</span>
-          </div>
-        </div>
-
-        <div class="map-frame" id="map-frame">
-          <svg class="world-map" id="world-map" viewBox="0 0 1000 500" role="img" aria-labelledby="map-title map-description">
-            <title id="map-title">Coarse synthetic resonance locations</title>
-            <desc id="map-description">An offline deterministic map. Location is used only for presentation and never for matching.</desc>
-            <defs>
-              <pattern id="dot-grid" width="28" height="28" patternUnits="userSpaceOnUse">
-                <circle cx="2" cy="2" r="1" class="grid-dot"></circle>
-              </pattern>
-              <radialGradient id="query-aura" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="#e8d5b7" stop-opacity=".24"></stop>
-                <stop offset="100%" stop-color="#e8d5b7" stop-opacity="0"></stop>
-              </radialGradient>
-              <filter id="soft-glow" x="-100%" y="-100%" width="300%" height="300%">
-                <feGaussianBlur stdDeviation="6" result="blur"></feGaussianBlur>
-                <feMerge><feMergeNode in="blur"></feMergeNode><feMergeNode in="SourceGraphic"></feMergeNode></feMerge>
-              </filter>
-            </defs>
-            <rect width="1000" height="500" class="map-grid"></rect>
-            <g class="graticule" aria-hidden="true">
-              <path d="M0 125H1000M0 250H1000M0 375H1000"></path>
-              <path d="M125 0V500M250 0V500M375 0V500M500 0V500M625 0V500M750 0V500M875 0V500"></path>
-            </g>
-            <g class="landmasses" aria-hidden="true">
-              <path d="M60 116L102 76 180 54 255 69 307 101 284 133 238 144 210 173 170 180 146 214 113 204 105 169 72 152Z"></path>
-              <path d="M245 51L280 30 319 38 332 60 298 73Z"></path>
-              <path d="M208 215L245 230 268 275 260 322 238 370 216 418 194 389 184 330 165 277 177 239Z"></path>
-              <path d="M438 116L469 94 510 99 531 119 554 119 582 97 635 88 688 102 725 94 780 115 836 113 900 151 916 186 875 201 826 185 784 205 741 198 699 218 656 199 622 164 587 157 560 174 528 157 498 165 474 145 443 146Z"></path>
-              <path d="M493 169L543 169 586 199 606 251 582 316 542 371 511 354 494 300 461 253 466 205Z"></path>
-              <path d="M765 328L807 309 858 320 890 352 870 380 820 386 779 369Z"></path>
-              <path d="M601 165L622 158 631 183 615 203Z"></path>
-              <path d="M912 273L925 289 914 309 902 291Z"></path>
-            </g>
-            <g id="connection-layer" class="connection-layer"></g>
-            <g id="marker-layer" class="marker-layer"></g>
-          </svg>
-          <div class="map-status" id="map-status" role="status">
-            <span class="map-status-pulse"></span>
-            <span id="map-status-text">Awaiting discovery response</span>
-          </div>
-          <div class="unlocated-anchor" id="unlocated-anchor" hidden>
-            <span class="shield-icon" aria-hidden="true"></span>
-            <div><strong id="unlocated-name">Location protected</strong><span>Coarse location not shared</span></div>
-          </div>
-          <p class="map-disclaimer">Coarse/synthetic location · presentation only · never used for ranking</p>
-        </div>
-
-        <section class="evidence-panel" id="evidence-panel" aria-labelledby="evidence-heading" aria-live="polite">
-          <div class="evidence-topline">
-            <div>
-              <p class="eyebrow accent-text" id="evidence-kicker">Why this match</p>
-              <h2 id="evidence-heading">Select a resonance</h2>
-              <p class="evidence-subtitle" id="evidence-subtitle">Backend mapping evidence will appear here.</p>
-            </div>
-            <dl class="evidence-metrics">
-              <div><dt>Class</dt><dd id="metric-class">—</dd></div>
-              <div><dt>Structural</dt><dd id="metric-structural">—</dd></div>
-              <div><dt>Verdict</dt><dd id="metric-confidence">—</dd></div>
-            </dl>
-          </div>
-          <div class="evidence-body">
-            <div class="mapping-list" id="mapping-list"></div>
-            <div class="relation-proof">
-              <p class="eyebrow">Preserved relations</p>
-              <div class="relation-chips" id="relation-chips"></div>
-              <p class="proof-note" id="proof-note">No frontend matching or score calculation.</p>
-            </div>
-          </div>
-        </section>
-      </section>
-
-      <aside class="surface matches-surface" aria-labelledby="matches-heading">
-        <div class="matches-header">
-          <div>
-            <p class="eyebrow">Backend order preserved</p>
-            <h2 id="matches-heading">Useful matches</h2>
-          </div>
-          <span class="shown-count" id="shown-count">00 shown</span>
-        </div>
-        <div class="match-list" id="match-list" aria-live="polite">
-          <div class="match-skeleton"></div>
-          <div class="match-skeleton"></div>
-          <div class="match-skeleton"></div>
-          <div class="match-skeleton"></div>
-        </div>
-
-        <button class="secondary-trigger" id="secondary-trigger" type="button" aria-expanded="false" aria-controls="secondary-drawer" disabled>
-          <span><strong id="secondary-count">0</strong> other backend results</span>
-          <span class="trigger-hint">View without reranking <i aria-hidden="true">↗</i></span>
-        </button>
-
-        <section class="contradiction-card" id="contradiction-card" aria-labelledby="contradiction-heading">
-          <div class="contradiction-icon" aria-hidden="true">×</div>
-          <div class="contradiction-content">
-            <p class="eyebrow warning-text" id="contradiction-heading">Contradiction evidence</p>
-            <p class="contradiction-topic" id="contradiction-topic">Loading rejected results…</p>
-            <div class="contradiction-meta"><span id="contradiction-person">—</span><code id="contradiction-reason">—</code></div>
-          </div>
-          <span class="rejected-count" id="rejected-count">0 rejected</span>
-        </section>
-
-        <div class="intro-unavailable" aria-label="Introductions unavailable">
-          <span class="lock-mark" aria-hidden="true"></span>
-          <div><strong>Introductions unavailable</strong><span>Not exposed by the accepted R8 MCP</span></div>
-        </div>
-      </aside>
-    </main>
-
-    <footer class="footer-strip">
-      <span id="source-note">Loading accepted R8 discovery contract…</span>
-      <span class="contract-chip">resonance-discovery/0.1</span>
-    </footer>
-
-    <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-    <aside class="secondary-drawer" id="secondary-drawer" aria-labelledby="drawer-heading" aria-hidden="true" inert>
-      <div class="drawer-header">
-        <div><p class="eyebrow">Complete backend response</p><h2 id="drawer-heading">Other returned results</h2></div>
-        <button class="icon-button" id="drawer-close" type="button" aria-label="Close other results">×</button>
+    <footer class="page-foot">
+      <div class="foot-identity">
+        <p class="foot-name"><span class="brand-mark" aria-hidden="true"></span>Resonance</p>
+        <p class="foot-claim" id="foot-claim">The match is computed, not judged: no language model decides who resonates with you, and you are shown the working.</p>
       </div>
-      <p class="drawer-copy">These rows remain in their original backend order. They are not hidden, rescored, or promoted into the flagship story.</p>
-      <div class="drawer-section"><h3>Other matches</h3><div id="drawer-matches"></div></div>
-      <div class="drawer-section rejected-section"><h3>Hard-rejected contradictions</h3><div id="drawer-rejected"></div></div>
-    </aside>
+      <nav class="foot-nav" aria-label="Footer">
+        <ul>
+          <li><a href="/privacy" id="foot-privacy">Privacy</a></li>
+          <li><a href="/terms" id="foot-terms">Terms</a></li>
+          <li><a href="/support" id="foot-support">Support</a></li>
+        </ul>
+      </nav>
+      <!-- Where the browser WebMCP modules report what this browser can do.
+           Shown on the Connect page, where it is about the browser. -->
+      <div id="tool-home" hidden><div class="tool-status" id="tool-status" hidden></div></div>
+    </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </div>
-  <script type="module" src="/app.mjs"></script>
+  <script type="module" src="/main.mjs"></script>
 </body>
 </html>

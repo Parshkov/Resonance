@@ -1,0 +1,422 @@
+{
+  "resource": "https://resonance.parshkov.com/mcp",
+  "started_at": "2026-09-04T23:45:30Z",
+  "steps": [],
+  "identities": {
+    "A": {
+      "user_id": "person-b30fe302b057689b"
+    },
+    "B": {
+      "user_id": "person-a6917bc1ea1de3b8"
+    },
+    "C": {
+      "user_id": "person-daf9df901788af3b"
+    }
+  },
+  "shared": {
+    "A": {
+      "draft_id": "draft-ea74c46a87312196b3018b4b",
+      "session_id": "ses-4cac9b877909eca9",
+      "preview_nodes": 6,
+      "preview_relations": 6,
+      "revoked": true
+    },
+    "B": {
+      "draft_id": "draft-a8ccf29bbdf29d8d23c932cb",
+      "session_id": "ses-a16b410a013d923a",
+      "preview_nodes": 6,
+      "preview_relations": 6
+    },
+    "C": {
+      "draft_id": "draft-33a3095666b623dd4dfcbfee",
+      "session_id": "ses-a22f5bd1c6886159",
+      "preview_nodes": 5,
+      "preview_relations": 3
+    }
+  },
+  "discover_B": {
+    "result_id": "result-888a07c2799f2e1fda76c5ee",
+    "source": "live",
+    "matches": [
+      {
+        "rank": 0,
+        "session_id": "ses-4cac9b877909eca9",
+        "mode": null,
+        "score": 1.0,
+        "scores": {
+          "structural": 1.0,
+          "semantic": 0.2885670248850574,
+          "r_direct": 1.0,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": true,
+        "is_C": false
+      },
+      {
+        "rank": 1,
+        "session_id": "ses-099c77441b96db62",
+        "mode": null,
+        "score": 0.6726272798700864,
+        "scores": {
+          "structural": 0.6726272798700864,
+          "semantic": 0.11451491247608618,
+          "r_direct": 0.5,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 2,
+        "session_id": "ses-a95528cc2a90ef11",
+        "mode": null,
+        "score": 0.6226272798700864,
+        "scores": {
+          "structural": 0.6226272798700864,
+          "semantic": 0.11150878743766095,
+          "r_direct": 0.5,
+          "y_systematicity": 1.0,
+          "coverage_containment": 1.0,
+          "contradiction": 0.16666666666666666,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": false
+      },
+      {
+        "rank": 3,
+        "session_id": "ses-a22f5bd1c6886159",
+        "mode": null,
+        "score": 0.17709548119224364,
+        "scores": {
+          "structural": 0.17709548119224364,
+          "semantic": 0.12413051833140902,
+          "r_direct": 0.16666666666666666,
+          "y_systematicity": 0.5,
+          "coverage_containment": 1.0,
+          "contradiction": 0.0,
+          "h_sign_conflict": false
+        },
+        "is_A": false,
+        "is_C": true
+      }
+    ],
+    "rejected_count": 0
+  },
+  "explain_A": {
+    "source": "live",
+    "result_id": "result-888a07c2799f2e1fda76c5ee",
+    "match": {
+      "match_id": "61dd4ffb3aec92a0c0854dbc",
+      "person_pseudonym": "guest-20d380",
+      "session_id": "ses-4cac9b877909eca9",
+      "mode_classification": "analogical",
+      "hard_rejection": null,
+      "scores": {
+        "structural": 1.0,
+        "semantic": 0.2885670248850574,
+        "r_direct": 1.0,
+        "y_systematicity": 1.0,
+        "coverage_containment": 1.0,
+        "contradiction": 0.0,
+        "h_sign_conflict": false
+      },
+      "confidence": "high",
+      "evidence": {
+        "mapped_node_count": 6,
+        "preserved_relation_count": 6,
+        "contradiction_count": 0,
+        "top_correspondences": [
+          {
+            "query_node": "b0",
+            "candidate_node": "a0",
+            "query_label": "supply shortage rumour",
+            "candidate_label": "partial upstream outage"
+          },
+          {
+            "query_node": "b1",
+            "candidate_node": "a1",
+            "query_label": "synchronized bulk purchases",
+            "candidate_label": "synchronized client retries"
+          },
+          {
+            "query_node": "b2",
+            "candidate_node": "a2",
+            "query_label": "demand amplification",
+            "candidate_label": "request amplification"
+          },
+          {
+            "query_node": "b3",
+            "candidate_node": "a3",
+            "query_label": "empty shelves",
+            "candidate_label": "cascading saturation"
+          },
+          {
+            "query_node": "b4",
+            "candidate_node": "a4",
+            "query_label": "per-customer purchase cap",
+            "candidate_label": "fixed retry budget"
+          }
+        ],
+        "preserved_relations": [
+          {
+            "query_relation": "r0",
+            "candidate_relation": "r0"
+          },
+          {
+            "query_relation": "r1",
+            "candidate_relation": "r1"
+          },
+          {
+            "query_relation": "r2",
+            "candidate_relation": "r2"
+          },
+          {
+            "query_relation": "r3",
+            "candidate_relation": "r3"
+          },
+          {
+            "query_relation": "r4",
+            "candidate_relation": "r4"
+          }
+        ]
+      },
+      "display": {
+        "share_state": "discoverable",
+        "cluster_id": "retry-storm-after-a-partial-outage",
+        "topic": "Retry storm after a partial outage",
+        "domain": "distributed-systems",
+        "demo_persona": false
+      },
+      "actions": [
+        "compare",
+        "explain",
+        "request_intro"
+      ]
+    }
+  },
+  "intro": {
+    "intro_id": "intro-240a0d24705033522a342ef1",
+    "channel_id": "chan-e2d17bbe7f930aec4958e8f9",
+    "accepted": true,
+    "messages": 1
+  },
+  "revoke": {
+    "A_session": "ses-4cac9b877909eca9",
+    "second_result_id": "result-cf4b41d6e3c2601610718774",
+    "A_absent": true
+  },
+  "cleanup": {
+    "revoked": [
+      {
+        "identity": "A",
+        "session_id": "ses-4cac9b877909eca9",
+        "revoked": true,
+        "already": true
+      },
+      {
+        "identity": "B",
+        "session_id": "ses-a16b410a013d923a",
+        "revoked": true,
+        "discoverable": false
+      },
+      {
+        "identity": "C",
+        "session_id": "ses-a22f5bd1c6886159",
+        "revoked": true,
+        "discoverable": false
+      }
+    ],
+    "still_discoverable": []
+  },
+  "checks": [
+    {
+      "step": "A onboarded via OAuth (guest) + MCP initialize + whoami",
+      "ok": true,
+      "detail": "user=person-b30fe302b057689b transport=stateless (no Mcp-Session-Id; spec-permitted)"
+    },
+    {
+      "step": "B onboarded via OAuth (guest) + MCP initialize + whoami",
+      "ok": true,
+      "detail": "user=person-a6917bc1ea1de3b8 transport=stateless (no Mcp-Session-Id; spec-permitted)"
+    },
+    {
+      "step": "C onboarded via OAuth (guest) + MCP initialize + whoami",
+      "ok": true,
+      "detail": "user=person-daf9df901788af3b transport=stateless (no Mcp-Session-Id; spec-permitted)"
+    },
+    {
+      "step": "three independent identities",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "A prepare -> private draft (discoverable=false)",
+      "ok": true,
+      "detail": "draft=draft-ea74c46a87312196b3018b4b input_kind=agent_structured retention=not_retained"
+    },
+    {
+      "step": "A nothing discoverable before explicit confirm",
+      "ok": true,
+      "detail": "shared_before=0"
+    },
+    {
+      "step": "A share with confirm=false rejected",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "A explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "session=ses-4cac9b877909eca9"
+    },
+    {
+      "step": "B prepare -> private draft (discoverable=false)",
+      "ok": true,
+      "detail": "draft=draft-a8ccf29bbdf29d8d23c932cb input_kind=agent_structured retention=not_retained"
+    },
+    {
+      "step": "B nothing discoverable before explicit confirm",
+      "ok": true,
+      "detail": "shared_before=0"
+    },
+    {
+      "step": "B share with confirm=false rejected",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "B explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "session=ses-a16b410a013d923a"
+    },
+    {
+      "step": "C prepare -> private draft (discoverable=false)",
+      "ok": true,
+      "detail": "draft=draft-33a3095666b623dd4dfcbfee input_kind=agent_structured retention=not_retained"
+    },
+    {
+      "step": "C nothing discoverable before explicit confirm",
+      "ok": true,
+      "detail": "shared_before=0"
+    },
+    {
+      "step": "C share with confirm=false rejected",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "C explicit share -> discoverable=true",
+      "ok": true,
+      "detail": "session=ses-a22f5bd1c6886159"
+    },
+    {
+      "step": "B discover returns result_id from live source",
+      "ok": true,
+      "detail": "result_id=result-888a07c2799f2e1fda76c5ee source=live matches=4"
+    },
+    {
+      "step": "A (retry storm) found by B (panic buying)",
+      "ok": true,
+      "detail": "rank=0 score=1.0 mode=None"
+    },
+    {
+      "step": "A ranks above C (structure beats shared vocabulary)",
+      "ok": true,
+      "detail": "rank_A=0 rank_C=3 score_C=0.17709548119224364"
+    },
+    {
+      "step": "B explain_match(A) returns structural evidence",
+      "ok": true,
+      "detail": "keys=['contract_version', 'freshness', 'match', 'result_id', 'source']"
+    },
+    {
+      "step": "C cannot read B's discovery result (result_id subject-bound)",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "B requests intro to A",
+      "ok": true,
+      "detail": "intro=intro-240a0d24705033522a342ef1 state=requested"
+    },
+    {
+      "step": "intro retry with same request_id is idempotent",
+      "ok": true,
+      "detail": "intro-240a0d24705033522a342ef1 == intro-240a0d24705033522a342ef1"
+    },
+    {
+      "step": "A sees the incoming intro",
+      "ok": true,
+      "detail": "incoming=1"
+    },
+    {
+      "step": "A accepts -> channel opened",
+      "ok": true,
+      "detail": "channel=chan-e2d17bbe7f930aec4958e8f9 state=accepted"
+    },
+    {
+      "step": "A sends a relay message",
+      "ok": true,
+      "detail": "message=msg-0632310c03e848903197e7b2"
+    },
+    {
+      "step": "B reads A's message",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "step": "C cannot read the A<->B channel",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "A stop_sharing -> revoked",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "fresh discovery: revoked A is absent immediately",
+      "ok": true,
+      "detail": "result_id=result-cf4b41d6e3c2601610718774 matches=3"
+    },
+    {
+      "step": "old result_id no longer serves revoked A's evidence",
+      "ok": true,
+      "detail": "tool isError"
+    },
+    {
+      "step": "stateless transport: a stale Mcp-Session-Id is ignored, bearer still authoritative (restart-safe)",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "step": "reconnect: fresh initialize with the same bearer maps to the same account",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "step": "access_token in query string does NOT authenticate",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "step": "cleanup: this run leaves no discoverable guest session behind",
+      "ok": true,
+      "detail": "revoked=['ses-4cac9b877909eca9', 'ses-a16b410a013d923a', 'ses-a22f5bd1c6886159'] still_discoverable=[]"
+    },
+    {
+      "step": "revoked access token stops working on /mcp",
+      "ok": true,
+      "detail": "revoke=200 then /mcp=401"
+    }
+  ],
+  "finished_at": "2026-09-04T23:45:49Z",
+  "summary": "36/36 checks passed"
+}

@@ -1,0 +1,24 @@
+amplified load	AMPLIFICATION,LOAD
+attention fatigue	ATTENTION,DEGRADATION,FATIGUE
+backlog	ACCUMULATION
+battery	DOMAIN_ELECTROCHEMISTRY
+cooling failure	COOLING,FAILURE
+delivery pressure	STRESS
+delivery queue	BOTTLENECK,DOMAIN_SOFTWARE
+empty shelves	
+fallow season	
+feedback loop	FEEDBACK
+heat buildup	ACCUMULATION,HEAT
+panic buying	SURGE_EVENT
+partial outage	FAILURE
+protected slack week	BLOCKING_ACTION,CAPACITY
+retry storm	DOMAIN_SOFTWARE,SURGE_EVENT
+rework	EFFICIENCY_LOSS
+root damage	FAILURE
+salt accumulation	ACCUMULATION
+shortage rumour	DEPLETION,SCARCITY
+skipped review	DEBT,TESTING
+synchronized retries	COORDINATION,RETRY
+technical debt	DEBT
+thermal runaway	HEAT
+trust erosion	DEPLETION,TRUST

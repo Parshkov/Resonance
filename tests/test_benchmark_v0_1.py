@@ -11,8 +11,32 @@ REPO = Path(__file__).parents[1]
 BENCHMARK = REPO / "benchmark" / "r0-v0.1"
 
 
+def _pin_own_build_fixtures() -> None:
+    """Make sure the v0.1 runner imports the v0.1 fixtures.
+
+    Both frozen benchmarks ship a module called `build_fixtures`, and the v0.2
+    one puts its own directory at the FRONT of sys.path when it is loaded. The
+    v0.1 runner then does a plain `from build_fixtures import build_records`
+    and gets v0.2's copy, which has no such name — so whether the frozen
+    benchmark passes depended on which test file pytest collected first. It
+    passed on a full run and failed on a subset, which is the worst way for a
+    benchmark to be wrong.
+
+    Registering the right module under that name makes the import hermetic:
+    `from build_fixtures import ...` resolves from sys.modules and never
+    reaches the path at all. Nothing under benchmark/ is touched.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "build_fixtures", BENCHMARK / "build_fixtures.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules["build_fixtures"] = module
+    spec.loader.exec_module(module)
+
+
 def load_runner():
     sys.path.insert(0, str(BENCHMARK))
+    _pin_own_build_fixtures()
     spec = importlib.util.spec_from_file_location("resonance_benchmark_runner", BENCHMARK / "runner.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

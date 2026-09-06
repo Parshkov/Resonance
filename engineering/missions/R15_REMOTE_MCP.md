@@ -1,4 +1,5 @@
 # R15-REMOTE-MCP — run record
+> **Historical note (2026-09-04):** the separate `RemoteProductService`/`RemoteMCP` server described below was removed; the hosted `/mcp` endpoint is the product server with `src/product/mcp_bridge.py` and the OAuth core (`src/remote/README.md`).
 
 - mission: #87
 - canonical agent: `dima2010-anthropic-fable5-7328` (Anthropic / Claude Fable 5)

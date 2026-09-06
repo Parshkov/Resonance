@@ -13,7 +13,26 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 | confirmation secret | `RESONANCE_CONFIRMATION_SECRET` env (≥ 32 bytes) or `--secret-file` | **required** with a persistent DB — the server refuses to start without it so prepared private drafts survive restarts. Never put it on the command line or in the image. |
 | browser origin allowlist | `--origin https://your.host` (repeatable) | must be the **exact** `https://` origin browsers will use; this is the CSRF/Origin check. Add a second `--origin` for a platform default host alongside a custom domain. |
 | bind address / port | `--host 0.0.0.0 --port $PORT` | the image reads `PORT` from the platform |
-| seed | default seeds the accepted R7 corpus (create-only, idempotent across restarts); `--no-seed` starts empty | |
+| retire unsigned accounts | `RESONANCE_PURGE_UNSIGNED=report` counts and prints; `=1` carries it out. Tombstones every session whose owning account has no verified sign-in behind it, and revokes those accounts. `RESONANCE_PURGE_KEEP=<id>[,<id>…]` spares named sessions or accounts. A signed-in account is never touched, and a second run finds nothing left to do. Run `report` first, read the counts in the deploy log, then `=1`, then unset. | one-shot operator action |
+| label encoder | `RESONANCE_EMBEDDER=<directory>` holding `tokenizer.json` and `onnx/model_quantized.onnx` (multilingual-e5-small, exported to ONNX; ~135 MB) plus the `onnxruntime` and `tokenizers` packages | **recommended.** Without it the semantic layer is the hand-written English lexicon, which is blind to most real vocabulary and to every other language: the same trip described twice in different words came back "not a resonance". With it, each label is embedded locally on the CPU (about 6 ms a pair, cached), and the cosine adds relatedness the lexicon could not see; structure, contradiction and the verdict are unchanged. The server refuses to start if the variable names a directory it cannot load, and `/api/product/health` reports `engine.label_encoder`. Build the image with `--build-arg RESONANCE_EMBEDDER_MODEL=Xenova/multilingual-e5-small` to bake the model in. |
+| sign-in providers | `RESONANCE_AUTH_GOOGLE_CLIENT_ID` / `RESONANCE_AUTH_GOOGLE_CLIENT_SECRET`, and/or `RESONANCE_AUTH_GITHUB_CLIENT_ID` / `RESONANCE_AUTH_GITHUB_CLIENT_SECRET` | **required for a real deployment.** Setting either pair turns on sign-in, and sign-in then becomes the *only* way an account is created: `POST /api/product/guest` answers `403 sign_in_required`, and the OAuth consent page offers no anonymous option. With neither pair set the pseudonymous guest path stays on — that is the local-development and test configuration, not a production one. Callback URL to register with the provider: `https://<your origin>/auth/callback/google` (and `/auth/callback/github`). Scopes requested are only `openid email profile` / `read:user user:email`. |
+| how mail leaves | This platform blocks outbound SMTP below its Pro plan, and its own documentation says so: "SMTP is only available on the Pro plan and above... Free, Trial, and Hobby plans must use transactional email services with HTTPS APIs", with Resend named as the recommended one. Measured here before that was found: ports 587, 465 and 25 all time out on IPv4, and IPv6 is off by default so every AAAA answers "network is unreachable". So set `RESONANCE_MAIL_API_KEY` (and `RESONANCE_MAIL_FROM`) and mail goes out over 443, the same door the site is served from. `RESONANCE_MAIL_API_URL` defaults to Resend's endpoint; Postmark and Mailgun differ only in field names. The `RESONANCE_SMTP_*` path still works where SMTP is allowed, and an API key wins over it wherever both are set. | |
+| prove mail works | `RESONANCE_MAIL_SELFTEST=you@example.com` sends exactly one message to that address at startup and prints the outcome, then you unset it. `/api/product/health` can only say the variables are set; this says the message arrived. Run it before inviting anyone, because the alternative is finding out from someone who waited for a notification that never came. | one-shot operator action |
+| notifications | `RESONANCE_MAIL_API_KEY` and `RESONANCE_MAIL_FROM` (or, where SMTP is allowed, `RESONANCE_SMTP_HOST` / `_PORT` / `_USER` / `_PASSWORD`) turn on the email that tells someone a resonance appeared while they were away — the half of the promise that happens after they leave. `RESONANCE_MAIL_REPLY_TO` (default: `RESONANCE_CONTACT`) is where a reply lands, because a technical sender must not be a dead end. With none of these set nothing is sent, nothing is queued, and `health.notifications.can_reach_people` is false. | |
+| what is set up on parshkov.com | Resend, Ireland (eu-west-1), sending as `pulse@parshkov.com`, verified 2026-09-05. Three DNS records were added at the registrar and nothing else was touched: `CNAME send -> send.forge.rmta.net`, `CNAME rsend -> rsend-euw1.forge.rmta.net`, `TXT resend._domainkey`. **The inbound MX record Resend also offers was deliberately NOT added**: the apex MX is Google Workspace, and pointing it at Resend would silently take delivery of every message to the domain. The root SPF is untouched for the same reason -- Resend's return path is the `send.` subdomain, which carries its own SPF, so DKIM at `resend._domainkey` is what aligns the apex, and it does, in relaxed mode, under the existing `p=quarantine`. Click and open tracking are off: click tracking rewrites every link, including the signed one-click unsubscribe. | |
+| demo purge | `RESONANCE_PURGE_DEMO=1` runs `purge-demo` once at process start (tombstones seeded demo sessions, revokes demo persona accounts, never touches `volunteer` rows; idempotent) and logs the counts. Set it, let the platform redeploy, confirm `purge-demo: sessions_deleted=…` in the deploy log and `corpus.demo_personas_present: false` in `/api/product/health`, then unset it. | one-shot operator action |
+| demo seed | **off by default** for any persistent database (real participants only). `--seed-demo` or `RESONANCE_SEED_DEMO=1` seeds the 25 labelled R7 demo personas (create-only, idempotent); `python3 -m src.persistence --db <DSN> purge-demo` tombstones seeded demo sessions and revokes the persona accounts. `:memory:` is always seeded (local dev/tests). | `purge-demo` ran on production 2026-09-04 19:13 UTC via `RESONANCE_PURGE_DEMO=1`: 0 sessions, 0 users (no demo rows were present) |
+
+> **The platform's start command wins over the Dockerfile.** Railway keeps a
+> per-service start command in its own settings, and it overrides `CMD`. Worse,
+> *redeploying* reuses the previous deployment's captured configuration, so
+> editing that setting and pressing redeploy changes nothing. After renaming or
+> moving the entrypoint module you must both update the platform's start command
+> **and** trigger a genuinely new deployment (a push, not a redeploy). Renaming
+> `competition_server` to `web_server` cost several failed deploys this way: the
+> container exited with `No module named src.product.competition_server`, the
+> health check failed, and the platform silently kept serving the previous
+> release — so the site looked merely stale rather than broken.
 
 Migrations under `ops/migrations/` are applied automatically at startup on both
 backends (`0005_oauth_grants` makes OAuth codes / refresh grants / client
@@ -29,11 +48,11 @@ On PostgreSQL 16.13, from a clean database, executed in a real browser
 (headless Chromium, two separate cookie jars) against the server started with
 exactly the command in the `Dockerfile`:
 
-- all three migrations apply and the R7 seed loads (25 sessions);
+- all three migrations apply and (when `RESONANCE_SEED_DEMO=1`) the R7 demo seed loads (25 sessions);
 - the full #86 human-UI scenario passes — B clicks **Request intro**, A
   **Accept**s, A opens the channel and **Send**s, B reads the message;
 - after killing and restarting the process: users, sessions, the accepted
-  intro, the channel and the message all persist, the seed does not duplicate,
+  intro, the channel and the message all persist, a demo seed does not duplicate,
   and the discovery index rebuilds to `index_current: true`.
 
 Two fixes were required for PostgreSQL to work at all. The first landed on
@@ -61,10 +80,29 @@ that first real build, so nobody repeats them:
   `PGDATA=/var/lib/postgresql/data/pgdata`; `DATABASE_URL` points at the
   private host `postgres.railway.internal:5432`.
 - Health-check success is Railway's own probe of `/api/product/health`, i.e.
-  migrations applied and the seed loaded before traffic is routed.
-- **Entrypoint is `src.product.competition_server`** (the image default, and
-  set explicitly as the Railway start command): the live product handler plus
-  the R9/R10 presentation routes and the live WebMCP module, so the public
+  migrations applied (and, only when requested, the demo seed loaded) before traffic is routed.
+- **Push auto-deploy is ON since 2026-09-04 16:30 UTC.** Until then it could
+  not even be toggled (`canEnable: false, reason: NO_INSTALLATION`): the
+  service was linked to `Parshkov/Resonance` by name only and the Railway
+  GitHub App was not installed on the repository, so every deployment was
+  started by hand. Fix that worked: the repository owner installed the Railway
+  GitHub App on `Parshkov/Resonance`, then the source was re-linked from the
+  Railway plugin (`connect-service-source` repo `Parshkov/Resonance`, branch
+  `main`), after which Railway reports
+  `{"enabled": true, "canEnable": true}` and the service source records
+  `branch: main`. If auto-deploy ever stops firing again, check those two
+  things in that order (App installed on the repo → source shows the branch).
+  A manual deploy is still possible from the plugin or the dashboard.
+- **Volume backups.** On 2026-09-04 a `DAILY` backup schedule was set on volume
+  `postgres-data` through Railway's agent (`updateVolumeTool`, result
+  `staged`). The API cannot read the schedule back, so confirm in the
+  dashboard: Postgres service → volume `postgres-data` → **Backups** should
+  show the daily schedule and, after the first run, a completed backup. Until
+  someone has seen a completed backup there, treat the database as
+  **unbacked-up**.
+- **Entrypoint is `src.product.web_server`** (the image default, and set
+  explicitly as the Railway start command): the live product handler plus the
+  browser presentation routes and the browser WebMCP module, so the public
   page shows the visual discovery view on real data and registers the six
   tools. `RESONANCE_ENTRYPOINT=src.product.server` runs the API-only server.
 
@@ -215,12 +253,10 @@ The manual MCP key path (Collaboration panel → **Create MCP key**, or
 
 ## Known limits at the time of writing
 
-- The R9 visual discovery view (map, match cards) does not initialise on the
-  live origin — its `/api/config` + `/api/context` routes exist only on the R9
-  demo server (#88). `demo/ui/live_shell.mjs` moves the page to an explicit
-  "Live product" state instead of loading placeholders and puts the
-  Collaboration panel first; the panel and every product API work. Wiring the
-  visual view to live per-user data is the remaining R13 follow-up.
+- The page (`/thoughts`, `/people`, `/talk`, `/groups`, `/connect`) needs the
+  browser routes that `src.product.web_server` serves (`/api/product/overview`,
+  `/api/discover`, the topic routes); the API-only `src.product.server` serves
+  the document but the screens cannot load their data there.
 - One process, one machine: fine for the ≥100-user pilot on the accepted
   structural engine; scale-out would need sticky sessions or a shared
   idempotency store, neither of which the pilot requires.

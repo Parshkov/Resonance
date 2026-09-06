@@ -1,0 +1,1346 @@
+{
+ "extractor": {
+  "id": "resonance-cue-extractor",
+  "version": "0.2.0"
+ },
+ "gates": {
+  "assertion_accuracy": {
+   "observed": 1.0,
+   "required": 0.9,
+   "status": "pass"
+  },
+  "determinism": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "edge_f1": {
+   "observed": 0.9359,
+   "required": 0.6,
+   "status": "pass"
+  },
+  "modality_accuracy": {
+   "observed": 0.9726,
+   "required": 0.8,
+   "status": "pass"
+  },
+  "node_f1": {
+   "observed": 0.9333,
+   "required": 0.7,
+   "status": "pass"
+  },
+  "nonempty_rate": {
+   "observed": 1.0,
+   "required": 1.0,
+   "status": "pass"
+  },
+  "pii_leaks": {
+   "observed": 0,
+   "required": 0,
+   "status": "pass"
+  },
+  "role_accuracy": {
+   "observed": 0.6218,
+   "required": 0.6,
+   "status": "pass"
+  }
+ },
+ "metrics": {
+  "assertion_accuracy": 1.0,
+  "cases": 22,
+  "determinism": 1.0,
+  "edge_f1": 0.9359,
+  "edge_precision": 0.9359,
+  "edge_recall": 0.9359,
+  "modality_accuracy": 0.9726,
+  "node_f1": 0.9333,
+  "node_precision": 0.9297,
+  "node_recall": 0.937,
+  "nonempty_rate": 1.0,
+  "pii_leaks": 0,
+  "role_accuracy": 0.6218
+ },
+ "overall_status": "pass",
+ "rows": [
+  {
+   "abstentions": [],
+   "gold_edges": 5,
+   "id": "X01-battery",
+   "matched_edges": 5,
+   "pred_edges": [
+    [
+     "Active cooling",
+     "prevents",
+     "buildup",
+     "asserted",
+     "possible"
+    ],
+    [
+     "charging speed limit",
+     "constrains",
+     "how aggressive cooling",
+     "asserted",
+     "possible"
+    ],
+    [
+     "cooling is undersized",
+     "causes",
+     "heat builds up",
+     "asserted",
+     "actual"
+    ],
+    [
+     "heat builds up",
+     "causes",
+     "cell failure",
+     "asserted",
+     "actual"
+    ],
+    [
+     "heat builds up",
+     "causes",
+     "electrolyte degradation",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "cooling is undersized",
+     "method"
+    ],
+    [
+     "electrolyte degradation",
+     "state"
+    ],
+    [
+     "buildup",
+     "state"
+    ],
+    [
+     "how aggressive cooling",
+     "method"
+    ],
+    [
+     "charging speed limit",
+     "constraint"
+    ],
+    [
+     "Active cooling",
+     "method"
+    ],
+    [
+     "heat builds up",
+     "state"
+    ],
+    [
+     "cell failure",
+     "outcome"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X02-retry-storm",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "client retries",
+     "causes",
+     "request storm",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Exponential backoff",
+     "constrains",
+     "client retries",
+     "asserted",
+     "actual"
+    ],
+    [
+     "request storm",
+     "causes",
+     "outage",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Slow responses",
+     "causes",
+     "client retries",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "Exponential backoff",
+     "method"
+    ],
+    [
+     "Slow responses",
+     "state"
+    ],
+    [
+     "outage",
+     "outcome"
+    ],
+    [
+     "client retries",
+     "mechanism"
+    ],
+    [
+     "request storm",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X03-fever",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "Running the culture",
+     "requires",
+     "laboratory capacity",
+     "asserted",
+     "actual"
+    ],
+    [
+     "blood culture results",
+     "supports",
+     "hypothesis",
+     "asserted",
+     "actual"
+    ],
+    [
+     "bacterial infection",
+     "causes",
+     "fever",
+     "asserted",
+     "possible"
+    ],
+    [
+     "blood culture results",
+     "contradicts",
+     "hypothesis",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "bacterial infection",
+     "problem"
+    ],
+    [
+     "laboratory capacity",
+     "resource"
+    ],
+    [
+     "blood culture results",
+     "outcome"
+    ],
+    [
+     "hypothesis",
+     "problem"
+    ],
+    [
+     "fever",
+     "state"
+    ],
+    [
+     "Running the culture",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X04-breaker",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "circuit breaker trips",
+     "prevents",
+     "downstream service from being overloaded",
+     "asserted",
+     "actual"
+    ],
+    [
+     "breaker",
+     "requires",
+     "accurate error-rate metric",
+     "asserted",
+     "actual"
+    ],
+    [
+     "error rate crosses the alert threshold",
+     "causes",
+     "circuit breaker trips",
+     "asserted",
+     "conditional"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "error rate crosses the alert threshold",
+     "constraint"
+    ],
+    [
+     "circuit breaker trips",
+     "method"
+    ],
+    [
+     "breaker",
+     "method"
+    ],
+    [
+     "downstream service from being overloaded",
+     "constraint"
+    ],
+    [
+     "accurate error-rate metric",
+     "evidence"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X05-negation",
+   "matched_edges": 2,
+   "pred_edges": [
+    [
+     "scattered teams",
+     "causes",
+     "duplicated effort",
+     "asserted",
+     "actual"
+    ],
+    [
+     "scattered teams",
+     "causes",
+     "coordination breakdown",
+     "asserted",
+     "actual"
+    ],
+    [
+     "More meetings",
+     "prevents",
+     "coordination breakdown",
+     "negated",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "scattered teams",
+     "agent"
+    ],
+    [
+     "duplicated effort",
+     "problem"
+    ],
+    [
+     "More meetings",
+     "resource"
+    ],
+    [
+     "coordination breakdown",
+     "mechanism"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X06-fishery",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "Growing fishing demand",
+     "prevents",
+     "spawning stock",
+     "asserted",
+     "actual"
+    ],
+    [
+     "protected reserve is part of the",
+     "prevents",
+     "further depletion",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Declining catch records",
+     "supports",
+     "stock is collapsing",
+     "asserted",
+     "actual"
+    ],
+    [
+     "protected reserve is part of the",
+     "part_of",
+     "recovery plan",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "Declining catch records",
+     "evidence"
+    ],
+    [
+     "Growing fishing demand",
+     "state"
+    ],
+    [
+     "recovery plan",
+     "method"
+    ],
+    [
+     "protected reserve is part of the",
+     "method"
+    ],
+    [
+     "spawning stock",
+     "resource"
+    ],
+    [
+     "stock is collapsing",
+     "outcome"
+    ],
+    [
+     "further depletion",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X07-tech-debt",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "debt",
+     "requires",
+     "refactoring budget",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Release deadline pressure",
+     "causes",
+     "quick hacks instead of proper design",
+     "asserted",
+     "actual"
+    ],
+    [
+     "debt",
+     "prevents",
+     "later change",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "refactoring budget",
+     "constraint"
+    ],
+    [
+     "debt",
+     "state"
+    ],
+    [
+     "later change",
+     "state"
+    ],
+    [
+     "quick hacks instead of proper design",
+     "method"
+    ],
+    [
+     "Release deadline pressure",
+     "constraint"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X08-grid",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "transmission lines are tightly interconnected",
+     "causes",
+     "one substation triggered a cascading blackout",
+     "asserted",
+     "actual"
+    ],
+    [
+     "transformer fault in one substation",
+     "causes",
+     "cascading blackout",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Islanding the grid sections",
+     "prevents",
+     "cascading blackout",
+     "asserted",
+     "conditional"
+    ],
+    [
+     "islanding",
+     "requires",
+     "spare generation capacity",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "cascading blackout",
+     "mechanism"
+    ],
+    [
+     "transformer fault in one substation",
+     "problem"
+    ],
+    [
+     "transmission lines are tightly interconnected",
+     "mechanism"
+    ],
+    [
+     "one substation triggered a cascading blackout",
+     "mechanism"
+    ],
+    [
+     "Islanding the grid sections",
+     "method"
+    ],
+    [
+     "spare generation capacity",
+     "method"
+    ],
+    [
+     "islanding",
+     "method"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X09-sleep",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "Sleep debt accumulates",
+     "causes",
+     "sluggish thinking",
+     "asserted",
+     "actual"
+    ],
+    [
+     "sluggish thinking",
+     "prevents",
+     "studying",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Rest days",
+     "prevents",
+     "debt",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Exam week pressure",
+     "causes",
+     "students skip sleep",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "debt",
+     "state"
+    ],
+    [
+     "studying",
+     "evidence"
+    ],
+    [
+     "Rest days",
+     "method"
+    ],
+    [
+     "Exam week pressure",
+     "constraint"
+    ],
+    [
+     "students skip sleep",
+     "agent"
+    ],
+    [
+     "sluggish thinking",
+     "state"
+    ],
+    [
+     "Sleep debt accumulates",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X10-thermostat",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "thermostat",
+     "requires",
+     "temperature sensor reading",
+     "asserted",
+     "actual"
+    ],
+    [
+     "room temperature passes the set point",
+     "causes",
+     "thermostat switches the cooling",
+     "asserted",
+     "conditional"
+    ],
+    [
+     "thermostat switches the cooling",
+     "prevents",
+     "room from overheating",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "thermostat switches the cooling",
+     "method"
+    ],
+    [
+     "thermostat",
+     "method"
+    ],
+    [
+     "room from overheating",
+     "state"
+    ],
+    [
+     "room temperature passes the set point",
+     "state"
+    ],
+    [
+     "temperature sensor reading",
+     "evidence"
+    ]
+   ]
+  },
+  {
+   "abstentions": [
+    "incomplete arguments for cue 'as a result'"
+   ],
+   "gold_edges": 2,
+   "id": "X11-startup",
+   "matched_edges": 2,
+   "pred_edges": [
+    [
+     "burn rate dashboard",
+     "supports",
+     "runway shrinking",
+     "asserted",
+     "actual"
+    ],
+    [
+     "emergency reserve fund",
+     "prevents",
+     "shortfall",
+     "asserted",
+     "conditional"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "shortfall",
+     "state"
+    ],
+    [
+     "emergency reserve fund",
+     "method"
+    ],
+    [
+     "burn rate dashboard",
+     "evidence"
+    ],
+    [
+     "runway shrinking",
+     "constraint"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X12-coral",
+   "matched_edges": 2,
+   "pred_edges": [
+    [
+     "controlled temperature experiment",
+     "causes",
+     "bleaching measurements",
+     "asserted",
+     "actual"
+    ],
+    [
+     "controlled temperature experiment",
+     "contradicts",
+     "pollution hypothesis",
+     "asserted",
+     "actual"
+    ],
+    [
+     "experiment",
+     "requires",
+     "research vessel",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "research vessel",
+     "resource"
+    ],
+    [
+     "bleaching measurements",
+     "evidence"
+    ],
+    [
+     "pollution hypothesis",
+     "problem"
+    ],
+    [
+     "controlled temperature experiment",
+     "method"
+    ],
+    [
+     "experiment",
+     "evidence"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 5,
+   "id": "X13-warehouse",
+   "matched_edges": 5,
+   "pred_edges": [
+    [
+     "dock congestion",
+     "causes",
+     "missed SLAs",
+     "asserted",
+     "actual"
+    ],
+    [
+     "staging pile-ups",
+     "causes",
+     "dock congestion",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Wave planning",
+     "prevents",
+     "staging pile-ups",
+     "asserted",
+     "actual"
+    ],
+    [
+     "inbound surge",
+     "causes",
+     "staging pile-ups",
+     "asserted",
+     "actual"
+    ],
+    [
+     "labor cap",
+     "constrains",
+     "Wave planning",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "missed SLAs",
+     "outcome"
+    ],
+    [
+     "staging pile-ups",
+     "state"
+    ],
+    [
+     "labor cap",
+     "constraint"
+    ],
+    [
+     "dock congestion",
+     "state"
+    ],
+    [
+     "Wave planning",
+     "method"
+    ],
+    [
+     "inbound surge",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X14-hospital-handoff",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "Missing notes",
+     "causes",
+     "conflicting medication orders",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Care is split across separate departments",
+     "causes",
+     "handoff notes go missing between shifts",
+     "asserted",
+     "actual"
+    ],
+    [
+     "discharge time limit",
+     "constrains",
+     "protocol",
+     "asserted",
+     "actual"
+    ],
+    [
+     "structured handoff protocol",
+     "prevents",
+     "conflicts",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "discharge time limit",
+     "constraint"
+    ],
+    [
+     "protocol",
+     "method"
+    ],
+    [
+     "handoff notes go missing between shifts",
+     "mechanism"
+    ],
+    [
+     "structured handoff protocol",
+     "mechanism"
+    ],
+    [
+     "Care is split across separate departments",
+     "agent"
+    ],
+    [
+     "conflicts",
+     "problem"
+    ],
+    [
+     "conflicting medication orders",
+     "problem"
+    ],
+    [
+     "Missing notes",
+     "problem"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X15-pii",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "low morale",
+     "causes",
+     "attrition",
+     "asserted",
+     "actual"
+    ],
+    [
+     "manager [redacted",
+     "prevents",
+     "proposal",
+     "asserted",
+     "actual"
+    ],
+    [
+     "blocking",
+     "causes",
+     "low morale",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "low morale",
+     "state"
+    ],
+    [
+     "blocking",
+     "method"
+    ],
+    [
+     "attrition",
+     "state"
+    ],
+    [
+     "manager [redacted",
+     "agent"
+    ],
+    [
+     "proposal",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X16-modality",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "Profiling",
+     "supports",
+     "GC hypothesis",
+     "asserted",
+     "possible"
+    ],
+    [
+     "Garbage collection pauses",
+     "causes",
+     "latency spikes",
+     "asserted",
+     "possible"
+    ],
+    [
+     "add memory",
+     "causes",
+     "pauses will keep growing",
+     "asserted",
+     "conditional"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "GC hypothesis",
+     "problem"
+    ],
+    [
+     "Profiling",
+     "method"
+    ],
+    [
+     "pauses will keep growing",
+     "state"
+    ],
+    [
+     "add memory",
+     "resource"
+    ],
+    [
+     "latency spikes",
+     "state"
+    ],
+    [
+     "Garbage collection pauses",
+     "problem"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X17-composition",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "high defect rate",
+     "causes",
+     "scrap",
+     "asserted",
+     "actual"
+    ],
+    [
+     "paint station",
+     "part_of",
+     "assembly line",
+     "asserted",
+     "actual"
+    ],
+    [
+     "three welding cells",
+     "part_of",
+     "assembly line",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "high defect rate",
+     "problem"
+    ],
+    [
+     "assembly line",
+     "state"
+    ],
+    [
+     "paint station",
+     "resource"
+    ],
+    [
+     "three welding cells",
+     "resource"
+    ],
+    [
+     "scrap",
+     "outcome"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X18-trust",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "Repeated billing errors",
+     "prevents",
+     "customer trust",
+     "asserted",
+     "actual"
+    ],
+    [
+     "audit of the billing code",
+     "prevents",
+     "errors",
+     "asserted",
+     "conditional"
+    ],
+    [
+     "Eroded trust",
+     "causes",
+     "churn",
+     "asserted",
+     "actual"
+    ],
+    [
+     "audit",
+     "requires",
+     "two engineers for a month",
+     "asserted",
+     "actual"
+    ],
+    [
+     "churn",
+     "prevents",
+     "revenue",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "audit of the billing code",
+     "method"
+    ],
+    [
+     "churn",
+     "problem"
+    ],
+    [
+     "Repeated billing errors",
+     "mechanism"
+    ],
+    [
+     "Eroded trust",
+     "state"
+    ],
+    [
+     "errors",
+     "problem"
+    ],
+    [
+     "two engineers for a month",
+     "agent"
+    ],
+    [
+     "customer trust",
+     "state"
+    ],
+    [
+     "audit",
+     "method"
+    ],
+    [
+     "revenue",
+     "state"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 4,
+   "id": "X19-irrigation",
+   "matched_edges": 4,
+   "pred_edges": [
+    [
+     "flushing schedule",
+     "prevents",
+     "Shoaling",
+     "asserted",
+     "actual"
+    ],
+    [
+     "depth gauge readings",
+     "supports",
+     "channel recovering",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Shoaling",
+     "constrains",
+     "irrigation quota",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Canal silt load",
+     "causes",
+     "sediment cascade that shoals the channel",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "Shoaling",
+     "constraint"
+    ],
+    [
+     "irrigation quota",
+     "resource"
+    ],
+    [
+     "flushing schedule",
+     "constraint"
+    ],
+    [
+     "depth gauge readings",
+     "evidence"
+    ],
+    [
+     "Canal silt load",
+     "state"
+    ],
+    [
+     "channel recovering",
+     "mechanism"
+    ],
+    [
+     "sediment cascade that shoals the channel",
+     "mechanism"
+    ]
+   ]
+  },
+  {
+   "abstentions": [
+    "no explicit relation cues; implicit structure not emitted"
+   ],
+   "gold_edges": 0,
+   "id": "X20-noise",
+   "matched_edges": 0,
+   "pred_edges": [],
+   "pred_nodes": []
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 5,
+   "id": "X21-because-chain",
+   "matched_edges": 5,
+   "pred_edges": [
+    [
+     "mastery quizzes",
+     "supports",
+     "steady effort",
+     "asserted",
+     "actual"
+    ],
+    [
+     "low motivation",
+     "causes",
+     "Students plateau",
+     "negated",
+     "actual"
+    ],
+    [
+     "Scaffolded practice",
+     "requires",
+     "contact hours",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Scaffolded practice",
+     "prevents",
+     "Students plateau",
+     "asserted",
+     "actual"
+    ],
+    [
+     "course skips prerequisites",
+     "causes",
+     "Students plateau",
+     "asserted",
+     "actual"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "contact hours",
+     "resource"
+    ],
+    [
+     "steady effort",
+     "method"
+    ],
+    [
+     "mastery quizzes",
+     "evidence"
+    ],
+    [
+     "Scaffolded practice",
+     "method"
+    ],
+    [
+     "low motivation",
+     "state"
+    ],
+    [
+     "Students plateau",
+     "agent"
+    ],
+    [
+     "course skips prerequisites",
+     "constraint"
+    ]
+   ]
+  },
+  {
+   "abstentions": [],
+   "gold_edges": 3,
+   "id": "X22-bank-run",
+   "matched_edges": 3,
+   "pred_edges": [
+    [
+     "withdrawals",
+     "prevents",
+     "bank's liquidity",
+     "asserted",
+     "actual"
+    ],
+    [
+     "banks are entangled through interbank lending",
+     "causes",
+     "one failure spreads to others",
+     "asserted",
+     "actual"
+    ],
+    [
+     "rumor about bad loans",
+     "causes",
+     "withdrawals",
+     "asserted",
+     "actual"
+    ],
+    [
+     "Ring-fencing retail deposits",
+     "prevents",
+     "contagion",
+     "asserted",
+     "conditional"
+    ]
+   ],
+   "pred_nodes": [
+    [
+     "Ring-fencing retail deposits",
+     "method"
+    ],
+    [
+     "withdrawals",
+     "method"
+    ],
+    [
+     "one failure spreads to others",
+     "mechanism"
+    ],
+    [
+     "bank's liquidity",
+     "agent"
+    ],
+    [
+     "rumor about bad loans",
+     "problem"
+    ],
+    [
+     "banks are entangled through interbank lending",
+     "agent"
+    ],
+    [
+     "contagion",
+     "mechanism"
+    ]
+   ]
+  }
+ ]
+}

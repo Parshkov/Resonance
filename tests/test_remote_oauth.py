@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import secrets
 import threading
 import unittest
@@ -99,7 +100,7 @@ class Client:
 class OAuthCoreTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"https://x"}))
+        cls.runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
         cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
         cls.issuer = cls.base
@@ -156,12 +157,13 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertIn("refresh_token", doc["grant_types_supported"])
         self.assertTrue(doc["resource_indicators_supported"])
 
-    def test_issuer_follows_forwarded_headers(self):
-        # Behind a proxy the discovery URLs must be the public https origin.
+    def test_issuer_is_never_taken_from_an_unlisted_forwarded_host(self):
+        # A caller-controlled forwarded host must not become the issuer of the
+        # discovery documents (metadata poisoning); the allowlist decides.
         _, _, body = self.c().get("/.well-known/oauth-authorization-server",
                                   {"X-Forwarded-Proto": "https",
                                    "X-Forwarded-Host": "resonance.example"})
-        self.assertEqual(json.loads(body)["issuer"], "https://resonance.example")
+        self.assertNotEqual(json.loads(body)["issuer"], "https://resonance.example")
 
     # -- 4-10 happy path ------------------------------------------------
     def _full_connect(self, client_id, *, scope="resonance"):
@@ -285,8 +287,8 @@ class OAuthCoreTests(unittest.TestCase):
     def test_revoke_then_reuse_fails(self):
         c, tok, _, _ = self._full_connect("cid")
         access = tok["access_token"]
-        _, sid, _ = c.rpc(access, "initialize", {"protocolVersion": "2025-03-26"})
-        self.assertIsNotNone(sid)
+        istatus, sid, _ = c.rpc(access, "initialize", {"protocolVersion": "2025-03-26"})
+        self.assertEqual(istatus, 200)
         status, _, _ = c.post_form("/oauth/revoke",
                                    {"token": access, "token_type_hint": "access_token"})
         self.assertEqual(status, 200)
@@ -370,11 +372,29 @@ class OAuthCoreTests(unittest.TestCase):
         self.assertIn("<strong>Test</strong>", page)          # registered client_name
         self.assertIn('href="/oauth/consent.css"', page)
         self.assertNotIn("<style", page)
-        self.assertNotIn("<script", page)
+        # Nothing inline: the page is served under default-src 'self' with no
+        # unsafe-inline, so an inline style or script would silently not run.
+        # A same-origin src is exactly what that policy allows, and the theme
+        # script has to be one -- the person's Light/Dark choice, made on the
+        # site, must reach the screen where they decide whether to trust a
+        # client. Without it this page follows the OS and contradicts them.
+        self.assertNotIn("<script>", page)
+        self.assertIn('<script src="/theme.mjs"></script>', page)
+        for tag in re.findall(r"<script[^>]*>", page):
+            self.assertRegex(tag, r'^<script src="/[^"]+">$', tag)
         status, headers, body = c.get("/oauth/consent.css")
         self.assertEqual(status, 200)
         self.assertTrue(headers.get("Content-Type", "").startswith("text/css"))
         self.assertIn("main.consent", body.decode())
+        # A cached sheet with no validator once outlived a fix to it by an
+        # hour, and the browser had no way to ask whether it had changed.
+        self.assertEqual(headers.get("Cache-Control"), "no-cache")
+        etag = headers.get("ETag")
+        self.assertTrue(etag and etag.startswith('"'), etag)
+        status, headers, body = c.get("/oauth/consent.css",
+                                      headers={"If-None-Match": etag})
+        self.assertEqual(status, 304)
+        self.assertEqual(body, b"")
 
     def test_consent_page_carries_no_token(self):
         c = self.c()
@@ -402,7 +422,7 @@ class DurableGrantStoreTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             db = str(Path(tmp) / "grants.sqlite3")
-            runtime = build_runtime(db, allowed_origins=frozenset({"https://x"}), seed=False)
+            runtime = build_runtime(db, allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
             runtime.remote_auth = RepositoryGrantStore(runtime.live.repo)
             httpd = build_httpd("127.0.0.1", 0, runtime=runtime)
             base = f"http://127.0.0.1:{httpd.server_address[1]}"

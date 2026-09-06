@@ -30,6 +30,13 @@ from src.graph import ThoughtGraph
 from src.identity import IdentityService
 from src.identity.models import AuthorizationError
 from src.ingestion import IdentityIngestionService
+from src.product.shapes import (
+    SAME_SHAPE_NOTE,
+    ShapeCensus,
+    census_of_repository,
+    shape_signature,
+)
+from src.product.standing import StandingSearch
 from src.security.guards import suppress_small_buckets
 
 LIVE_PRODUCT_CONTRACT = "resonance-live-product/0.1"
@@ -109,6 +116,15 @@ class LiveProductService:
         self._lock = threading.RLock()
         self._results: dict[str, dict[str, Any]] = {}
         self._result_order: list[str] = []
+        # A shared thought does not stop being a query once discovery has run
+        # for it. It keeps looking, and tells both sides when someone whose
+        # reasoning has the same shape arrives later.
+        self.standing = StandingSearch(self)
+        # How many unrelated accounts hold each exact shape, recomputed only
+        # when the corpus generation moves. Consent, revocation and deletion
+        # all move it, so a cached census is never older than the index the
+        # engine is searching with. See shapes.py for what it is for.
+        self._census: tuple[Any, ShapeCensus] | None = None
 
     # ------------------------------------------------------------------
     # thin delegations: one boundary, accepted semantics untouched
@@ -147,22 +163,61 @@ class LiveProductService:
         return self.ingestion.preview(access_token, draft_id, **kwargs)
 
     def share_prepared(self, access_token: str, draft_id: str, **kwargs: Any):
-        return self.ingestion.share_prepared(access_token, draft_id, **kwargs)
+        receipt = self.ingestion.share_prepared(access_token, draft_id, **kwargs)
+        self._sweep(receipt.get("session_id") if isinstance(receipt, Mapping) else None)
+        return receipt
+
+    def _sweep(self, session_id: str | None) -> None:
+        """Record who a newly discoverable thought resonates with, both ways.
+
+        Deliberately best-effort: the share has already happened and is the
+        person's, so a failure to look for resonances must not turn it into an
+        error they see. The next share, or their next discovery, looks again.
+        """
+        if not session_id:
+            return
+        try:
+            self.standing.sweep_for_session(str(session_id))
+        except Exception as exc:  # noqa: BLE001 - never fail a share on the sweep
+            # Swallowed, but never silently: a swallow with no trace once hid a
+            # plain import error, so the whole waiting half of the product was
+            # dead and every share still looked perfect. The class and message
+            # are enough to find it; no thought content is ever printed.
+            print(f"standing search: sweep failed ({exc.__class__.__name__}: {exc})")
 
     def discard(self, access_token: str, draft_id: str, **kwargs: Any):
         return self.ingestion.discard(access_token, draft_id, **kwargs)
 
     def set_consent(self, access_token: str, session_id: str, choices, **kwargs: Any):
-        return self.identity.set_consent(access_token, session_id, choices, **kwargs)
+        result = self.identity.set_consent(access_token, session_id, choices, **kwargs)
+        # Consent is the switch that puts a thought into the pool or takes it
+        # out, so it is also what starts and stops its standing search.
+        if bool(getattr(choices, "share_thought_dna", False)):
+            self._sweep(session_id)
+        else:
+            self._retract(session_id)
+        return result
+
+    def _retract(self, session_id: str | None) -> None:
+        if not session_id:
+            return
+        try:
+            self.standing.retract_for_session(str(session_id))
+        except Exception as exc:  # noqa: BLE001 - never fail a withdrawal on cleanup
+            print(f"standing search: retract failed ({exc.__class__.__name__}: {exc})")
 
     def update_metadata(self, access_token: str, session_id: str, **kwargs: Any):
         return self.identity.update_metadata(access_token, session_id, **kwargs)
 
     def revoke_session(self, access_token: str, session_id: str, **kwargs: Any):
-        return self.identity.revoke_thought_session(access_token, session_id, **kwargs)
+        result = self.identity.revoke_thought_session(access_token, session_id, **kwargs)
+        self._retract(session_id)
+        return result
 
     def delete_session(self, access_token: str, session_id: str, **kwargs: Any):
-        return self.identity.delete_thought_session(access_token, session_id, **kwargs)
+        result = self.identity.delete_thought_session(access_token, session_id, **kwargs)
+        self._retract(session_id)
+        return result
 
     # ------------------------------------------------------------------
     # freshness / mode
@@ -186,7 +241,25 @@ class LiveProductService:
                 authenticated = True
             except Exception:
                 authenticated = False
+        account: dict[str, Any] = {}
         if authenticated:
+            actor = self.identity.authenticate(access_token)
+            user = self.identity.backend.get_user(actor.user_id)
+            claims = self.identity.identity_claims(actor.user_id) or {}
+            account = {
+                "user_id": actor.user_id,
+                "display_label": str(getattr(user, "display_label", "") or ""),
+                # Whether this account was signed into, as opposed to a
+                # pseudonymous account on a deployment with no sign-in.
+                "signed_in": bool(claims),
+                # The person's own sign-in, so the page can answer "who am I
+                # here?" instead of only "you are signed in". It goes to this
+                # account and no further: it is never in a discovery result,
+                # never in a match, and never reaches another participant --
+                # the same thing the consent page already shows them.
+                "sign_in_email": str(claims.get("email") or ""),
+                "sign_in_provider": str(claims.get("provider") or ""),
+            }
             owned = [
                 {
                     "session_id": row.get("session_id"),
@@ -200,13 +273,14 @@ class LiveProductService:
         return {
             "contract_version": LIVE_PRODUCT_CONTRACT,
             "mode": "live",
-            "mode_note": "DB-backed live product state; seed/replay demo is a separate, clearly labeled mode.",
+            "mode_note": "Live product state, read from the database.",
             "freshness": self.freshness(),
             "health_ok": health.ok,
             "users": health.users,
             "sessions": health.sessions,
             "discoverable": health.discoverable,
             "authenticated": authenticated,
+            "account": account,
             "owned_sessions": owned,
         }
 
@@ -248,10 +322,16 @@ class LiveProductService:
         viewer_coords = None
         if viewer_consent.get("share_coarse_location"):
             viewer_coords = _coords(dict(getattr(session, "location", {}) or {}))
+        # The query's own label-free skeleton. A candidate with exactly this
+        # skeleton, when the census says the skeleton is one author's habit
+        # rather than anyone's reasoning, is set aside in _project_row.
+        query_shape = shape_signature(graph)
+        tally: dict[str, int] = {"same_shape": 0}
         matches: list[dict[str, Any]] = []
         dropped_blocked = 0
         for row in raw["matches"]:
-            projected = self._project_row(actor.user_id, row, viewer_coords)
+            projected = self._project_row(actor.user_id, row, viewer_coords,
+                                          query_shape=query_shape, tally=tally)
             if projected is None:
                 dropped_blocked += 1
                 continue
@@ -259,11 +339,17 @@ class LiveProductService:
         rejected: list[dict[str, Any]] = []
         for row in raw.get("rejected", []):
             projected = self._project_row(actor.user_id, row, viewer_coords,
-                                          allow_hard_rejected=True)
+                                          allow_hard_rejected=True,
+                                          query_shape=query_shape, tally=tally)
             if projected is None:
                 dropped_blocked += 1
                 continue
             rejected.append(projected)
+        # Rows set aside for their shape are not "blocked": nobody blocked
+        # anyone, and the count that field carries is already a small leak
+        # about other people's consent. The shape note is a sentence, not a
+        # number, for the same reason.
+        dropped_blocked -= tally["same_shape"]
 
         freshness = self.freshness()
         payload = {
@@ -276,6 +362,7 @@ class LiveProductService:
             "aggregation": self._aggregate(matches),
             "blocked_rows_removed": dropped_blocked,
             "location_note": LOCATION_NOTE,
+            "shape_note": SAME_SHAPE_NOTE if tally["same_shape"] else "",
             "freshness": freshness,
         }
         result_id = "result-" + hashlib.sha256(_canonical(payload)).hexdigest()[:24]
@@ -284,6 +371,7 @@ class LiveProductService:
             self._results[result_id] = {
                 "subject": actor.user_id,
                 "serving_generation": freshness["serving_generation"],
+                "query_shape": query_shape,
                 "payload": payload,
             }
             if result_id in self._result_order:
@@ -319,14 +407,19 @@ class LiveProductService:
             )
         payload = dict(record["payload"])
         payload["freshness"] = current
+        tally: dict[str, int] = {"same_shape": 0}
         for key, allow_rejected in (("matches", False), ("rejected", True)):
             refreshed = []
             for row in payload.get(key, []):
                 projected = self._project_row(actor.user_id, row, None,
-                                              allow_hard_rejected=allow_rejected)
+                                              allow_hard_rejected=allow_rejected,
+                                              query_shape=record.get("query_shape"),
+                                              tally=tally)
                 if projected is not None:
                     refreshed.append(projected)
             payload[key] = refreshed
+        if tally["same_shape"]:
+            payload["shape_note"] = SAME_SHAPE_NOTE
         return payload
 
     def get_match(
@@ -389,6 +482,25 @@ class LiveProductService:
             self._workspaces = WorkspaceService(self.identity)
         return self._workspaces
 
+    @property
+    def topics(self):
+        """The shared topic each introduction can grow into.
+
+        Two assistants meet here on behalf of two people, so what accumulates
+        is structure rather than a transcript. Lazily built for the same reason
+        as the workspace service it sits on.
+        """
+        from src.workspaces.topics import SharedTopicService
+        if not hasattr(self, "_topics"):
+            self._topics = SharedTopicService(self.workspaces)
+        return self._topics
+
+    def contribute_to_topic(self, access_token, workspace_id, **kwargs):
+        return self.topics.contribute(access_token, workspace_id, **kwargs)
+
+    def read_topic(self, access_token, workspace_id, **kwargs):
+        return self.topics.read(access_token, workspace_id, **kwargs)
+
     def create_workspace(self, access_token, intro_id, **kwargs):
         return self.workspaces.create_from_intro(access_token, intro_id, **kwargs)
 
@@ -431,6 +543,18 @@ class LiveProductService:
     # ------------------------------------------------------------------
     # collaboration (R14) — one boundary, accepted semantics underneath
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # standing searches: what was found while you were not looking
+    # ------------------------------------------------------------------
+    def pending_resonances(self, access_token: str, **kwargs: Any) -> dict[str, Any]:
+        return self.standing.pending(access_token, **kwargs)
+
+    def mark_resonances_seen(self, access_token: str, alert_keys: list[str]) -> dict[str, Any]:
+        return self.standing.mark_seen(access_token, alert_keys)
+
+    def dismiss_resonance(self, access_token: str, alert_key: str) -> dict[str, Any]:
+        return self.standing.dismiss(access_token, alert_key)
+
     @property
     def collaboration(self):
         from src.collaboration import CollaborationService
@@ -508,10 +632,22 @@ class LiveProductService:
         viewer_coords: tuple[float, float] | None,
         *,
         allow_hard_rejected: bool = False,
+        query_shape: str | None = None,
+        tally: dict[str, int] | None = None,
     ) -> dict[str, Any] | None:
         candidate_session = str(row.get("session_id", ""))
         source = self.identity.policy_source
         owner = source.owner_of("session", candidate_session)
+        if owner and owner == viewer_id:
+            # Your own other thought is not somebody who turned up. Share two
+            # things here and discovery reported the second back to you as a
+            # person whose reasoning has the same shape as yours -- under your
+            # own pseudonym, in a service whose whole purpose is introducing
+            # you to someone else. You could then ask to be introduced to
+            # yourself. The standing search has always excluded this
+            # (standing.py: their_owner == owner); the two halves simply
+            # disagreed, and only the half that speaks to people was wrong.
+            return None
         if owner and source.is_blocked(viewer_id, owner):
             return None
         consent = source.session_consent(candidate_session)
@@ -520,8 +656,25 @@ class LiveProductService:
                 return None
             if not consent.get("share_thought_dna") and not allow_hard_rejected:
                 return None
+        if query_shape and self._same_habit_shape(query_shape, candidate_session):
+            # The candidate has exactly the viewer's skeleton, and that
+            # skeleton is held by so many unrelated accounts that it is the
+            # pipeline's habit rather than anybody's reasoning. A match that
+            # rests on it alone is not an introduction to anyone. Last of the
+            # drop rules on purpose: a row that was yours, blocked or withdrawn
+            # is dropped for that reason and never counted here, so the shape
+            # note is only ever shown when the shape was the reason.
+            if tally is not None:
+                tally["same_shape"] = tally.get("same_shape", 0) + 1
+            return None
         projected = dict(row)
         display = dict(projected.get("display", {}) or {})
+        # Seeded demo personas (record_kind synthetic / manually_curated) are
+        # labelled so a real participant never mistakes them for people who
+        # can accept an introduction.
+        record = self.backend.get_session(candidate_session)
+        record_kind = str(getattr(record, "record_kind", "") or "")
+        display["demo_persona"] = bool(record_kind) and record_kind != "volunteer"
         if consent and not consent.get("share_display_profile"):
             # Mirror R12B projection semantics: with profile sharing off, no
             # profile-derived presentation metadata escapes either.
@@ -541,6 +694,53 @@ class LiveProductService:
             }
         projected["display"] = display
         return projected
+
+    # ------------------------------------------------------------------
+    # one shape, many names (shapes.py)
+    # ------------------------------------------------------------------
+    def _current_census(self) -> ShapeCensus:
+        """The census for the corpus generation being served, built at most
+        once per generation. A runtime with no durable store gets an empty
+        census, which condemns nothing: where this cannot measure, it must
+        not delete."""
+        repo = getattr(self.live, "repo", None)
+        if repo is None:
+            return ShapeCensus(accounts=0, thoughts=0, counts={})
+        try:
+            generation = repo.get_corpus_generation()
+        except Exception:  # noqa: BLE001 - unknown generation: never cache
+            return census_of_repository(repo)
+        with self._lock:
+            cached = self._census
+            if cached is not None and cached[0] == generation:
+                return cached[1]
+        census = census_of_repository(repo)
+        with self._lock:
+            self._census = (generation, census)
+        return census
+
+    def _same_habit_shape(self, query_shape: str, candidate_session: str) -> bool:
+        census = self._current_census()
+        if not census.is_signature(query_shape):
+            return False
+        record = self.backend.get_session(candidate_session)
+        dna = getattr(record, "thought_dna", None)
+        if not dna:
+            return False
+        try:
+            return shape_signature(ThoughtGraph.from_dict(dict(dna))) == query_shape
+        except Exception:  # noqa: BLE001 - unparseable: not the same shape
+            return False
+
+    def shape_census(self) -> dict[str, Any]:
+        """The measurement behind the rule, for an operator or a test.
+
+        Counts only: how concentrated the corpus is on its most common exact
+        skeletons and what verdict each would get. No signature, session,
+        account or label appears in it, and shapes held by fewer accounts
+        than the heat-map minimum are folded into a count rather than listed.
+        """
+        return self._current_census().summary(minimum=self.aggregation_minimum)
 
     def _aggregate(self, matches: list[dict[str, Any]]) -> dict[str, Any]:
         buckets: dict[str, int] = {}

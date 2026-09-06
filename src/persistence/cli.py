@@ -3,6 +3,7 @@
 Examples:
   python -m src.persistence --db var/resonance-pilot.sqlite health
   python -m src.persistence --db var/resonance-pilot.sqlite seed-r7
+  python -m src.persistence --db var/resonance-pilot.sqlite purge-demo
   python -m src.persistence --db var/resonance-pilot.sqlite seed-pilot --count 100
   python -m src.persistence --db var/resonance-pilot.sqlite export --out var/backup.json
 """
@@ -15,7 +16,7 @@ import sys
 from pathlib import Path
 
 from .factory import open_repository
-from .seed import seed_pilot_scale, seed_r7
+from .seed import purge_demo, seed_pilot_scale, seed_r7
 from .service import LiveCorpusService
 
 
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("health")
     sub.add_parser("reset")
     sub.add_parser("seed-r7")
+    sub.add_parser("purge-demo", help="tombstone every seeded demo session and revoke the demo persona accounts")
     pilot = sub.add_parser("seed-pilot")
     pilot.add_argument("--count", type=int, default=100)
     exp = sub.add_parser("export")
@@ -71,6 +73,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "seed-r7":
             n = seed_r7(service)
             print(json.dumps({"seeded": n, **_health_payload(service)}, sort_keys=True))
+            return 0
+        if args.cmd == "purge-demo":
+            result = purge_demo(service)
+            print(json.dumps({**result, **_health_payload(service)}, sort_keys=True))
             return 0
         if args.cmd == "seed-pilot":
             if args.count < 1:

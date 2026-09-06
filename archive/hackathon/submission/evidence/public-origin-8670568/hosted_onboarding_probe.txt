@@ -1,0 +1,20 @@
+Resonance hosted-client onboarding probe -> https://resonance-production-cfe3.up.railway.app/mcp
+  [PASS] unauthenticated /mcp challenge (HTTP 401) — 401 with resource_metadata pointer
+  [PASS] protected-resource metadata (RFC 9728) (HTTP 200) — resource=https://resonance-production-cfe3.up.railway.app/mcp
+  [PASS] resource == canonical /mcp — advertised https://resonance-production-cfe3.up.railway.app/mcp vs given https://resonance-production-cfe3.up.railway.app/mcp
+  [PASS] authorization-server metadata (RFC 8414) (HTTP 200) — S256=True
+  [PASS] dynamic client registration (RFC 7591) (HTTP 201) — client_id=resonance-client-844336a9190de5e6
+  [PASS] authorize consent page (GET) (HTTP 200) — human consent screen rendered
+  [PASS] authorize approve -> code + state (HTTP 302) — 302 to redirect_uri with code + exact state
+  [PASS] token exchange (authorization_code + PKCE) (HTTP 200) — aud=None refresh=yes
+  [PASS] MCP initialize (Bearer) (HTTP 200) — protocol 2025-03-26; stateless (bearer per request)
+  [PASS] tools/list (HTTP 200) — 12 tools
+  [PASS] resonance_whoami (HTTP 200) — user_id=person-78053b65f3294a60
+  [PASS] post-connect smoke (prepare→share→discover) — shared ses-417f5cf492d0c25d, discover ok (0 matches)
+  [PASS] smoke cleanup (revoke own guest share) (HTTP 200) — ses-417f5cf492d0c25d revoked=True discoverable=False
+  [PASS] refresh grant -> new access token (HTTP 200) — rotated=True
+  [PASS] old refresh token reuse rejected (HTTP 400) — reuse returned 400
+  [PASS] revoke refresh token (RFC 7009) (HTTP 200) — revocation endpoint accepted
+  [PASS] refresh after revoke rejected (HTTP 400) — reuse of revoked token returned 400
+
+ONBOARDING PASS: 9/9 required steps passed

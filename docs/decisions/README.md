@@ -20,13 +20,12 @@ ADR-0007 — Resonance score and explanation contract
 
 The numbering/order may change as evidence arrives.
 
-## Current proposed records
+## Current records
 
-- [ADR-0002 — candidate retrieval with gated multi-scale structural fingerprints](ADR-0002-retrieval-candidate-generation.md)
-- [ADR-0003 — typed partial graph alignment for structural verification](ADR-0003-structural-verification.md)
-
-These remain proposed until maintainer review and the declared benchmark gates;
-their presence here is not acceptance.
+- [ADR-0002 — candidate retrieval with gated multi-scale structural fingerprints](ADR-0002-retrieval-candidate-generation.md) (engine 0.1; partially superseded)
+- [ADR-0003 — typed partial graph alignment for structural verification](ADR-0003-structural-verification.md) (engine 0.1; partially superseded)
+- [ADR-0004 — concept-aligned analogy, multi-skeleton benchmark, verified ranking](ADR-0004-concept-aligned-analogy-and-benchmark-v0.2.md) (engine 0.2, accepted)
+- [ADR-0005 — same-vocabulary cross-domain pairs: `approximate` vs `analogical`](ADR-0005-same-vocabulary-cross-domain-verdict.md) (**proposed / open**; needs human-authored gold)
 
 ## Required ADR content
 

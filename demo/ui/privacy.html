@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-theme-choice="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy — Resonance</title>
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/legal.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <script src="/theme.mjs"></script>
+</head>
+<body>
+<main class="doc">
+  <p class="doc-brand"><a href="/">Resonance</a></p>
+  <h1>Privacy</h1>
+  <p class="doc-lede">What Resonance stores, what it does not, and how to remove it.
+    This describes the service running at this origin. It is written from the
+    behaviour of the code that serves you, not from an intention.</p>
+
+  <h2>The short version</h2>
+  <ul>
+    <li>You sign in with Google or GitHub. Resonance receives your verified
+      email address and the name on that account, and never your password.</li>
+    <li>Other people never see your email address. What they see is a
+      pseudonymous identifier and what you explicitly chose to share.</li>
+    <li>The text you or your assistant write is <strong>not stored</strong>. What is
+      stored is the causal structure extracted from it.</li>
+    <li>Nothing you share is discoverable by anyone until you explicitly confirm it,
+      after seeing exactly what would become discoverable.</li>
+    <li>You can revoke a share at any time, which removes it from discovery
+      immediately.</li>
+  </ul>
+
+  <h2>What is stored</h2>
+  <h3>Your account</h3>
+  <p>A pseudonymous identifier (<code>person-…</code>) and a display label taken
+    from the name on the account you signed in with.</p>
+  <p>From your sign-in provider, Resonance stores three things: which provider it
+    was, the stable identifier that provider uses for you, and your verified email
+    address. Nothing else is requested — no contacts, no repositories, no files,
+    no ability to act anywhere on your behalf — and your password never reaches
+    this service.</p>
+  <p><strong>Why an email address is required.</strong> Resonance's purpose is to
+    tell you when someone whose reasoning has the same shape as yours appears. If
+    nobody matches you today, the service keeps looking; when someone does, there
+    has to be a way to reach you. An account nobody can reach could never be told,
+    and would be a different stranger each time you connected a new chat client.
+    The address is used for that, and to recognise you as the same person across
+    the browser and every chat client you connect. It is not used for marketing,
+    and it is never shown to other participants.</p>
+
+  <h3>A thought you share</h3>
+  <p>The <em>Thought DNA</em>: short labels for the nodes of your reasoning and the
+    typed relations between them, plus a topic and domain you or your assistant
+    supply for display. These labels are what other people can see when your
+    thought is discoverable.</p>
+
+  <h3>What happens to the original text</h3>
+  <p>When a thought is prepared from raw text, the text is processed by a
+    deterministic extractor and then <strong>blanked before anything is written</strong>:
+    the stored record carries an empty source field. A one-way SHA-256 hash of the
+    submitted text is kept on the private draft so that resubmitting the same text
+    is recognised as the same draft. A hash cannot be reversed into the text. The
+    durable, discoverable record contains neither the text nor that hash.</p>
+
+  <h3>Coarse location</h3>
+  <p>If you supply one, a city-level or synthetic coarse location is stored and
+    displayed. It is <strong>never used for matching or ranking</strong>. You can
+    decline to share it; matches then read “Location not shared”.</p>
+
+  <h3>Introductions and messages</h3>
+  <p>If you request an introduction and the other person accepts, a relay channel is
+    opened and the messages you send through it are stored so both sides can read
+    them. Nothing is relayed before both sides agree.</p>
+
+  <h3>Operational records</h3>
+  <p>Audit events for actions that change state — sharing, revoking, deleting,
+    introductions — recording the account, the affected record and the time, so that
+    a change can be accounted for. Authorisation grants for any chat client you
+    connect. Server logs of requests; the operator does not log message bodies,
+    thought labels, tokens or recovery secrets.</p>
+
+  <h2>What is not stored</h2>
+  <ul>
+    <li>The raw text of your conversation.</li>
+    <li>Your password, for any provider. Sign-in happens on the provider's own
+      pages; Resonance only ever receives the result.</li>
+    <li>Any email address or phone number other than your sign-in address —
+      including any found in text you submit, which the extractor scrubs.</li>
+    <li>Precise location.</li>
+    <li>Third-party analytics or advertising identifiers. The pages load no external
+      scripts, fonts or trackers of any kind — the origin enforces this with a
+      <code>default-src 'self'</code> content security policy.</li>
+  </ul>
+
+  <h2>Who can see what</h2>
+  <p>A thought you have shared is visible, as its Thought DNA and display labels, to
+    other people who run a discovery that matches it. Your account identifier is
+    pseudonymous and your email address is never among what they see. Nothing is
+    sold, and nothing is shared with a third party for their own purposes.</p>
+  <p>A chat client you connect through MCP acts as you, within the tools it was
+    authorised for, until you disconnect it or revoke the grant.</p>
+
+  <h2>Retention and removal</h2>
+  <p>A shared thought is kept until you revoke or delete it. Revoking removes it from
+    discovery immediately; existing discovery results that referenced it stop
+    resolving. Deleting additionally tombstones the record so it is no longer served.
+    Audit events for an action are retained after it, because their purpose is to
+    account for what happened.</p>
+  <p>You can revoke from your chat (<code>resonance_stop_sharing</code>), from the
+    Collaboration panel on this site, or by asking the operator. Removing your
+    account removes the link to your sign-in provider and the email address with
+    it; signing in again afterwards creates a new account, not the old one.</p>
+
+  <h2>Security</h2>
+  <p>Traffic is served over HTTPS. Client connections use OAuth 2.1 with PKCE;
+    tokens are scoped to this service and can be revoked. Cookies are session
+    cookies for the browser interface only.</p>
+
+  <h2>Changes</h2>
+  <p>If this document changes in a way that affects what is collected or who can see
+    it, the change is visible in the public repository's history along with the code
+    that implements it.</p>
+
+  <h2>Contact</h2>
+  <p id="contact-line">Contact: <span class="contact-value">__RESONANCE_CONTACT__</span></p>
+
+  <p class="doc-foot"><a href="/">Back to Resonance</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></p>
+</main>
+</body>
+</html>

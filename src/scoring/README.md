@@ -42,3 +42,18 @@ Deliberate implementation decisions, all recorded in the verifier config hash:
   `classification_accuracy = 0` (no gate reads that metric). Real concept
   IDs from R0-E/R2 extraction will activate the knowledge branch and retire
   the fallback for annotated corpora.
+
+## Scoring policy v0.2 (ADR-0004)
+
+* `semantic` is lexicon similarity; `extras` carry `surface_semantic`,
+  `concept_alignment` (mean over lexicon-covered pairs × sqrt(coverage)),
+  `domain_overlap`, `rarity`, `n_role_exact`.
+* `label_identity` contradictions: a mapped node whose unmistakable label twin
+  (surface >= 0.8) sits elsewhere.
+* Role/coverage terms scale with sqrt(R); path credit is additive to direct
+  credit; the evidence gate is sqrt(min(1,n/4)·min(1,e/3)).
+* Classification: complementary → hard sign → structural/contradiction gate →
+  surface/domain overlap ⇒ direct/approximate → concept alignment >= 0.25 ⇒
+  analogical → rare skeleton (corpus present) with weak concept support ⇒
+  analogical → negative. Thresholds calibrated on Benchmark v0.2 S1–S4 only.
+* `confidence()` returns high / medium / low.

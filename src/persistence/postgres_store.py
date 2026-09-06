@@ -343,6 +343,17 @@ class PostgresRepository:
                 self._conn.rollback()
                 raise
 
+    def list_grants_for_user(self, kind: str, user_id: str) -> Sequence[Mapping[str, Any]]:
+        """Every record of one kind belonging to one account, oldest first."""
+        with self._lock:
+            rows = self._fetchall_map(
+                "SELECT record_json FROM oauth_grants WHERE kind = ? AND user_id = ? "
+                "ORDER BY created_at, grant_key",
+                (kind, user_id),
+            )
+            self._conn.commit()
+            return [loads(row["record_json"]) for row in rows]
+
     def delete_grants_for_user(self, kind: str, user_id: str) -> int:
         with self._lock:
             try:
@@ -381,6 +392,23 @@ class PostgresRepository:
             )
 
     def put_session(
+        self,
+        session: SessionRecord,
+        *,
+        expected_version: int | None = None,
+        idempotency: IdempotencyKey | None = None,
+        audit: AuditEvent | None = None,
+    ) -> SessionRecord:
+        try:
+            return self._put_session(session, expected_version=expected_version,
+                                     idempotency=idempotency, audit=audit)
+        except Exception as exc:
+            if postgres_unique_violation(exc):
+                raise PersistenceConflictError(
+                    "session identifier or thought_id conflicts with durable state") from exc
+            raise
+
+    def _put_session(
         self,
         session: SessionRecord,
         *,
@@ -892,9 +920,23 @@ class PostgresRepository:
                 self._conn.rollback()
                 raise
 
+    # The generic helpers below interpolate the table name into SQL. Every
+    # caller passes a literal, but "every caller today" is not a guarantee, so
+    # the set of tables they may touch is stated once here.
+    WORKSPACE_ROW_TABLES = frozenset({
+        "workspace_notes", "workspace_tasks", "workspace_artifacts",
+        "workspace_links", "workspace_activity", "workspace_contributions",
+    })
+
+    def _workspace_table(self, table: str) -> str:
+        if table not in self.WORKSPACE_ROW_TABLES:
+            raise ValueError(f"unknown workspace table {table!r}")
+        return table
+
     def add_workspace_row(self, table, columns, values, *, audit=None):
         with self._lock:
             try:
+                table = self._workspace_table(table)
                 placeholders = ", ".join("?" for _ in columns)
                 self._execute(f"INSERT INTO {table}({', '.join(columns)}) VALUES ({placeholders})", values)
                 self._insert_audit(audit)
@@ -919,7 +961,7 @@ class PostgresRepository:
     def list_workspace_rows(self, table, workspace_id, order="created_at"):
         with self._lock:
             return self._fetchall_map(
-                f"SELECT * FROM {table} WHERE workspace_id = ? ORDER BY {order}", (workspace_id,))
+                f"SELECT * FROM {self._workspace_table(table)} WHERE workspace_id = ? ORDER BY {order}", (workspace_id,))
 
     def bump_workspace(self, workspace_id, *, expected_version, brief=None, now=None):
         with self._lock:

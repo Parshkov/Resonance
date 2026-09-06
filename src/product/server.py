@@ -16,16 +16,21 @@ from __future__ import annotations
 import argparse
 import os
 import json
+from html import escape
 import secrets
+import threading
+import time
+from collections import deque
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from urllib.parse import parse_qs, urlparse
 
 from src.identity import IdentityService, R11IdentityBackend
+from src.identity.service import ACCOUNT_IDENTITY_LINKED
 from src.identity.models import (
     AuthenticationError,
     AuthorizationError,
@@ -52,6 +57,9 @@ from src.persistence.seed import seed_r7
 from src.collaboration import CollaborationError
 from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
+from src.product import authorship as authorship_rule
+from src.product.notify import (Notifier, NoTransport, account_in_token,
+                                self_test)
 from src.product.service import LiveProductService, ProductError, StaleResultError
 from src.product.mcp_bridge import (
     BridgeError,
@@ -60,31 +68,71 @@ from src.product.mcp_bridge import (
     RemoteMCPBridge,
     bearer_token,
 )
-from src.product import oauth_mount
+from src.product import auth_mount, oauth_mount
 
 REPO = Path(__file__).resolve().parents[2]
 UI_DIR = REPO / "demo" / "ui"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8788
 MAX_BODY_BYTES = 96 * 1024
+# Unauthenticated account creation is bounded per client address so an
+# anonymous caller cannot grow the database or spam introductions.
+REGISTRATION_LIMIT = 20
+REGISTRATION_WINDOW_SECONDS = 3600.0
+_registration_hits: dict[str, deque] = {}
+_registration_lock = threading.Lock()
+
+
+def _client_ip(headers: Mapping[str, str], peer: str) -> str:
+    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
+    return forwarded or peer
+
+
+def registration_allowed(ip: str, *, now: float | None = None) -> bool:
+    if ip in ("127.0.0.1", "::1", "localhost", ""):
+        return True                        # local development / test harness
+    now = time.monotonic() if now is None else now
+    with _registration_lock:
+        hits = _registration_hits.setdefault(ip, deque())
+        while hits and now - hits[0] > REGISTRATION_WINDOW_SECONDS:
+            hits.popleft()
+        if len(hits) >= REGISTRATION_LIMIT:
+            return False
+        hits.append(now)
+        return True
 COOKIE_NAME = "resonance_token"
 
 STATIC = {
-    "/styles.css": ("styles.css", "text/css; charset=utf-8"),
-    "/app.mjs": ("app.mjs", "text/javascript; charset=utf-8"),
-    "/webmcp.mjs": ("webmcp.mjs", "text/javascript; charset=utf-8"),
-    "/deeplink.mjs": ("deeplink.mjs", "text/javascript; charset=utf-8"),
-    "/collab.mjs": ("collab.mjs", "text/javascript; charset=utf-8"),
+    # The type scale and the radii, linked by the product page and by the
+    # documentation pages, which do not share a stylesheet.
+    "/tokens.css": ("tokens.css", "text/css; charset=utf-8"),
+    # The page: one stylesheet, one router with every screen, one state
+    # store, and every sentence in one place (two languages).
+    "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/main.mjs": ("main.mjs", "text/javascript; charset=utf-8"),
+    "/store.mjs": ("store.mjs", "text/javascript; charset=utf-8"),
+    "/strings.mjs": ("strings.mjs", "text/javascript; charset=utf-8"),
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
-    "/collab_ui.mjs": ("collab_ui.mjs", "text/javascript; charset=utf-8"),
-    "/workspaces.mjs": ("workspaces.mjs", "text/javascript; charset=utf-8"),
-    "/live_shell.mjs": ("live_shell.mjs", "text/javascript; charset=utf-8"),
-    # R16 Chrome audit: collaboration drawer + narrow-viewport rules (CSP-safe
-    # linked stylesheet) and a favicon (the page used to 404 on /favicon.ico).
-    "/live_ui.css": ("live_ui.css", "text/css; charset=utf-8"),
+    "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
+    # The browser WebMCP tools: the same product, the same tools, for an
+    # agent living in the browser. The module reads the tool list from
+    # /api/product/tools and executes through /api/product/tool, so the
+    # browser and the remote MCP server can never carry two vocabularies.
+    "/webmcp.mjs": ("browser_tools.mjs", "text/javascript; charset=utf-8"),
+    "/legal.css": ("legal.css", "text/css; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/favicon.ico": ("favicon.svg", "image/svg+xml"),
 }
+
+# The screens the page routes to on the client. Each is served the same
+# document; main.mjs reads the path and shows that screen, so a link to
+# /people or /groups/<id> can be opened, bookmarked and shared.
+APP_PATHS = {"/", "/index.html", "/thoughts", "/people", "/talk", "/groups", "/connect"}
+
+
+def is_app_path(path: str) -> bool:
+    return path in APP_PATHS or path.startswith("/groups/") or path.startswith("/talk/")
+
 
 def _mcp_path_token(path: str) -> str | None:
     """`/mcp` -> "" (key must come in the Authorization header);
@@ -97,12 +145,6 @@ def _mcp_path_token(path: str) -> str | None:
     return None
 
 
-HEAD_INJECTION = (
-    '  <link rel="icon" href="/favicon.svg" type="image/svg+xml">\n'
-    '  <link rel="stylesheet" href="/live_ui.css">\n</head>'
-)
-
-
 @dataclass
 class ProductRuntime:
     live: LiveCorpusService
@@ -111,13 +153,292 @@ class ProductRuntime:
     allowed_origins: frozenset[str]
 
 
+def engine_identity(runtime: "ProductRuntime") -> dict[str, str]:
+    """Versions a tester needs to know which engine answered (no secrets)."""
+    from src import scoring as _scoring
+    from src.engine import ENGINE_VERSION
+    from src.extraction import EXTRACTOR_VERSION
+    from src.fingerprint.keys import FEATURE_VERSION
+    from src.index import INDEX_VERSION
+    from src.semantics import SEMANTICS_VERSION
+    from src.semantics import neural as _neural
+    engine = runtime.live.engine
+    return {
+        "engine_version": ENGINE_VERSION,
+        "scoring_version": _scoring.SCORE_MODEL_VERSION,
+        "classify_policy": _scoring.CLASSIFY_POLICY,
+        "index_version": INDEX_VERSION,
+        "feature_version": FEATURE_VERSION,
+        "semantics_version": SEMANTICS_VERSION,
+        "label_encoder": (_neural.active().name if _neural.active() else None),
+        "extractor_version": EXTRACTOR_VERSION,
+        "verifier_config_hash": engine.verifier.config_hash,
+    }
+
+
+def corpus_summary(runtime: "ProductRuntime") -> dict[str, Any]:
+    """How much of the live corpus is real people vs seeded demo personas."""
+    kinds = runtime.live.session_kinds()
+    demo = sum(n for kind, n in kinds.items() if kind != "volunteer")
+    return {"sessions_by_kind": kinds, "volunteer_sessions": kinds.get("volunteer", 0),
+            "demo_sessions": demo, "demo_personas_present": demo > 0}
+
+
+def startup_purge_demo(runtime: "ProductRuntime", environ: Mapping[str, str] | None = None) -> dict[str, int] | None:
+    """One-shot operator action: ``RESONANCE_PURGE_DEMO=1`` tombstones every seeded
+    demo session and revokes the demo persona accounts at process start
+    (idempotent; real participants are never touched). Prints counts only."""
+    environ = os.environ if environ is None else environ
+    if environ.get("RESONANCE_PURGE_DEMO", "").strip().lower() not in ("1", "true", "yes", "on"):
+        return None
+    from src.persistence.seed import purge_demo
+    result = purge_demo(runtime.live)
+    print(f"purge-demo: sessions_deleted={result['sessions_deleted']} "
+          f"users_revoked={result['users_revoked']} (RESONANCE_PURGE_DEMO set; unset it after this deploy)")
+    return result
+
+
+def startup_purge_sessions(runtime: "ProductRuntime",
+                           environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: ``RESONANCE_PURGE_SESSIONS=<id>[,<id>…]``
+    tombstones exactly the sessions the operator named, at process start.
+
+    This exists because `purge-demo` deliberately cannot help here. It selects
+    rows by `record_kind != "volunteer"`, and the rows an owner actually needs
+    to remove — duplicate guest sessions left by acceptance runs before they
+    learned to revoke themselves — are real `volunteer` records. The product's
+    own `delete_session` needs the *owner's* access token, and those guests'
+    tokens are long gone.
+
+    So this deletes by explicit id and nothing else. It never selects rows on
+    its own, never matches a pattern, and never touches a session the operator
+    did not type. Every id is reported with what happened to it, including ids
+    that do not exist and ids that were already deleted, so a run that quietly
+    did less than the operator intended is visible in the log. Idempotent: a
+    second run reports `already_deleted` for everything and changes nothing.
+
+    Prints ids and counts only — never a topic, a label or any thought content.
+    """
+    environ = os.environ if environ is None else environ
+    raw = (environ.get("RESONANCE_PURGE_SESSIONS") or "").strip()
+    if not raw:
+        return None
+    wanted: list[str] = []
+    for chunk in raw.replace(",", " ").split():
+        token = chunk.strip()
+        if token and token not in wanted:
+            wanted.append(token)
+    outcome: dict[str, str] = {}
+    deleted = 0
+    for session_id in wanted:
+        session = runtime.live.get_session(session_id)
+        if session is None:
+            outcome[session_id] = "missing"
+            continue
+        if session.deleted_at is not None:
+            outcome[session_id] = "already_deleted"
+            continue
+        runtime.live.delete_session(session_id, rebuild=False)
+        outcome[session_id] = "deleted"
+        deleted += 1
+    if deleted:
+        runtime.live.rebuild_index()
+    result = {"requested": len(wanted), "deleted": deleted,
+              "already_deleted": sum(1 for v in outcome.values() if v == "already_deleted"),
+              "missing": sum(1 for v in outcome.values() if v == "missing"),
+              "outcome": outcome}
+    print(f"purge-sessions: requested={result['requested']} deleted={result['deleted']} "
+          f"already_deleted={result['already_deleted']} missing={result['missing']} "
+          f"({', '.join(f'{k}={v}' for k, v in outcome.items())}) "
+          f"(RESONANCE_PURGE_SESSIONS set; unset it after this deploy)")
+    return result
+
+
+def startup_assign_pseudonyms(runtime: "ProductRuntime",
+                              environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: give a human pseudonym to accounts that lack one.
+
+    ``RESONANCE_ASSIGN_PSEUDONYMS=report`` counts and prints; ``=1`` applies.
+
+    The display label is what other participants see. Two kinds of account have
+    the wrong thing there: the ones created before pseudonyms existed, whose
+    label is a `guest-…` identifier, and — far worse — the ones created by
+    federated sign-in before this was fixed, whose label is the person's real
+    name as their provider knows it. A structural match is not consent to learn
+    someone's name, so that is a disclosure, not an aesthetic problem.
+
+    An account already carrying a pseudonym from this service's own vocabulary
+    is left exactly as it is, so a second run changes nothing. Prints counts and
+    account ids only — never the label being replaced, because that label is the
+    very thing that should not be written down anywhere else.
+    """
+    environ = os.environ if environ is None else environ
+    mode = (environ.get("RESONANCE_ASSIGN_PSEUDONYMS") or "").strip().lower()
+    if mode not in {"1", "true", "yes", "report", "dry-run"}:
+        return None
+    dry_run = mode in {"report", "dry-run"}
+
+    from src.identity.pseudonyms import generate as _generate, is_pseudonym
+
+    users = list(runtime.live.repo.list_users())
+    taken = {str(getattr(u, "display_label", "") or "") for u in users
+             if is_pseudonym(getattr(u, "display_label", ""))}
+    live = [u for u in users if getattr(u, "revoked_at", None) is None]
+    revoked = len(users) - len(live)
+    # Counted separately rather than as "everything we are not renaming". A
+    # single skipped-count conflated revoked accounts with accounts that
+    # already had a pseudonym, and an operator reads these numbers before
+    # deciding to change 160 people's names.
+    already_named = [u for u in live if is_pseudonym(getattr(u, "display_label", ""))]
+    needs = [u for u in live if not is_pseudonym(getattr(u, "display_label", ""))]
+
+    assigned: list[str] = []
+    for user in needs:
+        name = _generate(taken)
+        taken.add(name)
+        if not dry_run:
+            runtime.live.create_user(user.user_id, display_label=name, rebuild=False)
+        assigned.append(user.user_id)
+    if not dry_run and assigned:
+        runtime.live.rebuild_index()
+
+    result = {
+        "dry_run": dry_run,
+        "accounts": len(users),
+        "revoked_skipped": revoked,
+        "already_named": len(already_named),
+        "assigned": len(assigned),
+        "account_ids": assigned,
+    }
+    print(f"assign-pseudonyms: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
+          f"accounts={result['accounts']} revoked_skipped={result['revoked_skipped']} "
+          f"already_named={result['already_named']} assigned={result['assigned']} "
+          f"(RESONANCE_ASSIGN_PSEUDONYMS set; unset it after this deploy)")
+    return result
+
+
+def startup_purge_unsigned(runtime: "ProductRuntime",
+                           environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: retire every account nobody ever signed into.
+
+    ``RESONANCE_PURGE_UNSIGNED=report`` counts and prints; ``=1`` carries it out.
+
+    This applies the product's own rule to what came before it. Resonance
+    introduces people to each other, so an account has to belong to someone who
+    can be recognised on return and reached when a match appears. An account
+    with no verified sign-in behind it can be neither. Leaving its thoughts
+    discoverable is worse than an empty corpus: a real participant is shown a
+    resonance with someone who can never accept an introduction — the service
+    inventing a person.
+
+    `purge-demo` cannot help here, because it selects on `record_kind` and these
+    are genuine `volunteer` rows left by acceptance runs. The distinction that
+    matters is not what kind of row it is, but whether a person stands behind it.
+
+    An account is spared when the identity log carries a linked provider
+    identity for it, and when its id is listed in ``RESONANCE_PURGE_KEEP``.
+    Prints ids and counts only — never a topic, a label or any thought content.
+    Idempotent: a second run finds nothing left to do.
+    """
+    environ = os.environ if environ is None else environ
+    mode = (environ.get("RESONANCE_PURGE_UNSIGNED") or "").strip().lower()
+    if mode not in {"1", "true", "yes", "report", "dry-run"}:
+        return None
+    dry_run = mode in {"report", "dry-run"}
+    keep = {token for token in
+            (environ.get("RESONANCE_PURGE_KEEP") or "").replace(",", " ").split()
+            if token}
+
+    identity = runtime.identity
+    signed_in = {
+        event.user_id for event in identity.backend.list_identity_events()
+        if event.event_type == ACCOUNT_IDENTITY_LINKED and event.user_id
+    }
+    sessions = [row for row in runtime.live.repo.list_sessions()
+                if getattr(row, "deleted_at", None) is None]
+    doomed_sessions: list[str] = []
+    doomed_owners: set[str] = set()
+    for row in sessions:
+        session_id = str(getattr(row, "session_id", "") or "")
+        owner = identity.policy_source.owner_of("session", session_id)
+        if not owner or owner in signed_in or owner in keep or session_id in keep:
+            continue
+        doomed_sessions.append(session_id)
+        doomed_owners.add(owner)
+
+    # An account with no verified sign-in and nothing shared is an empty shell
+    # left by an acceptance run. Under the rule this action exists to apply it
+    # should not exist at all, and leaving it behind means the next operator
+    # reads a count of hundreds of "accounts" that are nobody.
+    owners_with_surviving_sessions = set()
+    for row in sessions:
+        session_id = str(getattr(row, "session_id", "") or "")
+        if session_id in doomed_sessions:
+            continue
+        owner = identity.policy_source.owner_of("session", session_id)
+        if owner:
+            owners_with_surviving_sessions.add(owner)
+    empty_accounts = []
+    for user in runtime.live.repo.list_users():
+        user_id = str(getattr(user, "user_id", "") or "")
+        if getattr(user, "revoked_at", None) is not None:
+            continue
+        if not user_id or user_id in signed_in or user_id in keep:
+            continue
+        if user_id in owners_with_surviving_sessions:
+            continue
+        empty_accounts.append(user_id)
+    doomed_owners.update(empty_accounts)
+
+    result: dict[str, Any] = {
+        "dry_run": dry_run,
+        "sessions_considered": len(sessions),
+        "accounts_signed_in": len(signed_in),
+        "sessions_to_delete": len(doomed_sessions),
+        "accounts_to_revoke": len(doomed_owners),
+        "empty_accounts": len(empty_accounts),
+        "kept_by_request": sorted(keep),
+    }
+    if not dry_run and (doomed_sessions or doomed_owners):
+        for session_id in doomed_sessions:
+            runtime.live.delete_session(session_id, rebuild=False)
+        for user_id in sorted(doomed_owners):
+            try:
+                runtime.live.revoke_user(user_id)
+            except Exception as exc:  # noqa: BLE001 - report, never abort the boot
+                print(f"purge-unsigned: could not revoke {user_id} "
+                      f"({exc.__class__.__name__})")
+        if doomed_sessions:
+            runtime.live.rebuild_index()
+        result["deleted"] = len(doomed_sessions)
+    print(f"purge-unsigned: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
+          f"sessions_considered={result['sessions_considered']} "
+          f"accounts_signed_in={result['accounts_signed_in']} "
+          f"sessions_to_delete={result['sessions_to_delete']} "
+          f"accounts_to_revoke={result['accounts_to_revoke']} "
+          f"(of which empty={result['empty_accounts']}) kept={len(keep)} "
+          f"(RESONANCE_PURGE_UNSIGNED set; unset it after this deploy)")
+    return result
+
+
 def build_runtime(
     db_path: str = ":memory:",
     *,
     allowed_origins: frozenset[str],
     confirmation_secret: bytes | None = None,
-    seed: bool = True,
+    seed: bool | None = None,
+    # The order the operator declared origins in is the only thing that says
+    # which host is canonical: a set cannot. Links in an email must point at
+    # the host people actually use -- picking alphabetically sent them to a
+    # platform host that had been deleted.
+    declared_origins: Sequence[str] | None = None,
 ) -> ProductRuntime:
+    """``seed=None`` seeds the R7 demo corpus only for an ephemeral ``:memory:``
+    database (local development, tests). A persistent database is never seeded
+    unless the operator asks for it explicitly (``--seed-demo`` /
+    ``RESONANCE_SEED_DEMO=1``); seeded rows are demo personas, not people."""
+    if seed is None:
+        seed = db_path == ":memory:"
     # Explicit path or DSN: a postgres:// / postgresql:// target selects the
     # PostgreSQL repository, anything else is a SQLite file (or ":memory:").
     # Previously this hard-wired SQLiteRepository, so a DSN was silently treated
@@ -137,8 +458,53 @@ def build_runtime(
             "silently fall back to a per-process value and orphan drafts"
         )
     product = LiveProductService(identity, confirmation_secret=confirmation_secret)
+    # Someone who has left is reached where they are, or not at all. The
+    # transport is configured by environment; without one, nothing is sent and
+    # the health endpoint says so rather than implying a promise being kept.
+    notifier = Notifier(
+        identity, getattr(live, "repo", None),
+        origin=oauth_mount.canonical_origin(declared_origins, allowed_origins),
+        secret=confirmation_secret)
+    product.standing.notifier = notifier
+    product.notifier = notifier
+    address = str(os.environ.get("RESONANCE_MAIL_SELFTEST") or "").strip()
+    if address and "@" in address:
+        # One message, to one address the operator named, to answer the only
+        # question the health endpoint cannot: does mail actually arrive.
+        print(f"mail self-test: {self_test(notifier.sender, address)}", flush=True)
+    if isinstance(notifier.sender, NoTransport):
+        # Once, here, rather than on every finding: a deployment that cannot
+        # reach anyone should be impossible to miss and impossible to drown in.
+        print(f"notifications: nobody can be reached — {NoTransport.reason}",
+              flush=True)
     return ProductRuntime(live=live, identity=identity, product=product,
                           allowed_origins=allowed_origins)
+
+
+
+def _unsubscribe_page(stopped: bool) -> str:
+    """One sentence and a way back. Nothing to sign into, nothing to undo by
+    accident: someone who arrives here has already decided."""
+    said = ("You will not get any more email from Resonance.<br>"
+            "Your thought is untouched: it is still discoverable, still "
+            "looking, and whatever it finds is on the site when you visit."
+            if stopped else
+            "That link has expired or was not meant for this account, so "
+            "nothing was changed. The unsubscribe link at the bottom of any "
+            "Resonance email will work.")
+    return (
+        '<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        "<title>Resonance email</title>"
+        '<link rel="stylesheet" href="/oauth/consent.css">'
+        '<script src="/theme.mjs"></script></head><body>'
+        '<main class="consent"><p class="brand">'
+        '<span class="mark" aria-hidden="true"></span>Resonance</p>'
+        f"<h1>{'Email stopped' if stopped else 'Nothing changed'}</h1>"
+        f"<p>{said}</p>"
+        '<p><a class="primary-link" href="/">Back to Resonance</a></p>'
+        "</main></body></html>"
+    )
 
 
 class _DiscardWriter:
@@ -209,6 +575,13 @@ class ProductHandler(BaseHTTPRequestHandler):
             raise IngestionError("request body must be a JSON object") from exc
         if not isinstance(parsed, dict):
             raise IngestionError("request body must be a JSON object")
+        # One word for consent on every door. The HTTP routes read `confirmed`
+        # and the MCP tools read `confirm`; a client that learned one spelling
+        # was refused by the other with "explicit confirmation required".
+        if "confirm" in parsed and "confirmed" not in parsed:
+            parsed["confirmed"] = parsed["confirm"]
+        elif "confirmed" in parsed and "confirm" not in parsed:
+            parsed["confirm"] = parsed["confirmed"]
         return parsed
 
     def _token(self) -> str:
@@ -224,15 +597,29 @@ class ProductHandler(BaseHTTPRequestHandler):
     def _csrf(self) -> str | None:
         return self.headers.get("X-Resonance-CSRF")
 
+    def _secure_cookies(self) -> bool:
+        origins = self.runtime.allowed_origins
+        return bool(origins) and all(o.startswith("https://") for o in origins)
+
     def _cookie_for(self, token: str) -> str:
         # Behind a TLS-terminating proxy the process only ever sees plain HTTP,
         # so derive `Secure` from the deployment contract instead: when every
         # allowed browser origin is https://, the cookie must never travel over
         # http. Local http://127.0.0.1 runs and tests keep the plain form.
-        origins = self.runtime.allowed_origins
-        secure = "; Secure" if origins and all(
-            o.startswith("https://") for o in origins) else ""
-        return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Strict; Path=/{secure}")
+        secure = "; Secure" if self._secure_cookies() else ""
+        # Lax, not Strict. Resonance is reached through cross-site top-level
+        # navigations by design: a chat client sends the browser from claude.ai
+        # or chatgpt.com to /oauth/authorize. Under Strict the session cookie
+        # was not sent on that navigation, so the consent page could not see
+        # that this browser was already signed in, and every client connection
+        # bound to a separate account — the same person split across surfaces,
+        # which is precisely what this product cannot afford.
+        #
+        # Lax is safe here because the cookie is not what authorises writes.
+        # Every state-changing request is a POST carrying an X-Resonance-CSRF
+        # token checked against the session, with the Origin checked against
+        # the allowlist; Lax withholds the cookie from cross-site POSTs anyway.
+        return (f"{COOKIE_NAME}={token}; HttpOnly; SameSite=Lax; Path=/{secure}")
 
     def _security_kwargs(self) -> dict[str, Any]:
         return {
@@ -267,6 +654,9 @@ class ProductHandler(BaseHTTPRequestHandler):
             if oauth_mount.is_oauth_path(parsed.path):
                 self._handle_oauth("GET", parsed.path, parse_qs(parsed.query))
                 return
+            if auth_mount.is_auth_path(parsed.path):
+                self._handle_auth("GET", parsed.path, parse_qs(parsed.query))
+                return
             self._route_get(parsed.path, parse_qs(parsed.query))
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
@@ -280,9 +670,58 @@ class ProductHandler(BaseHTTPRequestHandler):
             if oauth_mount.is_oauth_path(parsed.path):
                 self._handle_oauth("POST", parsed.path, parse_qs(parsed.query))
                 return
+            if auth_mount.is_auth_path(parsed.path):
+                self._handle_auth("POST", parsed.path, parse_qs(parsed.query))
+                return
             self._route_post(parsed.path)
         except Exception as exc:  # noqa: BLE001 - transport boundary
             self._handle_error(exc)
+
+    # -- sign-in mount ---------------------------------------------------------
+    def _auth_mount(self) -> Any:
+        """One mount per process, so a sign-in in flight survives the redirect
+        out to the provider and back."""
+        mount = getattr(self.runtime, "auth_mount", None)
+        if mount is None:
+            mount = auth_mount.AuthMount(
+                self.runtime.identity,
+                cookie_for=self._cookie_for,
+                secure_cookies=self._secure_cookies(),
+            )
+            self.runtime.auth_mount = mount
+        # The cookie factory is bound to a handler instance, and handlers are
+        # per-request; rebind so the long-lived mount always writes a cookie
+        # shaped by the request it is answering.
+        mount.cookie_for = self._cookie_for
+        mount.secure_cookies = self._secure_cookies()
+        return mount
+
+    def _handle_auth(self, method: str, path: str, query: dict[str, list[str]]) -> None:
+        response = self._auth_mount().handle(
+            method, path, query, {k: v for k, v in self.headers.items()},
+            issuer=self._issuer())
+        self.send_response(response.status)
+        headers = dict(response.headers)
+        headers["Content-Length"] = str(len(response.body))
+        for key, value in headers.items():
+            self.send_header(key, value)
+        for cookie in response.cookies:
+            self.send_header("Set-Cookie", cookie)
+        self._security_headers()
+        self.end_headers()
+        if response.body:
+            self.wfile.write(response.body)
+
+    def _sign_in_required(self) -> bool:
+        """True where a real sign-in is on offer.
+
+        Resonance introduces people to each other, so an account has to belong
+        to someone who can be recognised on return and told when a match
+        appears. Wherever a provider is configured, that is the only way in. A
+        deployment with no provider at all — a local run, the test suite — has
+        no sign-in to insist on, and keeps the pseudonymous path.
+        """
+        return bool(self._auth_mount().providers)
 
     # -- canonical OAuth mount (R15C, #136) ------------------------------------
     def _issuer(self) -> str:
@@ -308,8 +747,12 @@ class ProductHandler(BaseHTTPRequestHandler):
             headers={k: v for k, v in self.headers.items()}, body=body, issuer=self._issuer())
         self.send_response(response.status)
         headers = dict(response.headers)
-        headers.setdefault("Content-Type", "application/json; charset=utf-8")
-        headers["Content-Length"] = str(len(response.body))
+        if response.status != 304:
+            # A 304 answers "what you have is current" and carries no
+            # representation, so it must not describe one: no body, and no
+            # Content-Type or Content-Length invented for an absent one.
+            headers.setdefault("Content-Type", "application/json; charset=utf-8")
+            headers["Content-Length"] = str(len(response.body))
         for key, value in headers.items():
             self.send_header(key, value)
         # Same CSP as the rest of the origin; the consent page must not need
@@ -425,22 +868,110 @@ class ProductHandler(BaseHTTPRequestHandler):
         self._send_error_json(HTTPStatus.INTERNAL_SERVER_ERROR, "internal_error",
                               "unexpected product error")
 
+    # Documentation pages a connector directory requires before it will list a
+    # server: Claude rejects a submission outright without a privacy policy, and
+    # OpenAI's form asks for website, support, privacy and terms URLs that
+    # "match the publisher and disclose relevant data handling". They are served
+    # from this origin so the URL a reviewer checks is the URL the tools run on.
+    DOC_PAGES = {
+        "/privacy": "privacy.html",
+        "/terms": "terms.html",
+        "/support": "support.html",
+    }
+
+    def _send_doc_page(self, filename: str) -> None:
+        html = (UI_DIR / filename).read_text(encoding="utf-8")
+        # The contact address is deliberately NOT baked into the repository: it
+        # is the operator's, and publishing someone's address is their decision.
+        # Unset, the page says so plainly rather than showing a plausible
+        # address that nobody reads.
+        contact = (os.environ.get("RESONANCE_CONTACT") or "").strip()
+        html = html.replace("__RESONANCE_CONTACT__", contact
+                            or "not configured on this deployment")
+        html = html.replace("__RESONANCE_ORIGIN__", self._issuer())
+        self._send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
+
+    def _initial_account(self) -> dict[str, str]:
+        """Who this visitor is, before any JavaScript runs.
+
+        The masthead used to arrive empty and fill itself in from a fetch, so
+        the account appeared a moment late and shoved the row it is in. The
+        server already knows -- the cookie is on the request -- so it says so
+        in the HTML and the page paints once. This is the same override seam as
+        `_initial_app_state`; the API-only server knows nothing about a browser
+        visitor and says nothing.
+        """
+        return {}
+
+    def _stamp_account(self, html: str) -> str:
+        account = self._initial_account()
+        if not account:
+            return html
+        attributes = " ".join(
+            f'data-{key}="{escape(str(value), quote=True)}"'
+            for key, value in sorted(account.items()) if value != "")
+        return html.replace('<div class="account-slot" id="account-slot">',
+                            f'<div class="account-slot" id="account-slot" {attributes}>', 1)
+
+    def _initial_app_state(self, params: Mapping[str, list[str]]) -> str:
+        """`data-state` to serve in the HTML, before any JavaScript runs.
+
+        The API-only server has no live browser product, so it keeps the
+        neutral "loading". `src/product/web_server.py` overrides this: it can tell
+        whether this visitor has anything shared, and serving the answer is
+        what stops the page rendering one view and then replacing it.
+        """
+        return "loading"
+
     # -- GET ---------------------------------------------------------------
     def _route_get(self, path: str, params: dict[str, list[str]]) -> None:
         product = self.runtime.product
-        if path in {"/", "/index.html"}:
+        if path == "/notifications/stop":
+            # Deliberately reachable without signing in. "To stop these
+            # emails, log in first" is the sentence nobody follows; the
+            # alternative they choose is marking us as spam, and then nobody
+            # here is ever reachable again. The token is an HMAC over the
+            # account, so it stops that account's mail and can do nothing else
+            # -- it opens no session, reads no thought, and names no one.
+            token = (params.get("token") or [""])[0]
+            notifier = getattr(self.runtime.product, "notifier", None)
+            who = (account_in_token(token, notifier.secret)
+                   if notifier is not None else None)
+            stopped = who is not None
+            if stopped:
+                notifier.unsubscribe(who)
+            self._send_bytes(_unsubscribe_page(stopped).encode("utf-8"),
+                             "text/html; charset=utf-8")
+            return
+        if is_app_path(path):
             html = (UI_DIR / "index.html").read_text(encoding="utf-8")
-            injected = html.replace("</head>", HEAD_INJECTION, 1).replace(
+            html = html.replace('data-state="loading"',
+                                f'data-state="{self._initial_app_state(params)}"', 1)
+            html = self._stamp_account(html)
+            # The browser WebMCP tools ride on the page as extra modules so an
+            # agent living in the browser gets the same product; the page
+            # itself is main.mjs, linked from index.html.
+            injected = html.replace(
                 "</body>",
-                '  <script type="module" src="/webmcp.mjs"></script>\n'
-                '  <script type="module" src="/deeplink.mjs"></script>\n'
-                '  <script type="module" src="/session.mjs"></script>\n'
-                '  <script type="module" src="/collab.mjs"></script>\n'
-                '  <script type="module" src="/collab_ui.mjs"></script>\n'
-                '  <script type="module" src="/workspaces.mjs"></script>\n'
-                '  <script type="module" src="/live_shell.mjs"></script>\n</body>',
+                '  <script type="module" src="/webmcp.mjs"></script>\n</body>',
             )
             self._send_bytes(injected.encode("utf-8"), "text/html; charset=utf-8")
+            return
+        if path in self.DOC_PAGES:
+            self._send_doc_page(self.DOC_PAGES[path])
+            return
+        if path == "/.well-known/openai-apps-challenge":
+            # OpenAI's app submission proves control of the hosting domain by
+            # serving a token it hands the publisher. The spec is explicit: the
+            # response is ONLY the token — not JSON, not a list. Unset, this is
+            # a 404 rather than an empty 200, so a half-configured deployment
+            # cannot look verified.
+            token = (os.environ.get("RESONANCE_OPENAI_CHALLENGE") or "").strip()
+            if not token:
+                self._send_error_json(HTTPStatus.NOT_FOUND, "not_found",
+                                      "no OpenAI apps challenge token is configured")
+                return
+            self._send_bytes(token.encode("utf-8"), "text/plain; charset=utf-8")
             return
         if path in STATIC:
             filename, content_type = STATIC[path]
@@ -457,8 +988,21 @@ class ProductHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/product/health":
             health = self.runtime.live.health()
+            # Whether anyone can actually be reached. A deployment with no
+            # mail server still works, but it does not keep the promise that
+            # this looks for you after you leave -- and that must be visible
+            # here rather than discovered by a person who waited for nothing.
+            notifier = getattr(product, "notifier", None)
+            reachable = notifier is not None and not isinstance(
+                notifier.sender, NoTransport)
             self._send_json({"ok": health.ok, "mode": "live",
-                             "freshness": product.freshness()})
+                             "freshness": product.freshness(),
+                             "engine": engine_identity(self.runtime),
+                             "corpus": corpus_summary(self.runtime),
+                             "notifications": {
+                                 "can_reach_people": reachable,
+                                 "why_not": None if reachable else NoTransport.reason,
+                             }})
             return
         if path in {"/api/product/state", "/api/webmcp/state"}:
             token = None
@@ -466,10 +1010,23 @@ class ProductHandler(BaseHTTPRequestHandler):
                 token = self._token()
             except AuthenticationError:
                 pass
-            self._send_json(product.state(token))
+            state = dict(product.state(token))
+            # The page shows "Sign in" rather than an anonymous start only
+            # where a sign-in actually exists to offer.
+            state["sign_in_required"] = self._sign_in_required()
+            state["sign_in_url"] = auth_mount.SIGN_IN_PATH
+            self._send_json(state)
             return
         if path == "/api/product/sessions":
             self._send_json({"sessions": product.owned_sessions(self._token())})
+            return
+        if path == "/api/product/resonances":
+            # What the standing search found while this person was not looking.
+            # The half of the product that waits: read it and you learn who
+            # arrived after you shared, which no discovery call could tell you.
+            include_seen = (params.get("include_seen") or [""])[0] == "1"
+            self._send_json(product.pending_resonances(
+                self._token(), include_seen=include_seen))
             return
         if path == "/api/product/intro/list":
             self._send_json(product.list_requests(self._token()))
@@ -539,6 +1096,31 @@ class ProductHandler(BaseHTTPRequestHandler):
     # -- POST --------------------------------------------------------------
     def _route_post(self, path: str) -> None:
         product = self.runtime.product
+        if path in ("/api/product/guest", "/api/product/register"):
+            # The order here is the whole point. Where a sign-in exists this
+            # endpoint creates nothing at all, and the page asks it on every
+            # load by a signed-out visitor -- so counting the request against
+            # the account limiter spends a token on a call that could never
+            # have made an account. Twenty page loads an hour from one address
+            # (one person reading, or two people behind the same router) and
+            # everybody there is told "too many accounts created from this
+            # address" about accounts nobody created, on a page that is simply
+            # refusing to load. Answer first, then count only what can create.
+            if self._sign_in_required():
+                # An anonymous account cannot be told that a match appeared,
+                # and cannot be recognised when the same person returns through
+                # another client. Where a sign-in exists, it is the only way an
+                # account is created.
+                self._send_json({"error": "sign_in_required",
+                                 "message": "Resonance accounts are created by signing in.",
+                                 "sign_in_url": auth_mount.SIGN_IN_PATH},
+                                status=HTTPStatus.FORBIDDEN)
+                return
+            ip = _client_ip(self.headers, self.client_address[0] if self.client_address else "")
+            if not registration_allowed(ip):
+                self._send_error_json(HTTPStatus.TOO_MANY_REQUESTS, "rate_limited",
+                                      "too many accounts created from this address; try later")
+                return
         if path == "/api/product/guest":
             creds = product.register_guest()
             self._send_json(
@@ -564,6 +1146,17 @@ class ProductHandler(BaseHTTPRequestHandler):
                 {"user_id": creds.user_id, "csrf_token": creds.csrf_token,
                  "expires_at": creds.expires_at},
                 cookie=self._cookie_for(creds.access_token))
+            return
+        if path == "/api/product/resonances/seen":
+            body = self._body()
+            keys = body.get("alert_keys")
+            self._send_json(product.mark_resonances_seen(
+                self._token(), [str(k) for k in keys] if isinstance(keys, list) else []))
+            return
+        if path == "/api/product/resonances/dismiss":
+            body = self._body()
+            self._send_json(product.dismiss_resonance(
+                self._token(), str(body.get("alert_key", ""))))
             return
         if path == "/api/product/logout":
             product.logout(self._token())
@@ -606,6 +1199,15 @@ class ProductHandler(BaseHTTPRequestHandler):
         security = self._security_kwargs()
 
         if path in {"/api/product/prepare", "/api/webmcp/prepare"}:
+            if path == "/api/webmcp/prepare":
+                # An assistant is driving the page here, exactly as it drives
+                # the MCP bridge, so it owes the same answer: whose reasoning
+                # is this? /api/product/prepare is the person's own click on
+                # their own page, and has nobody to declare.
+                try:
+                    authorship_rule.require(body)
+                except authorship_rule.AuthorshipError as exc:
+                    raise IngestionError(str(exc)) from exc
             intent_raw = body.get("share_intent") or {}
             intent = ShareIntent(
                 share_display_profile=bool(intent_raw.get("share_display_profile", True)),
@@ -677,9 +1279,18 @@ class ProductHandler(BaseHTTPRequestHandler):
                 confirmed=bool(body.get("confirmed", False)), **security))
             return
         if path == "/api/product/intro/respond":
+            # Declining is what happens when nobody chose anything: the field
+            # defaulted to False, so a renamed key, a typo or a half-built
+            # client silently refused a stranger's introduction on this
+            # person's behalf. Refusing to meet someone is a decision, and it
+            # has to be made, not fallen into.
+            decision = body.get("accept")
+            if not isinstance(decision, bool):
+                raise ValueError("accept must be true or false: an introduction "
+                                 "is never declined by default")
             self._send_json(product.respond_intro(
                 token, str(body.get("intro_id", "")),
-                accept=bool(body.get("accept", False)),
+                accept=decision,
                 request_id=body.get("request_id"),
                 confirmed=bool(body.get("confirmed", False)), **security))
             return
@@ -835,7 +1446,24 @@ def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
     return None
 
 
+def startup_label_encoder() -> str | None:
+    """Load the label encoder named by RESONANCE_EMBEDDER, or say there is none.
+
+    A misnamed directory is a refusal to start rather than a quiet fallback:
+    a deployment told to read more than English must not run reading less.
+    """
+    from src.semantics import neural
+    try:
+        name = neural.activate_from_environment()
+    except neural.NeuralUnavailable as error:
+        raise SystemExit(f"label encoder: {error}") from error
+    print(f"label encoder: {name or 'none (lexicon only; set RESONANCE_EMBEDDER to add one)'}",
+          flush=True)
+    return name
+
+
 def main(argv: list[str] | None = None) -> None:
+    startup_label_encoder()
     parser = argparse.ArgumentParser(description="Resonance live product server")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -844,19 +1472,30 @@ def main(argv: list[str] | None = None) -> None:
                         help="allowed browser origin (repeatable)")
     parser.add_argument("--secret-file", default=None,
                         help="file holding the stable draft-confirmation secret")
-    parser.add_argument("--no-seed", action="store_true",
-                        help="start with an empty live corpus (no R7 seed baseline)")
+    parser.add_argument("--seed-demo", action="store_true",
+                        help="seed the R7 demo corpus (25 labelled demo personas) into this database; "
+                             "RESONANCE_SEED_DEMO=1 has the same effect. Persistent databases are "
+                             "never seeded by default; :memory: always is")
     args = parser.parse_args(argv)
+    seed = True if args.db == ":memory:" else (
+        args.seed_demo or os.environ.get("RESONANCE_SEED_DEMO", "").strip().lower() in ("1", "true", "yes", "on"))
     origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
     try:
         secret = _resolve_secret(args.secret_file, os.environ, args.db)
     except ValueError as exc:
         parser.error(str(exc))
-    runtime = build_runtime(args.db, allowed_origins=origins,
+    runtime = build_runtime(args.db, allowed_origins=origins, declared_origins=(args.origin or []),
                             confirmation_secret=secret,
-                            seed=not args.no_seed)
+                            seed=seed)
+    startup_purge_demo(runtime)
+    startup_purge_sessions(runtime)
+    startup_purge_unsigned(runtime)
+    startup_assign_pseudonyms(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
-    oauth_mount.attach_core(runtime, issuer=oauth_mount.public_issuer(origins))
+    # The startup log names the FIRST declared --origin; per-request metadata
+    # still follows the host actually addressed (see `_issuer`).
+    oauth_mount.attach_core(
+        runtime, issuer=oauth_mount.canonical_origin(args.origin, origins))
     server = serve(args.host, args.port, runtime=runtime)
     # Never echo credentials: a PostgreSQL DSN carries the password, and this
     # line lands in platform logs (privacy-safe logs are an R16 gate).

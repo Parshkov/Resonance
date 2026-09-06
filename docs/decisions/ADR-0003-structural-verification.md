@@ -1,6 +1,6 @@
 # Typed Partial Graph Alignment for Structural Verification
 
-Status: proposed
+Status: accepted for engine 0.1; partially superseded by ADR-0004 (engine 0.2): see that record for the retrieval stop-key rule, the concept channel and the classification policy.
 
 Date: 2026-08-31
 

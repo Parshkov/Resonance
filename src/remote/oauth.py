@@ -49,7 +49,9 @@ import time
 from dataclasses import dataclass, field
 from http.cookies import SimpleCookie
 from typing import Any, Mapping
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
+
+from .cimd import ClientMetadataCache, CimdError, looks_like_cimd
 
 # The single resource this authorization server protects, relative to issuer.
 RESOURCE_PATH = "/mcp"
@@ -95,35 +97,59 @@ class OAuthError(Exception):
 # ---------------------------------------------------------------------------
 
 CONSENT_CSS = """
-:root { color-scheme: dark; --canvas: #0a0a0a; --panel: rgba(255,255,255,.045); --border: rgba(255,255,255,.12);
-  --text: #f2eee8; --text-2: #aaa49b; --gold: #c9b8a0; --bright: #e8d5b7; --rust: #b66d58;
+:root { color-scheme: light dark;
+  --paper: #f4f1eb; --paper-2: #fbfaf7; --paper-3: #ece7de; --ink: #1d1a16; --ink-2: #57524a; --ink-3: #857f75;
+  --line: rgba(29,26,22,.14); --line-soft: rgba(29,26,22,.08);
+  --accent: #8a5a2b; --accent-ink: #6f4620; --accent-soft: rgba(138,90,43,.10); --accent-line: rgba(138,90,43,.35);
   --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
-  --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+/* The person's own choice, made on the site, decides this page too: it is the
+   same origin and the same person, and this is the one screen where Resonance
+   should not look like a different service. /theme.mjs stamps data-theme
+   before first paint; the media query only speaks when nothing was chosen. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #16140f; --paper-2: #1e1b16; --paper-3: #26221c; --ink: #ede8df; --ink-2: #b7b0a4; --ink-3: #8c8579;
+  --line: rgba(237,232,223,.16); --line-soft: rgba(237,232,223,.09);
+  --accent: #d3a66f; --accent-ink: #e2bc8a; --accent-soft: rgba(211,166,111,.12); --accent-line: rgba(211,166,111,.4); } }
+:root[data-theme="dark"] {
+  --paper: #16140f; --paper-2: #1e1b16; --paper-3: #26221c; --ink: #ede8df; --ink-2: #b7b0a4; --ink-3: #8c8579;
+  --line: rgba(237,232,223,.16); --line-soft: rgba(237,232,223,.09);
+  --accent: #d3a66f; --accent-ink: #e2bc8a; --accent-soft: rgba(211,166,111,.12); --accent-line: rgba(211,166,111,.4); }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: radial-gradient(1200px 600px at 20% -10%, rgba(201,184,160,.12), transparent 60%), var(--canvas);
-  color: var(--text); font: 16px/1.55 var(--sans); display: flex; align-items: flex-start; justify-content: center; padding: 6vh 16px; }
-main.consent { width: min(640px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 22px; padding: 32px 34px 28px; }
-.brand { display: flex; align-items: center; gap: 10px; margin: 0 0 18px; font: 600 12px/1 var(--sans); letter-spacing: .18em; text-transform: uppercase; color: var(--text-2); }
-.mark { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--gold); box-shadow: inset 0 0 0 4px var(--canvas), inset 0 0 0 6px var(--gold); }
-h1 { font: 500 30px/1.15 var(--serif); margin: 0 0 14px; color: var(--bright); }
-p { margin: 0 0 12px; color: var(--text-2); }
-p strong, p em { color: var(--text); }
-code { font: 13px var(--mono); color: var(--gold); word-break: break-all; }
-fieldset { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px 6px; margin: 18px 0 20px; }
-legend { padding: 0 8px; font: 600 12px/1 var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
-label.opt { display: block; margin: 6px 0 10px; color: var(--text); cursor: pointer; }
-fieldset p { margin: 8px 0; }
-fieldset p label { display: flex; flex-direction: column; gap: 6px; color: var(--text-2); font-size: 14px; }
-input[type=text], input[type=password] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
-  background: rgba(0,0,0,.35); color: var(--text); font: 15px var(--mono); }
-input[type=text]:focus, input[type=password]:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
-.actions { display: flex; gap: 12px; flex-wrap: wrap; }
-button { cursor: pointer; border-radius: 999px; padding: 12px 22px; font: 600 15px var(--sans); border: 1px solid var(--border);
-  background: transparent; color: var(--text); }
-button.primary { background: var(--bright); color: #14120f; border-color: var(--bright); }
-button:hover { filter: brightness(1.08); }
-.fine { margin: 18px 0 0; font-size: 13px; color: var(--text-2); }
+body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink); font: 15px/1.55 var(--sans);
+  display: flex; align-items: flex-start; justify-content: center; padding: clamp(16px, 6vh, 64px) 16px; }
+main.consent { width: min(600px, 100%); background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; padding: clamp(20px, 4vw, 34px); }
+.brand { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; font: 500 20px/1 var(--serif); color: var(--ink); }
+.mark { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--accent); box-shadow: inset 0 0 0 4px var(--paper-2), inset 0 0 0 6px var(--accent); }
+h1 { font: 500 clamp(26px, 4vw, 32px)/1.15 var(--serif); letter-spacing: -.01em; margin: 0 0 14px; }
+p { margin: 0 0 12px; color: var(--ink-2); }
+p strong { color: var(--ink); font-weight: 600; }
+p em { color: var(--ink); font-style: italic; }
+code { font: 13px var(--mono); color: var(--accent-ink); overflow-wrap: anywhere; }
+fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px 12px; margin: 22px 0 18px; }
+legend { padding: 0 8px; font: 600 11px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+label.opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--line-soft); color: var(--ink); cursor: pointer; }
+label.opt:last-of-type { border-bottom: 0; }
+label.opt input { margin: 4px 0 0; accent-color: var(--accent); }
+fieldset p { margin: 6px 0 0 30px; }
+fieldset p label { display: flex; flex-direction: column; gap: 4px; color: var(--ink-2); font-size: 13.5px; }
+input[type=text], input[type=password] { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); font: 14px var(--mono); }
+input[type=text]:focus, input[type=password]:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+button { cursor: pointer; min-height: 42px; border-radius: 999px; padding: 0 22px; font: 500 15px var(--sans); border: 1px solid var(--line);
+  background: var(--paper-2); color: var(--ink); }
+button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+button:hover { border-color: var(--ink-3); }
+button.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+.fine { margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--line-soft); font-size: 13px; color: var(--ink-3); }
+.who { margin: 10px 4px 4px; font-size: 14px; }
+.who-id { font-size: 12.5px; color: var(--ink-3); }
+a.primary-link { display: inline-flex; align-items: center; min-height: 42px; margin: 4px 4px 8px; padding: 0 22px; border-radius: 999px;
+  background: var(--ink); color: var(--paper); border: 1px solid var(--ink); font: 500 15px var(--sans); text-decoration: none; }
+a.primary-link:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+a.primary-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 """
 
 
@@ -140,6 +166,7 @@ class GrantStore:
     codes: dict[str, dict[str, Any]] = field(default_factory=dict)
     refresh: dict[str, dict[str, Any]] = field(default_factory=dict)
     clients: dict[str, dict[str, Any]] = field(default_factory=dict)
+    access: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     # -- authorization codes --------------------------------------------
     def put_code(self, code: str, record: Mapping[str, Any]) -> None:
@@ -180,6 +207,15 @@ class GrantStore:
             self.refresh.pop(h, None)
         return len(gone)
 
+    # -- access-token audience records -----------------------------------
+    def put_access(self, token: str, record: Mapping[str, Any]) -> None:
+        """Remember which resource an access token was issued for (RFC 8707)."""
+        self.access[_hash(token)] = dict(record)
+
+    def get_access(self, token: str) -> dict[str, Any] | None:
+        record = self.access.get(_hash(token))
+        return dict(record) if record is not None else None
+
     # -- clients --------------------------------------------------------
     def put_client(self, client_id: str, record: Mapping[str, Any]) -> None:
         self.clients[client_id] = dict(record)
@@ -200,6 +236,7 @@ class RepositoryGrantStore(GrantStore):
     KIND_CODE = "code"
     KIND_REFRESH = "refresh"
     KIND_CLIENT = "client"
+    KIND_ACCESS = "access"
 
     def __init__(self, repository: Any, *, clock: Any = time.time) -> None:
         super().__init__(clock=clock)
@@ -237,6 +274,16 @@ class RepositoryGrantStore(GrantStore):
     def revoke_refresh_for_subject(self, user_id: str) -> int:
         return int(self.repository.delete_grants_for_user(self.KIND_REFRESH, user_id))
 
+    # -- access-token audience records -----------------------------------
+    def put_access(self, token: str, record: Mapping[str, Any]) -> None:
+        """Remember which resource an access token was issued for (RFC 8707)."""
+        self.repository.put_grant(self.KIND_ACCESS, _hash(token), dict(record),
+                                  user_id=record.get("user_id"), expires_at=record.get("expires"))
+
+    def get_access(self, token: str) -> dict[str, Any] | None:
+        record = self.repository.get_grant(self.KIND_ACCESS, _hash(token))
+        return dict(record) if record is not None else None
+
     # -- clients --------------------------------------------------------
     def put_client(self, client_id: str, record: Mapping[str, Any]) -> None:
         self.repository.put_grant(self.KIND_CLIENT, client_id, dict(record))
@@ -254,6 +301,39 @@ CodeStore = GrantStore
 # ---------------------------------------------------------------------------
 # the core
 # ---------------------------------------------------------------------------
+
+def _account_line(account: Mapping[str, str] | str, e: Any) -> str:
+    """The "you are signed in as" line, in the plainest terms available.
+
+    A name the person recognises first, the address that proves which account
+    it is second, and the identifier last for the case where a provider gave
+    neither.
+    """
+    if not isinstance(account, Mapping):
+        return f'<p class="who">Signed in as <code>{e(account)}</code>.</p>'
+    name = (account.get("name") or "").strip()
+    email = (account.get("email") or "").strip()
+    pseudonym = (account.get("pseudonym") or "").strip()
+    user_id = account.get("user_id") or ""
+    if name and email:
+        headline = f"Signed in as <strong>{e(name)}</strong> ({e(email)})."
+    elif name:
+        headline = f"Signed in as <strong>{e(name)}</strong>."
+    elif email:
+        headline = f"Signed in as <strong>{e(email)}</strong>."
+    elif pseudonym:
+        headline = f"Signed in as <strong>{e(pseudonym)}</strong>."
+    else:
+        headline = f"Signed in as <code>{e(user_id)}</code>."
+    lines = [f'<p class="who">{headline}</p>']
+    if pseudonym and (name or email):
+        # The question the headline immediately raises is whether that name is
+        # about to be shown to strangers. Answer it in the same breath.
+        lines.append(f'<p class="who who-id">Other people see you as '
+                     f'<strong>{e(pseudonym)}</strong> — never your name or '
+                     'your address.</p>')
+    return "".join(lines)
+
 
 @dataclass
 class OAuthResult:
@@ -273,12 +353,29 @@ class OAuthCore:
     def __init__(self, identity: Any, store: GrantStore | None = None, *,
                  code_ttl: int = DEFAULT_CODE_TTL,
                  refresh_ttl: int = DEFAULT_REFRESH_TTL,
-                 clock: Any = time.time) -> None:
+                 clock: Any = time.time,
+                 sign_in_required: Any = None) -> None:
         self.identity = identity
         self.store = store or GrantStore(clock=clock)
         self.code_ttl = code_ttl
         self.refresh_ttl = refresh_ttl
         self.clock = clock
+        # Callable answering whether this deployment offers a real sign-in.
+        # Where it does, a connector authorization must bind to the account the
+        # person signed into — a connection that minted a fresh anonymous
+        # account would make the same person a stranger on every surface, and
+        # leave no one to notify when a match appears.
+        self._sign_in_required = sign_in_required or (lambda: False)
+        # Client ID Metadata Documents: a client identified by an https URL
+        # rather than by a stored registration. Fetched documents are cached
+        # briefly so a busy directory costs one fetch, not one per person.
+        self.client_metadata = ClientMetadataCache()
+
+    def sign_in_required(self) -> bool:
+        try:
+            return bool(self._sign_in_required())
+        except Exception:  # noqa: BLE001 - never fail an authorization on this
+            return False
 
     # -- public helpers used by the transport ---------------------------
     def resource_for(self, issuer: str) -> str:
@@ -307,6 +404,9 @@ class OAuthCore:
             self.identity.authenticate(token)
         except Exception:  # noqa: BLE001 -- any auth failure is "no subject"
             return None
+        record = self.store.get_access(token) if hasattr(self.store, "get_access") else None
+        if record is not None and record.get("resource", "").rstrip("/") != resource.rstrip("/"):
+            return None                      # token bound to another audience
         return token
 
     # -- routing --------------------------------------------------------
@@ -324,9 +424,21 @@ class OAuthCore:
             if method == "GET" and path == "/.well-known/oauth-authorization-server/mcp":
                 return self._ok(self._authorization_server_metadata(issuer))
             if path == "/oauth/consent.css" and method == "GET":
+                # An hour of max-age with no validator meant a fix to this
+                # sheet reached nobody who had already seen the page, and
+                # their browser could not even ask whether it had changed --
+                # the stale copy simply won. It is one small file on a page
+                # shown once per authorization, so it revalidates every time;
+                # the ETag keeps that a 304 rather than a refetch.
+                css = CONSENT_CSS.encode("utf-8")
+                etag = '"%s"' % hashlib.sha256(css).hexdigest()[:32]
+                sent = next((v for k, v in headers.items()
+                             if k.lower() == "if-none-match"), None)
+                if sent == etag:
+                    return OAuthResult(304, {"ETag": etag, "Cache-Control": "no-cache"}, b"")
                 return OAuthResult(200, {"Content-Type": "text/css; charset=utf-8",
-                                         "Cache-Control": "public, max-age=3600"},
-                                   CONSENT_CSS.encode("utf-8"))
+                                         "Cache-Control": "no-cache", "ETag": etag},
+                                   css)
             if path == "/oauth/register" and method == "POST":
                 return self._register(body)
             if path == "/oauth/authorize" and method == "GET":
@@ -337,6 +449,8 @@ class OAuthCore:
                 return self._token(body, issuer)
             if path == "/oauth/revoke" and method == "POST":
                 return self._revoke(body)
+            if path == "/oauth/userinfo" and method in ("GET", "POST"):
+                return self._userinfo(headers, issuer)
             return OAuthResult(404, {"Content-Type": "application/json"},
                                _json_body({"error": "not_found"}))
         except OAuthError as exc:
@@ -360,14 +474,64 @@ class OAuthCore:
             "token_endpoint": issuer + "/oauth/token",
             "registration_endpoint": issuer + "/oauth/register",
             "revocation_endpoint": issuer + "/oauth/revoke",
+            "userinfo_endpoint": issuer + "/oauth/userinfo",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
             "token_endpoint_auth_methods_supported": ["none"],
+            # Selected over dynamic registration when a host sees both this and
+            # the "none" auth method above.
+            "client_id_metadata_document_supported": True,
             "revocation_endpoint_auth_methods_supported": ["none"],
             "scopes_supported": list(SUPPORTED_SCOPES),
             "resource_indicators_supported": True,
         }
+
+    # -- userinfo -------------------------------------------------------
+    def _userinfo(self, headers: Mapping[str, str], issuer: str) -> OAuthResult:
+        """Who the presented bearer belongs to.
+
+        Hosted clients use this to show whose account they connected, and to
+        confirm that two of their surfaces reached the same person. Only the
+        account identifier and the sign-in address are returned; nothing about
+        what the person has thought or shared is reachable here.
+        """
+        raw = (headers.get("Authorization") or headers.get("authorization") or "")
+        token = raw[7:].strip() if raw[:7].lower() == "bearer " else ""
+        subject = self.resolve_bearer(token or None, resource=self.resource_for(issuer))
+        if not subject:
+            return OAuthResult(401, {
+                "Content-Type": "application/json",
+                "WWW-Authenticate": self.challenge_header(issuer),
+            }, _json_body({"error": "invalid_token"}))
+        try:
+            actor = self.identity.authenticate(subject)
+        except Exception:  # noqa: BLE001
+            return OAuthResult(401, {
+                "Content-Type": "application/json",
+                "WWW-Authenticate": self.challenge_header(issuer),
+            }, _json_body({"error": "invalid_token"}))
+        doc: dict[str, Any] = {"sub": actor.user_id}
+        claims = {}
+        if hasattr(self.identity, "identity_claims"):
+            try:
+                claims = self.identity.identity_claims(actor.user_id) or {}
+            except Exception:  # noqa: BLE001
+                claims = {}
+        if claims.get("email"):
+            doc["email"] = claims["email"]
+            doc["email_verified"] = bool(claims.get("email_verified"))
+        user = self.identity.backend.get_user(actor.user_id)
+        pseudonym = getattr(user, "display_label", None) if user is not None else None
+        if pseudonym:
+            # What other participants see. Named `preferred_username` because
+            # that is what it is: the handle, not the person.
+            doc["preferred_username"] = str(pseudonym)
+        if claims.get("name"):
+            doc["name"] = str(claims["name"])
+        elif pseudonym:
+            doc["name"] = str(pseudonym)
+        return self._ok(doc)
 
     # -- dynamic client registration (RFC 7591) -------------------------
     def _register(self, body: bytes) -> OAuthResult:
@@ -424,9 +588,21 @@ class OAuthCore:
             raise OAuthError("invalid_request", "client_id required")
         if not redirect_uri or not self._redirect_shape_ok(redirect_uri):
             raise OAuthError("invalid_request", "a valid absolute redirect_uri is required")
-        client = self.store.get_client(client_id)
-        if client is not None and redirect_uri not in client["redirect_uris"]:
-            raise OAuthError("invalid_request", "redirect_uri not registered for this client")
+        if looks_like_cimd(client_id):
+            # The client_id is its own metadata document. Its redirect_uris are
+            # authoritative, so an unknown redirect_uri is refused here rather
+            # than tolerated the way an unregistered client_id is.
+            try:
+                metadata = self.client_metadata.get(client_id)
+            except CimdError as exc:
+                raise OAuthError("invalid_client", str(exc))
+            if not metadata.allows(redirect_uri):
+                raise OAuthError("invalid_request",
+                                 "redirect_uri is not listed in the client metadata document")
+        else:
+            client = self.store.get_client(client_id)
+            if client is not None and redirect_uri not in client["redirect_uris"]:
+                raise OAuthError("invalid_request", "redirect_uri not registered for this client")
         # Past this point redirect_uri is trusted enough to redirect errors to it.
         resp_type = params.get("response_type", "")
         if resp_type != "code":
@@ -459,8 +635,10 @@ class OAuthCore:
                     params["redirect_uri"]):
                 return self._redirect_error(params["redirect_uri"], exc, params.get("state"))
             raise
-        current = self._cookie_subject(headers)
-        html_page = self._consent_page(clean, current_account=current)
+        current = self._cookie_account(headers)
+        html_page = self._consent_page(clean, current_account=current,
+                                       return_to="/oauth/authorize?" + urlencode(
+                                           {k: v for k, v in params.items() if v}))
         return OAuthResult(200, {"Content-Type": "text/html; charset=utf-8",
                                  "Cache-Control": "no-store"},
                            html_page.encode("utf-8"))
@@ -525,9 +703,40 @@ class OAuthCore:
                 raise OAuthError("access_denied", "no active browser session to continue")
             creds = identity._issue_session(subject, actor_type="agent")  # noqa: SLF001
             return creds.access_token, creds
-        # default: guest continuation
+        if self.sign_in_required():
+            # Reached only when the consent form was replayed without a signed-in
+            # browser session; the page itself offers no guest option.
+            raise OAuthError("access_denied", "sign in to Resonance before connecting a client")
+        # default: guest continuation (deployments with no sign-in provider)
         creds = identity.register_guest(actor_type="agent")
         return creds.access_token, creds
+
+    def _cookie_account(self, headers: Mapping[str, str]) -> dict[str, str] | None:
+        """Who the browser is signed in as, in terms a person can check.
+
+        This page asks someone to confirm that a client may act as them, and
+        they may have just chosen between several accounts at their provider.
+        An opaque `person-…` identifier gives them nothing to check against, so
+        the name and address they signed in with are shown, with the identifier
+        kept as the precise thing underneath. All three are the viewer's own —
+        nothing here is another participant's.
+        """
+        user_id = self._cookie_subject(headers)
+        if not user_id:
+            return None
+        account = {"user_id": user_id, "pseudonym": "", "name": "", "email": ""}
+        try:
+            user = self.identity.backend.get_user(user_id)
+            account["pseudonym"] = str(getattr(user, "display_label", "") or "")
+        except Exception:  # noqa: BLE001 - the identifier alone still works
+            pass
+        try:
+            claims = self.identity.identity_claims(user_id) or {}
+            account["email"] = str(claims.get("email") or "")
+            account["name"] = str(claims.get("name") or "")
+        except Exception:  # noqa: BLE001
+            pass
+        return account
 
     def _cookie_subject(self, headers: Mapping[str, str]) -> str | None:
         raw = headers.get("Cookie") or headers.get("cookie") or ""
@@ -598,6 +807,25 @@ class OAuthCore:
             "expires_in": DEFAULT_TOKEN_TTL,
             "scope": scope,
         }
+        if hasattr(self.store, "put_access"):
+            try:
+                owner = self.identity.authenticate(access_token)
+                self.store.put_access(access_token, {
+                    "user_id": owner.user_id, "resource": resource, "client_id": client_id,
+                    "expires": self.clock() + DEFAULT_TOKEN_TTL,
+                })
+            except Exception as exc:  # noqa: BLE001 -- transport returns an OAuth error
+                # Never return an OAuth-issued token unless its audience record
+                # was committed.  Otherwise a transient grant-store failure
+                # would silently downgrade RFC 8707 enforcement to the legacy
+                # unbound manual-key path.
+                try:
+                    self.identity.logout(access_token)
+                except Exception:  # noqa: BLE001 -- best-effort cleanup only
+                    pass
+                raise OAuthError(
+                    "server_error", "could not bind access token to the requested resource", 500
+                ) from exc
         if SCOPE_OFFLINE in scope.split():
             actor = self.identity.authenticate(access_token)
             refresh = secrets.token_urlsafe(32)
@@ -612,6 +840,16 @@ class OAuthCore:
                 # the access token issued with it; keep it reachable for that.
                 "access_token": access_token,
             })
+            # And the way back, so revoking the access token can reach exactly
+            # the grant it was issued with -- and nothing else.
+            if hasattr(self.store, "put_access"):
+                try:
+                    record = self.store.get_access(access_token) or {}
+                    self.store.put_access(access_token,
+                                          {**record, "refresh_token": refresh})
+                except Exception as exc:  # noqa: BLE001 - the token still works
+                    print(f"[oauth] could not link the refresh grant to its "
+                          f"access token: {type(exc).__name__}: {exc}", flush=True)
             body["refresh_token"] = refresh
         return OAuthResult(200, {"Content-Type": "application/json",
                                  "Cache-Control": "no-store"}, _json_body(body))
@@ -647,21 +885,46 @@ class OAuthCore:
         return True
 
     def _revoke_access(self, token: str) -> bool:
+        """Revoke this token and the grant it was issued with. Only that one.
+
+        This used to revoke every refresh grant the person had, with any
+        client: `revoke_refresh_for_subject`. So disconnecting Resonance in one
+        chat silently signed them out of every other one, and the next thing
+        they saw somewhere else was "login expired" with no explanation. Found
+        by doing it: a throwaway client was revoked after an acceptance run and
+        two unrelated chats asked to reconnect.
+
+        RFC 7009 §2.1 asks for tokens based on the SAME authorization grant,
+        which is the sibling recorded when the pair was issued -- not the
+        person's other clients, which are other grants they gave separately and
+        have not withdrawn.
+        """
+        sibling = None
+        if hasattr(self.store, "get_access"):
+            try:
+                sibling = (self.store.get_access(token) or {}).get("refresh_token")
+            except Exception:  # noqa: BLE001 - revocation must still happen
+                sibling = None
         try:
-            actor = self.identity.authenticate(token)
+            self.identity.authenticate(token)
         except Exception:  # noqa: BLE001
             return False
         try:
             self.identity.logout(token)
         except Exception:  # noqa: BLE001
             pass
-        # Revoking an access token also revokes the subject's refresh grants:
-        # a client that lost its access token must re-authorize.
-        self.store.revoke_refresh_for_subject(actor.user_id)
+        if sibling:
+            try:
+                self.store.revoke_refresh(sibling)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[oauth] could not revoke the sibling refresh grant: "
+                      f"{type(exc).__name__}: {exc}", flush=True)
         return True
 
     # -- rendering / helpers --------------------------------------------
-    def _consent_page(self, clean: Mapping[str, str], *, current_account: str | None) -> str:
+    def _consent_page(self, clean: Mapping[str, str], *,
+                      current_account: Mapping[str, str] | str | None,
+                      return_to: str = "/") -> str:
         e = html.escape
         hidden = "".join(
             f'<input type="hidden" name="{e(k)}" value="{e(v)}">'
@@ -676,14 +939,74 @@ class OAuthCore:
                 "scope": clean["scope"],
             }.items())
         offline = SCOPE_OFFLINE in clean["scope"].split()
-        current_block = ""
-        if current_account:
-            current_block = (
-                '<label class="opt"><input type="radio" name="identity" value="current" checked> '
-                f'Continue as your current account (<code>{e(current_account)}</code>)</label>')
-        guest_checked = "" if current_account else " checked"
-        client = self.store.get_client(clean["client_id"]) or {}
-        client_name = str(client.get("client_name") or "").strip()
+        # Where a real sign-in exists it is the only way in, and the choice on
+        # this page collapses to one: connect this client to the account you
+        # signed into. Anonymous connections are what made the same person a
+        # stranger on every surface, so they are not offered.
+        if self.sign_in_required():
+            if current_account:
+                who_line = _account_line(current_account, e)
+                identity_block = (
+                    '<input type="hidden" name="identity" value="current">'
+                    '<fieldset><legend>Your Resonance account</legend>'
+                    f'{who_line}'
+                    '</fieldset>')
+                actions = (
+                    '<div class="actions">'
+                    '<button type="submit" name="decision" value="approve" class="primary">'
+                    'Allow access</button>'
+                    '<button type="submit" name="decision" value="deny">Cancel</button>'
+                    '</div>')
+            else:
+                identity_block = (
+                    '<fieldset><legend>Sign in to Resonance</legend>'
+                    '<p class="who">Resonance introduces people whose reasoning has the '
+                    'same shape, so a connection has to belong to a person it can come '
+                    'back to. Sign in, and this client connects to that account.</p>'
+                    '<p><a class="primary-link" '
+                    # URL-encoded, not merely HTML-escaped: the authorize URL
+                    # carries its own query, and an unencoded `&` would split
+                    # `next` into separate parameters of the sign-in page and
+                    # lose the way back to this consent screen.
+                    f'href="/auth/sign-in?next={e(quote(return_to, safe=""))}">'
+                    'Sign in to continue</a></p></fieldset>')
+                actions = ('<div class="actions">'
+                           '<button type="submit" name="decision" value="deny">Cancel</button>'
+                           '</div>')
+        else:
+            current_block = ""
+            if current_account:
+                current_id = (current_account["user_id"]
+                              if isinstance(current_account, Mapping) else current_account)
+                current_block = (
+                    '<label class="opt"><input type="radio" name="identity" value="current" checked> '
+                    f'Continue as your current account (<code>{e(current_id)}</code>)</label>')
+            guest_checked = "" if current_account else " checked"
+            identity_block = (
+                '<fieldset><legend>Sign in to Resonance</legend>'
+                f'{current_block}'
+                f'<label class="opt"><input type="radio" name="identity" value="guest"{guest_checked}> '
+                'Continue as a new pseudonymous guest</label>'
+                '<label class="opt"><input type="radio" name="identity" value="login"> '
+                'Sign in with an existing account</label>'
+                '<p><label>Account ID <input type="text" name="user_id" autocomplete="username"></label></p>'
+                '<p><label>Recovery secret <input type="password" name="recovery_secret" '
+                'autocomplete="current-password"></label></p>'
+                '</fieldset>')
+            actions = ('<div class="actions">'
+                       '<button type="submit" name="decision" value="approve" class="primary">'
+                       'Allow access</button>'
+                       '<button type="submit" name="decision" value="deny">Cancel</button>'
+                       '</div>')
+        client_name = ""
+        if looks_like_cimd(clean["client_id"]):
+            try:
+                client_name = self.client_metadata.get(clean["client_id"]).client_name
+            except CimdError:
+                client_name = ""
+        else:
+            client = self.store.get_client(clean["client_id"]) or {}
+            client_name = str(client.get("client_name") or "").strip()
         who = (f"<strong>{e(client_name)}</strong> (<code>{e(clean['client_id'])}</code>)"
                if client_name else f"A client (<code>{e(clean['client_id'])}</code>)")
         # No inline script/style: the origin serves CSP default-src 'self'. The
@@ -692,7 +1015,8 @@ class OAuthCore:
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Authorize Resonance access</title>
-<link rel="stylesheet" href="/oauth/consent.css"></head>
+<link rel="stylesheet" href="/oauth/consent.css">
+<script src="/theme.mjs"></script></head>
 <body>
 <main class="consent">
 <p class="brand"><span class="mark" aria-hidden="true"></span>Resonance</p>
@@ -707,18 +1031,8 @@ every share still needs your separate in-tool confirmation.</p>
 {"<p>The client requested offline access (a refresh token so it can reconnect without asking again).</p>" if offline else ""}
 <form method="post" action="/oauth/authorize">
 {hidden}
-<fieldset>
-<legend>Sign in to Resonance</legend>
-{current_block}
-<label class="opt"><input type="radio" name="identity" value="guest"{guest_checked}> Continue as a new pseudonymous guest</label>
-<label class="opt"><input type="radio" name="identity" value="login"> Sign in with an existing account</label>
-<p><label>Account ID <input type="text" name="user_id" autocomplete="username"></label></p>
-<p><label>Recovery secret <input type="password" name="recovery_secret" autocomplete="current-password"></label></p>
-</fieldset>
-<div class="actions">
-<button type="submit" name="decision" value="approve" class="primary">Allow access</button>
-<button type="submit" name="decision" value="deny">Cancel</button>
-</div>
+{identity_block}
+{actions}
 </form>
 <p class="fine">Private by default. Only the structural Thought DNA you explicitly confirm becomes discoverable; conversation text is never stored.</p>
 </main>
