@@ -886,11 +886,28 @@ class RemoteMCPBridge:
         extra: list[Mapping[str, Any]] = []
         if isinstance(result, ToolOutput):
             extra, result = result.content, result.result
-        # The text block is what a client shows a person, so it says the result
-        # in words. The structured half is unchanged and still carries
-        # everything, including what the assistant needs for the next call.
+        # Two audiences, two blocks, and never the same block.
+        #
+        # The first is what a client shows a person, so it says the result in
+        # words and carries no identifier: engine ids read as machine output
+        # and are not the person's business.
+        #
+        # The second is the same result serialized, for the client. It has to
+        # be here and not only in `structuredContent`, because a client that
+        # reads only content blocks -- Claude does -- otherwise has no
+        # draft_id, no confirmation_token and no session ids, so after the
+        # preview it can neither share the thought nor ask for an
+        # introduction. Measured in Claude, which said so itself: the server
+        # "didn't echo the exact node labels or a draft ID / confirmation
+        # token back to me, so I can't ... proceed to sharing". The MCP spec
+        # asks for exactly this duplication for the same reason.
         return _result(msg_id, {
-            "content": [{"type": "text", "text": phrasing.say(name, result)}, *extra],
+            "content": [
+                {"type": "text", "text": phrasing.say(name, result)},
+                *extra,
+                {"type": "text",
+                 "text": json.dumps(result, ensure_ascii=False, default=str)},
+            ],
             "structuredContent": result,
             "isError": False,
         })
