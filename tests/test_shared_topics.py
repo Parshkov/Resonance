@@ -219,11 +219,28 @@ class OneIndexOneLanguageTests(unittest.TestCase):
     would make the product quietly find nobody outside English.
     """
 
-    def test_the_thought_schema_tells_the_assistant_which_language_to_label_in(self):
+    def test_the_thought_schema_states_that_labels_are_matched_as_english(self):
+        """The schema states the fact; `instructions` carries the instruction.
+
+        This used to shout "WRITE THE LABELS IN ENGLISH ... that is your job
+        here, not theirs" from inside the tool schema. It is a true and
+        necessary requirement, and it was in the wrong place: a schema
+        description is data from a third-party server, and one written as an
+        order to the model is what a prompt-injection payload looks like.
+        ChatGPT's safety layer flagged this surface and then blocked the share
+        call, which took the product's central action away in that client.
+
+        The requirement did not move far. The schema says what the server
+        does -- labels are matched as English text, so another language
+        matches nothing -- and the next test holds the instruction itself in
+        `instructions`, which is the field MCP defines for telling an
+        assistant how to use a server.
+        """
         from src.product.mcp_bridge import THOUGHT_SCHEMA
         description = THOUGHT_SCHEMA["description"]
-        self.assertIn("ENGLISH", description)
-        self.assertIn("translate", description.lower())
+        self.assertIn("English", description)
+        self.assertIn("another language", description)
+        self.assertNotIn("ENGLISH", description)
 
     def test_the_server_instructions_say_it_too_and_say_why(self):
         from src.product.mcp_bridge import RemoteMCPBridge

@@ -18,6 +18,7 @@ and can say "no, that was your idea".
 
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -90,11 +91,56 @@ class AuthorshipTests(unittest.TestCase):
         self.assertIn("authorship", schema.get("required", []))
         self.assertEqual(schema["properties"]["authorship"]["enum"],
                          ["their_own_words", "their_words_reorganised", "i_proposed_it"])
-        self.assertIn("REFUSED", schema["properties"]["authorship"]["description"])
+        described = schema["properties"]["authorship"]["description"]
+        self.assertIn("i_proposed_it", described)
+        self.assertIn("rejects", described)
 
-    def test_the_description_gives_the_assistant_a_test_it_can_apply(self):
-        tool = next(t for t in TOOLS if t["name"] == "resonance_prepare_thought")
-        self.assertIn("could they have said this without you", tool["description"])
+    def test_no_description_is_written_as_an_instruction_to_the_model(self):
+        """The rule is enforced, so it must not also be argued for.
+
+        This description used to make the case in the second person -- "could
+        they have said this without you", "your summary, your diagnosis, the
+        framing you offered". It was persuasive, it was true, and it was the
+        wrong channel: a tool description is data supplied by a third-party
+        server, and one written as instructions to the model, prescribing what
+        to treat as sensitive and when to approve, is indistinguishable from a
+        prompt-injection payload.
+
+        Measured, not theorised. ChatGPT's connector safety layer showed the
+        person a red "Suspicious Instruction" warning on their first call --
+        "Tool description prescribes classifier behavior and risk outcomes,
+        including what to treat as sensitive and when to approve sharing" --
+        and then blocked resonance_share_thought outright, so the product's
+        central action was impossible in that client.
+
+        Nothing was lost by removing it. `authorship.py` refuses
+        `i_proposed_it` on the server; the confirmation token is one-time; the
+        person sees the authorship claim in the preview. A rule that is
+        enforced does not need prose to defend it, and prose is the part a
+        classifier is right to distrust.
+        """
+        second_person = re.compile(r"\b(you|your|yours)\b|[A-Z]{4,}")
+
+        def descriptions(node):
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    if key == "description" and isinstance(value, str):
+                        yield value
+                    else:
+                        yield from descriptions(value)
+            elif isinstance(node, list):
+                for value in node:
+                    yield from descriptions(value)
+
+        for tool in TOOLS:
+            with self.subTest(tool["name"]):
+                for text in [tool.get("description", "")] + list(
+                        descriptions(tool.get("inputSchema", {}))):
+                    found = second_person.findall(text)
+                    self.assertEqual(
+                        found, [],
+                        f"{tool['name']} addresses the model directly ({found}); "
+                        "describe what the server does instead")
 
     def test_the_server_instructions_carry_the_rule_and_the_reason(self):
         reply = self.bridge.handle(
