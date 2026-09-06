@@ -857,12 +857,14 @@ class WebHandler(ProductHandler):
             self._send_json(_discovery_view(live))
             return
         if path == "/api/geo":
-            # The geographic view of the same result, for geo.mjs. Read under
-            # the same cookie and the same "nothing shared, nothing to show"
-            # answer as /api/discover: a visitor without a shared thought has
-            # no result, so nobody to place.
+            # The geographic view of the same result, for the page's world
+            # map. Read under the same cookie and the same "nothing shared,
+            # nothing to show" answer as /api/discover.
             token = self._visitor_token()
             session_id = _owned_live_session(product, token) if token else None
+            asked = (params.get("session_id") or [""])[0]
+            if token and asked and asked in set(_discoverable_sessions(product, token)):
+                session_id = asked
             if not session_id:
                 self._send_share_required()
                 return

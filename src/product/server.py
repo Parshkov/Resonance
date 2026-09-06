@@ -112,6 +112,7 @@ STATIC = {
     "/main.mjs": ("main.mjs", "text/javascript; charset=utf-8"),
     "/store.mjs": ("store.mjs", "text/javascript; charset=utf-8"),
     "/strings.mjs": ("strings.mjs", "text/javascript; charset=utf-8"),
+    "/maps.mjs": ("maps.mjs", "text/javascript; charset=utf-8"),
     "/session.mjs": ("session.mjs", "text/javascript; charset=utf-8"),
     "/theme.mjs": ("theme.mjs", "text/javascript; charset=utf-8"),
     # The browser WebMCP tools: the same product, the same tools, for an

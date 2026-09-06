@@ -21,6 +21,7 @@ const state = {
   error: "",
   overview: null,            // /api/product/overview
   discovery: new Map(),      // session_id -> {loading, error, payload}
+  geo: new Map(),            // session_id -> {loading, error, payload}
   groups: new Map(),         // workspace_id -> {loading, error, detail, topic}
   stamped: null,             // the account the server wrote into the HTML
 };
@@ -130,6 +131,21 @@ export async function discover(sessionId, {force = false} = {}) {
   return state.discovery.get(sessionId).payload;
 }
 
+export async function geo(sessionId, {force = false} = {}) {
+  if (!sessionId) return null;
+  const cached = state.geo.get(sessionId);
+  if (cached && !force && (cached.payload || cached.loading)) return cached.payload;
+  state.geo.set(sessionId, {loading: true, error: "", payload: cached?.payload || null});
+  try {
+    const payload = await readJson(`/api/geo?session_id=${encodeURIComponent(sessionId)}`);
+    state.geo.set(sessionId, {loading: false, error: "", payload});
+  } catch (error) {
+    state.geo.set(sessionId, {loading: false, error: error.message, payload: null});
+  }
+  emit();
+  return state.geo.get(sessionId).payload;
+}
+
 export async function group(workspaceId, {force = false} = {}) {
   if (!workspaceId) return null;
   const cached = state.groups.get(workspaceId);
@@ -167,7 +183,7 @@ export function requestId(prefix) {
 // that change a discovery result or a group also drop that cache entry.
 export async function write(path, body = {}, {invalidate = {}} = {}) {
   const result = await apiFetch("POST", path, body);
-  if (invalidate.discovery) state.discovery.clear();
+  if (invalidate.discovery) { state.discovery.clear(); state.geo.clear(); }
   if (invalidate.group) state.groups.delete(invalidate.group);
   if (invalidate.groups) state.groups.clear();
   refresh();
@@ -189,10 +205,11 @@ export function startPolling() {
   document.addEventListener("resonance:write", (event) => {
     if (event.detail?.path === "/api/product/resonances/seen") return;
     state.discovery.clear();
+    state.geo.clear();
     state.groups.clear();
     refresh();
   });
-  document.addEventListener("resonance:discovered", () => { state.discovery.clear(); refresh(); });
+  document.addEventListener("resonance:discovered", () => { state.discovery.clear(); state.geo.clear(); refresh(); });
 }
 
 // ---- derived views ---------------------------------------------------------

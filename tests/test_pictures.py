@@ -96,7 +96,9 @@ class WhatThePictureSaysTests(unittest.TestCase):
         self.assertEqual(phrasing.classification("negative"), "not called a resonance")
 
     def test_a_long_label_is_cut_with_a_mark_rather_than_silently(self):
-        self.assertEqual(fit("abcdefghij", 5), "abcd…")
+        # three dots, not the ellipsis glyph: the font has no "…", and a
+        # missing glyph was drawn as a box at the end of every cut label
+        self.assertEqual(fit("abcdefghij", 5), "ab...")
         self.assertEqual(fit("short", 20), "short")
 
     def test_an_unknown_character_is_drawn_as_a_box_not_dropped(self):
