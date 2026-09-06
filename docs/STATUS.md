@@ -63,7 +63,7 @@ service.
   measurement, and the honest reading of `classification_accuracy = 1.0` is "no
   regression", not "generalises". 13 thresholds against 72 gold pairs.
 - Whether a same-vocabulary cross-domain pair should be `approximate` or `analogical`: Benchmark v0.2 has no gold case for "same words, different domain, same structure". Recorded as **open** in ADR-0005 rather than settled by moving a threshold.
-- Human execution of the hosted-client cards (B in claude.ai, C in ChatGPT developer mode); agents have executed B, a person has not.
+- Human execution of the hosted-client cards **B (claude.ai) and C (ChatGPT developer mode)**; agents have executed B, a person has not. The underlying hosted OAuth flow is no longer unproven on production — see below — but those two named client integrations remain unexecuted by a human.
 
 ## Process notes
 
@@ -158,6 +158,43 @@ written down in `ops/TEST_READINESS.md` rather than left as a trap.
 Not closed: completing the hosted flow **on production** needs a human to sign
 in with Google or GitHub. No script can do it, and that remains the outstanding
 hosted-client item below.
+
+## The hosted flow, completed on production (2026-09-06)
+
+`ops/TEST_READINESS.md` records that no script can finish the hosted flow on
+production, because anonymous guests are refused and the authorize step needs a
+signed-in human. That step has now been executed, in the maintainer's own Chrome
+against <https://resonance.parshkov.com>, on `9e2b41c`:
+
+| step | result |
+| --- | --- |
+| dynamic client registration (RFC 7591) | `201`, `client_id` issued |
+| `GET /oauth/authorize` with PKCE S256 | consent page renders, names the client, the account (`mail@parshkov.com` / *Quiet Lapidary*) and exactly what is granted |
+| consent approved by the signed-in human | redirect to the exact loopback `redirect_uri`, **`code` returned**, exact `state` round-trip |
+| token exchange | `200`, `token_type: Bearer` (no refresh token — `offline_access` was not requested, which is correct) |
+| MCP `initialize` over `/mcp` | `200`, protocol `2025-03-26`, server `resonance` |
+| `tools/list` | **21 tools** |
+| `resonance_whoami` | resolves to the real account, *Quiet Lapidary* |
+| `resonance_my_thoughts`, `resonance_pending_resonances`, `resonance_topics` | all answer for the real account |
+| `POST /oauth/revoke` (RFC 7009) | `200`, and the revoked bearer is immediately **`401` on `/mcp`** |
+
+**This was deliberately read-only.** Nothing was prepared, shared, revoked or
+written in the live corpus, and the access token was revoked at the end. It is
+the exact step the automated probes stop at (`[FAIL] 5 code returned`,
+`access_denied: sign in to Resonance before connecting a client`), and it
+passes when a human is signed in — which is what those probes were always
+telling us.
+
+The page itself was checked in the same browser: it renders the signed-in home
+screen with real data — a match at 0.83 with its "See why", the account's own
+thoughts with one shared and one private, a group and a conversation — with **no
+console errors**.
+
+**Native WebMCP was not re-verified here.** That Chrome is 152.0.7977.77, the
+version that supports it, but `document.modelContext` is `undefined` because the
+profile is not running with `--enable-features=WebMCP`. The flagged 24/24 run
+recorded in `archive/.../public-origin-8670568/card-a-browser/` stands as the
+native evidence; nothing in this session adds to or subtracts from it.
 
 ## Next falsification targets
 
