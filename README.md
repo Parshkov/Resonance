@@ -704,11 +704,25 @@ package were retired once the live product existed; their record is under
 To see the product locally with people in it (no accounts, no fixtures on
 the page):
 
+Resonance runs on PostgreSQL — everywhere, including its tests, so the store
+under test is the store that ships. One container is the whole setup:
+
 ```bash
-python3 -m src.product.web_server --db :memory: --host 127.0.0.1 --port 8830 \
+docker run -d --name resonance-pg -e POSTGRES_PASSWORD=postgres \
+    -e POSTGRES_DB=resonance_test -p 55432:5432 postgres:16
+
+python3 -m src.product.web_server --db :ephemeral: --host 127.0.0.1 --port 8830 \
     --origin http://127.0.0.1:8830 &
 python3 ops/populate_local.py http://127.0.0.1:8830 /tmp/people.json
 open http://127.0.0.1:8830/
+```
+
+`:ephemeral:` is a throwaway schema on that server. Point `--db` at a
+`postgresql://…` DSN for a real database. Run the suite the same way:
+
+```bash
+pip install "psycopg[binary]"
+python3 -m unittest discover -s tests
 ```
 
 ---

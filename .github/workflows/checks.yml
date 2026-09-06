@@ -3,9 +3,9 @@
 # checked automatically. This runs exactly what the protocol already asks a
 # contributor to run, and nothing it cannot reproduce locally.
 #
-# Pure standard library: no requirements file, no build step, no network.
-# `psycopg` is deliberately absent, so the PostgreSQL smoke test skips here the
-# same way it skips locally -- see work/queue.yaml R18-E.
+# The engine and gates are pure standard library. The test suite additionally
+# needs PostgreSQL, because that is what the product runs on: a `postgres:16`
+# service backs it here, exactly as a contributor runs one locally.
 name: checks
 
 on:
@@ -25,11 +25,28 @@ jobs:
     name: test suite
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Resonance runs on PostgreSQL everywhere, including its tests, so that the
+    # store under test is the store that ships. There is no second backend to
+    # fall back to any more.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: resonance_test
+        ports: ["55432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      RESONANCE_TEST_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:55432/resonance_test
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: install the PostgreSQL driver
+        run: pip install --no-cache-dir "psycopg[binary]==3.3.5"
       - name: unittest discover
         run: python3 -m unittest discover -s tests
 

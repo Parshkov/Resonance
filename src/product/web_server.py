@@ -1255,14 +1255,15 @@ def main(argv: list[str] | None = None) -> None:
         description="Resonance: live product + browser WebMCP")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument("--db", default="live-product.sqlite3")
+    parser.add_argument("--db", default=":ephemeral:",
+                        help="postgresql:// DSN, or :ephemeral: for a throwaway schema")
     parser.add_argument("--origin", action="append", default=None)
     parser.add_argument("--secret-file", default=None)
     parser.add_argument("--seed-demo", action="store_true",
                         help="seed the R7 demo corpus into this database (RESONANCE_SEED_DEMO=1 "
                              "has the same effect); persistent databases are never seeded by default")
     args = parser.parse_args(argv)
-    seed = True if args.db == ":memory:" else (
+    seed = True if args.db.startswith(":ephemeral:") else (
         args.seed_demo or os.environ.get("RESONANCE_SEED_DEMO", "").strip().lower() in ("1", "true", "yes", "on"))
     origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
     try:

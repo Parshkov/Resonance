@@ -9,7 +9,7 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 
 | setting | how it is passed | notes |
 | --- | --- | --- |
-| database | `--db <path-or-DSN>` | `postgresql://…` selects PostgreSQL; anything else is a SQLite file; `:memory:` is ephemeral |
+| database | `--db <DSN>` | a `postgresql://…` DSN. Resonance runs on PostgreSQL only; `:ephemeral:` makes a throwaway schema on the development/test server (local development and tests) |
 | confirmation secret | `RESONANCE_CONFIRMATION_SECRET` env (≥ 32 bytes) or `--secret-file` | **required** with a persistent DB — the server refuses to start without it so prepared private drafts survive restarts. Never put it on the command line or in the image. |
 | browser origin allowlist | `--origin https://your.host` (repeatable) | must be the **exact** `https://` origin browsers will use; this is the CSRF/Origin check. Add a second `--origin` for a platform default host alongside a custom domain. |
 | bind address / port | `--host 0.0.0.0 --port $PORT` | the image reads `PORT` from the platform |
@@ -58,7 +58,7 @@ exactly the command in the `Dockerfile`:
 Two fixes were required for PostgreSQL to work at all. The first landed on
 `main` as `457506b` (the `;` inside a comment in `0001_init.sql` broke the very
 first migration; fixed in the migration, with a hygiene test). The second is
-part of the same change as this runbook: `build_runtime` hard-wired SQLite, so a
+part of the same change as this runbook: `build_runtime` hard-wired the old store, so a
 DSN passed via `--db` was treated as a file name and the live product could not
 run on PostgreSQL regardless of the migration fix. Cookies are marked `Secure`
 automatically when every allowed origin is `https://`.
@@ -261,4 +261,4 @@ The manual MCP key path (Collaboration panel → **Create MCP key**, or
   structural engine; scale-out would need sticky sessions or a shared
   idempotency store, neither of which the pilot requires.
 - Backups: use the platform's Postgres snapshots (Fly: `fly postgres backup`,
-  Railway/Render: dashboard). SQLite deployments must snapshot the volume.
+  Railway/Render: dashboard).

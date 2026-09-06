@@ -8,7 +8,8 @@ from dataclasses import replace
 from pathlib import Path
 
 from src.graph import ThoughtGraph
-from src.persistence import LiveCorpusService, PersistenceStaleIndexError, SQLiteRepository
+from src.persistence import LiveCorpusService, PersistenceStaleIndexError
+from tests.support import repository
 from src.persistence.models import ConsentState
 from src.persistence.seed import minimal_thought
 
@@ -31,7 +32,7 @@ PRESENTATION = {"domain": "test", "topic": "restart", "cluster_id": "r11"}
 
 
 def make_service(path: Path) -> tuple[LiveCorpusService, object]:
-    service = LiveCorpusService(SQLiteRepository(path))
+    service = LiveCorpusService(repository(path))
     service.create_user("person-restart", display_label="Restart")
     session = service.create_session(
         session_id="ses-restart",
@@ -47,7 +48,7 @@ def make_service(path: Path) -> tuple[LiveCorpusService, object]:
 class CrashRestartFailClosedTests(unittest.TestCase):
     def test_committed_revoke_survives_rebuild_failure_and_process_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "restart.sqlite"
+            path = ":ephemeral:" + Path(tmp).name + "_restart"
             first, session = make_service(path)
             original_rebuild = first.rebuild_index
 
@@ -75,7 +76,7 @@ class CrashRestartFailClosedTests(unittest.TestCase):
             first.repo.close()
 
             # Startup deterministically rebuilds from the authoritative DB.
-            second = LiveCorpusService(SQLiteRepository(path))
+            second = LiveCorpusService(repository(path))
             try:
                 stored = second.get_session(session.session_id)
                 self.assertIsNotNone(stored.revoked_at)
@@ -92,7 +93,7 @@ class CrashRestartFailClosedTests(unittest.TestCase):
 
     def test_direct_repository_visibility_write_invalidates_serving_generation(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "external.sqlite"
+            path = ":ephemeral:" + Path(tmp).name + "_external"
             service, session = make_service(path)
             query = ThoughtGraph.from_dict(minimal_thought("query-external", "thermal"))
             self.assertTrue(service.health().ok)

@@ -21,7 +21,8 @@ sys.path.insert(0, str(REPO))
 from demo.corpus.discovery import load_sessions  # noqa: E402
 from src.identity import IdentityService, R11IdentityBackend  # noqa: E402
 from src.identity.models import ConsentChoices  # noqa: E402
-from src.persistence import LiveCorpusService, SQLiteRepository  # noqa: E402
+from src.persistence import LiveCorpusService  # noqa: E402
+from tests.support import repository
 from src.product.service import LiveProductService  # noqa: E402
 from src.product.standing import ALERT_KIND, StandingSearch  # noqa: E402
 
@@ -41,7 +42,7 @@ def dna(source_session: str, thought_id: str) -> dict:
 
 
 def build_stack():
-    repo = SQLiteRepository(":memory:")
+    repo = repository(":ephemeral:")
     repo.migrate()
     live = LiveCorpusService(repo)
     identity = IdentityService(R11IdentityBackend(live),

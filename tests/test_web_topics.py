@@ -99,12 +99,12 @@ class Person:
 class WebTopicTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}))
+        pending = build_runtime(":ephemeral:", allowed_origins=frozenset({"pending"}))
         server = serve("127.0.0.1", 0, runtime=pending)
         host, port = server.server_address[:2]
         cls.base = f"http://{host}:{port}"
         server.RequestHandlerClass.runtime = build_runtime(
-            ":memory:", allowed_origins=frozenset({cls.base}), seed=False)
+            ":ephemeral:", allowed_origins=frozenset({cls.base}), seed=False)
         cls.server = server
         cls.thread = threading.Thread(target=server.serve_forever, daemon=True)
         cls.thread.start()

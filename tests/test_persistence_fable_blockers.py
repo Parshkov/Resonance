@@ -7,7 +7,6 @@ tombstone re-share, malformed location shapes, and restart repairability.
 from __future__ import annotations
 
 import json
-import sqlite3
 import tempfile
 import unittest
 from dataclasses import replace
@@ -19,8 +18,8 @@ from src.persistence import (
     PersistenceConflictError,
     PersistenceStaleIndexError,
     PersistenceValidationError,
-    SQLiteRepository,
 )
+from tests.support import repository
 from src.persistence.seed import minimal_thought
 
 DISCOVER = {
@@ -40,8 +39,8 @@ LOCATION = {
 PRESENTATION = {"domain": "test", "topic": "hardening", "cluster_id": "r11"}
 
 
-def seeded(path=":memory:"):
-    service = LiveCorpusService(SQLiteRepository(path))
+def seeded(path=":ephemeral:"):
+    service = LiveCorpusService(repository(path))
     service.create_user("person-a", display_label="A")
     service.create_user("person-b", display_label="B")
     first = service.create_session(
@@ -72,7 +71,7 @@ class ThoughtUniquenessBoundaryTests(unittest.TestCase):
         self.assertIsNone(service.get_session("ses-b"))
         self.assertTrue(service.health().ok)
 
-    def test_direct_sqlite_repository_unique_failure_is_never_raw_integrity_error(self):
+    def test_repository_unique_failure_is_never_a_raw_driver_error(self):
         service, first = seeded()
         duplicate = replace(
             first,
@@ -107,7 +106,7 @@ class ThoughtUniquenessBoundaryTests(unittest.TestCase):
 
 class ProjectionValidationAndRestartTests(unittest.TestCase):
     def test_malformed_location_is_rejected_before_durable_write(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         service.create_user("person-a", display_label="A")
         before = service.repo.get_corpus_generation()
         bad = {"city": "Moscow", "lat": 55.8, "lon": 37.6}
@@ -125,7 +124,7 @@ class ProjectionValidationAndRestartTests(unittest.TestCase):
         self.assertTrue(service.health().ok)
 
     def test_unknown_precise_location_field_is_rejected(self):
-        service = LiveCorpusService(SQLiteRepository(":memory:"))
+        service = LiveCorpusService(repository(":ephemeral:"))
         service.create_user("person-a", display_label="A")
         bad = {**LOCATION, "raw_point": {"lat": 10.012345, "lon": 20.012345}}
         with self.assertRaisesRegex(PersistenceValidationError, "unknown fields"):
@@ -139,24 +138,29 @@ class ProjectionValidationAndRestartTests(unittest.TestCase):
             )
 
     def test_restart_with_legacy_bad_row_stays_bootable_fail_closed_and_repairable(self):
+        """A row that committed before the projection hardening must not stop
+        the product booting: it degrades, fails closed, and can be repaired.
+
+        The bad row is written through the repository's own connection rather
+        than a second driver, because there is one store now and reaching
+        around it would test something the product never runs."""
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "bad-location.sqlite"
+            path = ":ephemeral:" + Path(tmp).name
             first, session = seeded(path)
-            first.repo.close()
 
             # Simulate a pre-hardening durable row that already committed.
-            conn = sqlite3.connect(path)
-            conn.execute(
+            first.repo._execute(
                 "UPDATE sessions SET location_json = ? WHERE session_id = ?",
                 (json.dumps({"city": "Moscow", "lat": 55.8, "lon": 37.6}), session.session_id),
             )
-            conn.execute(
-                "UPDATE persistence_state SET corpus_generation = corpus_generation + 1 WHERE state_id = 1"
+            first.repo._execute(
+                "UPDATE persistence_state SET corpus_generation = corpus_generation + 1 "
+                "WHERE state_id = 1"
             )
-            conn.commit()
-            conn.close()
+            first.repo._conn.commit()
+            first.repo.close()
 
-            restarted = LiveCorpusService(SQLiteRepository(path))
+            restarted = LiveCorpusService(repository(path))
             try:
                 self.assertFalse(restarted.health().ok)
                 self.assertFalse(restarted.health().index_current)

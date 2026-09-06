@@ -50,11 +50,12 @@ class R11PublicAuditIntegrationTests(unittest.TestCase):
     def test_auth_verifiers_and_recovery_hashes_are_not_in_public_audit_projection(self):
         try:
             from src.identity.backend import R11IdentityBackend
-            from src.persistence import LiveCorpusService, SQLiteRepository
+            from src.persistence import LiveCorpusService
+            from tests.support import repository
         except ImportError:
             self.skipTest("R11 persistence branch not present in standalone R12 checkout")
 
-        live = LiveCorpusService(SQLiteRepository(":memory:"))
+        live = LiveCorpusService(repository(":ephemeral:"))
         identity = IdentityService(R11IdentityBackend(live))
         credentials = identity.register("Audit User")
         try:

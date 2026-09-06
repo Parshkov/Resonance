@@ -7,12 +7,21 @@ structural retrieval/alignment/verifier/scoring stack is unchanged.
 `demo/corpus/*.jsonl` remains a deterministic fixture/replay seed only. It is
 not the live product database.
 
-## Backends
+## The store
 
-- **SQLite file** — deterministic local/judge/reset backend, stdlib only.
-- **PostgreSQL** — hosted-pilot backend behind the same repository contract.
-  Set `RESONANCE_DATABASE_URL=postgresql://...` and install `psycopg` or
-  `psycopg2`.
+**PostgreSQL, everywhere** — production, local development and the test suite,
+so the store that is tested is the store that ships. Set
+`RESONANCE_DATABASE_URL=postgresql://...` and install `psycopg`.
+
+There is no second backend. A SQLite repository sat behind this contract until
+2026-09-06: production ran PostgreSQL while 28 of 62 test files ran SQLite, so
+the shipped implementation had one test — skipped by default — and the
+unshipped one carried the suite. Removing it immediately surfaced a latent
+`NameError` on the PostgreSQL duplicate-`thought_id` path.
+
+For a throwaway store, open `:ephemeral:` — an isolated PostgreSQL schema. A
+named `:ephemeral:<name>` is stable, so reopening it is a restart with the data
+intact.
 
 Canonical SQL migrations live in `ops/migrations/`.
 
@@ -36,8 +45,7 @@ successful rebuild reconstructs deterministic state from the DB.
 ### Immutable ownership
 
 `session_id -> user_id` is immutable in normal product writes. The repository
-checks ownership inside its write transaction (`BEGIN IMMEDIATE` on SQLite,
-`SELECT ... FOR UPDATE` on PostgreSQL). Import/restore is a separately named
+checks ownership inside its write transaction (`SELECT ... FOR UPDATE` on PostgreSQL). Import/restore is a separately named
 privileged administrative path.
 
 This persistence API is an **internal data-layer seam**, not an authorization
@@ -95,13 +103,13 @@ being silently skipped.
 ## Operations
 
 ```bash
-python3 -m src.persistence --db var/resonance-pilot.sqlite migrate
-python3 -m src.persistence --db var/resonance-pilot.sqlite seed-r7
-python3 -m src.persistence --db var/resonance-pilot.sqlite seed-pilot --count 100
-python3 -m src.persistence --db var/resonance-pilot.sqlite health
-python3 -m src.persistence --db var/resonance-pilot.sqlite export --out var/backup.json
-python3 -m src.persistence --db var/resonance-pilot.sqlite import-backup var/backup.json
-python3 -m src.persistence --db var/resonance-pilot.sqlite reset
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" migrate
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" seed-r7
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" seed-pilot --count 100
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" health
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" export --out var/backup.json
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" import-backup var/backup.json
+python3 -m src.persistence --db "$RESONANCE_DATABASE_URL" reset
 ```
 
 `health` reports both durable `db_generation` and `serving_generation` plus

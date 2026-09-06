@@ -119,10 +119,13 @@ carrying a `metadata` block from the retired stdio adapter — regenerated).
 
 - No CI existed for 396 commits; a workflow is added on this branch, but it has
   never run on a pull request yet.
-- `src/persistence/{sqlite,postgres}_store.py` are two independent
-  implementations of a 53-method protocol with no shared base; the PostgreSQL
-  path is skipped unless `RESONANCE_TEST_POSTGRES_URL` is set, and production
-  runs SQLite.
+- ~~two persistence implementations~~ **corrected and closed, 2026-09-06.** The
+  audit reported this backwards: it claimed production ran SQLite, on the
+  strength of a Dockerfile comment that had been wrong for weeks. Production
+  runs **PostgreSQL** (`db: postgresql://...` in the deploy log), so the true
+  position was worse than reported — 682 tests exercised SQLite while the
+  shipped store had a single test, skipped unless `RESONANCE_TEST_POSTGRES_URL`
+  was set. SQLite has been removed entirely; see "One store" below.
 - `agents/SCOREBOARD.md` was never operated.
 - The whole-thought embedding baseline that `WHY_NOT.md` and ADR-0004 both name
   as the falsification target still does not exist.
@@ -195,6 +198,38 @@ version that supports it, but `document.modelContext` is `undefined` because the
 profile is not running with `--enable-features=WebMCP`. The flagged 24/24 run
 recorded in `archive/.../public-origin-8670568/card-a-browser/` stands as the
 native evidence; nothing in this session adds to or subtracts from it.
+
+## One store (2026-09-06)
+
+Resonance now runs on **PostgreSQL everywhere** — production, local development
+and the whole test suite. `src/persistence/sqlite_store.py` (979 lines) is
+deleted.
+
+It was not merely duplication. Production runs PostgreSQL; 28 of 62 test files
+ran SQLite. So the implementation under the product was exercised by **one
+test, skipped by default**, while the implementation nobody shipped carried the
+suite. Two independent implementations of a 53-method repository protocol, with
+no shared base, and the divergence could only ever have been found in
+production.
+
+- `open_repository` takes a `postgresql://` DSN, or `:ephemeral:` for a
+  throwaway schema. A **named** `:ephemeral:<name>` is stable, so reopening it
+  is a restart with the data intact — which is how the recovery, idempotency
+  and durable-secret cases keep their meaning.
+- Isolation is one PostgreSQL schema per repository: migrations name their
+  tables unqualified, so a `search_path` of one schema is complete isolation.
+- Seeding follows the old rule exactly: an unnamed throwaway is seeded (as
+  `:memory:` was), a named one is not (as a file path was not).
+- The two SQLite-internals migration tests were **rewritten against
+  PostgreSQL** rather than dropped: a clean database applies every versioned
+  migration, and a migration interrupted before its marker rolls back so that
+  reopening simply completes the upgrade.
+- CI runs a `postgres:16` service. Contributors need one container:
+  `docker run -d -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=resonance_test -p 55432:5432 postgres:16`.
+
+The cost is deliberate: the suite now needs a database, which raises the bar
+for a contributor arriving with nothing. The alternative was to keep testing a
+store the product does not run.
 
 ## Next falsification targets
 

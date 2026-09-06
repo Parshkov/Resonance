@@ -157,7 +157,7 @@ It depends on the engine; the engine never depends on it.
 discovery/     consented, visualization-ready read model over engine results
 ingestion/     private prepare -> preview -> explicit share
 identity/      accounts, sessions, consent, federation, pseudonyms
-persistence/   SQLite and PostgreSQL repositories, migrations, projection
+persistence/   the PostgreSQL repository, migrations, projection
 security/      fail-closed authorization kernel, audit, rate limits
 collaboration/ intro state machine and private relay
 workspaces/    multi-person workspaces and shared topics

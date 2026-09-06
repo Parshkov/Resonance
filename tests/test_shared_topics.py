@@ -42,7 +42,7 @@ FED = {"topic": "soil", "domain": "agriculture",
 
 class TopicTests(unittest.TestCase):
     def setUp(self):
-        self.runtime = build_runtime(":memory:",
+        self.runtime = build_runtime(":ephemeral:",
                                      allowed_origins=frozenset({"http://127.0.0.1"}),
                                      seed=False)
         self.bridge = RemoteMCPBridge(self.runtime.product)
@@ -245,7 +245,7 @@ class OneIndexOneLanguageTests(unittest.TestCase):
     def test_the_server_instructions_say_it_too_and_say_why(self):
         from src.product.mcp_bridge import RemoteMCPBridge
         from src.product.server import build_runtime
-        runtime = build_runtime(":memory:",
+        runtime = build_runtime(":ephemeral:",
                                 allowed_origins=frozenset({"http://127.0.0.1"}),
                                 seed=False)
         bridge = RemoteMCPBridge(runtime.product)

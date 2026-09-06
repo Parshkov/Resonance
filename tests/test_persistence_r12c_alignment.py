@@ -8,8 +8,8 @@ from src.persistence import (
     LiveCorpusService,
     PersistenceConflictError,
     PersistenceValidationError,
-    SQLiteRepository,
 )
+from tests.support import repository
 from src.persistence.seed import minimal_thought
 
 PRIVATE = {
@@ -37,7 +37,7 @@ PRESENTATION = {"domain": "d", "topic": "t", "cluster_id": "c"}
 
 class PrivateSparseDraftAlignmentTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.service = LiveCorpusService(SQLiteRepository(":memory:"))
+        self.service = LiveCorpusService(repository(":ephemeral:"))
         self.service.create_user("person-a", display_label="A")
 
     def tearDown(self) -> None:

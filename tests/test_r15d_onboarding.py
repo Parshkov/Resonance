@@ -48,7 +48,7 @@ def _oauth_core_present(base: str) -> bool:
 class HostedOnboardingAcceptance(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.runtime = build_runtime(":memory:",
+        cls.runtime = build_runtime(":ephemeral:",
                                     allowed_origins=frozenset({"http://127.0.0.1"}))
         cls.httpd = build_httpd("127.0.0.1", 0, runtime=cls.runtime)
         cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"

@@ -424,7 +424,7 @@ def startup_purge_unsigned(runtime: "ProductRuntime",
 
 
 def build_runtime(
-    db_path: str = ":memory:",
+    db_path: str = ":ephemeral:",
     *,
     allowed_origins: frozenset[str],
     confirmation_secret: bytes | None = None,
@@ -435,16 +435,18 @@ def build_runtime(
     # platform host that had been deleted.
     declared_origins: Sequence[str] | None = None,
 ) -> ProductRuntime:
-    """``seed=None`` seeds the R7 demo corpus only for an ephemeral ``:memory:``
-    database (local development, tests). A persistent database is never seeded
-    unless the operator asks for it explicitly (``--seed-demo`` /
+    """``seed=None`` seeds the R7 demo corpus only for an ephemeral database
+    (local development, tests). A persistent database is never seeded unless
+    the operator asks for it explicitly (``--seed-demo`` /
     ``RESONANCE_SEED_DEMO=1``); seeded rows are demo personas, not people."""
     if seed is None:
-        seed = db_path == ":memory:"
-    # Explicit path or DSN: a postgres:// / postgresql:// target selects the
-    # PostgreSQL repository, anything else is a SQLite file (or ":memory:").
-    # Previously this hard-wired SQLiteRepository, so a DSN was silently treated
-    # as a file name and the live product could never run on PostgreSQL.
+        # An unnamed ``:ephemeral:`` is the throwaway the old ``:memory:`` was,
+        # and is seeded for local development. A *named* one is reopenable and
+        # therefore stands in for a persistent database, which is never seeded
+        # unless the operator asks: seeded rows are demo personas, not people.
+        seed = db_path == ":ephemeral:"
+    # Everything runs on PostgreSQL: a postgresql:// DSN is a real database,
+    # ``:ephemeral:`` is a throwaway schema on the development/test server.
     live = LiveCorpusService(open_repository(db_path))
     if seed:
         seed_r7(live)
@@ -1451,7 +1453,7 @@ def _resolve_secret(secret_file: str | None, environ: Mapping[str, str],
     if env_secret:
         return _require_strong(env_secret.encode("utf-8"),
                                "RESONANCE_CONFIRMATION_SECRET")
-    if db_path != ":memory:":
+    if not db_path.startswith(":ephemeral:"):
         raise ValueError(
             "a persistent --db requires a stable confirmation secret: pass "
             "--secret-file or set RESONANCE_CONFIRMATION_SECRET, otherwise "
@@ -1481,7 +1483,8 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Resonance live product server")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
-    parser.add_argument("--db", default="live-product.sqlite3")
+    parser.add_argument("--db", default=":ephemeral:",
+                        help="postgresql:// DSN, or :ephemeral: for a throwaway schema")
     parser.add_argument("--origin", action="append", default=None,
                         help="allowed browser origin (repeatable)")
     parser.add_argument("--secret-file", default=None,
@@ -1489,9 +1492,9 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--seed-demo", action="store_true",
                         help="seed the R7 demo corpus (25 labelled demo personas) into this database; "
                              "RESONANCE_SEED_DEMO=1 has the same effect. Persistent databases are "
-                             "never seeded by default; :memory: always is")
+                             "never seeded by default; :ephemeral: always is")
     args = parser.parse_args(argv)
-    seed = True if args.db == ":memory:" else (
+    seed = True if args.db.startswith(":ephemeral:") else (
         args.seed_demo or os.environ.get("RESONANCE_SEED_DEMO", "").strip().lower() in ("1", "true", "yes", "on"))
     origins = frozenset(args.origin or [f"http://{args.host}:{args.port}"])
     try:

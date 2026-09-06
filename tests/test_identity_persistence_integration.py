@@ -15,11 +15,12 @@ from src.identity import (
 )
 
 try:
-    from src.persistence import LiveCorpusService, SQLiteRepository
+    from src.persistence import LiveCorpusService
+    from tests.support import repository
     from src.persistence.seed import minimal_thought
 except ImportError:  # R11 is a parallel PR until its accepted merge lands.
     LiveCorpusService = None
-    SQLiteRepository = None
+    repository = None
     minimal_thought = None
 
 
@@ -41,8 +42,8 @@ PRESENTATION = {"domain": "test", "topic": "identity", "cluster_id": "r12"}
 class R11IdentityIntegrationTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self.tmp.name) / "identity.sqlite"
-        self.live = LiveCorpusService(SQLiteRepository(self.path))
+        self.path = Path(self.tmp.name) / "identity"
+        self.live = LiveCorpusService(repository(self.path))
         self.identity = IdentityService(R11IdentityBackend(self.live))
 
     def tearDown(self):
@@ -88,7 +89,7 @@ class R11IdentityIntegrationTests(unittest.TestCase):
             self.identity.consent_for(bob.access_token, created.session_id)
 
         self.live.repo.close()
-        self.live = LiveCorpusService(SQLiteRepository(self.path))
+        self.live = LiveCorpusService(repository(self.path))
         self.identity = IdentityService(R11IdentityBackend(self.live))
         ui = ManualUIAdapter(self.identity, request_origin="https://resonance.local")
         self.assertEqual(
@@ -147,7 +148,7 @@ class R11IdentityIntegrationTests(unittest.TestCase):
         self.live.update_consent = original
 
         self.live.repo.close()
-        self.live = LiveCorpusService(SQLiteRepository(self.path))
+        self.live = LiveCorpusService(repository(self.path))
         restarted = IdentityService(R11IdentityBackend(self.live))
         self.assertFalse(
             restarted.consent_for(

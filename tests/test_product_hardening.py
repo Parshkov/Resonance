@@ -31,7 +31,7 @@ class RegistrationLimitTests(unittest.TestCase):
             self.assertTrue(product_server.registration_allowed("127.0.0.1"))
 
     def test_http_guest_creation_returns_429_over_the_limit(self):
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
         httpd = serve("127.0.0.1", 0, runtime=runtime)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         base = f"http://127.0.0.1:{httpd.server_address[1]}"
@@ -71,7 +71,7 @@ class LimiterCountsOnlyWhatCanCreateTests(unittest.TestCase):
     """
 
     def _server_with_sign_in(self):
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}),
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}),
                                 seed=False)
         httpd = serve("127.0.0.1", 0, runtime=runtime)
         # A provider, so `_sign_in_required()` is true the way production's is.
@@ -108,7 +108,7 @@ class LimiterCountsOnlyWhatCanCreateTests(unittest.TestCase):
 
 class AudienceBindingTests(unittest.TestCase):
     def test_access_token_bound_to_another_resource_is_refused(self):
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False)
         store = GrantStore()
         core = OAuthCore(runtime.identity, store)
         creds = runtime.identity.register_guest()
@@ -126,7 +126,7 @@ class AudienceBindingTests(unittest.TestCase):
                 raise RuntimeError("storage unavailable")
 
         runtime = build_runtime(
-            ":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False
+            ":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=False
         )
         core = OAuthCore(runtime.identity, BrokenAudienceStore())
         creds = runtime.identity.register_guest(actor_type="agent")
@@ -144,7 +144,7 @@ class AudienceBindingTests(unittest.TestCase):
 
 class DemoPersonaAndScrubTests(unittest.TestCase):
     def test_seeded_rows_are_flagged_and_labels_are_scrubbed(self):
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=True)
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}), seed=True)
         product = runtime.product
         creds = product.register_guest()
         thought = {"nodes": [{"label": "sustained fast-charging load from bob@acme.com", "role": "problem"},
@@ -180,7 +180,9 @@ class DemoSeedPolicyTests(unittest.TestCase):
         from pathlib import Path
         from src.persistence.seed import purge_demo
         with tempfile.TemporaryDirectory() as tmp:
-            db = str(Path(tmp) / "live.sqlite3")
+            # A persistent database, i.e. not the throwaway kind: a stable
+            # ephemeral schema reopened by name is exactly that.
+            db = ":ephemeral:" + Path(tmp).name
             rt = build_runtime(db, allowed_origins=frozenset({"http://127.0.0.1"}), confirmation_secret=b"x" * 32)
             self.assertEqual(rt.live.health().sessions, 0)
             rt.live.repo.close()
@@ -198,14 +200,14 @@ class DemoSeedPolicyTests(unittest.TestCase):
             rt.live.repo.close()
 
     def test_in_memory_runtime_is_seeded_for_local_development(self):
-        rt = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        rt = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}))
         self.assertEqual(rt.live.health().sessions, 25)
 
 
 class ReadinessTests(unittest.TestCase):
     def test_health_reports_engine_identity_and_demo_presence(self):
         from src.engine import ENGINE_VERSION
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}))
         httpd = serve("127.0.0.1", 0, runtime=runtime)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         try:
@@ -221,7 +223,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(health["corpus"]["volunteer_sessions"], 0)
 
     def test_startup_purge_is_gated_by_the_environment_variable(self):
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}))
         self.assertIsNone(product_server.startup_purge_demo(runtime, {}))
         self.assertEqual(product_server.corpus_summary(runtime)["demo_sessions"], 25)
         result = product_server.startup_purge_demo(runtime, {"RESONANCE_PURGE_DEMO": "1"})
@@ -236,7 +238,7 @@ class ReadinessTests(unittest.TestCase):
         # left by acceptance runs before they revoked themselves. Those guests'
         # access tokens are gone, so the product's own delete_session is out of
         # reach too. This deletes by explicit id and nothing else.
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({"http://127.0.0.1"}))
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({"http://127.0.0.1"}))
         live = runtime.live
         ids = [s.session_id for s in live.repo.list_sessions()]
         self.assertGreaterEqual(len(ids), 4)

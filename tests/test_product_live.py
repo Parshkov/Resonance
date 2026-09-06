@@ -29,7 +29,8 @@ from src.ingestion import (
     WebMCPIngestionAdapter,
 )
 from src.ingestion.service import ShareIntent
-from src.persistence import LiveCorpusService, SQLiteRepository
+from src.persistence import LiveCorpusService
+from tests.support import repository
 from src.persistence.seed import seed_r7
 from src.product import (
     LIVE_PRODUCT_CONTRACT,
@@ -60,7 +61,7 @@ def location(region: str = "R", lat: float = 55.8, lon: float = 37.6) -> dict:
             "lat": lat, "lon": lon, "precision": "city"}
 
 
-def build_stack(db_path=":memory:", *, seed=True):
+def build_stack(db_path=":ephemeral:", *, seed=True):
     """Live stack over the seeded baseline platform.
 
     The pilot ships with the accepted R7 seed corpus as ambient discoverable
@@ -70,7 +71,7 @@ def build_stack(db_path=":memory:", *, seed=True):
     cold-start corpus of N<=2 near-duplicates is a documented small-N
     weakness of the frozen retrieval layer, not of this product boundary.
     """
-    live = LiveCorpusService(SQLiteRepository(db_path))
+    live = LiveCorpusService(repository(db_path))
     if seed:
         seed_r7(live)
     identity = IdentityService(
@@ -331,7 +332,7 @@ class PresentationInvariantTests(unittest.TestCase):
 class DurabilityAndParityTests(unittest.TestCase):
     def test_new_session_survives_service_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
-            db = Path(tmp) / "live.db"
+            db = ":ephemeral:" + Path(tmp).name
             live, identity, product = build_stack(db)
             alice = product.register("Alice")
             a_session, _ = share_thought(
@@ -424,7 +425,7 @@ class DurableSecretTests(unittest.TestCase):
     def test_draft_preview_survives_runtime_restart_with_stable_secret(self):
         from src.product.server import build_runtime
         with tempfile.TemporaryDirectory() as tmp:
-            db = str(Path(tmp) / "live.db")
+            db = ":ephemeral:" + Path(tmp).name
             rt1 = build_runtime(db, allowed_origins=frozenset({ORIGIN}),
                                 confirmation_secret=SECRET)
             creds = rt1.product.register("Alice")
@@ -449,18 +450,18 @@ class DurableSecretTests(unittest.TestCase):
     def test_persistent_db_requires_stable_secret_at_cli(self):
         from src.product.server import _resolve_secret
         with self.assertRaises(ValueError):
-            _resolve_secret(None, {}, "live-product.sqlite3")
-        self.assertIsNone(_resolve_secret(None, {}, ":memory:"))
+            _resolve_secret(None, {}, "postgresql://localhost/live-product")
+        self.assertIsNone(_resolve_secret(None, {}, ":ephemeral:"))
         strong = "e" * 32
         self.assertEqual(
             _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": strong},
-                            "live-product.sqlite3"),
+                            "postgresql://localhost/live-product"),
             strong.encode())
         with tempfile.TemporaryDirectory() as tmp:
             secret_path = Path(tmp) / "secret"
             secret_path.write_bytes(b"f" * 40 + b"\n")
             self.assertEqual(
-                _resolve_secret(str(secret_path), {}, "live-product.sqlite3"),
+                _resolve_secret(str(secret_path), {}, "postgresql://localhost/live-product"),
                 b"f" * 40)
 
     def test_empty_or_short_secret_fails_instead_of_random_fallback(self):
@@ -471,16 +472,16 @@ class DurableSecretTests(unittest.TestCase):
                 secret_path = Path(tmp) / "secret"
                 secret_path.write_bytes(content)
                 with self.assertRaises(ValueError):
-                    _resolve_secret(str(secret_path), {}, "live-product.sqlite3")
+                    _resolve_secret(str(secret_path), {}, "postgresql://localhost/live-product")
         with self.assertRaises(ValueError):
             _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": "  \n"},
-                            "live-product.sqlite3")
+                            "postgresql://localhost/live-product")
         with self.assertRaises(ValueError):
             _resolve_secret(None, {"RESONANCE_CONFIRMATION_SECRET": "tiny"},
-                            "live-product.sqlite3")
+                            "postgresql://localhost/live-product")
         # build_runtime itself refuses an explicit empty secret (never random).
         with self.assertRaises(ValueError):
-            build_runtime(":memory:", allowed_origins=frozenset({ORIGIN}),
+            build_runtime(":ephemeral:", allowed_origins=frozenset({ORIGIN}),
                           confirmation_secret=b"")
 
 

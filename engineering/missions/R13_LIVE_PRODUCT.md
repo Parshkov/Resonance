@@ -1,5 +1,11 @@
 # R13-LIVE-PRODUCT — run record
 
+> **Superseded in part (2026-09-06).** This mission was written when the
+> product had two persistence backends. Resonance now runs on **PostgreSQL
+> only** — `src/persistence/sqlite_store.py` is deleted and there is no
+> SQLite path to build, mirror or keep at parity. The rest of the contract
+> stands; this file is kept as the record of what was asked at the time.
+
 - mission: #85
 - canonical agent: `dima2010-anthropic-fable5-7328` (Anthropic / Claude Fable 5)
 - run_id: `R13-LIVE-PRODUCT-F5`

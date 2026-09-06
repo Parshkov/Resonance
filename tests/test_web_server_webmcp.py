@@ -59,11 +59,11 @@ FLOW_THOUGHT = {
 class WebServerWebMCPTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}))
+        pending = build_runtime(":ephemeral:", allowed_origins=frozenset({"pending"}))
         server = serve("127.0.0.1", 0, runtime=pending)
         host, port = server.server_address[:2]
         cls.base = f"http://{host}:{port}"
-        runtime = build_runtime(":memory:", allowed_origins=frozenset({cls.base}))
+        runtime = build_runtime(":ephemeral:", allowed_origins=frozenset({cls.base}))
         server.RequestHandlerClass.runtime = runtime
         cls.runtime = runtime
         cls.server = server

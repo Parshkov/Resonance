@@ -57,12 +57,12 @@ class HeadRequestTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from src.product.server import build_runtime, serve
-        pending = build_runtime(":memory:", allowed_origins=frozenset({"pending"}))
+        pending = build_runtime(":ephemeral:", allowed_origins=frozenset({"pending"}))
         cls.server = serve("127.0.0.1", 0, runtime=pending)
         host, port = cls.server.server_address[:2]
         cls.base = f"http://{host}:{port}"
         cls.server.RequestHandlerClass.runtime = build_runtime(
-            ":memory:", allowed_origins=frozenset({cls.base}))
+            ":ephemeral:", allowed_origins=frozenset({cls.base}))
         threading.Thread(target=cls.server.serve_forever, daemon=True).start()
 
     @classmethod
@@ -88,13 +88,13 @@ class HeadRequestTests(unittest.TestCase):
 class ProductHttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        runtime = build_runtime(":memory:",
+        runtime = build_runtime(":ephemeral:",
                                 allowed_origins=frozenset({"pending"}))
         server = serve("127.0.0.1", 0, runtime=runtime)
         host, port = server.server_address[:2]
         cls.origin = f"http://{host}:{port}"
         # rebuild runtime with the real bound origin in the allowlist
-        cls.runtime = build_runtime(":memory:",
+        cls.runtime = build_runtime(":ephemeral:",
                                     allowed_origins=frozenset({cls.origin}))
         server.RequestHandlerClass.runtime = cls.runtime
         cls.server = server
@@ -153,7 +153,7 @@ class ProductHttpTests(unittest.TestCase):
         from src.product.server import ProductHandler, build_runtime
 
         class Handler(ProductHandler):
-            runtime = build_runtime(":memory:",
+            runtime = build_runtime(":ephemeral:",
                                     allowed_origins=frozenset({"https://resonance.example"}))
 
         httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)

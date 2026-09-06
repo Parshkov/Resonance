@@ -1,12 +1,22 @@
 # Resonance live product server — hosted deployment image (R16 surface).
 #
-# The server is pure standard-library Python: no requirements file, no build
-# step. It needs the repository tree at runtime for three things only:
+# The server is standard-library Python apart from the PostgreSQL driver: no
+# requirements file, no build step. It needs the repository tree at runtime for
+# three things only:
 #   demo/ui/        static page + WebMCP/collaboration modules
 #   ops/migrations  schema migrations applied at startup
 #   demo/corpus     the R7 demo corpus (seeded only with RESONANCE_SEED_DEMO=1)
 #
-# State lives in ONE SQLite file under /data; mount a persistent volume there.
+# State lives in PostgreSQL, which is the ONLY store Resonance runs on: set
+# RESONANCE_DB to the DSN (production reads it from the platform). The image
+# holds no state and needs no volume.
+#
+# This header used to say "state lives in ONE SQLite file under /data", and set
+# a SQLite path as the default RESONANCE_DB. That has been untrue since the
+# hosted deployment moved to PostgreSQL — production overrode the variable, so
+# the wrong default never bit, but it did mislead a reader into believing the
+# product ships on SQLite. There is no SQLite backend any more.
+#
 # A stable RESONANCE_CONFIRMATION_SECRET (>= 32 bytes) is REQUIRED with a
 # persistent DB — the server refuses to start without it, by design, so
 # prepared private drafts survive restarts. Never bake the secret into the
@@ -19,8 +29,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     LANG=C.UTF-8
 
-# The only third-party dependency, and only for PostgreSQL: the binary wheel
-# needs no compiler. SQLite deployments work without it.
+# The only third-party dependency: the PostgreSQL driver. The binary wheel
+# needs no compiler. It is required, not optional -- there is no other store.
 RUN pip install --no-cache-dir "psycopg[binary]==3.3.5"
 
 # The label encoder (src/semantics/neural.py): a small multilingual sentence
@@ -47,8 +57,7 @@ COPY --chown=resonance:resonance . /app
 
 USER resonance
 # No Docker VOLUME instruction: Railway rejects it ("use Railway Volumes"), and
-# with PostgreSQL the app container holds no state. For a SQLite deployment,
-# attach a platform volume at /data instead.
+# the app container holds no state -- everything durable is in PostgreSQL.
 
 # Platform sets PORT (Fly/Railway/Render all do); PUBLIC_ORIGIN must be the
 # exact https origin browsers will use — it is the CSRF/Origin allowlist.
@@ -56,8 +65,10 @@ USER resonance
 # the database at start; unset (default) the product starts with real
 # participants only. `python3 -m src.persistence --db "$RESONANCE_DB" purge-demo`
 # removes previously seeded demo state.
+# RESONANCE_DB has no default on purpose: it must be the deployment's own
+# PostgreSQL DSN, and a wrong default is worse than a startup error.
 ENV PORT=8080 \
-    RESONANCE_DB=/data/live-product.sqlite3 \
+    RESONANCE_DB= \
     PUBLIC_ORIGIN= \
     RESONANCE_SEED_DEMO= \
     RESONANCE_EMBEDDER=

@@ -304,7 +304,7 @@ class RichIntroStateLiveTests(unittest.TestCase):
         import tempfile
         from pathlib import Path
         with tempfile.TemporaryDirectory() as tmp:
-            db = Path(tmp) / "live.db"
+            db = ":ephemeral:" + Path(tmp).name
             live, identity, product = build_stack(db)
             alice = product.register("Alice")
             a_session, _ = share_thought(

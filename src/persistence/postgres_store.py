@@ -1,12 +1,13 @@
 """PostgreSQL repository for the hosted pilot.
 
 The optional driver keeps the deterministic engine/test path dependency-light.
-The transaction semantics mirror SQLite: public-state writes, generation bumps,
+Transaction semantics: public-state writes, generation bumps,
 optimistic versions, audit evidence, and idempotency completion commit together.
 """
 
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -14,6 +15,10 @@ from typing import Any, Mapping, Sequence
 from urllib.parse import urlparse
 
 from .errors import PersistenceConflictError, PersistenceOwnershipError
+# Latent since this path had no test: `put_session` called this and it was
+# never imported, so a duplicate thought_id raised NameError -- a 500 --
+# instead of the PersistenceConflictError the caller handles.
+from .projection import postgres_unique_violation
 from .models import (
     PERSISTENCE_SCHEMA_VERSION,
     AuditEvent,
@@ -61,10 +66,20 @@ def _connect(dsn: str):
         return psycopg2.connect(dsn)
 
 
+_SAFE_SCHEMA = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,54}")
+
+
 class PostgresRepository:
     backend_name = "postgres"
 
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, *, schema: str | None = None) -> None:
+        """`schema` puts this repository in its own PostgreSQL schema on the
+        same server. That is what replaced the old ephemeral SQLite database:
+        the tests need a clean, isolated store per case, and the only honest
+        way to give them one is the engine production actually runs. Migrations
+        name their tables unqualified, so a `search_path` of one schema is
+        complete isolation -- and reopening the same schema name is a restart,
+        which is how the recovery tests keep working."""
         if not postgres_available():
             raise RuntimeError(
                 "PostgreSQL driver not installed. Install psycopg or psycopg2 "
@@ -73,10 +88,30 @@ class PostgresRepository:
         parsed = urlparse(dsn)
         if parsed.scheme not in {"postgres", "postgresql"}:
             raise ValueError("PostgreSQL DSN must start with postgres:// or postgresql://")
+        if schema is not None and not _SAFE_SCHEMA.fullmatch(schema):
+            # Interpolated into DDL, so it may never come from anywhere but a
+            # caller-chosen identifier.
+            raise ValueError(f"unsafe schema name: {schema!r}")
         self.dsn = dsn
+        self.schema = schema
         self._lock = threading.RLock()
         self._conn = _connect(dsn)
+        if schema is not None:
+            cur = self._conn.cursor()
+            cur.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
+            cur.execute(f'SET search_path TO "{schema}"')
+            self._conn.commit()
         self.migrate()
+
+    def drop_schema(self) -> None:
+        """Throw away an isolated schema and everything in it. Only ever called
+        on a schema this repository created; refuses to touch `public`."""
+        if not self.schema:
+            raise RuntimeError("refusing to drop the default schema")
+        with self._lock:
+            cur = self._conn.cursor()
+            cur.execute(f'DROP SCHEMA IF EXISTS "{self.schema}" CASCADE')
+            self._conn.commit()
 
     def _execute(self, sql: str, params: Sequence[Any] = ()) -> Any:
         cur = self._conn.cursor()
@@ -624,7 +659,7 @@ class PostgresRepository:
                 self._conn.rollback()
                 raise
 
-    # -- collaboration (R14): parity with SQLiteRepository ----------------
+    # -- collaboration (R14) --------------------------------------------
     @staticmethod
     def _is_unique_violation(exc: BaseException) -> bool:
         code = getattr(exc, "sqlstate", None) or getattr(exc, "pgcode", None)
@@ -833,7 +868,7 @@ class PostgresRepository:
                 "ORDER BY created_at, message_id", (channel_id,))
             return tuple(row_message(r) for r in rows)
 
-    # -- workspaces (R14B): parity with SQLiteRepository ------------------
+    # -- workspaces (R14B) ----------------------------------------------
     def create_workspace(self, workspace, members, *, audit=None):
         with self._lock:
             try:

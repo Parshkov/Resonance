@@ -55,7 +55,7 @@ ENGLISH_LABELS_RUSSIAN_TITLE = {
 
 class WouldMatchNobodyTests(unittest.TestCase):
     def setUp(self):
-        self.runtime = build_runtime(":memory:",
+        self.runtime = build_runtime(":ephemeral:",
                                      allowed_origins=frozenset({"http://127.0.0.1"}),
                                      seed=False)
         self.bridge = RemoteMCPBridge(self.runtime.product)

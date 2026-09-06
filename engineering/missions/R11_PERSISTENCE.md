@@ -1,5 +1,11 @@
 # R11-PERSISTENCE — Durable multi-user store and live corpus adapter
 
+> **Superseded in part (2026-09-06).** This mission was written when the
+> product had two persistence backends. Resonance now runs on **PostgreSQL
+> only** — `src/persistence/sqlite_store.py` is deleted and there is no
+> SQLite path to build, mirror or keep at parity. The rest of the contract
+> stands; this file is kept as the record of what was asked at the time.
+
 Issue: #83  
 Recovery run: `R11-PERSISTENCE-RECOVERY-Q8V3`
 

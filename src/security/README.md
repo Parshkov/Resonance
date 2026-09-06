@@ -46,4 +46,4 @@ OAuth authorization lives in `src/remote/oauth.py` (`OAuthCore`, PKCE S256, audi
 
 This module cannot prove managed-database encryption, encrypted/access-controlled backups, private object storage, TLS termination, production CSP/CORS headers, real backup retention, or deployed log routing. Those controls remain required by `SECURITY.md`, `docs/THREAT_MODEL.md`, and #89 and must be verified on the exact hosted release candidate.
 
-The current combined R11/R12 integration suite proves durable product-path enforcement, restart-safe block/revoke behavior, protocol-session binding, minimized decision logs, and policy-preserving SQLite backup/restore. Production TLS, managed-storage, retention, and hosted-log evidence remains a release-freeze requirement rather than something unit tests can establish.
+The current combined R11/R12 integration suite proves durable product-path enforcement, restart-safe block/revoke behavior, protocol-session binding, minimized decision logs, and policy-preserving backup/restore. Production TLS, managed-storage, retention, and hosted-log evidence remains a release-freeze requirement rather than something unit tests can establish.
