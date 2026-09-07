@@ -86,18 +86,34 @@ concept channel. `ResonanceEngine._require_bound()` additionally re-hashes the
 whole corpus on every query. Not urgent at the current corpus size, and a wall
 at 10⁴.
 
-### 5. Multilingual prose extraction
+### 5. Multilingual prose extraction — Russian closed, the rest open
 
-`src/extraction/cue.py` is English-only — not just its cue table, but its
-sentence splitting (it wants a capital Latin letter after the period), its
-clause boundaries, and its noun-phrase heuristics. A conversation in another
-language therefore yields an honest empty graph and the assistant must supply
-the structure itself.
+**Russian was closed on 2026-09-07** (ADR-0008, extractor `0.3.0`), after a
+person hit it in the browser: the same reasoning gave 5 nodes and 3 relations
+in English and **0 and 0** in Russian. This section had diagnosed it correctly
+— it was never only the cue table. `WORD` matched no Cyrillic token at all, so
+even a matched cue produced empty arguments; `SENTENCE_END` wanted a capital
+Latin letter, so Russian prose was one unbroken sentence. Four subsystems, of
+which the connectives were the least of it.
 
-That is now a visible seam rather than a hidden one: the lexicon reads Latin
-and Cyrillic, the optional encoder reads every script, and the tool contract
-says the extractor is the English-only part. Closing it means a real extraction
-mission per language, with its own gate, not more regular expressions.
+Two things Russian needed that English does not: infinitive cue forms, because
+«может привести к» is the ordinary hedged register; and the comma written into
+«показывают, что», because Russian orthography requires that comma and a comma
+is a clause break.
+
+**This section warned that closing it means "a real extraction mission per
+language, with its own gate, not more regular expressions". Russian was closed
+with more regular expressions and no gate.** What justifies that is narrower
+than what the warning asked for: the Russian table is appended after the
+English one, the alphabets do not overlap, and the English gate reports
+byte-identical figures before and after — so the risk taken was to Russian
+quality, never to English. What is still missing is the gate: the 22 extraction
+cases are all English, so there is no Russian gold and no measurement of how
+much Russian structure is lost. The honest claim is "Russian extracts and
+English did not move", not "Russian extracts as well as English".
+
+Every other language remains English-only, and would need the same four
+subsystems treated the same way.
 
 ## Smaller, known
 

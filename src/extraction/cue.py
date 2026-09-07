@@ -1,4 +1,4 @@
-"""Cue-grounded Thought Graph extraction (v0.2).
+"""Cue-grounded Thought Graph extraction (v0.3, English + Russian).
 
 Deterministic, dependency-free, no LLM. Every relation is licensed by an
 explicit lexical connective in the text ("because", "leads to", "prevents",
@@ -7,8 +7,10 @@ explicit lexical connective in the text ("because", "leads to", "prevents",
 v0.2 replaces the 12-pattern v0.1 window extractor with:
 
 * sentence and clause segmentation with character offsets;
-* ~90 connectives in seven relation types, each with a direction (whether the
-  source argument sits left or right of the cue) and a confidence;
+* ~90 English and ~60 Russian connectives in seven relation types, each with a
+  direction (whether the source argument sits left or right of the cue) and a
+  confidence. The two tables are separate and the alphabets do not overlap, so
+  neither language can move the other (ADR-0008);
 * argument extraction that strips determiners, auxiliaries, pronoun subjects
   and adverbs, keeps up to six content tokens, and resolves a bare pronoun
   subject ("this", "it", "which") to the previous relation's target;
@@ -36,7 +38,7 @@ from src.interfaces import ConfigRef, ExtractionResult
 from src.semantics import role_hint as _role_hint, scrub as _scrub, stems as _stems
 
 EXTRACTOR_ID = "resonance-cue-extractor"
-EXTRACTOR_VERSION = "0.2.0"
+EXTRACTOR_VERSION = "0.3.0"
 DROP_THRESHOLD = 0.35
 IOU_MERGE = 0.5
 MAX_ARG_TOKENS = 6
@@ -81,18 +83,79 @@ _CUE_TABLE: tuple[tuple[str, str, str, float], ...] = (
     (r"is contradicted by|contradicted by|is refuted by|refuted by|is undermined by|undermined by|is disproved by|disproved by", "contradicts", "rev", 0.76),
     (r"contradicts|contradicted|contradict|conflicts with|conflict with|conflicted with|is inconsistent with|inconsistent with|is incompatible with|incompatible with|undermines|undermined|undermine|refutes|refuted|refute|disproves|disproved|disprove|rules out|ruled out|rule out|argues against|argue against|argued against|is at odds with|at odds with|clashes with|clash with|clashed with|casts doubt on|cast doubt on|challenges|challenged|challenge|goes against|went against|runs counter to|ran counter to|counters|countered|counter", "contradicts", "fwd", 0.78),
 )
+
+# Russian connectives, kept in their own table and appended after the English
+# one so the scanning order English text sees is byte-for-byte what it was.
+# The two alphabets do not overlap, so no Russian pattern can match English
+# prose or the reverse -- which is why this could be added without moving a
+# single frozen extraction figure.
+#
+# The engine already spoke Russian on the *matching* side (a bilingual lexicon
+# and a multilingual label encoder), so the only thing standing between a
+# Russian speaker and this product was the extractor. A person writing in their
+# own language got 0 nodes, 0 relations and an error addressed to a language
+# model.
+_CUE_TABLE_RU: tuple[tuple[str, str, str, float], ...] = (
+    # ---- causes, reversed (effect ... cue ... cause) --------------------
+    (r"из-за того,? что|ввиду того,? что|в силу того,? что|по причине того,? что|оттого,? что", "causes", "rev", 0.86),
+    (r"потому,? что|так как|поскольку|ибо", "causes", "rev", 0.84),
+    (r"вызвано|вызван|вызвана|вызваны|обусловлено|обусловлен|обусловлена|обусловлены|порождено|порождена", "causes", "rev", 0.86),
+    (r"из-за|вследствие|в результате|по причине|благодаря", "causes", "rev", 0.8),
+    # ---- causes, forward --------------------------------------------------
+    (r"привести к|приводить к|вести к|приводит к|приводят к|привело к|привела к|привели к|ведёт к|ведет к|ведут к|вело к|влечёт за собой|влечет за собой|влекут за собой|оборачивается|выливается в|вылилось в", "causes", "fwd", 0.86),
+    (r"вызвать|вызывать|породить|порождать|спровоцировать|создать|создавать|вызывает|вызывают|вызвал|вызвала|вызвало|вызвали|порождает|порождают|породил|породило|провоцирует|провоцируют|создаёт|создает|создают|создал|создало", "causes", "fwd", 0.88),
+    (r"увеличить|увеличивать|повысить|повышать|усилить|усиливать|ускорить|ускорять|ухудшить|ухудшать|усугубить|увеличивает|увеличивают|повышает|повышают|усиливает|усиливают|усугубляет|усугубляют|обостряет|обостряют|ускоряет|ускоряют|раздувает|подстёгивает|подстегивает|ухудшает|ухудшают", "causes", "fwd", 0.74),
+    (r"делает|делают|сделал|сделало|превращает|превращают|превратил|превратило", "causes", "fwd", 0.6),
+    # clause-level consequence markers: the previous clause causes this one
+    (r"поэтому|следовательно|таким образом|в итоге|в результате чего|значит|стало быть|и тогда|отсюда", "causes", "fwd", 0.7),
+    # purpose reads as the English "so that": the left clause is done to bring
+    # about the right one
+    (r"чтобы|для того,? чтобы|дабы", "causes", "fwd", 0.66),
+    # conditionals: "если X, то Y" -> X causes Y (conditional)
+    (r"если|когда|как только|стоит только|при условии,? что|пока не", "causes", "cond", 0.62),
+    # ---- prevents ------------------------------------------------------------
+    (r"предотвращается|блокируется|сдерживается|подавляется|компенсируется", "prevents", "rev", 0.8),
+    (r"помешать|мешать|препятствовать|предотвратить|предотвращать|заблокировать|остановить|исключить|не дать|не позволить|мешает|мешают|помешал|помешало|препятствует|препятствуют|предотвращает|предотвращают|предотвратил|не даёт|не дает|не дают|не позволяет|не позволяют|блокирует|блокируют|останавливает|останавливают|исключает|исключают|срывает|срывают", "prevents", "fwd", 0.86),
+    (r"снизить|снижать|уменьшить|уменьшать|сократить|сокращать|ослабить|ослаблять|замедлить|замедлять|затруднить|затруднять|подавить|сдержать|снижает|снижают|уменьшает|уменьшают|сокращает|сокращают|ослабляет|ослабляют|замедляет|замедляют|тормозит|тормозят|затрудняет|затрудняют|подавляет|подавляют|сдерживает|сдерживают|гасит|гасят|съедает|съедают|истощает|истощают|размывает|размывают", "prevents", "fwd", 0.76),
+    # ---- requires --------------------------------------------------------------
+    (r"необходим для|необходима для|необходимо для|нужен для|нужна для|нужно для|требуется для|позволяет|позволяют|позволил|позволило|даёт возможность|дает возможность|делает возможным|открывает возможность", "requires", "rev", 0.74),
+    (r"требовать|потребовать|зависеть от|опираться на|нуждаться в|требует|требуют|потребовал|потребовало|зависит от|зависят от|зависел от|опирается на|опираются на|держится на|строится на|невозможно без|немыслимо без|не может без|нуждается в|нуждаются в|предполагает наличие", "requires", "fwd", 0.86),
+    # ---- part_of -----------------------------------------------------------------
+    (r"является частью|являются частью|входит в состав|входят в состав|часть|входит в|входят в|относится к|относятся к|принадлежит к", "part_of", "fwd", 0.82),
+    (r"состоит из|состоят из|включает в себя|включают в себя|включает|включают|содержит|содержат|складывается из", "part_of", "rev", 0.78),
+    # ---- constrains --------------------------------------------------------------
+    (r"ограничен|ограничена|ограничено|ограничены|ограничивается|ограничиваются|определяется|задаётся|задается", "constrains", "rev", 0.8),
+    (r"ограничить|ограничивать|урезать|ограничивает|ограничивают|ограничил|сдерживает рост|задаёт предел|задает предел|устанавливает предел|ставит потолок|регулирует|регулируют|нормирует", "constrains", "fwd", 0.82),
+    # ---- supports ------------------------------------------------------------------
+    (r"подтверждается|подкрепляется|доказывается|по данным|согласно|как показывает|как показал|как показали", "supports", "rev", 0.74),
+    (r"показывают,? что|показывает,? что|показал[аио]?,? что|подтверждают,? что|подтверждает,? что|доказывают,? что|доказывает,? что|свидетельствуют о том,? что|свидетельствует о том,? что|говорят о том,? что|говорит о том,? что|указывают на то,? что|указывает на то,? что|означает,? что|значит,? что", "supports", "fwd", 0.74),
+    (r"подтвердить|подтверждать|показать|показывать|доказать|доказывать|указать на|подтверждает|подтверждают|подтвердил|показывает|показывают|показал|показало|свидетельствует о|свидетельствуют о|говорит о том,? что|говорит в пользу|доказывает|доказывают|указывает на|указывают на|подкрепляет|подкрепляют|намекает на", "supports", "fwd", 0.72),
+    # ---- contradicts -----------------------------------------------------------------
+    (r"опровергается|оспаривается|ставится под сомнение", "contradicts", "rev", 0.76),
+    (r"противоречить|опровергнуть|опровергать|подорвать|подрывать|противоречит|противоречат|опровергает|опровергают|опроверг|подрывает|подрывают|расходится с|расходятся с|идёт вразрез с|идет вразрез с|ставит под сомнение|ставят под сомнение|исключает возможность|конфликтует с|не согласуется с|несовместимо с|несовместим с", "contradicts", "fwd", 0.78),
+)
+
 CUES: tuple[tuple[re.Pattern[str], str, str, float], ...] = tuple(
     (re.compile(r"\b(?:" + pattern + r")\b", re.I), rel_type, direction, conf)
-    for pattern, rel_type, direction, conf in _CUE_TABLE
+    for pattern, rel_type, direction, conf in _CUE_TABLE + _CUE_TABLE_RU
 )
 # Public v0.1-compatible view (pattern text, type, confidence, reverse flag).
-CUE_COUNT = sum(len(p.split("|")) for p, _t, _d, _c in _CUE_TABLE)
+CUE_COUNT = sum(len(p.split("|")) for p, _t, _d, _c in _CUE_TABLE + _CUE_TABLE_RU)
 
-SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(\[])|\n{2,}")
+# A sentence ends where punctuation is followed by a capital -- in EITHER
+# alphabet. With the Latin-only class this scanned Russian prose as one
+# unbroken sentence, so clause segmentation never ran and every cue matched
+# against the whole paragraph. `«` opens a quotation the way `"` does.
+SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-ZА-ЯЁ\"'«(\[])|\n{2,}")
 CLAUSE_BOUNDARY = re.compile(
     r"[,;:!?]|\.(?=\s|$)|\((?:.*?)\)|\s--\s|\s-\s|—|\b(?:and|but|or|nor|yet|while|whereas|although|though|even though|"
     r"however|meanwhile|then|which|who|whom|where|whether|after|before|until|till|so|because|since|if|when|"
-    r"whenever|once|unless|that)\b",
+    r"whenever|once|unless|that|"
+    # NB: no bare `что`. English splits on `that` and recovers via
+    # AUX_AFTER_THAT, but Russian drops the copula, so there is no
+    # auxiliary to recover on and `показывают, что X` loses its object.
+    r"и|но|или|а|хотя|однако|тогда|который|которая|которое|которые|которых|где|пока|после того как|"
+    r"прежде чем|до того как|потому что|так как|поскольку|если|когда|чтобы)\b",
     re.I,
 )
 AUX_AFTER_THAT = re.compile(
@@ -100,14 +163,26 @@ AUX_AFTER_THAT = re.compile(
     r"cannot|never|not)\b",
     re.I,
 )
-WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’\-/]*")
+# The deepest of the four Russian blockers: with a Latin-only class this found
+# no tokens at all in Cyrillic prose, so even a matched cue produced empty
+# arguments. `stems()` already handled Cyrillic; only this did not.
+WORD = re.compile(r"[A-Za-zА-Яа-яЁё0-9][A-Za-zА-Яа-яЁё0-9'’\-/]*")
 LEADING_DROP = frozenset(
     "the a an this that these those our their its my his her your it they we there here you i he she "
     "some any every each all both few many most much such no not also often usually eventually then now "
     "still already just even only really very quite rather too as of in on at by for with from to into "
     "about over under through during is are was were be been being am has have had do does did will would "
     "can could may might should must shall ought seems seem seemed appears appear appeared tends tend tended "
-    "keeps keep kept gets get got became become becomes getting becoming being going went go goes".split()
+    "keeps keep kept gets get got became become becomes getting becoming being going went go goes "
+    # Russian: articles do not exist, so this carries pronouns, demonstratives,
+    # prepositions, copulas and the hedges that open a clause.
+    "это эта этот эти эту том та то те тот наш наша наше наши их его её ее мой моя моё моя твой ваш "
+    "я он она оно они мы вы ты там тут здесь такой такая такое такие сам сама само сами "
+    "некоторые каждый каждая все всё весь вся оба много больше меньше всего "
+    "не ни нет также тоже часто обычно ещё еще уже просто даже только очень довольно слишком крайне "
+    "как из в во на при для с со от до к ко по о об обо про за над под между через без "
+    "быть был была было были есть буду будет будут стал стала стало стали "
+    "может могут мочь можно нужно надо следует стоит".split()
 )
 TRAILING_DROP = frozenset(
     "too again also anyway though however as well over time at all in turn itself themselves him her them it "
@@ -115,17 +190,30 @@ TRAILING_DROP = frozenset(
     "of in on at by for with from to into about over under through during a an the which who that whom "
     "not never no longer cannot probably possibly likely perhaps maybe potentially eventually still then often "
     "usually always sometimes rarely hardly seldom now already just even only really very quite rather "
-    "gradually slowly quickly rapidly increasingly".split()
+    "gradually slowly quickly rapidly increasingly "
+    "тоже также снова опять вообще совсем вовсе впрочем однако со временем в свою очередь "
+    "сам сама само сами себя себе не ни нет никогда уже ещё еще "
+    "вероятно возможно наверное скорее видимо потенциально постепенно медленно быстро "
+    "обычно всегда иногда редко часто сейчас теперь тогда".split()
 )
-PRONOUN_ONLY = frozenset("this that it which they these those such he she we one".split())
+PRONOUN_ONLY = frozenset("this that it which they these those such he she we one "
+                         "это эта этот эти то тот та те он она оно они мы вы я такой такая такое "
+                         "который которая которое которые".split())
 NEGATORS = re.compile(
     r"(?:\bdo\s+not|\bdoes\s+not|\bdid\s+not|\bcannot|\bcan(?:no)?'?t|\bwill\s+not|\bwon'?t|\bwould\s+not|"
     r"\bwouldn'?t|\bnever|\bnot|\bno\s+longer|\bfails?\s+to|\bfailed\s+to|\bdoesn'?t|\bdon'?t|\bdidn'?t|\bisn'?t|"
-    r"\baren'?t|\bwasn'?t|\bweren'?t|\bhardly|\brarely|\bneither|\bnor)\s+(?:\w+\s+){0,2}$",
+    r"\baren'?t|\bwasn'?t|\bweren'?t|\bhardly|\brarely|\bneither|\bnor|"
+    r"\bне|\bни|\bнет|\bнельзя|\bневозможно|\bникогда|\bбольше\s+не|\bперестал[аио]?|\bотказал(?:ся|ась)?\s+от)"
+    r"\s+(?:\w+\s+){0,2}$",
     re.I,
 )
-POSSIBLE = re.compile(r"\b(?:may|might|could|possibly|perhaps|probably|likely|maybe|potentially|can|appears? to|seems? to|tends? to)\b", re.I)
-CONDITIONAL = re.compile(r"\b(?:if|unless|would|whenever|in case|provided that|assuming)\b", re.I)
+POSSIBLE = re.compile(
+    r"\b(?:may|might|could|possibly|perhaps|probably|likely|maybe|potentially|can|appears? to|seems? to|tends? to|"
+    r"может|могут|мог|могла|могло|возможно|наверное|вероятно|скорее всего|потенциально|кажется|похоже|"
+    r"обычно|как правило|склонен|склонна|склонны)\b", re.I)
+CONDITIONAL = re.compile(
+    r"\b(?:if|unless|would|whenever|in case|provided that|assuming|"
+    r"если|когда бы|при условии|в случае|допустим|предположим|бы)\b", re.I)
 GENERIC_ROLE_WORDS = frozenset("problem mechanism state outcome constraint method evidence resource agent".split())
 # Cue words that are also common nouns; read as verbs only in verb position.
 NOUN_VERB_CUES = frozenset(
