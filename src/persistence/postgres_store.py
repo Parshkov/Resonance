@@ -432,6 +432,13 @@ class PostgresRepository:
             self._conn.commit()
             return [loads(row["record_json"]) for row in rows]
 
+    def count_grants_of_kind(self, kind: str) -> int:
+        """How many records of one kind there are, without removing them."""
+        with self._lock:
+            row = self._fetchone_map(
+                "SELECT COUNT(*) AS n FROM oauth_grants WHERE kind = ?", (kind,))
+            return int(row["n"]) if row else 0
+
     def delete_grants_of_kind(self, kind: str) -> int:
         """Every record of one kind, whoever it belongs to.
 
