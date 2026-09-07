@@ -11,6 +11,7 @@ Research submissions do not become architecture automatically. They are inputs t
 - [ADR-0004 — concept-aligned analogy, multi-skeleton benchmark, verified ranking](ADR-0004-concept-aligned-analogy-and-benchmark-v0.2.md) (engine 0.2, accepted)
 - [ADR-0005 — same-vocabulary cross-domain pairs: `approximate` vs `analogical`](ADR-0005-same-vocabulary-cross-domain-verdict.md) (**proposed / open**; needs human-authored gold)
 - [ADR-0006 — a local label encoder beside the lexicon](ADR-0006-label-encoder.md) (accepted 2026-09-06; opt-in, on in the hosted deployment)
+- [ADR-0007 — same-subject resonance, and ranking on meaning as well as shape](ADR-0007-same-subject-resonance-and-ranking.md) (accepted 2026-09-06; from the first real pair of real thoughts)
 
 ## Numbering, and the record that was never written
 

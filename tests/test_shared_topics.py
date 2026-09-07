@@ -231,15 +231,26 @@ class OneIndexOneLanguageTests(unittest.TestCase):
         call, which took the product's central action away in that client.
 
         The requirement did not move far. The schema says what the server
-        does -- labels are matched as English text, so another language
-        matches nothing -- and the next test holds the instruction itself in
+        does, and the next test holds the instruction itself in
         `instructions`, which is the field MCP defines for telling an
         assistant how to use a server.
+
+        What it says changed on 2026-09-06 (ADR-0007). The schema used to
+        state that labels are matched as English text, so an assistant driving
+        a Russian conversation translated the person's reasoning first and
+        said so -- it downgraded authorship to `their_words_reorganised`,
+        because a translation is the assistant's phrasing. That defeated the
+        multilingual encoder the deployment actually runs. The schema now says
+        the index compares meaning across languages, and that a script it
+        cannot read is refused by name.
         """
         from src.product.mcp_bridge import THOUGHT_SCHEMA
         description = THOUGHT_SCHEMA["description"]
-        self.assertIn("English", description)
-        self.assertIn("another language", description)
+        self.assertIn("own words and own language", description)
+        self.assertIn("across languages", description)
+        self.assertIn("refused", description)
+        # the promise it must no longer make
+        self.assertNotIn("matched as English text", description)
         self.assertNotIn("ENGLISH", description)
 
     def test_the_server_instructions_say_it_too_and_say_why(self):
@@ -252,6 +263,9 @@ class OneIndexOneLanguageTests(unittest.TestCase):
         reply = bridge.handle({"jsonrpc": "2.0", "id": 1, "method": "initialize",
                                "params": {"protocolVersion": "2025-06-18"}}, "")
         instructions = reply["result"]["instructions"]
-        self.assertIn("English", instructions)
-        self.assertIn("their own language", instructions)
-        self.assertIn("different languages should still meet", instructions)
+        # `instructions` is the field MCP defines for addressing the assistant,
+        # so unlike a tool description it may speak to it directly.
+        self.assertIn("own words and own language", instructions.lower())
+        self.assertIn("different languages do meet", instructions)
+        # translating to reach the index is the thing to avoid, not the rule
+        self.assertIn("translate", instructions.lower())

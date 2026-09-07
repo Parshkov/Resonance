@@ -257,6 +257,51 @@ The README was rewritten from 880 lines to 249: what Resonance is, how the
 engine works, what is measured and what is not, how to run it, how to connect a
 client. The onboarding, claim, lease and achievement material is gone.
 
+## What the first real pair found (2026-09-06)
+
+The product was driven end to end by two real people through claude.ai and
+ChatGPT as ordinary clients: prepare -> preview -> explicit consent -> share ->
+discover -> explain -> message. Two independent thoughts in different domains
+turned out to be the same construction, step for step.
+
+**The engine called it `negative`, and returned a template coincidence above
+it.** Measured on production: the coincidence at structural 0.305 / semantic
+0.120, the actual twin at 0.186 / 0.590 / contradiction 0.214. Four defects,
+none of them visible to the suite or to Benchmark v0.2, all fixed here and
+recorded in [ADR-0007](decisions/ADR-0007-same-subject-resonance-and-ranking.md):
+
+- **Ranking read `structural` alone**, so shape without meaning led the list.
+  It now ranks on `0.65·structural + 0.35·semantic`; classification is
+  untouched.
+- **The same-subject branch demanded `contradiction == 0.0` exactly**, so one
+  crossed correspondence dropped the pair to the strangers' bar. Same subject
+  now buys a higher contradiction ceiling (0.35), not immunity; polarity
+  conflicts are still hard-rejected. Policy `.../same-subject/0.4`.
+- **The tool contract demanded English labels.** An assistant driving a Russian
+  conversation translated the reasoning first and honestly downgraded
+  authorship to `their_words_reorganised` — a translation is the assistant's
+  phrasing, which then gets matched instead of the person's. The contract now
+  says the index compares meaning across languages, which is what the deployed
+  encoder does.
+- **The chat drawing was not the page's drawing.** It placed dots on rings by
+  structural score, told a different story from the list beside it, and printed
+  one pseudonym twice when a person had two matching thoughts. It is now the
+  same seven-axis radar the page draws, one polygon per match, each row naming
+  the thought.
+
+Benchmark v0.2 passes unchanged on both splits with gold unedited, including
+`same_vocabulary_wrong_structure` — the family designed to catch exactly this
+loosening. The gap was that the benchmark has **no case for two people on the
+same subject who order the causes differently**; production produced one, and
+it is now `tests/test_same_subject_resonance.py`, built from the measured
+components rather than authored fixtures.
+
+**Still English-only: prose extraction.** `src/extraction/cue.py` reads English
+connectives, sentence ends and clause boundaries. A Russian conversation
+yields an honest empty graph, so the assistant must build the `thought` graph
+itself — which the contract now says plainly. Making the extractor multilingual
+is real work, not a patch, and is not attempted here.
+
 ## Next falsification targets
 
 1. A corpus of real extracted thoughts (consented) with two-human gold; compare engine 0.2 against a whole-thought embedding baseline.

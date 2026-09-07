@@ -47,12 +47,35 @@ def _tie_key(hit: ResonanceHit):
             round(hit.verification.components.structural, 6))
 
 
+# Ranking weight on agreement about meaning, beside agreement about shape.
+#
+# Ranking used to read `structural` alone, and on the first real pair of real
+# thoughts it inverted: a template coincidence (structural 0.305, semantic
+# 0.120 -- "overtime in a ward" laid over "scattered information about
+# employers") was returned ABOVE the person's actual twin (structural 0.186,
+# semantic 0.590), whose every node corresponded. Shape alone cannot tell a
+# coincidence from a match, which is the whole reason `semantic` is computed;
+# leaving it out of the order threw that evidence away at the last step.
+#
+# Classification is untouched by this -- only the order within a class -- so a
+# coincidence is still `negative`, it simply no longer leads the list.
+RANK_STRUCTURAL = 0.65
+RANK_SEMANTIC = 0.35
+
+
+def _rank_score(v: VerifierResult) -> float:
+    """What the ranking calls a better match: mostly shape, partly meaning."""
+    return (RANK_STRUCTURAL * v.components.structural
+            + RANK_SEMANTIC * v.components.semantic)
+
+
 def _verified_sort_key(hit: ResonanceHit):
     v = hit.verification
     rejected = 1 if v.hard_rejection else 0
     negative = 1 if v.classification == "negative" else 0
     primary = hit.candidate.channel_scores.get("primary", 0.0)
-    return (rejected, negative, -round(v.components.structural, 6), -round(primary, 6), hit.candidate.candidate_id)
+    return (rejected, negative, -round(_rank_score(v), 6),
+            -round(v.components.structural, 6), -round(primary, 6), hit.candidate.candidate_id)
 
 
 class EngineIntegrityError(RuntimeError):
