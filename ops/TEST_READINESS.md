@@ -47,6 +47,29 @@ The procedure stays valid for a future re-seeded environment:
 Never set `RESONANCE_SEED_DEMO=1` on production unless a demo corpus is wanted
 on purpose.
 
+## Acceptance re-run — 2026-09-06, `main` at the purge
+
+The three suites below were last recorded against `85eeaba`. They were re-run
+after the corpus purge, on current `main`, against a local guest-enabled origin
+(`--db :ephemeral:`), and every one matches its recorded baseline:
+
+| suite | result | baseline |
+| --- | --- | --- |
+| `ops/oauth_smoke.py … --auto-consent` | 27/27 | 27/27 |
+| `ops/hosted_onboarding_probe.py --smoke --refresh --revoke` | 9/9 required, 17/17 total | 9/9 |
+| A/B/C over `/mcp` (copy with `authorship`) | 36/36 | 36/36 |
+
+Notable inside the A/B/C run, because they are the product's actual claims:
+`A ranks above C` (rank 0 vs rank 14 — structure beating shared vocabulary),
+a subject-bound `result_id` C cannot read, intro → accept → relay, a revoked
+thought absent from a fresh discovery immediately, and a revoked bearer refused
+on `/mcp`.
+
+**The live corpus is empty** (`corpus.sessions_by_kind: {}`) as of the same
+day; see `ROADMAP.md`. Discovery on an empty corpus answers normally and says
+"your thought stays in the search" — pinned by
+`tests/test_purge_corpus.py::TheFirstPersonInAnEmptyWorldTests`.
+
 ## Two ways to reach the public origin from an agent session
 
 1. **Egress-capable machine** (owner laptop, CI, or a Claude Code environment
@@ -64,9 +87,21 @@ on purpose.
 ## Automated checks (run from a machine with public egress; the Claude Code
 ## web sandbox with the default network policy cannot reach the public origin)
 
+Resonance runs on PostgreSQL only. `:ephemeral:` means "a throwaway schema on
+a PostgreSQL server", not an in-memory database — the tests and every local
+origin below need one reachable, named by `RESONANCE_TEST_POSTGRES_URL` or
+`RESONANCE_DATABASE_URL`. A container is enough:
+
 ```bash
-# repository gates (any machine)
-python3 -m unittest discover -s tests                 # 682 tests, 2 skips without PostgreSQL
+docker run -d --rm --name resonance-test-pg -p 55432:5432 \
+        -e POSTGRES_USER=resonance -e POSTGRES_PASSWORD=resonance \
+        -e POSTGRES_DB=resonance pgvector/pgvector:pg16
+export RESONANCE_TEST_POSTGRES_URL=postgresql://resonance:resonance@127.0.0.1:55432/resonance
+```
+
+```bash
+# repository gates (any machine with that server up)
+python3 -m unittest discover -s tests                 # 712 tests, 1 skip
 python3 ops/lexicon_check.py                          # English scoring unchanged, exit 0
 python3 benchmark/r0-v0.2/runner.py                  # engine gates, exit 0
 python3 benchmark/extraction-v0.2/runner.py          # extractor gates, exit 0
@@ -106,9 +141,11 @@ scripts at it:
 
 ```bash
 python3 -m src.product.web_server --host 127.0.0.1 --port 8901 \
-        --db :memory: --origin http://127.0.0.1:8901 &
+        --db :ephemeral: --origin http://127.0.0.1:8901 &
 python3 ops/oauth_smoke.py http://127.0.0.1:8901/mcp --auto-consent
-PYTHONPATH=. python3 history/hackathon/submission/evidence/abc_mcp_test.py http://127.0.0.1:8901/mcp
+python3 ops/hosted_onboarding_probe.py --base http://127.0.0.1:8901 --smoke --refresh --revoke
+# copy the A/B/C harness first and add authorship -- see the section below
+PYTHONPATH=. python3 /tmp/abc_now.py http://127.0.0.1:8901/mcp
 ```
 
 Completing the hosted flow **on production** requires a human to sign in with
