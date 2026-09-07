@@ -193,6 +193,17 @@ def _mark_resonances_seen(r: Result) -> str:
 SAME_SUBJECT_MEANING = 0.40
 
 
+def _page_note(r: Result) -> str:
+    """Where the drawing always is.
+
+    A picture is sent with these answers, but it cannot be relied on: ChatGPT
+    renders no image at all and claude.ai hides it behind an expander. The
+    page draws the same radar on live data, and a link works in every client.
+    """
+    link = str(r.get("see_on_the_page") or "").strip()
+    return f" The same thing drawn, and every match on it: {link}" if link else ""
+
+
 def _semantic_of(row: Mapping[str, Any]) -> float:
     """Agreement about meaning, whatever the verdict was."""
     try:
@@ -243,7 +254,8 @@ def _discover(r: Result) -> str:
                     "wrong. These people are talking about the same things as you, and "
                     "what lines up is shown so the judgement can be yours: "
                     + " ".join(lines) +
-                    " Ask for the working on any of them before deciding.")
+                    " Ask for the working on any of them before deciding."
+                    + _page_note(r))
         elif rows:
             said = ("Nothing the engine calls a resonance. Some thoughts share a "
                     "skeleton with yours, but not enough meaning for it to say they "
@@ -292,7 +304,7 @@ def _discover(r: Result) -> str:
     said = (f"{lead} Closest first: " + " ".join(lines) +
             " The match is computed, not judged: no language model decided it, and the "
             "working can be shown. None of them knows about you unless you ask for an "
-            "introduction and they agree.")
+            "introduction and they agree." + _page_note(r))
     return f"{said} {aside}".strip()
 
 

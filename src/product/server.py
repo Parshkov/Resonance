@@ -153,6 +153,11 @@ class ProductRuntime:
     identity: IdentityService
     product: LiveProductService
     allowed_origins: frozenset[str]
+    # The host this deployment calls its own, resolved once at build time.
+    # `allowed_origins` is a set and cannot say which of several hosts is
+    # canonical, and a link that lands a person on the wrong host sends them
+    # somewhere their session is not.
+    canonical_origin: str = ""
 
 
 def engine_identity(runtime: "ProductRuntime") -> dict[str, str]:
@@ -465,9 +470,10 @@ def build_runtime(
     # Someone who has left is reached where they are, or not at all. The
     # transport is configured by environment; without one, nothing is sent and
     # the health endpoint says so rather than implying a promise being kept.
+    origin = oauth_mount.canonical_origin(declared_origins, allowed_origins)
     notifier = Notifier(
         identity, getattr(live, "repo", None),
-        origin=oauth_mount.canonical_origin(declared_origins, allowed_origins),
+        origin=origin,
         secret=confirmation_secret)
     product.standing.notifier = notifier
     product.notifier = notifier
@@ -482,7 +488,7 @@ def build_runtime(
         print(f"notifications: nobody can be reached — {NoTransport.reason}",
               flush=True)
     return ProductRuntime(live=live, identity=identity, product=product,
-                          allowed_origins=allowed_origins)
+                          allowed_origins=allowed_origins, canonical_origin=origin)
 
 
 
@@ -833,7 +839,8 @@ class ProductHandler(BaseHTTPRequestHandler):
                              "error": {"code": PARSE_ERROR, "message": "invalid JSON"}},
                             HTTPStatus.BAD_REQUEST)
             return
-        bridge = RemoteMCPBridge(self.runtime.product)
+        bridge = RemoteMCPBridge(self.runtime.product,
+                                 origin=getattr(self.runtime, "canonical_origin", ""))
         if isinstance(message, list):
             if not message:
                 self._send_json({"jsonrpc": "2.0", "id": None,

@@ -162,3 +162,53 @@ class EvidenceNotJudgementTests(unittest.TestCase):
         told about; `phrasing` copies the constant to avoid an import cycle."""
         from src.product import phrasing
         self.assertEqual(phrasing.SAME_SUBJECT_MEANING, scoring.T_SAME_SUBJECT_SEMANTIC)
+
+
+class PointAtThePageTests(unittest.TestCase):
+    """A drawing is sent with a discovery answer, and it cannot be relied on.
+
+    Measured in both clients on 2026-09-06: the image reaches the model
+    everywhere -- ChatGPT said "yes, I see it as a radar diagram" -- but
+    ChatGPT renders no `<img>` at all, and claude.ai puts it behind a
+    collapsed tool block. So the words must carry the answer, and the link
+    must carry the picture.
+    """
+
+    LINK = "https://resonance.parshkov.com/people?thought=ses-a"
+
+    def _row(self, semantic, verdict="negative"):
+        return {"person_pseudonym": "Fleet Minstrel", "mode_classification": verdict,
+                "hard_rejection": None, "scores": {"structural": 0.19, "semantic": semantic},
+                "evidence": {"mapped_node_count": 11, "preserved_relation_count": 2,
+                             "contradiction_count": 4},
+                "display": {"topic": "Shared landlord history before signing"}}
+
+    def _said(self, rows, link=True):
+        from src.product import phrasing
+        result = {"matches_in_backend_order": rows, "rejected": [], "shape_note": ""}
+        if link:
+            result["see_on_the_page"] = self.LINK
+        return phrasing.say("resonance_discover", result)
+
+    def test_a_match_points_at_the_page(self):
+        self.assertIn(self.LINK, self._said([self._row(0.59, "approximate")]))
+
+    def test_a_near_miss_points_at_the_page_too(self):
+        self.assertIn(self.LINK, self._said([self._row(0.59)]))
+
+    def test_nobody_yet_sends_nobody_to_an_empty_page(self):
+        """There is nothing drawn, so there is nothing to look at."""
+        self.assertNotIn("http", self._said([]))
+
+    def test_no_link_when_the_deployment_has_no_origin(self):
+        """A half-built URL is worse than none: it sends a person nowhere."""
+        self.assertNotIn("http", self._said([self._row(0.59, "approximate")], link=False))
+
+    def test_the_link_selects_the_match(self):
+        from src.product.mcp_bridge import RemoteMCPBridge
+        bridge = RemoteMCPBridge(None, origin="https://resonance.parshkov.com/")
+        self.assertEqual(
+            bridge._page_link("ses-mine", "ses-theirs"),
+            "https://resonance.parshkov.com/people?thought=ses-mine&select=ses-theirs")
+        self.assertEqual(bridge._page_link("ses-mine"),
+                         "https://resonance.parshkov.com/people?thought=ses-mine")
