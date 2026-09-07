@@ -2,15 +2,20 @@
 
 ## The thing that decides everything
 
-**Seven shared thoughts exist in the world.** That is the entire live corpus.
+**No shared thoughts exist in the world.** That is the entire live corpus.
+
+It briefly held eight, all of them written here to prove a path worked, and on
+2026-09-06 they were removed (`RESONANCE_PURGE_CORPUS`, `ops/DEPLOY.md`) — not
+because they were in the way, but because the first person to arrive cannot tell
+a test from a stranger, and would have been introduced to one.
 
 Everything below is secondary to that, and it is worth saying plainly because
 the project has spent most of its effort on the other side. The engine now has
 eighteen benchmark families, five verdicts, thirteen thresholds, four policy
-versions and seven ADRs. The corpus has seven thoughts. A matcher with nobody
+versions and seven ADRs. The corpus has nothing in it. A matcher with nobody
 to match is not a product, however good the matching is — and the matching is
-now good enough: on 2026-09-06 it found a genuine cross-domain twin between two
-people who had never met.
+now good enough: on 2026-09-06, before the corpus was emptied, it found a
+genuine cross-domain twin between two people who had never met.
 
 There is an irony worth naming. The thought that produced that match was about
 a registry of employer conduct, and its author had already reasoned out the

@@ -62,6 +62,7 @@ from src.product import authorship as authorship_rule
 from src.product.notify import (Notifier, NoTransport, account_in_token,
                                 self_test)
 from src.product.service import LiveProductService, ProductError, StaleResultError
+from src.product.standing import ALERT_KIND
 from src.product.mcp_bridge import (
     BridgeError,
     INVALID_REQUEST,
@@ -205,6 +206,40 @@ def startup_purge_demo(runtime: "ProductRuntime", environ: Mapping[str, str] | N
     return result
 
 
+def _retract_alerts_for(runtime: "ProductRuntime", session_ids: set[str]) -> int:
+    """Drop every standing-search alert that points at one of these thoughts.
+
+    An alert is a pointer to a pair of thoughts, so when either end is deleted
+    the alert is no longer about anything. `StandingSearch.retract_for_session`
+    reaches only the owner's own side -- the alert recorded for the *other*
+    person still names the deleted thought, and survives until whenever they
+    next look, when the liveness re-check finally drops it. That is right for a
+    person revoking one thought and wrong for an operator emptying a store: the
+    rows stay, and the next operator counts them.
+
+    Never fails the boot: an alert left behind is filtered on read anyway.
+    """
+    repo = getattr(runtime.live, "repo", None)
+    if repo is None or not hasattr(repo, "list_grants_for_user") or not session_ids:
+        return 0
+    removed = 0
+    try:
+        for user in repo.list_users():
+            user_id = str(getattr(user, "user_id", "") or "")
+            if not user_id:
+                continue
+            for record in list(repo.list_grants_for_user(ALERT_KIND, user_id)):
+                mine = str(record.get("my_session_id") or "")
+                theirs = str(record.get("their_session_id") or "")
+                if mine not in session_ids and theirs not in session_ids:
+                    continue
+                repo.pop_grant(ALERT_KIND, str(record.get("alert_key", "")))
+                removed += 1
+    except Exception as exc:  # noqa: BLE001 - report, never abort the boot
+        print(f"standing search: retract failed ({exc.__class__.__name__}: {exc})")
+    return removed
+
+
 def startup_purge_sessions(runtime: "ProductRuntime",
                            environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
     """One-shot operator action: ``RESONANCE_PURGE_SESSIONS=<id>[,<id>…]``
@@ -248,14 +283,17 @@ def startup_purge_sessions(runtime: "ProductRuntime",
         runtime.live.delete_session(session_id, rebuild=False)
         outcome[session_id] = "deleted"
         deleted += 1
+    alerts = _retract_alerts_for(runtime, {k for k, v in outcome.items() if v == "deleted"})
     if deleted:
         runtime.live.rebuild_index()
     result = {"requested": len(wanted), "deleted": deleted,
               "already_deleted": sum(1 for v in outcome.values() if v == "already_deleted"),
               "missing": sum(1 for v in outcome.values() if v == "missing"),
+              "alerts_retracted": alerts,
               "outcome": outcome}
     print(f"purge-sessions: requested={result['requested']} deleted={result['deleted']} "
           f"already_deleted={result['already_deleted']} missing={result['missing']} "
+          f"alerts_retracted={alerts} "
           f"({', '.join(f'{k}={v}' for k, v in outcome.items())}) "
           f"(RESONANCE_PURGE_SESSIONS set; unset it after this deploy)")
     return result
@@ -426,6 +464,104 @@ def startup_purge_unsigned(runtime: "ProductRuntime",
           f"(of which empty={result['empty_accounts']}) kept={len(keep)} "
           f"(RESONANCE_PURGE_UNSIGNED set; unset it after this deploy)")
     return result
+
+
+def startup_purge_corpus(runtime: "ProductRuntime",
+                         environ: Mapping[str, str] | None = None) -> dict[str, Any] | None:
+    """One-shot operator action: empty the shared corpus, keep the accounts.
+
+    ``RESONANCE_PURGE_CORPUS=report`` counts and prints; ``=1`` carries it out.
+
+    What a deployment accumulates before anyone real arrives is not data, it is
+    the residue of testing: thoughts written to exercise a path, the alerts
+    they raised against each other, the introductions accepted to prove
+    introductions work. Left in place it is indistinguishable, to the first
+    person who arrives, from a world where other people are thinking -- and the
+    resonance they are shown is with a test.
+
+    So this removes every thought, every standing-search alert, every
+    introduction, every conversation and every shared topic. It does not touch
+    accounts, sign-ins or OAuth client registrations: nobody signs in again and
+    no connected client re-authorizes, which is the whole reason this exists
+    rather than `python -m src.persistence ... reset`.
+
+    It takes no exceptions. ``RESONANCE_PURGE_KEEP`` is refused rather than
+    ignored, because an operator who sets it is expecting something to survive
+    and would otherwise find out afterwards; removing named thoughts is
+    ``RESONANCE_PURGE_SESSIONS``, which does exactly that and nothing else.
+
+    Prints counts only -- never a topic, a label, a message or any thought
+    content. Idempotent: a second run finds nothing left to do.
+    """
+    environ = os.environ if environ is None else environ
+    mode = (environ.get("RESONANCE_PURGE_CORPUS") or "").strip().lower()
+    if mode not in {"1", "true", "yes", "report", "dry-run"}:
+        return None
+    if (environ.get("RESONANCE_PURGE_KEEP") or "").strip():
+        print("purge-corpus: REFUSED -- RESONANCE_PURGE_KEEP is set and this action "
+              "takes no exceptions; use RESONANCE_PURGE_SESSIONS to remove named "
+              "thoughts, or unset RESONANCE_PURGE_KEEP to empty the corpus")
+        return {"refused": "RESONANCE_PURGE_KEEP is set"}
+    dry_run = mode in {"report", "dry-run"}
+
+    live = [row for row in runtime.live.repo.list_sessions()
+            if getattr(row, "deleted_at", None) is None]
+    session_ids = {str(getattr(row, "session_id", "") or "") for row in live}
+    session_ids.discard("")
+    connections = _count_connections(runtime)
+
+    result: dict[str, Any] = {
+        "dry_run": dry_run,
+        "sessions_to_delete": len(session_ids),
+        "connections_to_delete": connections,
+        "alerts_retracted": 0,
+    }
+    if not dry_run:
+        for session_id in sorted(session_ids):
+            runtime.live.delete_session(session_id, rebuild=False)
+        # Every alert, not only the ones this pass can reach through a live
+        # account: a corpus with no thoughts in it can hold no true pointer to
+        # one, and an alert whose owner was revoked belongs to no account to
+        # walk.
+        repo = runtime.live.repo
+        if hasattr(repo, "delete_grants_of_kind"):
+            result["alerts_retracted"] = int(repo.delete_grants_of_kind(ALERT_KIND))
+        else:
+            result["alerts_retracted"] = _retract_alerts_for(runtime, session_ids)
+        if hasattr(repo, "delete_connections"):
+            result["connections_deleted"] = dict(repo.delete_connections())
+        if session_ids:
+            runtime.live.rebuild_index()
+    print(f"purge-corpus: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
+          f"sessions={result['sessions_to_delete']} "
+          f"alerts_retracted={result['alerts_retracted']} "
+          f"connections=" + ",".join(f"{k}:{v}" for k, v in sorted(connections.items()) if v)
+          + " accounts_and_oauth_untouched=yes "
+          "(RESONANCE_PURGE_CORPUS set; unset it after this deploy)")
+    return result
+
+
+def _count_connections(runtime: "ProductRuntime") -> dict[str, int]:
+    """How much shared state two people made, by table, without removing it.
+
+    Read through the store's own connection so `report` and `applied` count the
+    same rows; a store that cannot answer reports nothing rather than guessing.
+    """
+    repo = runtime.live.repo
+    tables = getattr(repo, "connection_tables", None)
+    if tables is None:
+        try:
+            from src.persistence.postgres_store import CONNECTION_TABLES as tables
+        except ImportError:
+            return {}
+    counts: dict[str, int] = {}
+    for table in tables:
+        try:
+            row = repo._fetchone_map(f"SELECT COUNT(*) AS n FROM {table}")
+        except Exception:  # noqa: BLE001 - a table this store does not have
+            continue
+        counts[table] = int(row["n"]) if row else 0
+    return counts
 
 
 def build_runtime(
@@ -1514,6 +1650,7 @@ def main(argv: list[str] | None = None) -> None:
     startup_purge_demo(runtime)
     startup_purge_sessions(runtime)
     startup_purge_unsigned(runtime)
+    startup_purge_corpus(runtime)
     startup_assign_pseudonyms(runtime)
     # R15C (#136): canonical OAuth for hosted MCP clients on this same origin.
     # The startup log names the FIRST declared --origin; per-request metadata
