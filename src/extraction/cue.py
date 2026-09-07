@@ -182,7 +182,15 @@ LEADING_DROP = frozenset(
     "не ни нет также тоже часто обычно ещё еще уже просто даже только очень довольно слишком крайне "
     "как из в во на при для с со от до к ко по о об обо про за над под между через без "
     "быть был была было были есть буду будет будут стал стала стало стали "
-    "может могут мочь можно нужно надо следует стоит".split()
+    "может могут мочь можно нужно надо следует стоит "
+    # Discourse connectives. These join clauses; they are never the head of the
+    # thing being reasoned about, and «поэтому система уменьшает вмешательство»
+    # produced a node called «поэтому система». English has the same hole
+    # (`therefore`, `hence` and `thus` are absent from this list too) but its
+    # gold never lands on it, so only the Cyrillic side is filled -- which is
+    # what keeps the English figures identical.
+    "поэтому следовательно иначе зато однако впрочем причём причем притом "
+    "кстати наконец ведь вот ну итак значит".split()
 )
 TRAILING_DROP = frozenset(
     "too again also anyway though however as well over time at all in turn itself themselves him her them it "
@@ -628,6 +636,22 @@ class CueExtractor:
                 abstentions.append(f"dropped node {nd['label']!r} below threshold")
         kept_ids = {nid for nid, nd in nodes.items() if float(nd["extract_conf"]) >= self.drop_threshold}
         relations = [r for r in relations if r["source"] in kept_ids and r["target"] in kept_ids]
+        # A relation whose one end says everything the other says and more is
+        # not a claim about two things -- it is one thing related to a sentence
+        # containing it. Unification by stem containment can produce these, and
+        # what a person reads is «Постоянная помощь --prevents--> Постоянная
+        # помощь мешает ребёнку научиться балансировать».
+        def _degenerate(rel: Mapping[str, Any]) -> bool:
+            src, dst = nodes.get(rel["source"]), nodes.get(rel["target"])
+            if src is None or dst is None:
+                return False
+            a = set(_stems(str(src["label"])))
+            b = set(_stems(str(dst["label"])))
+            return bool(a) and bool(b) and (a < b or b < a)
+        for rel in [r for r in relations if _degenerate(r)]:
+            abstentions.append(
+                f"one end of {rel['type']} restates the other; nothing is claimed")
+        relations = [r for r in relations if not _degenerate(r)]
         node_list = [nd for nid, nd in nodes.items() if nid in kept_ids]
         # node ids are derived from spans + role; recompute now that roles are final
         rename: dict[str, str] = {}

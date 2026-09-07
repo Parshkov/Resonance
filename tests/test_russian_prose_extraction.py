@@ -119,6 +119,46 @@ class NoNonsenseNodesTests(unittest.TestCase):
         self.assertEqual(got[0][1], "causes")
 
 
+class ConnectivesAreNotThingsTests(unittest.TestCase):
+    """Second round of the same complaint, from the same person, on the same card.
+
+    After «что» stopped becoming a node, «поэтому» started heading one:
+    «поэтому система --prevents--> вмешательство». A discourse connective joins
+    clauses; it is never the head of the thing being reasoned about.
+
+    English has the same hole — `therefore`, `hence` and `thus` are absent from
+    `LEADING_DROP` too — but its gold never lands on it, so only the Cyrillic
+    side is filled and the English figures stay identical.
+    """
+
+    def test_a_connective_does_not_head_a_label(self):
+        text = ("Постоянная помощь мешает ребёнку научиться балансировать, "
+                "поэтому система постепенно уменьшает вмешательство.")
+        labels = [n["label"] for n in graph_of(text)["nodes"]]
+        for label in labels:
+            self.assertFalse(label.lower().startswith(("поэтому", "следовательно", "иначе", "однако")),
+                             f"a connective headed a node label: {label!r}")
+
+    def test_a_relation_may_not_restate_one_end_in_the_other(self):
+        """Unification by stem containment could relate a thing to a sentence
+        containing it, which a person read as «Постоянная помощь --prevents-->
+        Постоянная помощь мешает ребёнку научиться балансировать». Nothing is
+        claimed by that, so it is abstained rather than shown.
+
+        This one is not Cyrillic-scoped — it applies to both languages — and
+        the extraction gate is unchanged by it, so English never produced one.
+        """
+        text = ("Постоянная помощь мешает ребёнку научиться балансировать, "
+                "поэтому система постепенно уменьшает вмешательство.")
+        d = graph_of(text)
+        by = {n["id"]: n["label"] for n in d["nodes"]}
+        from src.semantics import stems
+        for r in d["relations"]:
+            a, b = set(stems(by[r["source"]])), set(stems(by[r["target"]]))
+            self.assertFalse(a < b or b < a,
+                             f"{by[r['source']]!r} --{r['type']}--> {by[r['target']]!r}")
+
+
 class CyrillicSegmentationTests(unittest.TestCase):
     def test_sentences_split_on_a_cyrillic_capital(self):
         from src.extraction.cue import sentences
