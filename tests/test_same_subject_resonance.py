@@ -116,3 +116,49 @@ class SameDomainTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EvidenceNotJudgementTests(unittest.TestCase):
+    """A verdict is this engine's opinion, not the truth about two people.
+
+    Rows the classifier called `negative` were dropped from what a person is
+    told, so on 2026-09-06 someone was told "nothing the engine calls a
+    resonance" about a person who had independently built the same
+    construction step for step. VISION.md says the opposite is the point:
+    provide evidence, not social judgement, and let people decide with a
+    better signal.
+    """
+
+    def _result(self, rows):
+        return {"matches_in_backend_order": rows, "rejected": [], "shape_note": ""}
+
+    def _row(self, pseudonym, semantic, topic, verdict="negative", ideas=11, links=2):
+        return {"person_pseudonym": pseudonym, "mode_classification": verdict,
+                "hard_rejection": None, "scores": {"structural": 0.19, "semantic": semantic},
+                "evidence": {"mapped_node_count": ideas, "preserved_relation_count": links,
+                             "contradiction_count": 4},
+                "display": {"topic": topic}}
+
+    def test_a_near_miss_with_real_meaning_is_shown_not_hidden(self):
+        from src.product import phrasing
+        said = phrasing.say("resonance_discover", self._result([
+            self._row("Fleet Minstrel", 0.59, "Shared landlord history before signing")]))
+        self.assertIn("Fleet Minstrel", said)
+        self.assertIn("Shared landlord history", said)
+        self.assertIn("may be wrong", said)
+        self.assertNotIn("nobody is being suggested", said)
+
+    def test_a_coincidence_without_meaning_is_still_not_offered(self):
+        """Showing everything would be as useless as showing nothing: the
+        template coincidence measured that day agreed on 0.12."""
+        from src.product import phrasing
+        said = phrasing.say("resonance_discover", self._result([
+            self._row("Fleet Minstrel", 0.12, "Protected handover time on a ward")]))
+        self.assertNotIn("Protected handover time", said)
+        self.assertIn("Nothing the engine calls a resonance", said)
+
+    def test_the_bar_is_the_engines_own(self):
+        """The words a person reads must not drift from the verdict they are
+        told about; `phrasing` copies the constant to avoid an import cycle."""
+        from src.product import phrasing
+        self.assertEqual(phrasing.SAME_SUBJECT_MEANING, scoring.T_SAME_SUBJECT_SEMANTIC)

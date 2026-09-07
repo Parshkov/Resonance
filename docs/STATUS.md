@@ -302,6 +302,30 @@ yields an honest empty graph, so the assistant must build the `thought` graph
 itself — which the contract now says plainly. Making the extractor multilingual
 is real work, not a patch, and is not attempted here.
 
+## Evidence, not judgement (2026-09-06)
+
+A verdict is this engine's opinion. It was being treated as the truth about two
+people: `phrasing._discover` dropped every row the classifier called
+`negative`, so what a person heard was *"Nothing the engine calls a
+resonance"* — said about someone who had independently built the same
+construction step for step, with meaning agreement 0.59 and eleven ideas
+corresponding.
+
+What rescued it that day was the chat assistant reading the raw rows and
+overruling the product. A product should not depend on that.
+
+Near misses are now shown, at the engine's own bar for two people being on the
+same subject (`T_SAME_SUBJECT_SEMANTIC`), and said for what they are: *"The
+engine did not call any of these a resonance, and it may be wrong. These people
+are talking about the same things as you, and what lines up is shown so the
+judgement can be yours."* The template coincidence from the same run, agreeing
+on 0.12, is still not offered — showing everything would be as useless as
+showing nothing.
+
+This is what `VISION.md` already asked for and the code was not doing:
+provide evidence, not social judgement, and let people decide with a better
+signal.
+
 ## Next falsification targets
 
 1. A corpus of real extracted thoughts (consented) with two-human gold; compare engine 0.2 against a whole-thought embedding baseline.
