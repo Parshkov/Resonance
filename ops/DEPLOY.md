@@ -95,6 +95,33 @@ that first real build, so nobody repeats them:
   `branch: main`. If auto-deploy ever stops firing again, check those two
   things in that order (App installed on the repo → source shows the branch).
   A manual deploy is still possible from the plugin or the dashboard.
+- **The source link degraded a second time, on 2026-09-06 — expect a third.**
+  The service settings showed a red `GitHub Repo not found` where the branch
+  picker belongs, directly under the static heading `Branch connected to
+  production`, which reads as a contradiction and is not one: the heading
+  describes the section, the red box *is* the failed control. Meanwhile the
+  repository name rendered fine above it (Railway serves that from its own
+  database) and pushes still deployed (an already-registered webhook), so only
+  the live GitHub API lookups were broken. **The GitHub App was installed and
+  healthy** — opening the repo picker listed `Parshkov/Resonance` among the
+  others — so the 2026-09-04 diagnosis above does not apply to this one. What
+  fixed it: re-select the *same* repository in the picker (pencil icon next to
+  the repo, not `Disconnect`), then **reload the page** — the widget keeps
+  showing the stale error until it does, which makes the fix look like it
+  failed. Try that before anything destructive.
+- **Production is gated on CI since 2026-09-06** (`Wait for CI`, i.e. the
+  source's `checkSuites: true`). Before that, every push to `main` deployed
+  within about 25 seconds whether or not the tests passed — CI itself only came
+  into existence on 2026-09-06, so production had never actually been gated by
+  it. Verified end to end on the `05d7d3c` merge: the deployment sat in
+  `WAITING` for 12 minutes, moved to `DEPLOYING` within seconds of the run
+  going green, and reached `SUCCESS` at 06:53:06 UTC. The site kept serving the
+  previous release throughout, so the gate costs latency and not availability.
+  Railway warns that this feature needs its updated GitHub permissions; they
+  were sufficient here. **If deployments ever hang in `WAITING` forever, that
+  warning is the first thing to check** — accept the updated permissions at
+  `github.com/settings/installations`, or turn `Wait for CI` back off to
+  restore immediate deploys.
 - **Volume backups.** On 2026-09-04 a `DAILY` backup schedule was set on volume
   `postgres-data` through Railway's agent (`updateVolumeTool`, result
   `staged`). The API cannot read the schedule back, so confirm in the
