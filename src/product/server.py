@@ -504,16 +504,23 @@ def startup_purge_corpus(runtime: "ProductRuntime",
         return {"refused": "RESONANCE_PURGE_KEEP is set"}
     dry_run = mode in {"report", "dry-run"}
 
-    live = [row for row in runtime.live.repo.list_sessions()
+    repo = runtime.live.repo
+    live = [row for row in repo.list_sessions()
             if getattr(row, "deleted_at", None) is None]
     session_ids = {str(getattr(row, "session_id", "") or "") for row in live}
     session_ids.discard("")
     connections = _count_connections(runtime)
+    # Counted in both modes. A report exists to say what the applied run will
+    # do, so a count it does not take is a count it reports as zero, and an
+    # operator reads "no alerts" from a store that holds them.
+    alerts = (int(repo.count_grants_of_kind(ALERT_KIND))
+              if hasattr(repo, "count_grants_of_kind") else 0)
 
     result: dict[str, Any] = {
         "dry_run": dry_run,
         "sessions_to_delete": len(session_ids),
         "connections_to_delete": connections,
+        "alerts_to_retract": alerts,
         "alerts_retracted": 0,
     }
     if not dry_run:
@@ -523,7 +530,6 @@ def startup_purge_corpus(runtime: "ProductRuntime",
         # account: a corpus with no thoughts in it can hold no true pointer to
         # one, and an alert whose owner was revoked belongs to no account to
         # walk.
-        repo = runtime.live.repo
         if hasattr(repo, "delete_grants_of_kind"):
             result["alerts_retracted"] = int(repo.delete_grants_of_kind(ALERT_KIND))
         else:
@@ -534,8 +540,9 @@ def startup_purge_corpus(runtime: "ProductRuntime",
             runtime.live.rebuild_index()
     print(f"purge-corpus: {'REPORT ONLY, nothing changed' if dry_run else 'applied'} "
           f"sessions={result['sessions_to_delete']} "
-          f"alerts_retracted={result['alerts_retracted']} "
-          f"connections=" + ",".join(f"{k}:{v}" for k, v in sorted(connections.items()) if v)
+          f"alerts={alerts} "
+          f"connections=" + (",".join(f"{k}:{v}" for k, v in sorted(connections.items()) if v)
+                             or "none")
           + " accounts_and_oauth_untouched=yes "
           "(RESONANCE_PURGE_CORPUS set; unset it after this deploy)")
     return result

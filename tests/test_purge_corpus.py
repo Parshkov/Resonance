@@ -90,6 +90,11 @@ class PurgeCorpusTests(unittest.TestCase):
             self.assertEqual(result["sessions_to_delete"], len(ids))
             self.assertEqual(result["connections_to_delete"]["intros"], 1)
             self.assertEqual(result["connections_to_delete"]["messages"], 1)
+            # The report says what the applied run WILL retract. It once said
+            # zero here whatever the store held, because it only ever counted
+            # while deleting -- so an operator read "no alerts" off a store
+            # with six in it.
+            self.assertEqual(result["alerts_to_retract"], 1)
             self.assertEqual(result["alerts_retracted"], 0)
 
             # nothing moved
@@ -123,6 +128,7 @@ class PurgeCorpusTests(unittest.TestCase):
                 runtime, {"RESONANCE_PURGE_CORPUS": "1"})
             self.assertFalse(result["dry_run"])
             self.assertEqual(result["sessions_to_delete"], len(ids))
+            self.assertEqual(result["alerts_to_retract"], 2)
             self.assertEqual(result["alerts_retracted"], 2)
             self.assertEqual(result["connections_deleted"]["intros"], 1)
 
@@ -165,6 +171,39 @@ class PurgeCorpusTests(unittest.TestCase):
             self.assertIn("refused", result)
             self.assertEqual(len([s for s in runtime.live.repo.list_sessions()
                                   if s.deleted_at is None]), len(ids))
+        finally:
+            runtime.live.repo.close()
+
+
+class TheFirstPersonInAnEmptyWorldTests(unittest.TestCase):
+    """What the purge leaves behind is the state every deployment starts in,
+    and the one nobody had ever run: a corpus with nothing in it.
+
+    Emptying production would be a poor trade if the first person to arrive
+    afterwards hit an error, or was told something that reads as a failure.
+    """
+
+    def test_discovery_answers_on_an_empty_corpus_without_calling_it_a_failure(self):
+        from src.graph import ThoughtGraph
+        from src.persistence.seed import minimal_thought
+        from src.product import phrasing
+
+        runtime = _runtime()
+        try:
+            product_server.startup_purge_corpus(runtime, {"RESONANCE_PURGE_CORPUS": "1"})
+            self.assertEqual(runtime.live.session_kinds(), {})
+            # An index over nothing is still an index, and must not read stale.
+            self.assertTrue(runtime.live.health().index_current)
+
+            graph = ThoughtGraph.from_dict(minimal_thought("thought-first", "heat"))
+            for mode in ("analogical", "structural"):
+                result = runtime.live.discover(graph, mode=mode)
+                self.assertEqual(result.get("matches_in_backend_order") or [], [])
+                said = phrasing.say("resonance_discover", result)
+                # Not "no results": the thought stays in the standing search,
+                # and that is the whole answer a first arrival is owed.
+                self.assertIn("stays in the search", said)
+                self.assertNotIn("failure", said.lower())
         finally:
             runtime.live.repo.close()
 
