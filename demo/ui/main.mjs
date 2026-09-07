@@ -540,6 +540,17 @@ function thoughtCard(row) {
   return card;
 }
 
+// The server's message for this failure is written for an assistant calling
+// the tool -- it ends "call again with `thought`: nodes with roles [...]",
+// which is right for a model and unusable for a person, who was shown it
+// verbatim on the page. The page has always had a sentence for this; it was
+// only ever reached when the server said nothing at all.
+function readableFailure(message) {
+  const said = String(message || "");
+  return /no shareable structure could be extracted/i.test(said) || !said
+    ? t("thoughts.composer.nothing") : said;
+}
+
 function shareWord(row) { return row.state === "withdrawn" ? t("thoughts.share_again") : t("thoughts.composer.share"); }
 
 // The stored structure as the graph the prepare route takes.
@@ -554,7 +565,7 @@ async function prepareAndShare(graph, {share = true} = {}) {
   await store.write("/api/webmcp/prepare", {request_id: store.requestId("prep"), thought: graph, authorship: "their_own_words"});
   if (!share) return true;
   const preview = await fetch("/api/webmcp/preview", {credentials: "same-origin", cache: "no-store"}).then((r) => r.json());
-  if (!preview?.confirmation_token) throw new Error(preview?.message || t("thoughts.composer.nothing"));
+  if (!preview?.confirmation_token) throw new Error(readableFailure(preview?.message));
   await store.write("/api/webmcp/share", {request_id: store.requestId("share"), confirm: true, confirmation_token: preview.confirmation_token}, {invalidate: {discovery: true}});
   return true;
 }
@@ -665,7 +676,7 @@ function composer() {
         // assistant between the words and the author, so the page states it.
         await store.write("/api/webmcp/prepare", {request_id: store.requestId("prep"), context: c.text, authorship: "their_own_words", coarse_location: where});
         const preview = await fetch("/api/webmcp/preview", {credentials: "same-origin", cache: "no-store"}).then((r) => r.json());
-        if (!preview?.confirmation_token) throw new Error(preview?.message || t("thoughts.composer.nothing"));
+        if (!preview?.confirmation_token) throw new Error(readableFailure(preview?.message));
         c.preview = preview; c.step = "preview";
       } catch (error) { c.error = error.message; }
       c.busy = false; render();
