@@ -219,13 +219,24 @@ progress::-moz-progress-bar { background: var(--accent); }
 
 /* ---- structure -------------------------------------------------------------- */
 
-.structure { display: grid; gap: 10px; }
-.ideas { display: flex; flex-wrap: wrap; gap: 6px; }
-.idea { display: inline-flex; align-items: baseline; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--paper); font-size: var(--text-base); }
-.idea__role { color: var(--ink-3); font-family: var(--mono); font-size: var(--text-xs); }
-.links { display: grid; gap: 4px; }
-.link-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: var(--text-base); }
-.link-type { color: var(--accent-ink); font-family: var(--mono); font-size: var(--text-sm); }
+.structure { display: grid; gap: 14px; }
+.chains { display: grid; gap: 0; }
+/* a hairline between blocks, so where one cause ends and the next begins is
+   visible without adding a box around each */
+.chain + .chain { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+/* The cause is the subject of its little block, so it takes the serif the
+   page already gives to titles. It used to be set in the same sans at the
+   same size as its effects, so a stack of chains read as one undifferentiated
+   run of text with no way to see where each began. */
+.chain__from { margin: 0; font-family: var(--serif); font-size: var(--text-body);
+  line-height: 1.3; color: var(--ink); }
+/* the rule is the cause; what hangs off it are its effects */
+.chain__outs { display: grid; gap: 4px; margin: 5px 0 0; padding-left: 12px; border-left: 2px solid var(--line); }
+.chain__out { display: grid; grid-template-columns: max-content 1fr; gap: 8px; align-items: baseline;
+  font-size: var(--text-base); line-height: 1.35; color: var(--ink-2); }
+.chain__type { color: var(--accent-ink); font-family: var(--mono); font-size: var(--text-xs); text-transform: lowercase; }
+.chain__to { min-width: 0; overflow-wrap: anywhere; }
+.structure__loose { margin: 0; color: var(--ink-3); font-size: var(--text-sm); line-height: 1.35; }
 
 /* ---- home -------------------------------------------------------------------- */
 
@@ -397,7 +408,12 @@ progress::-moz-progress-bar { background: var(--accent); }
 .kebab__item:hover { background: var(--paper-3); }
 .kebab__item.is-danger { color: var(--rust); }
 
-.card-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+/* `align-items: start` so a card is its own height. Grid items stretch to the
+   tallest in the row by default, and `.card__actions { margin-top: auto }`
+   then pushed the footer to the bottom of that borrowed height -- which is
+   why a short thought showed its title floating in the middle of an empty
+   card next to a long one. */
+.card-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-items: start; }
 .card__head { display: flex; align-items: center; gap: 10px; }
 .card__when { color: var(--ink-3); font-size: var(--text-sm); }
 .card__title { font-family: var(--serif); font-size: var(--text-lg); line-height: 1.25; margin: 0; }

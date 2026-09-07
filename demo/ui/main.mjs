@@ -91,16 +91,35 @@ function avatar(name, size = "") {
 
 // A thought's structure, the one way it is drawn everywhere: ideas as chips,
 // then each link as a sentence.
+// The reasoning, written once. Every idea used to be printed twice -- as a
+// chip and again inside each relation it appears in -- so a cause with three
+// effects was repeated four times and the card read as a heap. Relations are
+// grouped under the idea they come from, which is also how a person says it:
+// "this causes that, and that, and prevents the other".
 function structure(nodes = [], relations = []) {
   const labels = new Map();
   for (const node of nodes) labels.set(node.id ?? node.label, node.label);
   const box = el("div", {class: "structure"});
-  box.append(el("ul", {class: "ideas"}, nodes.map((node) => el("li", {class: "idea"}, node.label))));
-  box.append(el("ul", {class: "links"}, relations.map((rel) => {
+  const groups = new Map();
+  const linked = new Set();
+  for (const rel of relations || []) {
     const from = rel.from ?? labels.get(rel.source) ?? rel.source;
     const to = rel.to ?? labels.get(rel.target) ?? rel.target;
-    return el("li", {class: "link-row"}, [el("span", {}, from), el("span", {class: "link-type"}, relationWord(rel.type)), el("span", {}, to)]);
-  })));
+    if (!from || !to) continue;
+    linked.add(from); linked.add(to);
+    if (!groups.has(from)) groups.set(from, []);
+    groups.get(from).push([relationWord(rel.type), to]);
+  }
+  if (groups.size) {
+    box.append(el("ul", {class: "chains"}, [...groups].map(([from, outs]) => el("li", {class: "chain"}, [
+      el("p", {class: "chain__from"}, from),
+      el("ul", {class: "chain__outs"}, outs.map(([word, to]) => el("li", {class: "chain__out"}, [
+        el("span", {class: "chain__type"}, word), el("span", {class: "chain__to"}, to)]))),
+    ]))));
+  }
+  // An idea nobody linked to anything would vanish otherwise.
+  const loose = (nodes || []).map((n) => n.label).filter((l) => l && !linked.has(l));
+  if (loose.length) box.append(el("p", {class: "structure__loose"}, `${t("structure.alone")} ${loose.join(" · ")}`));
   return box;
 }
 
