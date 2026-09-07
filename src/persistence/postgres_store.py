@@ -68,6 +68,25 @@ def _connect(dsn: str):
 
 _SAFE_SCHEMA = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,54}")
 
+# What two people made together, in the order a delete may walk them: rows that
+# reference a workspace before the workspace, and messages before the channel
+# that holds them. Distinct from the corpus (`sessions`) and from the account
+# (`users`, `oauth_grants`), which is why `reset()` names all three and
+# `delete_connections()` names only this one.
+CONNECTION_TABLES = (
+    "workspace_contributions",
+    "workspace_activity",
+    "workspace_links",
+    "workspace_artifacts",
+    "workspace_tasks",
+    "workspace_notes",
+    "workspace_members",
+    "workspaces",
+    "messages",
+    "channels",
+    "intros",
+)
+
 
 class PostgresRepository:
     backend_name = "postgres"
@@ -218,9 +237,7 @@ class PostgresRepository:
             try:
                 for table in (
                     "oauth_grants",
-                    "messages",
-                    "channels",
-                    "intros",
+                    *CONNECTION_TABLES,
                     "idempotency_keys",
                     "audit_events",
                     "sessions",
@@ -229,6 +246,32 @@ class PostgresRepository:
                     self._execute(f"DELETE FROM {table}")
                 self._bump_generation()
                 self._conn.commit()
+            except Exception:
+                self._conn.rollback()
+                raise
+
+    def delete_connections(self) -> dict[str, int]:
+        """Remove every introduction, channel, message and shared topic.
+
+        Accounts, sessions, sign-ins and OAuth client registrations are left
+        alone, so this empties what people made together without making anyone
+        sign in again or any connected client re-authorize.
+
+        No corpus generation bump: none of these tables is discoverable corpus
+        content, so the discovery index does not go stale when they change
+        (the same reason workspace writes never bump it -- see 0004).
+        """
+        with self._lock:
+            try:
+                removed: dict[str, int] = {}
+                for table in CONNECTION_TABLES:
+                    row = self._fetchone_map(f"SELECT COUNT(*) AS n FROM {table}")
+                    count = int(row["n"]) if row else 0
+                    if count:
+                        self._execute(f"DELETE FROM {table}")
+                    removed[table] = count
+                self._conn.commit()
+                return removed
             except Exception:
                 self._conn.rollback()
                 raise
@@ -388,6 +431,24 @@ class PostgresRepository:
             )
             self._conn.commit()
             return [loads(row["record_json"]) for row in rows]
+
+    def delete_grants_of_kind(self, kind: str) -> int:
+        """Every record of one kind, whoever it belongs to.
+
+        `delete_grants_for_user` cannot stand in for this: it walks the accounts
+        it is given, and a record whose owning account has since been revoked or
+        removed belongs to none of them, so it would be left behind and counted
+        by whoever looks next.
+        """
+        with self._lock:
+            try:
+                cur = self._execute("DELETE FROM oauth_grants WHERE kind = ?", (kind,))
+                removed = int(cur.rowcount or 0)
+                self._conn.commit()
+                return removed
+            except Exception:
+                self._conn.rollback()
+                raise
 
     def delete_grants_for_user(self, kind: str, user_id: str) -> int:
         with self._lock:
@@ -594,9 +655,7 @@ class PostgresRepository:
         with self._lock:
             try:
                 for table in (
-                    "messages",
-                    "channels",
-                    "intros",
+                    *CONNECTION_TABLES,
                     "idempotency_keys",
                     "audit_events",
                     "sessions",
