@@ -545,6 +545,8 @@ function thoughtCard(row) {
 // which is right for a model and unusable for a person, who was shown it
 // verbatim on the page. The page has always had a sentence for this; it was
 // only ever reached when the server said nothing at all.
+const COMPOSE_LIMIT = 4000;
+
 function readableFailure(message) {
   const said = String(message || "");
   return /no shareable structure could be extracted/i.test(said) || !said
@@ -651,7 +653,12 @@ function composer() {
   const c = ui.composer;
   const box = el("section", {class: "panel composer", "aria-label": t("thoughts.new")});
   if (c.step === "write") {
-    const area = el("textarea", {id: "compose-text", rows: 6, maxLength: 4000, placeholder: t("thoughts.composer.placeholder"), value: c.text, oninput: (e) => { c.text = e.target.value; }});
+    const area = el("textarea", {id: "compose-text", rows: 6, placeholder: t("thoughts.composer.placeholder"), value: c.text, oninput: (e) => { c.text = e.target.value; render(); }});
+    // The server takes 4000 characters. `maxLength` used to enforce that by
+    // silently swallowing every keystroke past it, so a long idea pasted in
+    // arrived truncated and nobody was told which half was read. Say it
+    // instead, and let the person choose what to cut.
+    const over = c.text.length - COMPOSE_LIMIT;
     const status = el("p", {class: `status ${c.error ? "status--error" : ""}`, role: "status"}, c.busy ? t("thoughts.composer.reading") : (c.error || ""));
     const place = el("div", {class: "place-row"});
     const placeToggle = el("input", {type: "checkbox", id: "compose-place", checked: !!c.place});
@@ -668,6 +675,7 @@ function composer() {
       el("p", {class: "hint"}, t("thoughts.place.hint", {lat: c.place.lat, lon: c.place.lon})));
     const submit = button(t("thoughts.composer.extract"), async () => {
       if (!c.text.trim()) { area.focus(); return; }
+      if (c.text.length > COMPOSE_LIMIT) { area.focus(); return; }
       c.busy = true; c.error = ""; render();
       try {
         const where = c.place && (ui.drafts["compose-city"] || "").trim()
@@ -681,7 +689,8 @@ function composer() {
       } catch (error) { c.error = error.message; }
       c.busy = false; render();
     }, {variant: "btn--primary", disabled: c.busy});
-    box.append(el("label", {for: "compose-text", class: "label"}, t("thoughts.composer.label")), area, el("p", {class: "hint"}, t("thoughts.composer.hint")), place,
+    box.append(el("label", {for: "compose-text", class: "label"}, t("thoughts.composer.label")), area, el("p", {class: over > 0 ? "hint hint--warn" : "hint"},
+        over > 0 ? t("thoughts.composer.too_long", {over: String(over)}) : t("thoughts.composer.hint")), place,
       el("div", {class: "row"}, [submit, button(t("cancel"), () => { ui.composer = null; render(); }, {variant: "btn--quiet"})]), status);
     return box;
   }

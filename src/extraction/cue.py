@@ -105,7 +105,7 @@ _CUE_TABLE_RU: tuple[tuple[str, str, str, float], ...] = (
     (r"привести к|приводить к|вести к|приводит к|приводят к|привело к|привела к|привели к|ведёт к|ведет к|ведут к|вело к|влечёт за собой|влечет за собой|влекут за собой|оборачивается|выливается в|вылилось в", "causes", "fwd", 0.86),
     (r"вызвать|вызывать|породить|порождать|спровоцировать|создать|создавать|вызывает|вызывают|вызвал|вызвала|вызвало|вызвали|порождает|порождают|породил|породило|провоцирует|провоцируют|создаёт|создает|создают|создал|создало", "causes", "fwd", 0.88),
     (r"увеличить|увеличивать|повысить|повышать|усилить|усиливать|ускорить|ускорять|ухудшить|ухудшать|усугубить|увеличивает|увеличивают|повышает|повышают|усиливает|усиливают|усугубляет|усугубляют|обостряет|обостряют|ускоряет|ускоряют|раздувает|подстёгивает|подстегивает|ухудшает|ухудшают", "causes", "fwd", 0.74),
-    (r"делает|делают|сделал|сделало|превращает|превращают|превратил|превратило", "causes", "fwd", 0.6),
+    (r"превращает|превращают|превратил|превратило", "causes", "fwd", 0.6),
     # clause-level consequence markers: the previous clause causes this one
     (r"поэтому|следовательно|таким образом|в итоге|в результате чего|значит|стало быть|и тогда|отсюда", "causes", "fwd", 0.7),
     # purpose reads as the English "so that": the left clause is done to bring
@@ -198,7 +198,12 @@ TRAILING_DROP = frozenset(
 )
 PRONOUN_ONLY = frozenset("this that it which they these those such he she we one "
                          "это эта этот эти то тот та те он она оно они мы вы я такой такая такое "
-                         "который которая которое которые".split())
+                         "который которая которое которые "
+                         # Function words that are not things: a cue landing
+                         # beside one used to mint it as a node, which is how
+                         # «что делает ребёнок» became «что --causes--> ребёнок».
+                         "что чего чему чем кто кого кому как где куда когда зачем почему "
+                         "том тому тем ком".split())
 NEGATORS = re.compile(
     r"(?:\bdo\s+not|\bdoes\s+not|\bdid\s+not|\bcannot|\bcan(?:no)?'?t|\bwill\s+not|\bwon'?t|\bwould\s+not|"
     r"\bwouldn'?t|\bnever|\bnot|\bno\s+longer|\bfails?\s+to|\bfailed\s+to|\bdoesn'?t|\bdon'?t|\bdidn'?t|\bisn'?t|"
@@ -306,6 +311,17 @@ def _clause_bounds(text: str, s_start: int, s_end: int, cue_start: int, cue_end:
     return l0, cue_start, cue_end, r1
 
 
+# Words that are never a thing being reasoned about. `PRONOUN_ONLY` marks a
+# label as *resolvable* to an antecedent; when there is none the label used to
+# survive, which is how «к тому, что делает ребёнок» produced a node called
+# «что». Cyrillic only, deliberately: an English argument cannot reach this,
+# so no frozen English figure can move.
+NEVER_A_NODE = frozenset(
+    "что чего чему чем кто кого кому ком как где куда откуда когда зачем почему "
+    "том тому тем это этом того тот та то те и а но или же ли бы".split()
+)
+
+
 def _argument(text: str, start: int, end: int, *, side: str) -> dict[str, object] | None:
     tokens = [(m.start() + start, m.end() + start, m.group()) for m in WORD.finditer(text[start:end])]
     while tokens and tokens[0][2].lower().strip("'’") in LEADING_DROP:
@@ -313,6 +329,11 @@ def _argument(text: str, start: int, end: int, *, side: str) -> dict[str, object
     while tokens and tokens[-1][2].lower().strip("'’") in TRAILING_DROP:
         tokens.pop()
     if not tokens:
+        return None
+    if all(t[2].lower().strip("'’") in NEVER_A_NODE for t in tokens):
+        # Only function words survived the trimming: there is no thing here to
+        # name, so this end is ungrounded and the caller abstains rather than
+        # minting a node out of grammar.
         return None
     if side == "left":
         tokens = tokens[-MAX_ARG_TOKENS:]

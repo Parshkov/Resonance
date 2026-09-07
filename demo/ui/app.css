@@ -602,3 +602,7 @@ progress::-moz-progress-bar { background: var(--accent); }
 .radar__series--you .radar__poly { fill: none; stroke: var(--ink-3); stroke-dasharray: 4 4; stroke-width: 1.5; }
 .radar__series--you .radar__dot { display: none; }
 .drawer .radar { max-height: 320px; }
+
+/* Over the length the server can read. Said in the page's own error colour,
+   because the previous behaviour was to enforce it by silence. */
+.hint--warn { color: var(--rust); }

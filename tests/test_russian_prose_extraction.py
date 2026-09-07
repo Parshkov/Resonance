@@ -80,6 +80,45 @@ class RussianProdusesStructureTests(unittest.TestCase):
         self.assertEqual(d["relations"][0]["modality"], "possible")
 
 
+class NoNonsenseNodesTests(unittest.TestCase):
+    """Found by the owner reading his own card: it said «что --causes--> ребёнок».
+
+    Two mistakes met. The first draft of the Russian table mapped English
+    `makes|made|make` onto «делает|делают|сделал» -- a false friend. English
+    "makes" is causal only in "makes X happen"; Russian «делает» is the
+    ordinary verb "does", so «к тому, что делает ребёнок» ("to what the child
+    does") was read as a causal claim. The second is that nothing stopped a
+    bare complementiser from becoming a node once a cue landed beside it.
+
+    A wrong relation is worse than a missing one here: the whole promise is
+    that the structure shown is the person's own reasoning.
+    """
+
+    def test_delaet_is_not_treated_as_a_causal_cue(self):
+        text = ("Я бы делала steering assist: система добавляет ограниченный "
+                "момент к тому, что делает ребёнок, но никогда полностью не "
+                "забирает управление.")
+        self.assertEqual(edges(text), [],
+                         "no explicit causal connective here, so nothing may be claimed")
+
+    def test_a_bare_function_word_is_never_a_node(self):
+        junk = {"что", "чего", "чем", "кто", "как", "где", "когда", "том", "то"}
+        for text in (
+            "Система добавляет момент к тому, что делает ребёнок.",
+            "Важно то, что ребёнок учится сам.",
+            "Непонятно, кто вызывает ошибку.",
+        ):
+            with self.subTest(text=text):
+                labels = {n["label"].strip().lower() for n in graph_of(text)["nodes"]}
+                self.assertEqual(labels & junk, set(), f"{text!r} -> {labels}")
+
+    def test_a_real_causal_claim_in_the_same_document_still_reads(self):
+        # Removing the false friend must not cost the relations that were right.
+        got = edges("Мотор через пружинную муфту создаёт небольшой корректирующий момент.")
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0][1], "causes")
+
+
 class CyrillicSegmentationTests(unittest.TestCase):
     def test_sentences_split_on_a_cyrillic_capital(self):
         from src.extraction.cue import sentences
