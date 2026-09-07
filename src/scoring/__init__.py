@@ -409,6 +409,23 @@ T_ANALOGICAL_STRUCTURE = 0.80
 # them, 0.561 against 0.082, and it is what this reads.
 T_STRUCTURE_SAME_SUBJECT = 0.15
 T_SAME_SUBJECT_SEMANTIC = 0.40
+# Contradiction tolerated between two people plainly on the same subject.
+#
+# `h_sign_conflict` already hard-rejects the real contradiction -- one says
+# causes where the other says prevents. What `contradiction` measures beyond
+# that is structural DISAGREEMENT: crossed correspondences, a different
+# ordering of the same causes. Between strangers on the same subject that is
+# not noise and not a reason to hide them from each other -- it is usually the
+# most interesting thing about the pair, and the reason an introduction is
+# worth making.
+#
+# Measured on the first real pair of real thoughts (a candidate-conduct
+# registry against a landlord-conduct registry, September 2026): semantic
+# 0.590, structural 0.186, contradiction 0.214. Every node corresponded and
+# both people had independently reached the same construction, including the
+# cold start. The engine returned `negative` because 0.214 > 0.15 -- two
+# people who obviously resonate were told they did not.
+T_CONTRADICTION_SAME_SUBJECT = 0.35
 T_DIRECT_COVERAGE = 0.80
 
 # The policy string is carried in the verifier config hash, so it is the only
@@ -417,7 +434,7 @@ T_DIRECT_COVERAGE = 0.80
 # the same-subject floor below was added (#193), so the frozen `0aea577`
 # evidence and every run after it report the same `verifier_config_hash`
 # 12998d45... for two different classifiers. Bumped here to end that.
-CLASSIFY_POLICY = "scoring-v0.2-concept-aligned-analogy+same-subject-floor/0.3"
+CLASSIFY_POLICY = "scoring-v0.2-concept-aligned-analogy+same-subject/0.4"
 
 # Every verdict `classify` can return, declared once so that the places which
 # have to put these into words cannot fall behind the engine.
@@ -449,16 +466,17 @@ def classify(components: dict) -> str:
     surface = components.get("surface_semantic", components["semantic"])
     domain = components.get("domain_overlap", 0.0)
     concept = components.get("concept_alignment", 0.0)
-    floor = T_STRUCTURE
-    if (components["semantic"] >= T_SAME_SUBJECT_SEMANTIC
-            and components["contradiction"] == 0.0
-            and components["r_direct"] > 0.0):
-        # Two people plainly on the same subject, with a relation in common and
-        # nothing contradicted. Whole-graph structure is the wrong ruler here:
-        # it measures how alike the pictures are, and the person working on one
-        # part of your problem necessarily has a smaller one.
-        floor = T_STRUCTURE_SAME_SUBJECT
-    if components["structural"] < floor or components["contradiction"] > T_CONTRADICTION:
+    # Two people plainly on the same subject, sharing at least one relation.
+    # Whole-graph structure is the wrong ruler here: it measures how alike the
+    # pictures are, and the person working on one part of your problem
+    # necessarily has a smaller one. This branch used to require
+    # `contradiction == 0.0` exactly, which meant one crossed correspondence
+    # dropped the pair back to the strangers' bar and returned `negative`.
+    same_subject = (components["semantic"] >= T_SAME_SUBJECT_SEMANTIC
+                    and components["r_direct"] > 0.0)
+    floor = T_STRUCTURE_SAME_SUBJECT if same_subject else T_STRUCTURE
+    ceiling = T_CONTRADICTION_SAME_SUBJECT if same_subject else T_CONTRADICTION
+    if components["structural"] < floor or components["contradiction"] > ceiling:
         return "negative"
     # Corpus rarity is a claim about a corpus: without one (pairwise compare)
     # structure alone may not argue analogy, whatever the default value says.

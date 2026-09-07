@@ -182,58 +182,127 @@ def render_map_png(rich: Mapping[str, Any]) -> bytes:
 # Kinds of match, coloured the way the page colours them: the same subject in
 # the sage, another subject in the accent, not a resonance in grey.
 _SAGE = (0x3F, 0x75, 0x48)
+# One colour per polygon, so two thoughts are told apart even when the engine
+# gives them the same verdict. The page colours by series for the same reason;
+# the verdict is carried by the words in the legend, not by the ink.
+_SERIES = ((0x7A, 0x2E, 0x6B), (0x2E, 0x5A, 0x7A), (0x3F, 0x75, 0x48),
+           (0x8A, 0x5A, 0x2B), (0x6B, 0x3F, 0x2E), (0x4A, 0x4A, 0x7A),
+           (0x7A, 0x6B, 0x2E), (0x2E, 0x7A, 0x6B))
+
+
+# The engine's own dimensions, as radar axes -- the same seven, in the same
+# order, with the same two inversions as `demo/ui/main.mjs` PROFILE_AXES, so
+# that the picture in a chat and the picture on the page are one drawing.
+# "More" always means "closer": contradiction and sign conflict are inverted.
+PROFILE_AXES = (
+    ("structural", "structure", lambda s: s.get("structural")),
+    ("semantic", "meaning", lambda s: s.get("semantic")),
+    ("r_direct", "direct links", lambda s: s.get("r_direct")),
+    ("y_systematicity", "systematic", lambda s: s.get("y_systematicity")),
+    ("coverage_containment", "coverage", lambda s: s.get("coverage_containment")),
+    ("contradiction", "no contradiction", lambda s: 1 - _number(s.get("contradiction"))),
+    ("h_sign_conflict", "same direction", lambda s: 1 - _number(s.get("h_sign_conflict"))),
+)
+
+
+def _number(value: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _axis_value(scores: Mapping[str, Any], read) -> float:
+    try:
+        return _number(read(scores))
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
 
 
 def render_resonance_png(rich: Mapping[str, Any]) -> bytes:
-    """How closely each person found matches, drawn.
+    """The same radar the page draws, for a chat that can only show a picture.
 
-    Your thought is the centre. Each person is placed at a distance given by
-    the engine's structural score (the inner ring is a perfect match, the rim
-    is none) and coloured by the kind of match. Nothing is ranked here: every
-    number is one the engine returned, and the picture only places it.
+    Seven axes, the engine's own dimensions, in the page's order and with the
+    page's two inversions so that further out always means closer
+    (`demo/ui/main.mjs`, PROFILE_AXES). One polygon per match, drawn over each
+    other, exactly as the person sees on screen.
+
+    This used to be a different drawing entirely -- dots on concentric rings,
+    placed by the structural score alone. It told a different story from the
+    page for the same data, and it could not show WHY two people were close or
+    far, which is the whole point of showing the working. It also printed the
+    same pseudonym twice when one person had two matching thoughts, with no
+    way to tell which dot was which; each row now names the thought.
     """
     matches = [row for row in (rich.get("matches") or rich.get("matches_in_backend_order") or [])
                if (row.get("display") or {}).get("share_state", "discoverable") == "discoverable"
                and row.get("hard_rejection") is None]
-    width, height = 720, 460
+    width, height = 720, 470
     canvas = Canvas(width, height)
-    y = _heading(canvas, "how closely each person's reasoning matches yours",
-                 "centre: your thought · inner ring: perfect · rim: none")
-    cx, cy = 250, 60 + 180
-    radius_max, radius_min = 170, 22
-    for step in (1.0, 0.75, 0.5, 0.25):
-        r = int(radius_min + (radius_max - radius_min) * (1 - step))
-        _ring(canvas, cx, cy, r, (0xD8, 0xD2, 0xC6))
-        canvas.text(cx + 6, cy - r - 8, f"{step:.2f}", INK_3, 1)
-    canvas.disc(cx, cy, 6, INK)
-    canvas.text(cx - 44, cy + 12, "your thought", INK_2, 1)
-    import math
-    count = max(1, len(matches))
-    legend_y = 60
-    for index, row in enumerate(matches[:12]):
-        scores = row.get("scores") or {}
-        try:
-            structural = max(0.0, min(1.0, float(scores.get("structural", 0))))
-        except (TypeError, ValueError):
-            structural = 0.0
-        kind = str(row.get("mode_classification") or "")
-        colour = _SAGE if kind in ("direct", "approximate") else (INK_3 if kind == "negative" else ACCENT)
-        theta = -math.pi / 2 + 2 * math.pi * (index + 0.5) / count
-        r = radius_min + (radius_max - radius_min) * (1 - structural)
-        x, yy = int(cx + r * math.cos(theta)), int(cy + r * math.sin(theta))
-        canvas.line(cx, cy, x, yy, (0xC9, 0xC2, 0xB5), 1)
-        canvas.disc(x, yy, 6, colour)
-        # the list on the right says who each dot is, in the same order
-        canvas.disc(470, legend_y + 7, 5, colour)
-        canvas.text(482, legend_y, fit(f"{row.get('person_pseudonym', '')}  {structural:.2f}", 29), INK, 1)
-        canvas.text(482, legend_y + 15, fit(phrasing.classification(kind), 29), INK_2, 1)
-        legend_y += 34
-        if legend_y > height - 40:
-            break
+    y = _heading(canvas, "how each person measures on every axis",
+                 "further out is closer to you")
     if not matches:
         canvas.text(_MARGIN, y, "nobody has matched yet; the thought keeps looking", INK_2, 1)
-    return canvas.to_png()
+        return canvas.to_png()
 
+    import math
+    cx, cy, R = 248, 60 + 190, 150
+    n = len(PROFILE_AXES)
+
+    def point(index: int, value: float) -> tuple[int, int]:
+        angle = -math.pi / 2 + 2 * math.pi * index / n
+        r = R * max(0.0, min(1.0, value))
+        return int(cx + r * math.cos(angle)), int(cy + r * math.sin(angle))
+
+    # rings and their ticks, as on the page
+    for ring in (0.25, 0.5, 0.75, 1.0):
+        corners = [point(i, ring) for i in range(n)]
+        for i in range(n):
+            a, b = corners[i], corners[(i + 1) % n]
+            canvas.line(a[0], a[1], b[0], b[1], (0xD8, 0xD2, 0xC6), 1)
+        if ring < 1.0:
+            # on the upper-left diagonal, away from the vertical spoke a
+            # polygon edge runs along
+            tx, ty = point(0, ring)
+            canvas.text(tx - 34, ty - 4, f"{ring:.2f}", INK_3, 1)
+    for i in range(n):
+        edge = point(i, 1.0)
+        canvas.line(cx, cy, edge[0], edge[1], (0xE2, 0xDD, 0xD2), 1)
+        label = PROFILE_AXES[i][1]
+        lx, ly = point(i, 1.14)
+        if abs(lx - cx) < 14:                      # straight up or straight down
+            canvas.text(cx - 4 * len(label), ly - 4, label, INK_2, 1)
+        elif lx < cx:                              # left half: end the text at the spoke
+            canvas.text(max(4, lx - 8 * len(label)), ly - 4, label, INK_2, 1)
+        else:                                      # right half: start at the spoke
+            canvas.text(min(lx + 6, width - 8 * len(label) - 4), ly - 4, label, INK_2, 1)
+
+    legend_y = 58
+    for index, row in enumerate(matches[:8]):
+        scores = row.get("scores") or {}
+        kind = str(row.get("mode_classification") or "")
+        colour = _SERIES[index % len(_SERIES)]
+        values = [_axis_value(scores, read) for _key, _word, read in PROFILE_AXES]
+        corners = [point(i, v) for i, v in enumerate(values)]
+        for i in range(n):
+            a, b = corners[i], corners[(i + 1) % n]
+            canvas.line(a[0], a[1], b[0], b[1], colour, 2)
+        for a in corners:
+            canvas.disc(a[0], a[1], 3, colour)
+        # the list on the right says which thought each polygon is
+        topic = str((row.get("display") or {}).get("topic") or "").strip()
+        canvas.disc(470, legend_y + 7, 5, colour)
+        canvas.text(482, legend_y, fit(str(row.get("person_pseudonym") or ""), 29), INK, 1)
+        if topic:
+            canvas.text(482, legend_y + 14, fit(topic, 29), INK_2, 1)
+            canvas.text(482, legend_y + 28, fit(phrasing.classification(kind), 29), INK_3, 1)
+            legend_y += 46
+        else:
+            canvas.text(482, legend_y + 15, fit(phrasing.classification(kind), 29), INK_2, 1)
+            legend_y += 34
+        if legend_y > height - 46:
+            break
+    return canvas.to_png()
 
 def _ring(canvas: Canvas, cx: int, cy: int, r: int, colour) -> None:
     import math

@@ -1,6 +1,6 @@
 {
  "benchmark_version": "r0-v0.2",
- "build_seconds": 0.1768,
+ "build_seconds": 0.2194,
  "calibration": {
   "analogy_over_coincidence": 1.0,
   "analogy_over_generic_motif": 1.0,
@@ -12,7 +12,7 @@
     "hard_rejected": 0,
     "n": 4,
     "node_f1": 0.0,
-    "retrieved_at_20": 0,
+    "retrieved_at_20": 1,
     "retrieved_at_5": 0
    },
    "branch_continuation": {
@@ -129,8 +129,8 @@
     "hard_rejected": 2,
     "n": 4,
     "node_f1": 0.0,
-    "retrieved_at_20": 2,
-    "retrieved_at_5": 2
+    "retrieved_at_20": 3,
+    "retrieved_at_5": 3
    },
    "serialization_permutation": {
     "class_correct": 4,
@@ -180,7 +180,7 @@
  "engine": {
   "engine_version": "resonance-engine/0.2",
   "index_config_hash": "9fb9994bddb12f0b191f71fb38d4bdf521ae82934b17cb10214edd16c76d4f3e",
-  "verifier_config_hash": "e093d77f8cd987c8fbad663c7e8bca68e2e8025b659a1c500ea49792bba2c8f3"
+  "verifier_config_hash": "bb35ee07bd161fc2b936377f2d506739fbdf3efe854201544b22c2ab9b84bc40"
  },
  "fixture_files": {
   "graphs.jsonl": "0458b44f113951d8f0b46fe1e78541fb4fcc9669ca458e84c8262db95decbb42",
@@ -305,8 +305,8 @@
     "hard_rejected": 0,
     "n": 4,
     "node_f1": 0.0,
-    "retrieved_at_20": 0,
-    "retrieved_at_5": 0
+    "retrieved_at_20": 1,
+    "retrieved_at_5": 1
    },
    "same_vocabulary_wrong_structure": {
     "class_correct": 4,
@@ -314,8 +314,8 @@
     "hard_rejected": 1,
     "n": 4,
     "node_f1": 0.0,
-    "retrieved_at_20": 1,
-    "retrieved_at_5": 1
+    "retrieved_at_20": 2,
+    "retrieved_at_5": 2
    },
    "serialization_permutation": {
     "class_correct": 4,
@@ -404,7 +404,7 @@
   }
  },
  "overall_status": "pass",
- "query_latency_mean_seconds": 0.6726,
+ "query_latency_mean_seconds": 0.6928,
  "rows": [
   {
    "case_id": "S1-C01",
@@ -1012,7 +1012,7 @@
    "predicted_class": "negative",
    "predicted_relevant": false,
    "relevant": false,
-   "retrieval_rank": null,
+   "retrieval_rank": 10,
    "semantic": 0.3813,
    "skeleton": "S2",
    "split": "calibration",
@@ -1336,7 +1336,7 @@
    "predicted_class": "negative",
    "predicted_relevant": false,
    "relevant": false,
-   "retrieval_rank": 34,
+   "retrieval_rank": null,
    "semantic": 0.1986,
    "skeleton": "S3",
    "split": "calibration",
@@ -1570,7 +1570,7 @@
    "predicted_class": "negative",
    "predicted_relevant": false,
    "relevant": false,
-   "retrieval_rank": null,
+   "retrieval_rank": 4,
    "semantic": 0.2859,
    "skeleton": "S4",
    "split": "calibration",
@@ -2542,7 +2542,7 @@
    "predicted_class": "negative",
    "predicted_relevant": false,
    "relevant": false,
-   "retrieval_rank": null,
+   "retrieval_rank": 4,
    "semantic": 1.0,
    "skeleton": "S7",
    "split": "gate",
@@ -2614,7 +2614,7 @@
    "predicted_class": "negative",
    "predicted_relevant": false,
    "relevant": false,
-   "retrieval_rank": null,
+   "retrieval_rank": 5,
    "semantic": 1.0,
    "skeleton": "S7",
    "split": "gate",

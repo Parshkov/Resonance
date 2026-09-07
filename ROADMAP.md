@@ -49,6 +49,19 @@ concept channel. `ResonanceEngine._require_bound()` additionally re-hashes the
 whole corpus on every query. Not urgent at the current corpus size, and a wall
 at 10⁴.
 
+## 5. Multilingual prose extraction
+
+`src/extraction/cue.py` is English-only — not just its cue table, but its
+sentence splitting (it wants a capital Latin letter after the period), its
+clause boundaries, and its noun-phrase heuristics. A conversation in another
+language therefore yields an honest empty graph and the assistant must supply
+the structure itself.
+
+That is now a visible seam rather than a hidden one: the lexicon reads Latin
+and Cyrillic, the optional encoder reads every script, and the tool contract
+says the extractor is the English-only part. Closing it means a real extraction
+mission per language, with its own gate, not more regular expressions.
+
 ## Smaller, known
 
 - Make CI required in branch protection (a repository-settings action).
