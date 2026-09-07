@@ -72,6 +72,7 @@ service.
 - The second remote MCP server and its 15-tool vocabulary were removed; `src/remote/server.py` is a thin factory over the product server.
 - Persistent databases are no longer seeded with demo personas by default (`--seed-demo` / `RESONANCE_SEED_DEMO=1` opt in; `python3 -m src.persistence --db <DSN> purge-demo` cleans an already seeded production). Production has never been seeded: the one `purge-demo` run deleted 0 rows.
 - Acceptance scripts now revoke the guest thoughts they share, so a test run leaves the live corpus as it found it. Rows left by earlier runs are real `volunteer` records and are listed for owner deletion in the freeze evidence, not deleted by an agent.
+  - **Superseded 2026-09-06.** The owner asked for them to be removed, and they were: the whole live corpus was emptied with `RESONANCE_PURGE_CORPUS=1` — 8 thoughts, 6 standing-search alerts, 17 introductions, 16 channels, 18 messages, 1 shared topic. Accounts, sign-ins and OAuth registrations were kept, so nobody was signed out and no connected client had to re-authorize. **No backup was taken first, and one should have been** (`python3 -m src.persistence --db <DSN> export --out …`): the thoughts are tombstones and recoverable in principle, the conversations and the topic are not. The rule the line above states still holds — an agent removes live rows on the owner's instruction, never on its own reading of what is untidy.
 
 ## 2026-09-06 audit corrections
 

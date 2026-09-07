@@ -70,6 +70,16 @@ day; see `ROADMAP.md`. Discovery on an empty corpus answers normally and says
 "your thought stays in the search" — pinned by
 `tests/test_purge_corpus.py::TheFirstPersonInAnEmptyWorldTests`.
 
+**Both sign-in providers are live** as of 2026-09-06. Google was configured
+first; GitHub was added the same day and verified end to end short of the human
+step: `/auth/sign-in` offers both, `GET /auth/start/github` answers `302` to
+`https://github.com/login/oauth/authorize` with the exact registered callback
+(`https://resonance.parshkov.com/auth/callback/github`), scopes
+`read:user user:email` and a `state`, and GitHub returns its own sign-in page
+rather than `redirect_uri is not associated` or `incorrect_client_credentials`
+— which is how a misconfigured OAuth App fails. Completing the round trip still
+needs a human at the consent screen.
+
 ## Two ways to reach the public origin from an agent session
 
 1. **Egress-capable machine** (owner laptop, CI, or a Claude Code environment
