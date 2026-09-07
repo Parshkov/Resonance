@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Mapping
 
+
 Result = Mapping[str, Any]
 
 
@@ -184,6 +185,22 @@ def _mark_resonances_seen(r: Result) -> str:
     return "Marked as seen. Nothing was sent to anyone."
 
 
+# The engine's own bar for "these two are on the same subject". Copied rather
+# than imported: `src.scoring` pulls in the alignment package, and this module
+# is loaded while that package is still initialising. A test asserts the two
+# stay equal, so the words a person reads cannot drift from the verdict they
+# are told about.
+SAME_SUBJECT_MEANING = 0.40
+
+
+def _semantic_of(row: Mapping[str, Any]) -> float:
+    """Agreement about meaning, whatever the verdict was."""
+    try:
+        return max(0.0, min(1.0, float((row.get("scores") or {}).get("semantic", 0))))
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _discover(r: Result) -> str:
     rows = list(r.get("matches_in_backend_order") or [])
     people = [row for row in rows if not row.get("hard_rejection")
@@ -193,7 +210,41 @@ def _discover(r: Result) -> str:
     # needs it too, so they do not wonder where the rest went.
     aside = str(r.get("shape_note") or "").strip()
     if not people:
-        if rows:
+        # A verdict is this engine's opinion, not the truth about two people.
+        # Rows it called `negative` used to be dropped here entirely, so a
+        # person was told "nothing the engine calls a resonance" about someone
+        # who had independently built the same construction step for step
+        # (2026-09-06: semantic agreement 0.59, every idea corresponding, and
+        # the classifier said no). Hiding that is a judgement; the project's
+        # whole claim is to show evidence and let the person decide.
+        #
+        # So near misses are shown when the engine's OWN bar for "these two are
+        # on the same subject" is met -- `T_SAME_SUBJECT_SEMANTIC` -- and said
+        # plainly for what they are.
+        near = [row for row in rows if not row.get("hard_rejection")
+                and _semantic_of(row) >= SAME_SUBJECT_MEANING]
+        near.sort(key=_semantic_of, reverse=True)
+        if near:
+            lines = []
+            for index, row in enumerate(near[:5], start=1):
+                evidence = row.get("evidence") or {}
+                display = row.get("display") or {}
+                nodes = int(evidence.get("mapped_node_count") or 0)
+                links = int(evidence.get("preserved_relation_count") or 0)
+                conflicts = int(evidence.get("contradiction_count") or 0)
+                depth = (f"{_count(nodes, 'idea corresponds', 'ideas correspond')}, "
+                         f"{_count(links, 'link kept', 'links kept')}")
+                if conflicts:
+                    depth += f", {_count(conflicts, 'contradiction', 'contradictions')}"
+                lines.append(f"{index}. {row.get('person_pseudonym') or 'someone'} — "
+                             f"meaning {_round(_semantic_of(row))}: {depth}"
+                             + (f" (“{display.get('topic')}”)" if display.get("topic") else ""))
+            said = ("The engine did not call any of these a resonance, and it may be "
+                    "wrong. These people are talking about the same things as you, and "
+                    "what lines up is shown so the judgement can be yours: "
+                    + " ".join(lines) +
+                    " Ask for the working on any of them before deciding.")
+        elif rows:
             said = ("Nothing the engine calls a resonance. Some thoughts share a "
                     "skeleton with yours, but not enough meaning for it to say they "
                     "are the same reasoning — so nobody is being suggested to you.")

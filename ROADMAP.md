@@ -1,10 +1,42 @@
 # What's next
 
-The product is built and deployed. What follows is not more features — it is the
-work that can still prove the idea wrong. In rough order of how much it would
-change.
+## The thing that decides everything
 
-## 1. The embedding baseline
+**Seven shared thoughts exist in the world.** That is the entire live corpus.
+
+Everything below is secondary to that, and it is worth saying plainly because
+the project has spent most of its effort on the other side. The engine now has
+eighteen benchmark families, five verdicts, thirteen thresholds, four policy
+versions and seven ADRs. The corpus has seven thoughts. A matcher with nobody
+to match is not a product, however good the matching is — and the matching is
+now good enough: on 2026-09-06 it found a genuine cross-domain twin between two
+people who had never met.
+
+There is an irony worth naming. The thought that produced that match was about
+a registry of employer conduct, and its author had already reasoned out the
+binding constraint: *while there are few reports there is no signal, so start
+from those who already hold the data.* That is exactly Resonance's own
+constraint, and it has never been applied to Resonance.
+
+So the first question is not "is the engine right?" It is **"where do the first
+few hundred thoughts come from?"** Some honest options, none of them code:
+seed from a community that already writes down what it is working on; invite
+people around one narrow problem rather than in general; or accept that the
+standing search — "we will tell you when someone arrives" — is the whole
+product until the pool is large enough for search to return anything.
+
+Nothing below matters if that is not answered.
+
+## What a person actually gets, today
+
+Worth holding in view while reading the rest. A person shares a thought and,
+almost always, hears that nobody matched yet. That is honest, and it is thin.
+The parts that make it not-thin are the standing search and what is said when a
+near miss turns up — not another decimal place on the classifier.
+
+## Then: can the idea be falsified?
+
+### 1. The embedding baseline
 
 The one experiment this project set itself and never ran.
 [`WHY_NOT.md`](WHY_NOT.md) rejects whole-thought embeddings, and
@@ -22,7 +54,7 @@ If the baseline matches the engine, the structural machinery is not earning its
 complexity and that has to be said out loud. If it does not, this is the claim
 the project has never been entitled to make.
 
-## 2. Human review of the benchmark gold
+### 2. Human review of the benchmark gold
 
 Every gold label and every benchmark graph was authored by agents. Until a
 person has reviewed the 8 analogy families and the 8 template-coincidence
@@ -32,7 +64,7 @@ negatives, `classification_accuracy = 1.0` means "no regression", not
 [ADR-0005](docs/decisions/ADR-0005-same-vocabulary-cross-domain-verdict.md) is
 explicitly waiting on this and must not be settled by moving a threshold.
 
-## 3. Real thoughts
+### 3. Real thoughts
 
 Every graph measured so far is authored, not extracted from a real
 conversation — and
@@ -41,7 +73,7 @@ scoring 0.00–0.07 on real pairs, which is what the label encoder exists to fix
 A consented corpus of real extracted thoughts, with two-human gold, is the only
 thing that measures the product as used.
 
-## 4. Scale
+### 4. Scale
 
 Query time is linear from roughly 350 graphs upward — 148 ms at 176, 580 ms at
 1408 — which is the second condition ADR-0004 names for reconsidering the
@@ -49,7 +81,7 @@ concept channel. `ResonanceEngine._require_bound()` additionally re-hashes the
 whole corpus on every query. Not urgent at the current corpus size, and a wall
 at 10⁴.
 
-## 5. Multilingual prose extraction
+### 5. Multilingual prose extraction
 
 `src/extraction/cue.py` is English-only — not just its cue table, but its
 sentence splitting (it wants a capital Latin letter after the period), its
