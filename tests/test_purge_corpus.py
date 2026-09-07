@@ -90,6 +90,11 @@ class PurgeCorpusTests(unittest.TestCase):
             self.assertEqual(result["sessions_to_delete"], len(ids))
             self.assertEqual(result["connections_to_delete"]["intros"], 1)
             self.assertEqual(result["connections_to_delete"]["messages"], 1)
+            # The report says what the applied run WILL retract. It once said
+            # zero here whatever the store held, because it only ever counted
+            # while deleting -- so an operator read "no alerts" off a store
+            # with six in it.
+            self.assertEqual(result["alerts_to_retract"], 1)
             self.assertEqual(result["alerts_retracted"], 0)
 
             # nothing moved
@@ -123,6 +128,7 @@ class PurgeCorpusTests(unittest.TestCase):
                 runtime, {"RESONANCE_PURGE_CORPUS": "1"})
             self.assertFalse(result["dry_run"])
             self.assertEqual(result["sessions_to_delete"], len(ids))
+            self.assertEqual(result["alerts_to_retract"], 2)
             self.assertEqual(result["alerts_retracted"], 2)
             self.assertEqual(result["connections_deleted"]["intros"], 1)
 
