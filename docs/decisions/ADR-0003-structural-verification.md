@@ -138,7 +138,7 @@ polarity, assertion, direction, or modality differences reject the path match.
   tiny graphs, numpy RRWM ≠ pygmtools.
 
 Exact artifacts and head SHAs are recorded in
-[R0 Synthesis](../../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
+[R0 Synthesis](../../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
 
 ## Alternatives Considered
 
@@ -275,7 +275,7 @@ average away a polarity, reversal, or global-conflict failure.
 
 ## Related Research
 
-- [R0 Synthesis](../../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+- [R0 Synthesis](../../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
 - [Thought DNA v0.1](../THOUGHT_DNA_v0.1.md)
 - [Invariance Specification](../INVARIANCE_SPECIFICATION_v0.1.md)
 - [Benchmark v0.1](../../benchmark/R0_BENCHMARK_v0.1.md)

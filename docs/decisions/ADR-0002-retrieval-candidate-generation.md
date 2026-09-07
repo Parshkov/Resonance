@@ -111,7 +111,7 @@ Verification may ignore seeds and must independently adjudicate the mapping.
   so it validates mechanics but does not replace a Thought-DNA-native gate.
 
 Exact input artifacts and commit provenance are recorded in
-[R0 Synthesis](../../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
+[R0 Synthesis](../../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
 
 ## Alternatives Considered
 
@@ -231,7 +231,7 @@ and Recall@K.
 
 ## Related Research
 
-- [R0 Synthesis](../../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+- [R0 Synthesis](../../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
 - [Thought DNA v0.1](../THOUGHT_DNA_v0.1.md)
 - [Invariance Specification](../INVARIANCE_SPECIFICATION_v0.1.md)
 - [Benchmark v0.1](../../benchmark/R0_BENCHMARK_v0.1.md)

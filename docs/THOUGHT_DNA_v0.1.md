@@ -250,4 +250,4 @@ type; or repeated verifier failures caused by information absent from v0.1.
 - [Retrieval ADR](decisions/ADR-0002-retrieval-candidate-generation.md)
 - [Verification ADR](decisions/ADR-0003-structural-verification.md)
 - [Scoring Contract](RESONANCE_SCORING_v0.1.md)
-- [R0 Synthesis](../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)
+- [R0 Synthesis](../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md)

@@ -1,6 +1,6 @@
 # Source
 
-Core implementation begins only after `R0-SYNTHESIS` is explicitly **ACCEPTED**. See `work/queue.yaml` for the live dependency chain.
+The engine was built after its architecture decisions were accepted; those decisions are in [`../docs/decisions/`](../docs/decisions/).
 
 The Resonance engine must remain independently callable without MCP. MCP is a thin transport adapter and is hard-blocked until `R5-INTEGRATION` is ACCEPTED.
 
@@ -36,4 +36,4 @@ R2/R3/R4 should communicate only through the accepted public interfaces, not eac
 
 `src/extraction/` implements R2: cue-grounded extraction plus a manual non-LLM ingest path through the same Thought DNA validator.
 
-Mission-specific ownership and acceptance gates live under `engineering/missions/` and the linked GitHub Issues.
+The mission contracts each module was built against are kept as a record in [`../history/engineering/missions/`](../history/engineering/missions/); they are history, not instructions.

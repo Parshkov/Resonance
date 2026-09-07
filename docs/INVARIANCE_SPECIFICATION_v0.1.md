@@ -141,4 +141,4 @@ not by rewriting this specification.
 ## Related Research
 
 This specification reconciles R0-A through R0-H as documented in
-[R0 Synthesis](../research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).
+[R0 Synthesis](../history/research/reviews/R0_SYNTHESIS_parshkov-openai-gpt5-codex-s7d3.md).

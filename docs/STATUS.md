@@ -13,9 +13,9 @@ Updated: 2026-09-06 (audit corrections)
 | Extraction from prose | cue extractor v0.2, edge F1 0.94 on 22 prose cases | `src/extraction`, `benchmark/extraction-v0.2` |
 | Benchmark | v0.2: 8 skeletons × 4 domains × 18 families; S5–S8 gate split never used to fit thresholds, but see the caveat under "What is not validated" | `benchmark/r0-v0.2` |
 | Product (MCP, WebMCP, OAuth, persistence) | deployed; one vocabulary of 21 tools for the chat and the browser (`src/product/mcp_bridge.py`, `/api/product/tools`) | `src/product`, `ops/DEPLOY.md` |
-| Native browser WebMCP | demonstrated behind a flag: Chrome 152.0.7977.83 with `--enable-features=WebMCP`, Card A **24/24, `mode: NATIVE`** | `archive/hackathon/submission/evidence/public-origin-8670568/card-a-browser/` |
+| Native browser WebMCP | demonstrated behind a flag: Chrome 152.0.7977.83 with `--enable-features=WebMCP`, Card A **24/24, `mode: NATIVE`** | `history/hackathon/submission/evidence/public-origin-8670568/card-a-browser/` |
 | The page | six screens over one state store (`demo/ui/main.mjs`, `store.mjs`, `strings.mjs`); groups with discussion, parts and shared understanding | `demo/ui/README.md`, `tests/test_product_http.py` |
-| Release freeze | engine 0.2 freeze taken 2026-09-04 on `0aea577` (deployment `834818b1`) | `archive/hackathon/submission/RELEASE_MANIFEST.md` §0, `archive/hackathon/submission/evidence/public-origin-0aea577/` |
+| Release freeze | engine 0.2 freeze taken 2026-09-04 on `0aea577` (deployment `834818b1`) | `history/hackathon/submission/RELEASE_MANIFEST.md` §0, `history/hackathon/submission/evidence/public-origin-0aea577/` |
 
 ## Release state
 
@@ -25,7 +25,7 @@ unedited, and the full acceptance set ran directly against the public origin —
 the engine 0.2 identity and `demo_personas_present: false`, onboarding probe 9/9 required,
 OAuth smoke 27/27, the three-person A/B/C test over `/mcp` 36/36, Card A in a real browser
 16/18, Card B through a real Claude custom connector. Evidence and the two Card A
-non-passes are in `archive/hackathon/submission/evidence/public-origin-0aea577/SUMMARY.md`.
+non-passes are in `history/hackathon/submission/evidence/public-origin-0aea577/SUMMARY.md`.
 
 ## 2026-09-06 rework
 
@@ -230,6 +230,32 @@ production.
 The cost is deliberate: the suite now needs a database, which raises the bar
 for a contributor arriving with nothing. The alternative was to keep testing a
 store the product does not run.
+
+## Individual phase (2026-09-06)
+
+The group-development protocol is retired. Resonance was built by independently
+claiming agents coordinating through GitHub Issues; that phase is complete and
+the project is now maintained by one person with AI assistance.
+
+Removed, because they were live instructions addressed to nobody: the mission
+queue, the claim protocol and state machine, the current-milestone selection
+policy, the two continuous-execution playbooks, the agent bootstrap and
+manifest, the achievements and scoreboard schemes, `START_HERE.md`, and the
+coordination checklist in the pull-request template. `PROJECT_STRUCTURE.md` went
+too — the repository map now lives once, in the README.
+
+Kept, in [`history/`](../history/): the R0 research submissions and reviews, the
+logbook, the engineering mission contracts, the 35 agent registry profiles, the
+hackathon build record and its acceptance evidence, the coordination protocol
+itself, and the full mission queue. None of it is an instruction and some of it
+is contradicted by the current code, which `history/README.md` says plainly.
+
+`docs/decisions/` stays live: it is not history. ADR-0005 is still open, and
+ADR-0004 and ADR-0006 describe the engine running in production today.
+
+The README was rewritten from 880 lines to 249: what Resonance is, how the
+engine works, what is measured and what is not, how to run it, how to connect a
+client. The onboarding, claim, lease and achievement material is gone.
 
 ## Next falsification targets
 

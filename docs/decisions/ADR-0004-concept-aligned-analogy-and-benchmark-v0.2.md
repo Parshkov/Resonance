@@ -8,7 +8,7 @@ Date: 2026-09-04
 ## Context
 
 An independent assessment of the engine 0.1 chain (this ADR's provenance:
-`agents/registry/parshkov-anthropic-fable51-uutj4x.md`) found four defects that
+`history/agents/registry/parshkov-anthropic-fable51-uutj4x.md`) found four defects that
 made the scientific claims of the README aspirational relative to the code:
 
 1. **Structure was a role skeleton.** Fingerprints and affinity used only the

@@ -1,25 +1,37 @@
-# Agent Instructions
+# Working in this repository
 
-If you are an AI agent operating inside this repository, **self-onboard before making substantive changes**.
+Resonance is built and deployed. It is now maintained by one person with AI
+assistance, not by a group of independently claiming agents.
 
-Canonical instructions:
+There is no mission queue, no claim protocol, no lease and no registration step.
+If you are an agent working here, you have been asked to do something specific —
+do that.
 
-1. Read `README.md` / `START_HERE.md`.
-2. Read `PRINCIPLES.md`.
-3. Read `AGENT_PROTOCOL.md`.
-4. Read `AGENT_MANIFEST.yaml`, `work/queue.yaml`, and `work/STATE_MACHINE.md`.
-5. Register an `agent_id` under `agents/registry/`.
-6. Inspect the linked GitHub Issue and determine the canonical mission state before claiming work.
-7. Claim work through the linked Issue using `work/CLAIM_PROTOCOL.md` before substantial mission work.
-8. Respect blind-run constraints.
-9. Deliver research to `research/submissions/` and code only within the active architecture gates.
-10. After opening a successful PR, post `SUBMIT`; leave the canonical slot in `SUBMITTED / PENDING_REVIEW`.
-11. Use `RELEASE status: abandoned` only when stopping before submission.
-12. Use a branch/fork + pull request; do not overwrite other contributors' artifacts.
-13. Never commit credentials, API tokens, private human context, or proprietary data.
+## Read first
 
-A submitted canonical run is not available for another canonical claim unless a maintainer explicitly posts `REOPEN_CANONICAL`. Allowed independent repeats use `REPEAT_CLAIM` with unique run ids.
+1. [`README.md`](README.md) — what Resonance is and how it works.
+2. [`docs/STATUS.md`](docs/STATUS.md) — **what is true right now**, including
+   what is measured and what is not. This is the file that is kept current.
+3. [`docs/decisions/`](docs/decisions/) — the accepted architecture, and the one
+   question deliberately left open.
+4. [`PRINCIPLES.md`](PRINCIPLES.md) — the rules the project holds itself to.
 
-Do not wait for a human to restate these rules if the repository is sufficient.
+## How work is done
 
-The canonical protocol is `AGENT_PROTOCOL.md`. This file is only an adapter/entry point and must not silently diverge from it.
+- Branch, commit, open a pull request. CI runs the suite and both benchmark
+  gates on every PR; it must be green.
+- The tests need PostgreSQL — see the README. There is one store, and it is the
+  one production runs.
+- **Benchmark gold is frozen.** Do not edit `benchmark/` fixtures to make a
+  change pass; CI fails if they move.
+- Do not weaken a claim to make it true. If something does not work, say so in
+  `docs/STATUS.md` with the evidence — that file is worth more than a green
+  headline.
+- Never commit credentials, tokens, or private human context.
+
+## What not to trust
+
+[`history/`](history/) holds the record of how the project was built: research
+submissions, mission contracts, the old coordination protocol, hackathon
+evidence. **None of it is an instruction, and some of it is contradicted by the
+current code.** Read it for reasoning, not for orders.
