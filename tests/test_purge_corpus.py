@@ -175,6 +175,39 @@ class PurgeCorpusTests(unittest.TestCase):
             runtime.live.repo.close()
 
 
+class TheFirstPersonInAnEmptyWorldTests(unittest.TestCase):
+    """What the purge leaves behind is the state every deployment starts in,
+    and the one nobody had ever run: a corpus with nothing in it.
+
+    Emptying production would be a poor trade if the first person to arrive
+    afterwards hit an error, or was told something that reads as a failure.
+    """
+
+    def test_discovery_answers_on_an_empty_corpus_without_calling_it_a_failure(self):
+        from src.graph import ThoughtGraph
+        from src.persistence.seed import minimal_thought
+        from src.product import phrasing
+
+        runtime = _runtime()
+        try:
+            product_server.startup_purge_corpus(runtime, {"RESONANCE_PURGE_CORPUS": "1"})
+            self.assertEqual(runtime.live.session_kinds(), {})
+            # An index over nothing is still an index, and must not read stale.
+            self.assertTrue(runtime.live.health().index_current)
+
+            graph = ThoughtGraph.from_dict(minimal_thought("thought-first", "heat"))
+            for mode in ("analogical", "structural"):
+                result = runtime.live.discover(graph, mode=mode)
+                self.assertEqual(result.get("matches_in_backend_order") or [], [])
+                said = phrasing.say("resonance_discover", result)
+                # Not "no results": the thought stays in the standing search,
+                # and that is the whole answer a first arrival is owed.
+                self.assertIn("stays in the search", said)
+                self.assertNotIn("failure", said.lower())
+        finally:
+            runtime.live.repo.close()
+
+
 class PurgeSessionsRetractsBothSidesTests(unittest.TestCase):
     def test_deleting_a_thought_removes_the_alert_recorded_for_the_other_person(self):
         # `retract_for_session` reaches only the owner's own side. The alert
