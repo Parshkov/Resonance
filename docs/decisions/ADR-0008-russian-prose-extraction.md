@@ -87,6 +87,35 @@ rather than a Russian-only fault discovered again later.
   other language is still English-only, and the same four subsystems would
   need the same treatment.
 
+## Corrected the same day, by the owner reading his own card
+
+The card said **«что --causes--> ребёнок»** — a grammatical particle presented
+to a person as their own reasoning.
+
+Two mistakes met. The Russian table was written by walking the English one and
+translating, and `makes|made|make` became «делает|делают|сделал». That is a
+false friend: English "makes" is causal only in "makes X happen", while Russian
+«делает» is the ordinary verb "does". So «момент к тому, что делает ребёнок»
+("torque added to what the child does") was read as a causal claim. And nothing
+stopped a bare complementiser from becoming a node once a cue landed beside it
+— `PRONOUN_ONLY` marks a label *resolvable* to an antecedent, and when there is
+none the label survived.
+
+Fixed by dropping the false friend and by refusing to ground an argument made
+only of function words (`NEVER_A_NODE`, Cyrillic-only so English cannot reach
+it; the gate is still byte-identical). A wrong relation is worse than a missing
+one here: the entire promise is that what is shown is the person's own
+reasoning, so grammar rendered as a causal claim is the worst failure this
+extractor has.
+
+**Recall on that real document is poor and this ADR should not pretend
+otherwise.** A ~7300-character design document containing roughly fifteen
+explicit causal claims yielded three relations, one of which reads the opening
+pleasantry rather than the idea. The misses are ordinary Russian connectives
+not yet in the table («иначе», «помогает») and cross-sentence reference, which
+English does not do either. The next honest step is the Russian gold set named
+below, not more patterns added by eye.
+
 ## What would falsify this
 
 A Russian corpus where extraction quality is materially worse than English on

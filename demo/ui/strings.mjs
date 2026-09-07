@@ -90,6 +90,7 @@ const STRINGS = {
   "thoughts.composer.label": "What are you working on, and what is hard about it?",
   "thoughts.composer.placeholder": "Say what causes what, what prevents what, what requires what. For example: “A partial outage causes synchronized client retries. The retries cause request amplification. Jittered backoff prevents the amplification.”",
   "thoughts.composer.hint": "Your text is not kept. Only the structure it contains becomes visible, and you will see it before anyone else can.",
+  "thoughts.composer.too_long": "This is {over} characters over the 4000 this can read. Nothing is cut silently — shorten it, or share the part that carries the reasoning.",
   "thoughts.composer.extract": "Show what would be shared",
   "thoughts.composer.reading": "Reading the structure…",
   "thoughts.composer.preview": "This is all anyone will ever see",
