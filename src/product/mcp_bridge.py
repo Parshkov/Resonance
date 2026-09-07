@@ -848,10 +848,16 @@ class RemoteMCPBridge:
     """Stateless JSON-RPC handler; one instance per product runtime."""
 
     def __init__(self, product: Any, *, server_name: str = "resonance",
-                 server_version: str = "0.1.0") -> None:
+                 server_version: str = "0.1.0", origin: str = "") -> None:
         self.product = product
         self.server_name = server_name
         self.server_version = server_version
+        # Where this deployment lives, so an answer in a chat can point at the
+        # working on the page. A drawing cannot: it reaches the model in every
+        # client, but ChatGPT renders no image at all and claude.ai hides it
+        # behind an expander, so a picture is a bonus and never the carrier.
+        # A link is, and it lands on live data the person can act on.
+        self.origin = str(origin or "").rstrip("/")
 
     # -- JSON-RPC ----------------------------------------------------------
     def handle(self, message: Any, access_token: str) -> dict[str, Any] | None:
@@ -1253,7 +1259,23 @@ class RemoteMCPBridge:
             "next_step": "resonance_explain_match(result_id, session_id) for evidence; "
                          "resonance_request_intro only with the person's approval.",
         }
+        # The same view on the page, for a person who would rather look than
+        # read -- and the only reliable way to show the drawing at all.
+        if self.origin:
+            result["see_on_the_page"] = self._page_link(session_id)
+            for row in result["matches_in_backend_order"]:
+                if isinstance(row, dict) and row.get("session_id"):
+                    row["see_on_the_page"] = self._page_link(
+                        session_id, str(row["session_id"]))
         return ToolOutput(result, self._discovery_visuals(token, response))
+
+    def _page_link(self, mine: str, theirs: str = "") -> str:
+        """The person's own radar on the page, with one match selected."""
+        from urllib.parse import quote
+        link = f"{self.origin}/people?thought={quote(str(mine), safe='')}"
+        if theirs:
+            link += f"&select={quote(theirs, safe='')}"
+        return link
 
     def _discovery_visuals(self, token: str, response: Mapping[str, Any]) -> list[dict[str, Any]]:
         """The map, when there is anything on it to see.
