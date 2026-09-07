@@ -123,6 +123,7 @@ const STRINGS = {
   "thoughts.delete.confirm": "Delete this thought for good? It disappears from every search and from everyone it was shown to.",
   "thoughts.delete.yes": "Yes, delete",
   "thoughts.structure": "Structure",
+  "structure.alone": "On its own:",
   "thoughts.ideas": "{n} idea|{n} ideas",
   "thoughts.links": "{n} link|{n} links",
   "thoughts.field": "Field",

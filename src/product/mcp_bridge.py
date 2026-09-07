@@ -199,6 +199,29 @@ def _refuse_uncomparable_labels(labels: list[str]) -> None:
         "itself is unaffected.")
 
 
+def thought_fingerprint(thought_dna: Mapping[str, Any]) -> str:
+    """What this thought says, independent of when it was sent.
+
+    Over labels and relation ends rather than node ids, because an assistant
+    may supply ids one time and leave them to the index the next, and sorted,
+    because the order the nodes arrive in is not part of the reasoning.
+    """
+    nodes = list(thought_dna.get("nodes") or [])
+    label_of = {n.get("id"): n.get("label") for n in nodes}
+    payload = {
+        "nodes": sorted([str(n.get("label") or ""), str(n.get("role") or ""),
+                         str(n.get("assertion") or ""), str(n.get("modality") or "")]
+                        for n in nodes),
+        "relations": sorted([str(label_of.get(r.get("source"), r.get("source")) or ""),
+                             str(label_of.get(r.get("target"), r.get("target")) or ""),
+                             str(r.get("type") or ""), str(r.get("assertion") or ""),
+                             str(r.get("modality") or "")]
+                            for r in (thought_dna.get("relations") or [])),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False).encode()).hexdigest()
+
+
 def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str, Any]:
     """Turn `{nodes:[{label, role, id?}], relations:[{source, target, type}]}`
     into canonical manual-provenance Thought DNA.  `source`/`target` may name a
@@ -264,6 +287,12 @@ def build_thought_dna(thought: Mapping[str, Any], *, human_id: str) -> dict[str,
             "extract_conf": 1.0, "spans": [],
         })
     topic = str(thought.get("topic") or nodes[0]["label"]).strip()
+    # Unique per attempt, and deliberately so: `thought_id` is a durable
+    # reservation the store never rebinds, even after deletion (v0.1 tombstone
+    # policy, `persistence/service.create_session`). Deriving it from the
+    # content would dedupe -- and permanently bar a person from sharing again
+    # anything they had once deleted. Duplicates are a product question and
+    # are answered in `_refuse_a_live_duplicate`, against what is live now.
     thought_id = f"thought-mcp-{_slug(topic) or 'shared'}-{secrets.token_hex(4)}"
     return {
         "schema_version": SCHEMA_VERSION,
@@ -1011,6 +1040,42 @@ class RemoteMCPBridge:
     def _owned(self, token: str) -> list[dict[str, Any]]:
         return list(self.product.owned_sessions(token))
 
+    def _refuse_a_live_duplicate(self, token: str, candidate: Mapping[str, Any]) -> None:
+        """One thought, shared once.
+
+        Seen on production 2026-09-07: the same reasoning was prepared twice
+        four seconds apart and shared twice thirteen seconds apart. Both
+        landed, each raised its own standing-search alert against the same
+        person, and the page honestly showed the duplicate twice -- so the
+        corpus, the alerts and every count were wrong together.
+
+        Checked against what is LIVE, never against the whole history: a
+        `thought_id` is reserved forever once used, so matching on history
+        would bar someone from ever sharing again a thought they had deleted.
+        Sharing it again after withdrawing it is exactly what should work.
+        """
+        wanted = thought_fingerprint(candidate)
+        for row in self._owned(token):
+            # Live means "not gone": discoverable, or held privately. A
+            # withdrawn or deleted thought is exactly the one a person may
+            # want to share again.
+            if str(row.get("share_state") or "") in _WITHDRAWN:
+                continue
+            dna = row.get("thought_dna") or {}
+            if not dna or thought_fingerprint(dna) != wanted:
+                continue
+            name = str((row.get("presentation") or {}).get("topic") or "").strip()
+            where = f" (\u201c{name}\u201d)" if name else ""
+            state = ("already shared and still looking"
+                     if str(row.get("share_state") or "") in _SHARED
+                     else "already prepared and waiting for confirmation")
+            raise BridgeError(
+                "conflict",
+                f"this reasoning is {state}{where}, as {row.get('session_id')}. "
+                "Nothing was duplicated. Share a different thought, or change "
+                "this one and prepare it again; resonance_my_thoughts lists "
+                "what is already here.")
+
     def _default_session(self, token: str) -> str:
         # The same thought the page means by "your thought": the one most
         # recently made discoverable. See current_shared_session for why it
@@ -1115,6 +1180,7 @@ class RemoteMCPBridge:
                       intent=intent, **self._security())
         if thought is not None:
             candidate = build_thought_dna(thought, human_id=actor.user_id)
+            self._refuse_a_live_duplicate(token, candidate)
             prepared = self.product.prepare_structured(token, candidate, **common)
         else:
             # A per-prepare namespace keeps the extracted Thought DNA id unique
