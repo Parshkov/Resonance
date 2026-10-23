@@ -50,6 +50,7 @@ from typing import Any, Callable, Mapping
 
 PREFERENCE_KIND = "notify_pref"
 SENT_KIND = "notify_sent"
+UNSUBSCRIBE_TOKEN_KIND = "notify_unsubscribe_token"
 DAILY_LIMIT_SECONDS = 20 * 3600      # "once a day", forgiving of an early check
 
 SUBJECT = "Someone is here whose reasoning has the same shape as yours"
@@ -369,6 +370,30 @@ class Notifier:
         return (f"{self.origin}/notifications/stop"
                 f"?token={unsubscribe_token(user_id, self.secret)}")
 
+    def retain_unsubscribe_token(self, user_id: str) -> None:
+        """Keep an issued opt-out link usable without retaining its signing key.
+
+        The digest is an exact allowlist entry, not another signing key. A
+        retired key cannot create an accepted link for an unlisted account.
+        Let storage errors propagate so no unrecorded link is sent.
+        """
+        token = unsubscribe_token(user_id, self.secret)
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        self.repository.put_grant(
+            UNSUBSCRIBE_TOKEN_KIND, digest, {"user_id": user_id}, user_id=user_id)
+
+    def account_for_unsubscribe(self, token: str) -> str | None:
+        """Authenticate only an opt-out; never use this for login or sharing."""
+        if not isinstance(token, str) or not token or len(token) > 4096:
+            return None
+        current = account_in_token(token, self.secret)
+        if current is not None:
+            return current
+        digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        record = self._get(UNSUBSCRIBE_TOKEN_KIND, digest)
+        user_id = (record or {}).get("user_id")
+        return user_id if isinstance(user_id, str) and user_id else None
+
     # -- deciding -------------------------------------------------------
     def address_for(self, user_id: str) -> str | None:
         """A verified address this person signed in with, or nothing.
@@ -410,6 +435,7 @@ class Notifier:
         stop = self.unsubscribe_url(user_id)
         body = _body(self.origin, stop)
         try:
+            self.retain_unsubscribe_token(user_id)
             if not self.sender.send(address, SUBJECT, body, stop):
                 return "transport_declined"
         except Exception as exc:  # noqa: BLE001 - a share must never fail on mail

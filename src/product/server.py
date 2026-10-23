@@ -59,8 +59,7 @@ from src.collaboration import CollaborationError
 from src.workspaces import WorkspaceError
 from src.security.models import ConfirmationRequired as PolicyConfirmationRequired
 from src.product import authorship as authorship_rule
-from src.product.notify import (Notifier, NoTransport, account_in_token,
-                                self_test)
+from src.product.notify import Notifier, NoTransport, self_test
 from src.product.service import LiveProductService, ProductError, StaleResultError
 from src.product.standing import ALERT_KIND
 from src.product.mcp_bridge import (
@@ -1096,12 +1095,12 @@ class ProductHandler(BaseHTTPRequestHandler):
             # Deliberately reachable without signing in. "To stop these
             # emails, log in first" is the sentence nobody follows; the
             # alternative they choose is marking us as spam, and then nobody
-            # here is ever reachable again. The token is an HMAC over the
-            # account, so it stops that account's mail and can do nothing else
+            # here is ever reachable again. A current HMAC or an exact retained
+            # opt-out link stops that account's mail and can do nothing else
             # -- it opens no session, reads no thought, and names no one.
             token = (params.get("token") or [""])[0]
             notifier = getattr(self.runtime.product, "notifier", None)
-            who = (account_in_token(token, notifier.secret)
+            who = (notifier.account_for_unsubscribe(token)
                    if notifier is not None else None)
             stopped = who is not None
             if stopped:

@@ -15,6 +15,7 @@ in.
 from __future__ import annotations
 
 import sys
+import hashlib
 import unittest
 from pathlib import Path
 
@@ -74,6 +75,46 @@ class WhatAnEmailSaysTests(unittest.TestCase):
             token, {"draft_id": draft["draft_id"], "confirm": True,
                     "confirmation_token": draft["confirmation_token"],
                     "request_id": tag + "-2"})
+
+    def test_rotation_preserves_only_retained_old_unsubscribe_links(self):
+        user = self.signed_in("rotation", "rotation@example.test")
+        old_secret = self.notifier.secret
+        old_token = notify.unsubscribe_token(user.user_id, old_secret)
+        self.notifier.retain_unsubscribe_token(user.user_id)
+        self.notifier.secret = b"replacement-signing-key-for-test-32-bytes"
+
+        self.assertIsNone(notify.account_in_token(old_token, self.notifier.secret))
+        self.assertEqual(self.notifier.account_for_unsubscribe(old_token), user.user_id)
+        self.assertIsNone(self.notifier.account_for_unsubscribe(
+            notify.unsubscribe_token("unlisted-account", old_secret)))
+        self.assertIsNone(self.notifier.account_for_unsubscribe(old_token + "x"))
+        self.assertIsNone(self.notifier.account_for_unsubscribe("x" * 4097))
+        new_token = notify.unsubscribe_token(user.user_id, self.notifier.secret)
+        self.assertEqual(self.notifier.account_for_unsubscribe(new_token), user.user_id)
+
+        digest = hashlib.sha256(old_token.encode()).hexdigest()
+        retained = self.notifier.repository.get_grant(notify.UNSUBSCRIBE_TOKEN_KIND, digest)
+        self.assertEqual(dict(retained), {"user_id": user.user_id})
+        self.assertNotIn(old_token, repr(retained))
+
+    def test_notification_retains_its_link_before_key_rotation(self):
+        user = self.signed_in("issued", "issued@example.test")
+        self.assertEqual(self.notifier.tell(user.user_id), "sent")
+        old_token = self.sender.sent[-1]["unsubscribe"].split("?token=", 1)[1]
+        self.notifier.secret = b"replacement-signing-key-for-test-32-bytes"
+        self.assertEqual(self.notifier.account_for_unsubscribe(old_token), user.user_id)
+
+    def test_link_retention_failure_prevents_sending_unrecoverable_link(self):
+        user = self.signed_in("store-down", "store-down@example.test")
+        original = self.notifier.repository.put_grant
+        def unavailable(*args, **kwargs):
+            raise RuntimeError("store unavailable")
+        self.notifier.repository.put_grant = unavailable
+        try:
+            self.assertEqual(self.notifier.tell(user.user_id), "send_failed")
+            self.assertEqual(self.sender.sent, [])
+        finally:
+            self.notifier.repository.put_grant = original
 
     def test_someone_who_left_is_actually_told(self):
         waiting = self.signed_in("s1", "waiting@example.test")
