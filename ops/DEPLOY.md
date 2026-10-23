@@ -7,6 +7,30 @@ dependency is the PostgreSQL driver (`psycopg[binary]`), installed by the
 
 ## What the process needs
 
+### Rotating the confirmation signing secret
+
+The confirmation secret also signs email opt-out links. Deploy the current
+notification implementation before replacing it: every attempted notification
+now records the SHA-256 digest of its opt-out token in `oauth_grants` under
+`notify_unsubscribe_token`. The record permits only that exact opt-out link;
+it grants no sign-in, read, or sharing authority and stores neither the token
+nor its signing key.
+
+For a deployment that sent mail before this compatibility path existed, retain
+the old tokens for the distinct account keys in `notify_sent` while the old
+secret is still installed. Use `Notifier.retain_unsubscribe_token(user_id)`
+against the existing repository, stop on any storage error, and verify all
+entries before changing the environment. The deployed mail sender retains any
+links issued during this transition too. Then replace
+`RESONANCE_CONFIRMATION_SECRET`, redeploy, and verify both new tokens and the
+exact retained old links. A token made with the retired secret for an unlisted
+account must fail. Never keep an old-secret validation fallback.
+
+Previously prepared thoughts remain in their owner-scoped durable sessions.
+Reopen their previews to obtain confirmation tokens under the new key before
+sharing; a token from an old open preview is deliberately rejected. Rotation
+does not publish, delete, or change consent on any thought.
+
 | setting | how it is passed | notes |
 | --- | --- | --- |
 | database | `--db <DSN>` | a `postgresql://…` DSN. Resonance runs on PostgreSQL only; `:ephemeral:` makes a throwaway schema on the development/test server (local development and tests) |
